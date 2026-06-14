@@ -75,6 +75,9 @@ You can append the `--debug` flag when launching the server to see live bandwidt
 > diff (`experiments/test_e2e.js`). Generate the test clips with
 > `experiments/make_test_clips.sh`. (A fuller mutation-test + Autobahn
 
+**LAN / Network Streaming:**
+To stream the video on your local network (Wi-Fi), use the `--host` flag:
+> python stream_server.py video.mp4 --host 0.0.0.0
 
 ## 📦 Installation
 
