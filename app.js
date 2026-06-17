@@ -2946,6 +2946,11 @@ button:hover{background:#202a35}
         );
         const transitionSeconds = preset.transitionSeconds ?? this.params.transitionSeconds;
         target.transitionSeconds = this.params.transitionSeconds;
+        const targetChanged = Object.keys(target).some((key) => target[key] !== this.params[key]);
+        if (preset.id === this.activePresetId && !targetChanged) {
+            this._renderPresets();
+            return;
+        }
         try {
             await this._transitionTo(target, transitionSeconds);
             if (!preset.readonly) {
