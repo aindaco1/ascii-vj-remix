@@ -341,6 +341,9 @@ async function resolveAutomaticPreviousReleaseTag(currentVersion) {
       'tagName'
     ], { timeout: timeoutMs }).stdout);
   } catch (error) {
+    if (process.env.CI) {
+      throw new Error(`could not resolve previous release automatically: ${error.message}`);
+    }
     console.log(`Could not resolve previous release automatically: ${error.message}`);
     return null;
   }
