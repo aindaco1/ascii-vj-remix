@@ -251,3 +251,43 @@ jobs:
           fi
 
           gh release upload "$RELEASE_TAG" "${ASSETS[@]}" --clobber
+
+  install-and-updater-smoke:
+    name: ${{ matrix.os }} install and updater smoke
+    needs: publish-github-release
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Linux smoke prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            dbus-x11 \
+            libfuse2 \
+            xvfb
+
+      - name: Download published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ env.RELEASE_TAG }}" --dir release-smoke --clobber
+
+      - name: Install release and verify updater hop
+        run: node scripts/smoke_tauri_release_install.mjs --assets-dir release-smoke --release-tag "${{ env.RELEASE_TAG }}"

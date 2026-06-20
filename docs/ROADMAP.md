@@ -519,10 +519,11 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
 ### Cross-Platform Distribution
 
 - macOS:
-  - Apple Silicon and Intel builds.
+  - Apple Silicon release builds.
   - include camera, microphone, and screen-capture usage descriptions before testing media capture in packaged builds.
-  - ad-hoc self-sign local/release bundles by default; add Developer ID signing/notarization before broad public testing.
-  - automate Developer ID certificate import, hardened-runtime signing, notarization submission, staple, and `spctl` validation once Apple credentials are available.
+  - ad-hoc self-sign local/release bundles by default.
+  - Developer ID signing/notarization is deferred until the app identity and distribution plan are ready for broader macOS testing.
+  - when resumed, automate Developer ID certificate import, hardened-runtime signing, notarization submission, staple, and `spctl` validation once Apple credentials are available.
   - validate fullscreen output-window behavior on secondary displays.
 - Windows:
   - WebView2/runtime assumptions documented; prefer a bundled/fixed runtime strategy if the app must install and run without network.
@@ -569,14 +570,14 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
    - Add GitHub Actions matrix builds for macOS, Windows, and Linux.
    - Add smoke tests for static mode and app launch.
    - Add signing/notarization/release steps once app identity is stable.
-   - Status: in progress. The desktop workflow installs Node 24 and Rust, verifies the offline frontend bundle, checks the Tauri local-only security policy, runs the output-display simulation, verifies updater manifest generation, and runs a Tauri debug no-bundle build on macOS, Windows, and Linux. The release workflow now builds pinned LGPL FFmpeg/ffprobe sidecars from official source before the release gate, then requires the offline bundle, Tauri policy, output-display simulation, updater manifest test, current-platform reviewed FFmpeg sidecar, and Rust tests before release bundling. Release builds generate signed updater artifacts, self-sign macOS bundles ad-hoc, collect publishable assets, merge platform updater fragments into `latest.json`, and publish installers/updater metadata to GitHub Releases. Developer ID notarization and installer smoke tests remain pending. See `docs/TAURI_RELEASES.md`.
+   - Status: in progress. The desktop workflow installs Node 24 and Rust, verifies the offline frontend bundle, checks the Tauri local-only security policy, runs the output-display simulation, verifies updater manifest generation, and runs a Tauri debug no-bundle build on macOS, Windows, and Linux. The release workflow now builds pinned LGPL FFmpeg/ffprobe sidecars from official source before the release gate, then requires the offline bundle, Tauri policy, output-display simulation, updater manifest test, current-platform reviewed FFmpeg sidecar, and Rust tests before release bundling. Release builds generate signed updater artifacts, self-sign macOS bundles ad-hoc, collect publishable assets, merge platform updater fragments into `latest.json`, and publish installers/updater metadata to GitHub Releases. Post-publish release smoke jobs download the public GitHub Release on real Windows and Linux runners, install the MSI/deb artifacts, verify bundled FFmpeg/ffprobe resources, run a bounded packaged-app launch, and force an updater-hop check/download through the Tauri updater plugin against the signed `latest.json` package. See `docs/TAURI_RELEASES.md`.
 
 7. **macOS Developer ID Notarization**
    - Add GitHub secrets and workflow steps for Developer ID certificate import.
    - Switch macOS release builds from ad-hoc signing to Developer ID signing when notarization secrets are present.
    - Submit release artifacts to Apple notarization, wait for completion, staple the result, and verify with `spctl -a -vv`.
    - Keep ad-hoc signing as the local/default fallback when Apple credentials are absent.
-   - Status: initial conditional workflow path is in place. Current macOS builds are codesign-valid with ad-hoc signing by default. If `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, and App Store Connect or Apple ID notarization secrets are present, the release workflow imports the Developer ID Application certificate into a temporary keychain, switches to `src-tauri/tauri.notarized.conf.json`, lets Tauri sign/notarize/staple the macOS bundle, and runs a Developer ID plus Gatekeeper validation step against the generated artifacts.
+   - Status: deferred. The initial conditional workflow path and helper scripts are already in place, but this work is intentionally paused until Developer ID credentials and a broader macOS distribution plan are ready. Current macOS builds remain codesign-valid with ad-hoc signing by default. If `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, and App Store Connect or Apple ID notarization secrets are present later, the release workflow can import the Developer ID Application certificate into a temporary keychain, switch to `src-tauri/tauri.notarized.conf.json`, let Tauri sign/notarize/staple the macOS bundle, and run a Developer ID plus Gatekeeper validation step against the generated artifacts.
 
 Reference docs used for the initial plan:
 

@@ -35,7 +35,7 @@ Ad-hoc signing is not Apple notarization. A GitHub-downloaded app can still show
 
 ## Developer ID Notarization Track
 
-Developer ID signing and notarization should be added before broad macOS distribution. This is separate from the current ad-hoc signing path.
+Developer ID signing and notarization is deferred until the app identity and public macOS distribution plan are ready. This is separate from the current ad-hoc signing path, which remains the default.
 
 Required inputs:
 
@@ -99,6 +99,7 @@ Release publishing is handled by `.github/workflows/release-desktop.yml`.
 1. Tag a release, or run the workflow manually with a tag.
 2. Each platform runs the release gates, builds a Tauri bundle, verifies the bundle, collects publishable assets, and writes an updater fragment.
 3. The publish job downloads all platform assets, merges the updater fragments into `latest.json`, creates or updates the GitHub Release, and uploads the installers, updater packages, signatures, and `latest.json`.
+4. Windows and Linux post-publish smoke jobs download the public GitHub Release, install the MSI/deb artifact on fresh hosted runners, verify bundled FFmpeg/ffprobe resources, run a bounded packaged-app launch, and force a Tauri updater check/download against the published signed updater package.
 
 The app is configured to check:
 
@@ -129,3 +130,15 @@ TAURI_SIGNING_PRIVATE_KEY="$(cat /private/tmp/asciline-remix-updater.key)" TAURI
 `npm run check:release` also runs updater-manifest validation, but it intentionally requires a reviewed standalone FFmpeg sidecar for the current platform. The GitHub release workflow satisfies that gate by running `npm run ffmpeg:build-sidecar` before `check:release`; it builds from the pinned official FFmpeg 8.1.2 source tarball, verifies the source SHA-256, disables FFmpeg network protocols, and stages LGPL-compatible FFmpeg/ffprobe binaries as local Tauri resources.
 
 Runtime builds remain offline. The release workflow may download official source during CI, but the packaged app includes the built sidecars and never downloads FFmpeg, codecs, or renderer assets at runtime.
+
+## Release Smoke Tests
+
+The release workflow runs `scripts/smoke_tauri_release_install.mjs` after publishing. It intentionally downloads artifacts from GitHub Releases instead of reusing local build directories, so it catches missing assets, bad `latest.json` URLs, installer layout problems, and broken signed updater downloads.
+
+The app has CI-only smoke hooks that are inert unless these environment variables are set:
+
+- `ASCILINE_DESKTOP_SMOKE=launch`: exits after a short bounded launch and writes a report.
+- `ASCILINE_UPDATER_SMOKE=download`: invokes the real Tauri updater plugin, checks `latest.json`, downloads the selected signed updater package, verifies its signature, writes a report, and exits.
+- `ASCILINE_UPDATER_SMOKE_FORCE_FROM_VERSION`: records the forced older-version hop used by CI. The current smoke job uses this to verify the release can hop from an older version to the just-published version without waiting for another real historical release.
+
+The updater smoke does not perform an in-process self-replacement in CI. Windows and Linux package replacement still runs through the platform installers during the install smoke. Full app-driven self-replacement can be added later once there is a smoke-capable previous release to install and compare against.

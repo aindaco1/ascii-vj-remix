@@ -1,3 +1,4 @@
+pub mod ci_smoke;
 pub mod desktop_bridge;
 pub mod media_engine;
 
@@ -9,6 +10,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            ci_smoke::maybe_spawn(app);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             desktop_bridge::select_media_file,
             desktop_bridge::list_media_files,

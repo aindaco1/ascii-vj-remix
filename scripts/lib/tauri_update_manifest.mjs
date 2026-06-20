@@ -110,6 +110,23 @@ function artifactScore(filePath) {
   return 100;
 }
 
+function installerForArtifactName(artifactName) {
+  const name = String(artifactName || '').toLowerCase();
+  if (name.endsWith('.app.tar.gz')) return 'app';
+  if (name.endsWith('.appimage.tar.gz') || name.endsWith('.appimage')) return 'appimage';
+  if (name.endsWith('.msi.zip') || name.endsWith('.msi')) return 'msi';
+  if (name.endsWith('.nsis.zip') || name.endsWith('-setup.exe') || name.endsWith('.exe')) return 'nsis';
+  if (name.endsWith('.deb')) return 'deb';
+  if (name.endsWith('.rpm')) return 'rpm';
+  return '';
+}
+
+function inferInstallerPlatform({ explicitPlatform, artifactName, env = process.env } = {}) {
+  const base = inferPlatform({ explicitPlatform, artifactName, env });
+  const installer = installerForArtifactName(artifactName);
+  return installer ? `${base}-${installer}` : base;
+}
+
 function normalizeSignature(raw) {
   const text = String(raw || '').trim();
   if (!text) throw new Error('empty updater signature');
@@ -191,15 +208,29 @@ async function createUpdateFragment({
   const finalVersion = version || await readTauriVersion(root);
   const baseUrl = (assetBaseUrl || gitHubReleaseBaseUrl(repo, tag)).replace(/\/+$/, '');
   const grouped = new Map();
+  const platforms = {};
+  const selectedArtifacts = [];
 
   for (const pair of pairs) {
     const key = inferPlatform({ explicitPlatform: platform, artifactName: pair.artifactName });
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(pair);
+
+    const installerKey = inferInstallerPlatform({ explicitPlatform: platform, artifactName: pair.artifactName });
+    if (installerKey !== key) {
+      if (platforms[installerKey]) throw new Error(`duplicate updater platform in artifacts: ${installerKey}`);
+      platforms[installerKey] = {
+        signature: pair.signature,
+        url: `${baseUrl}/${encodeURIComponent(pair.artifactName)}`
+      };
+      selectedArtifacts.push({
+        platform: installerKey,
+        artifact: pair.artifactName,
+        ignoredAlternates: []
+      });
+    }
   }
 
-  const platforms = {};
-  const selectedArtifacts = [];
   for (const [key, candidates] of grouped) {
     candidates.sort((a, b) => artifactScore(a.artifactPath) - artifactScore(b.artifactPath) || a.artifactName.localeCompare(b.artifactName));
     const selected = candidates[0];
@@ -273,7 +304,9 @@ async function mergeUpdateFragments({ fragmentsDir, outFile, version, notes, pub
 export {
   collectReleaseAssets,
   createUpdateFragment,
+  inferInstallerPlatform,
   inferPlatform,
+  installerForArtifactName,
   isReleaseAsset,
   mergeUpdateFragments,
   normalizeSignature,
