@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-store">
     <title>ASCILINE Remix Renderer Lab</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css?v=20260618-camera-source">
+    <link rel="stylesheet" href="style.css?v=20260619-audio-reactive">
 </head>
 
 <body>
@@ -43,6 +43,8 @@
             </div>
 
             <div class="topbar-status">
+                <button id="check-update" class="update-status-button" type="button" hidden>Update</button>
+                <span id="update-status" class="update-status-text" hidden></span>
                 <span id="backend-status">Backend: idle</span>
                 <span id="connection-status">Disconnected</span>
             </div>
@@ -57,6 +59,12 @@
                     </div>
                     <div class="preview-toolbar-right">
                         <button id="popout-window" type="button">Pop Out</button>
+                        <label class="field compact output-display-field">
+                            <span>Output</span>
+                            <select id="output-display">
+                                <option value="auto">Auto</option>
+                            </select>
+                        </label>
                         <button id="wtf-randomize" type="button" aria-pressed="false">WTF</button>
                         <div class="meter-strip">
                             <span id="fps-meter">FPS 0/24</span>
@@ -91,7 +99,7 @@
                     </div>
                     <div class="source-actions">
                         <button id="add-custom-file" type="button">Add Custom File</button>
-                        <input id="local-media-file" class="visually-hidden" type="file" accept="video/*,image/*" tabindex="-1" aria-hidden="true">
+                        <input id="local-media-file" class="visually-hidden" type="file" accept=".mp4,.webm,.jpg,.jpeg,.png,.gif,.svg,video/mp4,video/webm,image/jpeg,image/png,image/gif,image/svg+xml" tabindex="-1" aria-hidden="true">
                     </div>
                 </section>
 
@@ -115,13 +123,44 @@
                     </div>
                 </section>
 
+                <section class="panel audio-panel">
+                    <div class="panel-heading">
+                        <h2>Audio Reactivity</h2>
+                        <button id="audio-reactive-toggle" type="button" aria-pressed="false">Start</button>
+                    </div>
+                    <div class="audio-reactive-body">
+                        <div class="audio-reactive-top">
+                            <label class="field compact">
+                                <span>Source</span>
+                                <select id="audio-reactive-source"></select>
+                            </label>
+                            <label class="field compact">
+                                <span>Preset</span>
+                                <select id="audio-reactive-preset"></select>
+                            </label>
+                        </div>
+                        <div class="audio-reactive-actions">
+                            <button id="audio-reactive-pick-file" type="button">Audio File</button>
+                            <span id="audio-reactive-status">Idle</span>
+                            <input id="audio-reactive-file" class="visually-hidden" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" tabindex="-1" aria-hidden="true">
+                        </div>
+                        <div id="audio-reactive-meters" class="audio-reactive-meters" aria-label="Audio meters">
+                            <span data-meter="rms">RMS</span>
+                            <span data-meter="bass">Bass</span>
+                            <span data-meter="mid">Mid</span>
+                            <span data-meter="treble">Treble</span>
+                        </div>
+                        <div id="audio-reactive-controls" class="audio-reactive-controls"></div>
+                    </div>
+                </section>
+
                 <form id="controls" class="controls"></form>
             </aside>
         </main>
     </div>
 
     <script src="codec.js?v=20260617-live-renderer-crossfade"></script>
-    <script type="module" src="app.js?v=20260618-camera-source"></script>
+    <script type="module" src="app.js?v=20260619-audio-reactive-dual-analyser"></script>
 </body>
 
 </html>

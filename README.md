@@ -36,7 +36,7 @@
 
 ### Renderer Lab Fork
 
-This fork also includes a browser-only renderer lab that vendors the `ascii-point-and-click` GPU renderer. It can render built-in demo media, user-selected local files, and a local webcam/camera source through WebGPU first, then WebGL2 or Canvas fallbacks. Local files and camera frames stay in the browser; they are not uploaded to the Python server.
+This fork also includes a browser-only renderer lab that vendors the `ascii-point-and-click` GPU renderer. It can render built-in demo media, user-selected local files, and one or more local cameras through WebGPU first, then WebGL2 or Canvas fallbacks. Multi-camera input is composited locally with Canvas2D and exposed to the renderer as a normal local media stream. Local files and camera frames stay in the browser; they are not uploaded to the Python server or fetched through online services.
 
 For static browser-only testing, serve the repo over localhost and open the page:
 
@@ -44,7 +44,91 @@ For static browser-only testing, serve the repo over localhost and open the page
 python3 -m http.server 8010 --bind 127.0.0.1
 ```
 
-Open `http://127.0.0.1:8010/`. The renderer autostarts with Demo Video 1. Select **Camera** in the Source panel to request webcam access; camera support requires `localhost` or another secure browser context and explicit browser permission.
+Open `http://127.0.0.1:8010/`. The renderer autostarts with Demo Video 1. Select **Camera** in the Source panel to request webcam access; camera support requires `localhost` or another secure browser context and explicit browser permission. After permission is granted, select multiple camera devices in the Camera panel to build a local camera mix with grid, split, stack, or PiP layouts.
+
+The browser/Tauri path is local-only at runtime. TIFF files are intentionally disabled until a decoder is vendored into the app; no CDN decoder is loaded.
+
+The renderer lab also includes an **Audio Reactivity** panel. It can analyze a local audio file, a microphone/input stream, or browser-supported display/tab audio through Web Audio and modulate live visual renderer params without changing saved presets or uploading audio. Browser display audio is permission-gated and platform/browser-dependent; on Chromium/macOS, sharing a browser tab with audio is the reliable path, while app/window capture often provides no audio track. Future Tauri builds should provide native local-file and system-loopback providers behind the same adapter boundary.
+
+### Frontend and Tauri development
+
+The renderer lab now has a minimal Vite build so the same vanilla HTML/CSS/ESM app can run in a browser or be packaged by Tauri.
+
+```bash
+npm install
+npm run dev         # Vite dev server on http://127.0.0.1:8010/
+npm run build       # static production build in dist/
+npm run preview     # preview the production build
+npm run check:offline
+npm run check:desktop
+npm run check:release
+npm run check:bundle:debug
+npm run smoke:static
+```
+
+Tauri v2 scaffolding lives in `src-tauri/`. The desktop shell is intentionally thin: it loads the built renderer lab and keeps browser local-file/camera/audio behavior intact until the native source and output-window adapters are added.
+
+```bash
+npm run tauri:dev
+npm run tauri:build
+```
+
+Tauri commands require the Rust toolchain (`cargo`) in addition to Node 24+. The app config points Tauri dev mode at Vite on `http://127.0.0.1:1420` and production builds at `dist/`.
+If `rustup` has installed Rust but `cargo` is not on the shell `PATH`, the npm Tauri scripts will prepend the active Rustup toolchain automatically.
+
+The packaged desktop app must be standalone at runtime. Renderer code, demo media, fonts, GPU assets, decoders, native adapters, and future sidecars should be bundled with the app. Online access is reserved for the explicit Tauri updater path hosted by GitHub Releases. Use the offline bundle check before packaging:
+
+```bash
+npm run check:offline
+```
+
+Use `npm run check:desktop` before desktop changes. It rebuilds the offline frontend bundle, checks the Tauri local-only security policy, verifies updater metadata generation, and verifies the Tauri shell with a debug no-bundle build. Use `npm run bundle:debug` when you need a local debug `.app`/DMG package.
+Use `npm run check:release` before claiming a standalone desktop release. It runs the offline/Tauri/output-display/updater/Rust gates and requires a reviewed FFmpeg sidecar for the current platform. `npm run bundle:release` runs those release gates before building release-mode desktop bundles.
+Use `npm run check:bundle:debug` or `npm run check:bundle:release` after a Tauri bundle build to verify the platform bundle exists and includes required desktop metadata/resources. On macOS this checks the `.app` executable, icon, privacy usage strings, FFmpeg resource README, staged FFmpeg manifest/NOTICE files when sidecars are present, and codesign validity.
+`npm run test:output-display` runs a deterministic secondary-display simulation for the native output selector and browser pop-out fallback. It covers auto-external placement, explicit display selection, stale preference fallback, and single-display fallback without requiring a real second monitor in CI.
+
+Tauri updater infrastructure is configured for GitHub Releases. Release builds create signed updater artifacts, the release workflow merges platform fragments into `latest.json`, and `plugins.updater.endpoints` points at the latest GitHub release metadata. The private updater signing key must live in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; see `docs/TAURI_RELEASES.md`.
+On macOS workspaces stored under iCloud Drive, Tauri build output is redirected to `/private/tmp/asciline-remix-tauri-target` so `.app` signing is not broken by iCloud extended attributes. Non-iCloud and CI builds keep the normal `src-tauri/target` output unless `ASCILINE_TAURI_TARGET_DIR` or `CARGO_TARGET_DIR` is set.
+
+The desktop build now includes the Tauri dialog plugin for custom media selection. Files selected through the native dialog are exposed to the webview through Tauri's local asset protocol for the current app session. The app stores the display metadata, not a durable broad filesystem grant; after restart, reselect the file if the Source panel shows **Needs access**.
+
+The packaged Tauri app uses a production Content Security Policy that blocks arbitrary remote HTTP(S) connections, keeps the asset protocol scope empty by default, and relies on Rust to grant session-local access to user-selected media. Development mode has a separate localhost-only CSP for Vite and local stream testing.
+Tauri capabilities are split by window: the main renderer lab can open media files and create/place the output window, while the output window can only listen for render-state events, close itself, and toggle fullscreen.
+
+macOS bundles merge `src-tauri/Info.plist`, which declares camera, microphone, and screen-capture usage strings for the local camera mixer and audio-reactive inputs. Platform-specific system audio loopback providers are still future native-adapter work.
+macOS bundles are ad-hoc self-signed by default with `bundle.macOS.signingIdentity: "-"`. This makes the `.app` codesign-valid, but it is not Apple Developer ID notarization; downloaded public releases may still need Gatekeeper approval until Developer ID signing/notarization is added.
+
+The **Pop Out** command uses a native Tauri output window in desktop builds when the active source is a static video or image. The toolbar **Output** selector chooses the target display when Tauri can enumerate monitors, and defaults to an external display when one is available. That output window runs its own local renderer from synced params, can enter fullscreen independently, and restores its last fullscreen state. Browser builds, stream mode, and camera mode continue to use the existing browser pop-out fallback.
+
+Stream packaging is being ported through the Rust/FFmpeg media engine rather than bundling Python by default. Browser builds and external-server stream mode still work unchanged, while Tauri stream mode can use registered local media sessions backed by the native pipeline.
+
+The initial Rust media-engine prototype owns the FFmpeg process boundary and can probe/decode a local video into RGB frames, then prepare the decoded frames as stream-compatible ASCII color and pixel framebuffers:
+
+```bash
+npm run media:decode-preview -- media/point-click-test.mp4 96 54 2
+npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 false
+```
+
+Development commands use `ASCILINE_FFMPEG` and `ASCILINE_FFPROBE` when set, then `ffmpeg` and `ffprobe` from `PATH`. Packaged Tauri builds should include reviewed binaries under `src-tauri/resources/ffmpeg/`; the desktop bridge prefers those bundled resources before falling back to `PATH`, so production stream mode does not require a runtime download or system package manager install.
+The shared Rust implementation lives behind `media_engine::pipeline`; the desktop bridge calls that module only for selected, registered media sources rather than exposing broad arbitrary-path media commands.
+
+Release CI builds FFmpeg sidecars from the pinned official FFmpeg 8.1.2 source tarball, verifies the source SHA-256, disables network protocols, keeps the build LGPL-compatible, and stages the resulting `ffmpeg`/`ffprobe` binaries before packaging:
+
+```bash
+npm run ffmpeg:build-sidecar
+npm run check:ffmpeg-release
+```
+
+To stage other reviewed FFmpeg binaries into the packaged-resource layout, provide explicit local binary paths and release provenance:
+
+```bash
+npm run ffmpeg:stage -- --ffmpeg /path/to/ffmpeg --ffprobe /path/to/ffprobe --license LGPL-2.1-or-later --source "reviewed reproducible build notes"
+npm run check:ffmpeg-resources
+npm run check:ffmpeg-release
+```
+
+`ffmpeg:stage` copies the binaries into `src-tauri/resources/ffmpeg/{platform}/bin/`, records versions and SHA-256 hashes in `manifest.json`, and writes a `NOTICE.md`. `check:desktop` validates staged sidecars when present; `check:ffmpeg-release` requires the current platform sidecar before claiming standalone stream packaging. Generated sidecar binaries and manifests are intentionally ignored by Git; release runners recreate them.
+On macOS, `check:ffmpeg-resources` also rejects staged binaries that still link to absolute Homebrew/MacPorts-style library paths such as `/opt/homebrew` or `/usr/local`. Use a self-contained build with bundled-relative dylib references or a static build, and make the license choice explicit. The default Homebrew FFmpeg formula is commonly GPL-enabled and dynamically linked, so it is useful for development but should not be treated as a reviewed standalone app sidecar without a deliberate license/distribution review.
 
 ## 🗜️ Adaptive Frame Codec (opt-in, backward compatible)
 
@@ -81,11 +165,12 @@ cases a further ~15–30% at imperceptible quality. Default is `lossless`
 **Monitor Bandwidth in Real-Time:**
 You can append the `--debug` flag when launching the server to see live bandwidth comparisons (RAW vs WIRE bytes) and the exact compression ratio in your terminal. This is highly useful for measuring the real-time savings of the adaptive codec on your specific video sources.
 
-> Verified two independent ways, both **bit-exact**: Python-encoded vectors
-> decoded by `codec.js` in Node (`experiments/gen_vectors.py` →
-> `experiments/check_vectors.js`), and a live `adaptive`-vs-`legacy` WebSocket
-> diff (`experiments/test_e2e.js`). Generate the test clips with
-> `experiments/make_test_clips.sh`. (A fuller mutation-test + Autobahn
+> Verified through generated vectors and live comparison: Python-encoded vectors
+> decode bit-exactly through the shipped browser decoder (`experiments/gen_vectors.py`
+> -> `experiments/check_vectors.js`) and the Rust decoder
+> (`npm run test:vectors` after vectors exist), and the live
+> `adaptive`-vs-`legacy` WebSocket diff remains in `experiments/test_e2e.js`.
+> Generate the test clips with `experiments/make_test_clips.sh`.
 
 **LAN / Network Streaming:**
 To stream the video on your local network (Wi-Fi), use the `--host` flag:
@@ -135,6 +220,22 @@ Run the codec/vector suite through the same container:
 
 ```bash
 scripts/podman_codec_tests.sh
+```
+
+After vectors have been generated, the host-side Rust decoder can validate the
+same fixtures:
+
+```bash
+npm run test:vectors
+```
+
+Rust frame-prep parity against the Python/OpenCV stream behavior can be checked
+through the Podman-backed reference harness:
+
+```bash
+npm run test:frame-prep
+npm run test:decode-resize
+npm run check:media
 ```
 
 The image defaults to Node 24 LTS. To smoke-test against the current even-numbered release, rebuild with:

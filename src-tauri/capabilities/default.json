@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-renderer-lab",
+  "description": "Capability set for the main renderer lab control window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-emit-to",
+    "core:event:allow-listen",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-available-monitors",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-show",
+    "dialog:allow-open",
+    "process:allow-restart",
+    "updater:default"
+  ]
+}

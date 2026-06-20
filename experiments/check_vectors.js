@@ -5,9 +5,16 @@
  * This exercises the real cross-language risk surface: zlib (Python) ->
  * DecompressionStream (JS), little-endian delta indices, and delta patching.
  */
-const fs = require('fs');
-const path = require('path');
-const codec = require('../codec.js');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadShippedCodec } from './load_codec.mjs';
+
+const codec = loadShippedCodec();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const vectorRoot = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(__dirname, 'vectors');
 
 function readChunks(buf) {
   const out = [];
@@ -19,8 +26,8 @@ function readChunks(buf) {
   return out;
 }
 
-async function checkDir(name) {
-  const dir = path.join(__dirname, 'vectors', name);
+async function checkDir(dir) {
+  const name = path.basename(dir);
   const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json')));
   const msgs = readChunks(fs.readFileSync(path.join(dir, 'adaptive.bin')));
   const truth = readChunks(fs.readFileSync(path.join(dir, 'truth.bin')));
@@ -46,7 +53,13 @@ async function checkDir(name) {
 }
 
 (async () => {
-  const names = fs.readdirSync(path.join(__dirname, 'vectors'));
+  const names = fs.readdirSync(vectorRoot)
+    .map((name) => path.join(vectorRoot, name))
+    .filter((dir) => fs.statSync(dir).isDirectory() && fs.existsSync(path.join(dir, 'meta.json')))
+    .sort();
+  if (names.length === 0) {
+    throw new Error(`${vectorRoot} does not contain vector fixtures. Run experiments/gen_vectors.py first.`);
+  }
   console.log('Decoding with codec.js, comparing to ground truth:\n');
   let allPass = true;
   for (const n of names) allPass = (await checkDir(n)) && allPass;

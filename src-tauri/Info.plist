@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>ASCILINE Remix uses cameras you select to render local live video in the renderer lab.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>ASCILINE Remix uses microphones or audio inputs you select to drive local audio-reactive visuals.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>ASCILINE Remix can capture display or window audio/video when you explicitly select display capture for local audio-reactive testing.</string>
+</dict>
+</plist>

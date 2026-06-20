@@ -1,0 +1,246 @@
+name: Release Desktop Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag to create or update
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      ASCILINE_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      ASCILINE_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+          - ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux Tauri prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            curl \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libfuse2 \
+            nasm \
+            xz-utils \
+            yasm
+
+      - name: Install macOS FFmpeg build prerequisites
+        if: runner.os == 'macOS'
+        run: brew install nasm
+
+      - name: Install Windows FFmpeg build prerequisites
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            base-devel
+            diffutils
+            curl
+            tar
+            xz
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-nasm
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-yasm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build FFmpeg sidecar
+        if: runner.os != 'Windows'
+        shell: bash
+        run: npm run ffmpeg:build-sidecar
+
+      - name: Build FFmpeg sidecar
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          ASCILINE_FFMPEG_BUILD_DIR: /tmp/asciline-ffmpeg
+        run: npm run ffmpeg:build-sidecar
+
+      - name: Verify release gates
+        run: npm run check:release
+
+      - name: Verify updater signing secret
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY GitHub secret is required for signed updater artifacts."
+            exit 1
+          fi
+
+      - name: Select macOS signing mode
+        id: macos_signing
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -z "$ASCILINE_APPLE_CERTIFICATE" ]; then
+            echo "notarize=false" >> "$GITHUB_OUTPUT"
+            echo "Using ad-hoc macOS signing."
+            exit 0
+          fi
+
+          if [ -z "$ASCILINE_APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo "APPLE_CERTIFICATE_PASSWORD is required when APPLE_CERTIFICATE is set."
+            exit 1
+          fi
+
+          if [ -z "$KEYCHAIN_PASSWORD" ]; then
+            echo "KEYCHAIN_PASSWORD is required when APPLE_CERTIFICATE is set."
+            exit 1
+          fi
+
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            if [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ]; then
+              echo "APPLE_API_KEY and APPLE_API_ISSUER are required with APPLE_API_KEY_P8."
+              exit 1
+            fi
+            api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            printf '%s' "$APPLE_API_KEY_P8" > "$api_key_path"
+            chmod 600 "$api_key_path"
+            echo "APPLE_API_KEY_PATH=$api_key_path" >> "$GITHUB_ENV"
+          elif [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "Notarization requires either APPLE_API_KEY/APPLE_API_ISSUER/APPLE_API_KEY_P8 or APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID."
+            exit 1
+          fi
+
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          keychain_path="$RUNNER_TEMP/asciline-release.keychain-db"
+          printf '%s' "$ASCILINE_APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -t 3600 -u "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" -P "$ASCILINE_APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          cert_info="$(security find-identity -v -p codesigning "$keychain_path" | grep "Developer ID Application" | head -1 || true)"
+          cert_id="$(echo "$cert_info" | awk -F'"' '{print $2}')"
+          if [ -z "$cert_id" ]; then
+            echo "No Developer ID Application identity was found in the imported certificate."
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$cert_id" >> "$GITHUB_ENV"
+
+          echo "notarize=true" >> "$GITHUB_OUTPUT"
+          echo "Using Developer ID signing and notarization for macOS."
+
+      - name: Build notarized macOS bundle
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.notarize == 'true'
+        run: npm run tauri:build -- --config src-tauri/tauri.notarized.conf.json
+
+      - name: Build self-signed desktop bundle
+        if: runner.os != 'macOS' || steps.macos_signing.outputs.notarize != 'true'
+        run: npm run tauri:build
+
+      - name: Verify desktop bundle contents
+        run: npm run check:bundle:release
+
+      - name: Verify macOS notarization
+        if: runner.os == 'macOS' && steps.macos_signing.outputs.notarize == 'true'
+        run: npm run check:macos-notarization
+
+      - name: Collect release assets
+        run: node scripts/collect_tauri_release_assets.mjs --profile release
+
+      - name: Create updater fragment
+        run: node scripts/create_tauri_update_fragment.mjs --profile release --repo "${{ github.repository }}" --tag "${{ env.RELEASE_TAG }}" --out "src-tauri/target/release/release-assets/updater-fragment-${{ runner.os }}-${{ runner.arch }}.json"
+
+      - name: Upload desktop release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: asciline-remix-${{ runner.os }}-${{ runner.arch }}
+          path: src-tauri/target/release/release-assets/*
+          if-no-files-found: error
+
+  publish-github-release:
+    name: Publish GitHub Release
+    needs: bundle
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Download platform assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Merge updater metadata
+        run: node scripts/merge_tauri_update_fragments.mjs --fragments-dir release-artifacts --out release-artifacts/latest.json
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --title "ASCILINE Remix $RELEASE_TAG" --notes "ASCILINE Remix desktop release $RELEASE_TAG"
+          fi
+
+          mapfile -d '' ASSETS < <(find release-artifacts -type f \
+            ! -name 'updater-fragment-*.json' \
+            ! -name '.DS_Store' \
+            -print0)
+
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "No release assets found."
+            exit 1
+          fi
+
+          gh release upload "$RELEASE_TAG" "${ASSETS[@]}" --clobber

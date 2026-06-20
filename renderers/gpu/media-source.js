@@ -1,8 +1,6 @@
 /**
  * Media Source - Unified abstraction for video and image sources
  * Normalizes different media types for the ASCII rendering pipeline.
- *
- * Supports TIFF decoding via UTIF.js (loaded from CDN on demand).
  */
 
 const MEDIA_EXTENSIONS = {
@@ -31,34 +29,10 @@ function isTiff(url) {
 }
 
 /**
- * Load UTIF.js from CDN on demand (only when a TIFF is encountered)
- */
-let utifPromise = null;
-function loadUTIF() {
-    if (utifPromise) return utifPromise;
-    utifPromise = new Promise((resolve, reject) => {
-        if (window.UTIF) { resolve(window.UTIF); return; }
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js';
-        script.onload = () => {
-            if (window.UTIF) {
-                console.log('[MediaSource] UTIF.js loaded for TIFF decoding');
-                resolve(window.UTIF);
-            } else {
-                reject(new Error('UTIF.js loaded but UTIF global not found'));
-            }
-        };
-        script.onerror = () => reject(new Error('Failed to load UTIF.js from CDN'));
-        document.head.appendChild(script);
-    });
-    return utifPromise;
-}
-
-/**
  * Load a media source (video or image) and return a normalized interface
  * @param {string} url - URL of the media file
  * @param {Object} options - Options
- * @param {string} options.type - Force media type ('video', 'image', or 'camera'), auto-detected if omitted
+ * @param {string} options.type - Force media type ('video', 'image', 'camera', or 'camera-mix'), auto-detected if omitted
  * @param {boolean} options.loop - Loop video (default: true)
  * @param {boolean} options.muted - Mute video (default: true)
  * @returns {Promise<MediaSource>} Resolved media source
@@ -66,8 +40,8 @@ function loadUTIF() {
 async function loadMediaSource(url, options = {}) {
     const type = options.type || detectMediaType(url);
 
-    if (type === 'camera') {
-        return loadCameraSource(options.stream, options);
+    if (type === 'camera' || type === 'camera-mix') {
+        return loadCameraSource(options.stream, { ...options, sourceType: type });
     } else if (type === 'video') {
         return loadVideoSource(url, options);
     } else {
@@ -141,8 +115,10 @@ async function loadCameraSource(stream, options = {}) {
     const width = video.videoWidth || settings.width || 640;
     const height = video.videoHeight || settings.height || 480;
 
+    const sourceType = options.sourceType || 'camera';
+
     return {
-        type: 'camera',
+        type: sourceType,
         element: video,
         canvas: null,
         width,
@@ -151,6 +127,7 @@ async function loadCameraSource(stream, options = {}) {
         isVideo: true,
         isImage: false,
         isCamera: true,
+        isCameraMix: sourceType === 'camera-mix',
         stream,
 
         play() { return video.play(); },
@@ -241,7 +218,7 @@ async function loadVideoSource(url, options = {}) {
 }
 
 async function loadImageSource(url, options = {}) {
-    // TIFF files need special decoding — browsers can't load them via <img>
+    // TIFF files need a vendored decoder for local-only browser/Tauri builds.
     if (isTiff(url)) {
         return loadTiffSource(url);
     }
@@ -265,36 +242,8 @@ async function loadImageSource(url, options = {}) {
     return makeImageResult(img, canvas, img.naturalWidth, img.naturalHeight);
 }
 
-/**
- * Load a TIFF file by fetching raw bytes and decoding with UTIF.js
- */
 async function loadTiffSource(url) {
-    const [UTIF, response] = await Promise.all([
-        loadUTIF(),
-        fetch(url)
-    ]);
-
-    const buffer = await response.arrayBuffer();
-    const ifds = UTIF.decode(buffer);
-    if (ifds.length === 0) throw new Error(`TIFF decode failed: no images in ${url}`);
-
-    UTIF.decodeImage(buffer, ifds[0]);
-    const rgba = UTIF.toRGBA8(ifds[0]);
-    const width = ifds[0].width;
-    const height = ifds[0].height;
-
-    // Draw decoded pixels to canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(width, height);
-    imageData.data.set(new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength));
-    ctx.putImageData(imageData, 0, 0);
-
-    console.log(`[MediaSource] TIFF decoded: ${width}x${height} from ${url}`);
-
-    return makeImageResult(null, canvas, width, height);
+    throw new Error(`TIFF decoding is disabled until a local decoder is vendored: ${url}`);
 }
 
 function makeImageResult(img, canvas, width, height) {

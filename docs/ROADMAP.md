@@ -21,6 +21,8 @@ The project is not adopting the `ascii-point-and-click` game UI. This fork shoul
 - The rendered output should be able to pop out into its own fullscreen-capable window for use on another display.
 - The renderer should start automatically on load with a usable static source when no stream is available.
 - The `ascii-point-and-click` renderer and assets should be copied into this repository as source files.
+- Browser and Tauri builds should stay local-only at runtime: no CDN decoders, online canvas dependencies, or remote media-provider dependencies in the static path.
+- Audio-reactive rendering should be local-only: browser builds use Web Audio against local files, microphone/input streams, or user-selected display audio; Tauri builds should hide platform audio capture behind a desktop adapter.
 
 ## Architecture
 
@@ -32,10 +34,11 @@ The project is not adopting the `ascii-point-and-click` game UI. This fork shoul
    - Client receives decoded frames and hands them to the active renderer backend.
 
 2. **Static Mode**
-   - Source: browser-native media (`video`, `image`, local `camera`, or canvas-backed TIFF decode).
+   - Source: browser-native media (`video`, `image`, local camera, or local multi-camera mix).
    - No Python server required.
    - Uses the copied `ascii-point-and-click` media source and GPU sampling architecture.
    - Can be served by any static HTTP server.
+   - Multi-camera input is composited locally through Canvas2D and exposed to the renderers as a single local `MediaStream`.
 
 ### Renderer Interface
 
@@ -101,18 +104,20 @@ Use the `ascii-point-and-click` renderer defaults:
   - stream/static
   - built-in demo video/image selection
   - custom local video/image file picker with Present, Missing, or Needs access status
-  - local camera selection with permission/status state
+  - local camera device selection/mixing with permission/status state
   - active source name/status
   - loop
   - muted
   - volume
 
 - **Camera**
-  - device
+  - device multi-select
   - facing mode
   - capture resolution
   - capture FPS
-  - mirror preview
+  - mixer layout
+  - tile framing
+  - local mixer mirror
 
 - **Backend**
   - auto
@@ -166,6 +171,16 @@ Use the `ascii-point-and-click` renderer defaults:
   - frame timing
   - wire/raw bandwidth
   - backend capability status
+
+- **Audio Reactivity**
+  - local audio file selection
+  - microphone/input stream
+  - browser display/tab audio when available
+  - audio-reactive preset
+  - sensitivity
+  - smoothing
+  - beat, bass, mid, and treble influence amounts
+  - live RMS/bass/mid/treble meters
 
 - **Output Display**
   - pop-out window
@@ -251,6 +266,42 @@ The server should distinguish between:
 
 - **soft changes**, which can apply immediately to timing/codec parameters.
 - **reinit changes**, which require a new `INIT` message and decoder/frame-buffer rebuild while preserving the WebSocket connection.
+
+## Audio-Reactive Rendering
+
+Audio reactivity is an ephemeral modulation layer over the canonical renderer parameters. The saved `params` object remains the source of truth for controls, presets, persistence, source selection, and renderer rebuild decisions. Audio analysis produces `effectiveParams` each animation frame, and renderers consume those effective params for live visual output.
+
+### Browser Sources
+
+- **Audio file:** selected through a local file picker and played through Web Audio. The file remains local and is never uploaded.
+- **Mic / input:** captured with `getUserMedia({ audio: true })`; echo cancellation, noise suppression, and automatic gain are disabled by default so analysis receives a cleaner signal.
+- **Display audio:** captured with `getDisplayMedia()` when the browser and OS expose a display, window, or tab audio track. This is permission-gated and browser-dependent; Chromium on macOS is most reliable when sharing a browser tab with audio enabled, while app/window capture often omits audio.
+
+### Analysis Model
+
+- Use one `AudioContext` with an `AnalyserNode` and local source node.
+- Extract RMS, bass, mid, treble, spectral flux, beat pulse, and a phase clock.
+- Keep analysis low-latency: use an interactive audio context, a short transient analyser for RMS/beat/flux, a higher-resolution spectral analyser for bass/mid/treble, and fast-attack/controlled-release smoothing so rising beats affect renderer params quickly without making releases visually chaotic.
+- Keep beat detection simple and deterministic initially: short rolling RMS history, flux confirmation, and cooldown.
+
+### Modulation Semantics
+
+- Audio frames must not mutate or persist `params`.
+- Audio frames should only modulate live-safe visual controls by default: brightness, contrast, saturation, gamma, background blend, jitter amount/speed, and sample offsets.
+- Structural controls such as backend, source, media URL, grid allocation, camera devices, and shader-program switches remain manual/preset-driven because changing them per beat would cause rebuild churn.
+- Manual sliders and preset transitions continue to move the base `params`; audio modulation is recomputed on top of the current base state.
+- Stream mode keeps WebSocket control messages tied to base params. Audio changes affect client-side rendering without spamming structural stream controls.
+
+### Tauri Direction
+
+- Keep browser Web Audio providers behind a small audio-source adapter.
+- Add Tauri providers later for local audio files selected via dialog and platform-specific loopback/system audio capture.
+- Prefer bundling any required native sidecar or Rust audio capture implementation with the app; do not add online audio dependencies.
+- Treat system audio capture as platform-specific:
+  - macOS may require ScreenCaptureKit or user-approved audio capture paths.
+  - Windows can use WASAPI loopback.
+  - Linux may depend on PipeWire/PulseAudio availability.
+- Keep modulation output as renderer params so the visual renderer does not care whether the features came from Web Audio or a Tauri-native provider.
 
 ## Presets
 
@@ -422,11 +473,18 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
 - Use Tauri v2.
 - Keep the frontend framework minimal. The current vanilla HTML/CSS/ESM app can be migrated to Vite without adopting React/Svelte/etc.
 - Add a real frontend build step so Tauri packages built assets instead of depending on a dev static server.
+- Treat standalone offline operation as a release blocker:
+  - no CDN imports, remote decoders, remote fonts, analytics, telemetry, hosted media, or provider SDKs in the packaged runtime.
+  - bundle renderer code, demo media, fonts, GPU assets, and any future native capture/stream sidecars with the app.
+  - keep network behavior limited to the explicit GitHub Releases updater path and invoke it only through a deliberate app update flow.
+  - run an offline bundle check against `dist/` before packaging.
+- Keep packaged Tauri runtime policy local-only: production CSP must block arbitrary remote HTTP(S), Tauri capabilities must not grant remote origins command access, and the asset protocol scope should stay empty except for Rust-owned session-local selected media grants.
 - Treat the Python/FastAPI stream server as optional:
   - **Default desktop app:** static browser-only renderer, custom local files, presets, pop-out/fullscreen output.
   - **Advanced/dev stream mode:** connect to an external server or launch a bundled sidecar.
   - **Long-term native stream path:** port the server-side media preparation path to Rust/FFmpeg or a standalone sidecar binary so end users do not need Python.
 - Bundle built-in demo videos, images, fonts, and renderer assets as Tauri resources.
+- Bundle reviewed FFmpeg/ffprobe binaries under `src-tauri/resources/ffmpeg/{os}-{arch}/bin/`; desktop stream commands should prefer env overrides for dev/CI, packaged resources for release, and `PATH` only as a development fallback. Use the staging/check scripts so each packaged binary carries version, SHA-256, license, source, and NOTICE metadata. Release validation must reject sidecars that are not actually standalone, including macOS binaries with absolute Homebrew/MacPorts-style dylib dependencies. The default release workflow now builds sidecars from the pinned official FFmpeg 8.1.2 source tarball with LGPL-compatible, network-disabled flags before packaging.
 
 ### File and Media Access
 
@@ -435,7 +493,9 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
   - use Tauri dialog APIs to choose files and folders.
   - use filesystem/path APIs only through explicit capabilities.
   - convert selected filesystem paths into webview-loadable media URLs using Tauri's asset protocol.
+- Register selected desktop media with a Rust-owned session registry before native stream commands can read it; stream/probe commands should accept only registry ids, not arbitrary paths.
 - Keep media path handling behind a small source-provider interface so browser `File`/`blob:` and Tauri filesystem paths are interchangeable from the renderer's perspective.
+- Add an audio-source adapter with the same boundary: browser `File`/`MediaStream` sources now, Tauri filesystem/system-loopback sources later.
 
 ### Windowing and External Displays
 
@@ -450,19 +510,22 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
   - dialog open-file/open-folder.
   - read access only to explicitly selected media paths.
   - app config/preset storage.
-  - optional process capability only when sidecar stream mode is enabled.
+  - process restart capability only for installing signed updater packages.
+- Split Tauri window capabilities so the output window cannot open dialogs, create more webviews, enumerate displays, or reposition other windows.
 - Keep `withGlobalTauri` disabled unless a specific API requires it.
 - Avoid broad home-directory read permissions.
-- Set CSP deliberately once asset protocol/media needs are known.
+- Set CSP deliberately once asset protocol/media needs are known. **Initial production/dev CSPs are in place and checked by `npm run check:tauri-policy`.**
 
 ### Cross-Platform Distribution
 
 - macOS:
   - Apple Silicon and Intel builds.
-  - signing/notarization before broad testing.
+  - include camera, microphone, and screen-capture usage descriptions before testing media capture in packaged builds.
+  - ad-hoc self-sign local/release bundles by default; add Developer ID signing/notarization before broad public testing.
+  - automate Developer ID certificate import, hardened-runtime signing, notarization submission, staple, and `spctl` validation once Apple credentials are available.
   - validate fullscreen output-window behavior on secondary displays.
 - Windows:
-  - WebView2/runtime assumptions documented.
+  - WebView2/runtime assumptions documented; prefer a bundled/fixed runtime strategy if the app must install and run without network.
   - NSIS or MSI bundle target after smoke tests.
   - test WebGPU/WebGL2 behavior across Chromium WebView2 versions.
 - Linux:
@@ -475,30 +538,45 @@ The desktop app should be a thin, secure wrapper around the renderer lab, not a 
    - Add `package.json`, Vite, and a deterministic static build output.
    - Preserve the current static-server workflow.
    - Move source files only as much as Vite requires.
+   - Add a repeatable offline-runtime check for packaged frontend assets.
+   - Status: initial Vite build scaffold is in place. Runtime media, fonts, and renderer asset folders are copied into `dist/` after build so packaged desktop output remains local-only. `npm run check:offline` now rebuilds and scans `dist/` for remote runtime URLs.
 
 2. **Tauri Skeleton**
    - Add `src-tauri/`.
    - Configure app metadata, icon placeholders, main window dimensions, dev URL, and frontend dist path.
    - Verify `tauri dev` on macOS.
+   - Keep npm Tauri scripts resilient when Rustup installed Rust but the active shell does not expose `cargo`.
+   - Status: initial Tauri v2 project/config files are in place. Rustup has a stable toolchain installed in this environment; npm Tauri scripts now discover that toolchain when `cargo` is not on `PATH`. Cross-platform app icons have been generated from the desktop source icon and are referenced explicitly by the Tauri bundle config.
 
 3. **Tauri Source Adapter**
    - Detect `window.__TAURI_INTERNALS__` or equivalent runtime marker through a small adapter.
    - Implement desktop file selection and media URL conversion.
    - Keep browser file selection unchanged.
+   - Status: initial adapter is in place. Tauri builds use a Rust-owned native dialog command, register the selected media under a session-local id, and allow only selected files through the local asset protocol for custom media playback; browser builds keep the existing File System Access / file input path. Selected desktop paths are session-scoped and show **Needs access** after restart until persisted-scope behavior is deliberately added.
 
 4. **Native Output Window**
    - Replace browser pop-out with a Tauri output window in desktop builds.
    - Preserve browser pop-out fallback.
    - Add display selection and fullscreen persistence.
+   - Status: initial static-source implementation is in place. Tauri desktop builds open an `output.html` webview for static video/image sources, sync renderer params over Tauri events, and keep browser pop-out as the fallback for browser builds, stream mode, and camera mode. The main toolbar now exposes a persisted output-display selector backed by Tauri monitor enumeration, with auto-external placement as the default when multiple displays are available. The output window persists and restores its own fullscreen state. A deterministic secondary-display simulation test now covers auto-external placement, explicit display selection, stale preference fallback, and browser pop-out screen placement without requiring real multi-monitor hardware in CI. Follow-up work still needs real secondary-display validation and broader source support.
 
 5. **Optional Stream Sidecar**
    - Decide whether to package Python, package a compiled server sidecar, or port the stream path.
    - If sidecar is used, add lifecycle management, port selection, logs, and crash recovery.
+   - Status: in progress. Directional decision: prefer a Rust/FFmpeg port for the long-term packaged stream path. Keep Python/FastAPI as a dev/external-server path until the Rust media pipeline is implemented and tested. The first Rust media-engine slices now own FFmpeg/ffprobe process args, probe local video metadata, stream RGB24 frames without buffering the whole decode, prepare text, `[char,R,G,B]`, and `[B,G,R]` stream framebuffers, and compose decode -> prep -> adaptive encode -> Rust decode verification through the reusable `media_engine::pipeline` module. Tauri now has registered-source probe, pipeline-preview, start-session, read-frame/read-frame-batch, stop-session, and list-session commands that accept selected media ids/session ids, and `StreamRuntime` can consume native session frame batches through the same canvas decode/render path used by WebSocket stream mode. Raw RGB frame-prep parity against Python/OpenCV passes through `npm run test:frame-prep`; FFmpeg/OpenCV decode-resize parity uses bounded metrics through `npm run test:decode-resize`; `npm run check:media` also runs native session preview validation in ASCII-color and pixel modes. FFmpeg resource validation now rejects macOS sidecars that still depend on absolute non-system package-manager library paths. Release CI now source-builds and stages pinned FFmpeg 8.1.2 sidecars before packaging. See `docs/RUST_FFMPEG_PORT.md`.
 
 6. **CI and Release Packaging**
    - Add GitHub Actions matrix builds for macOS, Windows, and Linux.
    - Add smoke tests for static mode and app launch.
    - Add signing/notarization/release steps once app identity is stable.
+   - Status: in progress. The desktop workflow installs Node 24 and Rust, verifies the offline frontend bundle, checks the Tauri local-only security policy, runs the output-display simulation, verifies updater manifest generation, and runs a Tauri debug no-bundle build on macOS, Windows, and Linux. The release workflow now builds pinned LGPL FFmpeg/ffprobe sidecars from official source before the release gate, then requires the offline bundle, Tauri policy, output-display simulation, updater manifest test, current-platform reviewed FFmpeg sidecar, and Rust tests before release bundling. Release builds generate signed updater artifacts, self-sign macOS bundles ad-hoc, collect publishable assets, merge platform updater fragments into `latest.json`, and publish installers/updater metadata to GitHub Releases. Developer ID notarization and installer smoke tests remain pending. See `docs/TAURI_RELEASES.md`.
+
+7. **macOS Developer ID Notarization**
+   - Add GitHub secrets and workflow steps for Developer ID certificate import.
+   - Switch macOS release builds from ad-hoc signing to Developer ID signing when notarization secrets are present.
+   - Submit release artifacts to Apple notarization, wait for completion, staple the result, and verify with `spctl -a -vv`.
+   - Keep ad-hoc signing as the local/default fallback when Apple credentials are absent.
+   - Status: initial conditional workflow path is in place. Current macOS builds are codesign-valid with ad-hoc signing by default. If `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, and App Store Connect or Apple ID notarization secrets are present, the release workflow imports the Developer ID Application certificate into a temporary keychain, switches to `src-tauri/tauri.notarized.conf.json`, lets Tauri sign/notarize/staple the macOS bundle, and runs a Developer ID plus Gatekeeper validation step against the generated artifacts.
 
 Reference docs used for the initial plan:
 
@@ -533,8 +611,10 @@ Reference docs used for the initial plan:
 - Support automatic media type detection without requiring a user-facing media type selector.
 - Support custom local video/image files as a single-select source-list item with Present, Missing, or Needs access status.
 - Support local webcam/camera as a browser-only source through `MediaDevices.getUserMedia`.
+- Support multiple simultaneous local camera devices when the browser/OS exposes them.
+- Composite selected cameras locally with Canvas2D; no camera frames should leave the browser process.
 - Keep camera frames local to the browser; do not upload or route them through the Python server.
-- Expose camera device, facing mode, capture size, FPS, and mirroring only when Camera is the active static source.
+- Expose camera device selection, facing mode, capture size, FPS, mirror, mixer layout, and framing only when Camera is the active static source.
 - Render through copied WebGPU/WebGL2 renderer.
 - Keep Canvas fallback path available.
 - Allow source URL changes without page reload.
@@ -578,11 +658,22 @@ Reference docs used for the initial plan:
 
 ### Phase 8: Desktop App Preparation
 
-- Add a Vite build path while keeping static browser mode.
-- Add a Tauri v2 skeleton after the frontend build is deterministic.
-- Add a source-provider adapter for browser files vs. Tauri-selected filesystem paths.
-- Implement a native Tauri output window after browser pop-out behavior stabilizes.
+- Add a Vite build path while keeping static browser mode. **Done.**
+- Add a Tauri v2 skeleton after the frontend build is deterministic. **Done.**
+- Add a source-provider adapter for browser files vs. Tauri-selected filesystem paths. **Done.**
+- Add a Rust-owned selected-media registry for Tauri native stream/probe commands. **Initial implementation done.**
+- Implement a native Tauri output window after browser pop-out behavior stabilizes. **Initial implementation done.**
 - Decide on the stream sidecar/native rewrite strategy before packaging stream mode for end users.
+- Validate native stream session batches through the Rust/FFmpeg media pipeline before packaging stream mode. **Initial implementation done.**
+- Keep `npm run check:offline`, `npm run check:desktop`, and `npm run smoke:static` passing before packaging changes.
+
+### Phase 9: Audio-Reactive Controls
+
+- Add the compact Audio Reactivity panel.
+- Add local audio file, input, and display-audio sources through Web Audio.
+- Add analysis meters and audio-reactive presets.
+- Route generated features through a non-persistent `effectiveParams` layer.
+- Verify static GPU/WebGL, Canvas fallback, stream Canvas, preset transitions, and pop-out output continue to consume current render params without regressions.
 
 ## Validation Strategy
 
@@ -591,6 +682,10 @@ Existing:
 - `experiments/gen_vectors.py`
 - `experiments/check_vectors.js`
 - `experiments/test_e2e.js`
+- `src-tauri/examples/check_codec_vectors.rs`
+- `npm run test:vectors`
+- `npm run test:frame-prep`
+- `npm run test:decode-resize`
 
 New:
 
@@ -598,6 +693,7 @@ New:
 - Screenshot checks for the lab UI.
 - Param update checks through DOM events.
 - Fake-device camera smoke test for Camera selection, permission/status UI, device constraints, mirror toggle, presets, and fallback backends.
+- Simulated multi-camera smoke test for the local camera mixer, device checklist, layout switching, and Canvas2D capture stream output.
 - WebSocket control-message test once server handling is in place.
 
 ## Open Technical Risks
@@ -605,17 +701,19 @@ New:
 - Browser support for WebGPU varies; WebGL2 fallback must remain reliable.
 - Static browser mode cannot load arbitrary local files without user selection or HTTP serving.
 - Local camera capture requires a secure context such as `localhost` and explicit browser permission; device labels may remain blank until permission is granted.
-- Desktop packaging will need Tauri window/camera permission handling before camera support can be considered production-ready outside the browser.
+- Simultaneous multi-camera capture depends on browser, OS, and hardware availability; some devices may reject concurrent capture or fixed constraints.
+- Desktop packaging has initial macOS camera, microphone, and screen-capture usage descriptions; permission behavior still needs hands-on packaged-app validation across macOS, Windows, and Linux.
 - Some WebSocket changes are not truly soft because OpenCV decoder resize changes require reinitialization.
 - `ascii-point-and-click` assets include glyph/LUT files that are not part of the current quality target; keep them vendored for future experimentation but do not block the WebGPU/WebGL block-rendering path on them.
-- TIFF support depends on UTIF loaded from CDN unless vendored later.
+- TIFF support is disabled until a local decoder is vendored; the static/Tauri path must not load a CDN decoder.
+- Homebrew FFmpeg is useful for development but is commonly GPL-enabled and dynamically linked against `/opt/homebrew`; standalone release packaging needs an explicit license decision and a self-contained sidecar build with bundled-relative dependencies.
 
 ## Definition of Done
 
 - The repo documents the plan and architecture.
 - The app launches into a renderer lab, not a blog page.
 - Users can switch between stream and static modes.
-- Users can render built-in media, custom local files, and a local camera source without server upload.
+- Users can render built-in media, custom local files, and one or more local camera sources without server upload.
 - Users can tune exposed renderer, stream, and performance parameters live where technically possible.
 - Users can create, save, import/export, and apply presets.
 - Preset switches animate gracefully using the configured transition time.

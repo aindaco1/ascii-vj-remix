@@ -10,7 +10,9 @@
  *
  * Usage: node experiments/test_e2e.js <port> [maxFrames]
  */
-const codec = require('../codec.js');
+import { loadShippedCodec } from './load_codec.mjs';
+
+const codec = loadShippedCodec();
 
 const PORT = process.argv[2] || '8011';
 const MAX = parseInt(process.argv[3] || '60', 10);

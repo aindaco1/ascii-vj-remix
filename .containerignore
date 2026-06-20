@@ -14,4 +14,7 @@ videos/*.webm
 experiments/vectors
 experiments/autobahn/reports
 node_modules
+dist
+src-tauri/target
+src-tauri/gen
 tmp*

@@ -14,12 +14,24 @@ __pycache__/
 # Environment & IDE
 .env
 .DS_Store
+dist/
+node_modules/
 .venv/
 .venv-linux/
 .venv-*/
 venv/
 .vscode/
 .idea/
+
+# Tauri / Rust build output
+src-tauri/target/
+src-tauri/gen/
+src-tauri/*.key
+src-tauri/*.key.pub
+src-tauri/*private*
+src-tauri/resources/ffmpeg/*/bin/
+src-tauri/resources/ffmpeg/*/manifest.json
+src-tauri/resources/ffmpeg/*/NOTICE.md
 
 # Experiment artifacts (scripts are tracked; generated outputs are not)
 experiments/vectors/
