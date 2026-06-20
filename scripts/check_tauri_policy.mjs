@@ -7,6 +7,7 @@ const configPath = path.join(root, 'src-tauri', 'tauri.conf.json');
 const notarizedConfigPath = path.join(root, 'src-tauri', 'tauri.notarized.conf.json');
 const capabilitiesDir = path.join(root, 'src-tauri', 'capabilities');
 const infoPlistPath = path.join(root, 'src-tauri', 'Info.plist');
+const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-desktop.yml');
 const tauriRoot = path.join(root, 'src-tauri');
 const issues = [];
 
@@ -209,6 +210,19 @@ for (const key of [
 ]) {
   if (!infoPlist.includes(`<key>${key}</key>`)) {
     issues.push(`Info.plist must include ${key}`);
+  }
+}
+
+const releaseWorkflow = await readFile(releaseWorkflowPath, 'utf8');
+const bundleJobStart = releaseWorkflow.indexOf('\n  bundle:');
+const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJobStart);
+const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
+  ? releaseWorkflow.slice(bundleJobStart, bundleStrategyStart)
+  : '';
+for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'KEYCHAIN_PASSWORD']) {
+  const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
+  if (pattern.test(bundleJobHeader)) {
+    issues.push(`release workflow bundle job env must not define ${forbiddenJobEnvPrefix}*; scope Apple notarization env to notarization-only steps`);
   }
 }
 
