@@ -96,7 +96,10 @@ if [ "$ACTUAL_SHA256" != "$SHA256" ]; then
 fi
 
 rm -rf "$SOURCE_DIR" "$PREFIX"
-tar -xf "$TARBALL" -C "$SOURCE_PARENT"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) tar --force-local -xf "$TARBALL" -C "$SOURCE_PARENT" ;;
+  *) tar -xf "$TARBALL" -C "$SOURCE_PARENT" ;;
+esac
 
 (
   cd "$SOURCE_DIR"
