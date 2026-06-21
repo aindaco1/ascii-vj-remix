@@ -92,10 +92,23 @@ async function runSmoke() {
         disabled: Boolean(document.querySelector('#output-display')?.disabled),
         options: [...document.querySelectorAll('#output-display option')].map((option) => option.textContent.trim())
       },
+      audioReactive: {
+        source: document.querySelector('#audio-reactive-source')?.value || '',
+        status: document.querySelector('#audio-reactive-status')?.textContent || '',
+        toggle: document.querySelector('#audio-reactive-toggle')?.textContent || '',
+        pressed: document.querySelector('#audio-reactive-toggle')?.getAttribute('aria-pressed') || '',
+        active: Boolean(window.ascilineRemix?.audioReactiveRuntime?.active)
+      },
       sources: [...document.querySelectorAll('#source-list [role=option]')].map((el) => el.textContent.trim())
     }));
     if (main.outputDisplay.value !== 'auto' || !main.outputDisplay.options.includes('Auto')) {
       throw new Error('Main page output-display selector did not initialize to Auto');
+    }
+    if (
+      main.audioReactive.source === 'input' &&
+      (main.audioReactive.active || main.audioReactive.toggle !== 'Start' || main.audioReactive.pressed !== 'false')
+    ) {
+      throw new Error(`Audio input should wait for an explicit Start click: ${JSON.stringify(main.audioReactive)}`);
     }
 
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });

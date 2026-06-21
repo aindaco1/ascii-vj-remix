@@ -1,4 +1,4 @@
-import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260619-camera-mixer';
+import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
 import { createRenderer, detectCapabilities } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
     checkTauriUpdate,
@@ -1376,6 +1376,63 @@ function cameraErrorStatus(error) {
     return { status: 'error', message: error?.message || 'Camera failed' };
 }
 
+function defaultStaticSourceParams() {
+    return {
+        sourceMode: 'static',
+        mediaUrl: DEFAULT_PARAMS.mediaUrl,
+        mediaType: DEFAULT_PARAMS.mediaType,
+        sourceName: DEFAULT_PARAMS.sourceName,
+        cameraDeviceId: DEFAULT_PARAMS.cameraDeviceId,
+        cameraSelectedDeviceIds: DEFAULT_PARAMS.cameraSelectedDeviceIds,
+        cameraFacingMode: DEFAULT_PARAMS.cameraFacingMode,
+        cameraResolution: DEFAULT_PARAMS.cameraResolution,
+        cameraFps: DEFAULT_PARAMS.cameraFps,
+        cameraMirror: DEFAULT_PARAMS.cameraMirror,
+        cameraLayout: DEFAULT_PARAMS.cameraLayout,
+        cameraFit: DEFAULT_PARAMS.cameraFit
+    };
+}
+
+function startupSafeParams(params) {
+    const normalized = normalizeParams(params);
+    if (isTauriRuntime() && normalized.sourceMode === 'stream') {
+        return normalizeParams({ ...normalized, ...defaultStaticSourceParams() });
+    }
+    return normalized;
+}
+
+function audioSourceNeedsUserActivation(source) {
+    return source === 'input' || source === 'display';
+}
+
+function audioStartPromptStatus(source) {
+    if (source === 'display') return 'Click Start to choose display audio';
+    if (source === 'input') return 'Click Start to allow audio input';
+    return 'Click Start';
+}
+
+function isPermissionBlockedError(error) {
+    const raw = `${error?.name || ''} ${error?.message || error || ''}`.toLowerCase();
+    return raw.includes('notallowed') ||
+        raw.includes('not allowed') ||
+        raw.includes('denied') ||
+        raw.includes('permission') ||
+        raw.includes('user agent') ||
+        raw.includes('platform in the current context');
+}
+
+function friendlyAudioErrorMessage(error, source) {
+    if (source === 'file') return error?.message || 'Choose audio file';
+    if (!window.isSecureContext && !isTauriRuntime()) return 'Audio input requires http://127.0.0.1 or http://localhost';
+    if (!navigator.mediaDevices?.getUserMedia && source === 'input') return 'Audio input unavailable';
+    if (!navigator.mediaDevices?.getDisplayMedia && source === 'display') return 'Display audio unavailable';
+    if (isPermissionBlockedError(error)) {
+        if (source === 'display') return 'Display audio needs permission. Click Start and choose a source that includes audio.';
+        if (source === 'input') return 'Audio input needs permission. Click Start and allow microphone access.';
+    }
+    return error?.message || 'Audio failed';
+}
+
 function fileSizeLabel(size) {
     if (!Number.isFinite(size) || size <= 0) return '';
     const units = ['B', 'KB', 'MB', 'GB'];
@@ -1415,16 +1472,7 @@ function persistedParams(params) {
     if (!isCustomRuntimeMediaUrl(params.mediaUrl) && !isCameraParams(params)) return params;
     return {
         ...params,
-        mediaUrl: DEFAULT_PARAMS.mediaUrl,
-        mediaType: DEFAULT_PARAMS.mediaType,
-        sourceName: DEFAULT_PARAMS.sourceName,
-        cameraDeviceId: DEFAULT_PARAMS.cameraDeviceId,
-        cameraSelectedDeviceIds: DEFAULT_PARAMS.cameraSelectedDeviceIds,
-        cameraFacingMode: DEFAULT_PARAMS.cameraFacingMode,
-        cameraResolution: DEFAULT_PARAMS.cameraResolution,
-        cameraFps: DEFAULT_PARAMS.cameraFps,
-        cameraLayout: DEFAULT_PARAMS.cameraLayout,
-        cameraFit: DEFAULT_PARAMS.cameraFit
+        ...defaultStaticSourceParams()
     };
 }
 
@@ -1901,7 +1949,7 @@ class AudioReactiveRuntime {
             this.app._syncAudioReactiveUi();
         } catch (error) {
             this.stop({ keepStatus: true });
-            this.status = error?.message || 'Audio failed';
+            this.status = friendlyAudioErrorMessage(error, this.app.audioReactive.source);
             this.app._syncAudioReactiveUi();
             throw error;
         }
@@ -3455,7 +3503,7 @@ class StreamRuntime {
 
 class RendererLabApp {
     constructor() {
-        this.params = normalizeParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS));
+        this.params = startupSafeParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS));
         this.effectiveParams = null;
         this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS };
         this.audioReactiveInputs = new Map();
@@ -4270,8 +4318,16 @@ class RendererLabApp {
             this._syncAudioReactiveUi();
             return;
         }
+        if (audioSourceNeedsUserActivation(this.audioReactive.source)) {
+            this.audioReactive.enabled = false;
+            this.audioReactiveRuntime.status = audioStartPromptStatus(this.audioReactive.source);
+            this._syncAudioReactiveUi(true);
+            return;
+        }
         requestAnimationFrame(() => {
-            this._restartAudioReactive().catch((error) => console.warn('[AudioReactive] Auto-start failed:', error));
+            this._restartAudioReactive().catch((error) => {
+                console.warn('[AudioReactive] Auto-start failed:', error);
+            });
         });
     }
 
@@ -4283,6 +4339,7 @@ class RendererLabApp {
         }
 
         if (this.audioReactive.source === 'file' && !this.audioReactiveRuntime.file) {
+            this.audioReactive.enabled = false;
             this.audioReactiveRuntime.stop({ keepStatus: true });
             this.audioReactiveRuntime.status = 'Choose audio file';
             this._syncAudioReactiveUi();
@@ -4293,9 +4350,17 @@ class RendererLabApp {
         try {
             await this.audioReactiveRuntime.start();
         } catch (error) {
-            this._syncAudioReactiveUi();
+            this._handleAudioReactiveStartFailure(error);
             throw error;
         }
+    }
+
+    _handleAudioReactiveStartFailure(error) {
+        const source = this.audioReactive.source;
+        this.audioReactive.enabled = false;
+        this.audioReactiveRuntime.stop({ keepStatus: true });
+        this.audioReactiveRuntime.status = friendlyAudioErrorMessage(error, source);
+        this._syncAudioReactiveUi(true);
     }
 
     async _toggleAudioReactive() {
@@ -4365,8 +4430,15 @@ class RendererLabApp {
         const tryStart = () => {
             if (this.running || this.starting) return;
             attempts++;
-            this.start({ autoStart: true }).then(() => {
-                if (!this.running && attempts < 3) setTimeout(tryStart, attempts * 500);
+            this.start({ autoStart: true }).catch((error) => {
+                console.warn('[Renderer] Auto-start failed:', error);
+            }).then(() => {
+                if (this.running) return;
+                if (attempts < 3) {
+                    setTimeout(tryStart, attempts * 500);
+                    return;
+                }
+                this._startDefaultStaticFallback().catch((error) => console.warn('[Renderer] Default fallback failed:', error));
             });
         };
         requestAnimationFrame(tryStart);
@@ -4381,6 +4453,18 @@ class RendererLabApp {
         const oldUrl = this.localObjectUrl;
         this.localObjectUrl = null;
         if (oldUrl) setTimeout(() => URL.revokeObjectURL(oldUrl), 2000);
+    }
+
+    async _startDefaultStaticFallback() {
+        if (this.running || this.starting) return;
+        this.params = normalizeParams({
+            ...this.params,
+            ...defaultStaticSourceParams()
+        });
+        this._syncInputs();
+        this._applyVisualState();
+        this._persist();
+        await this.start({ autoStart: true });
     }
 
     _ensureCustomObjectUrl() {
@@ -4684,10 +4768,7 @@ class RendererLabApp {
         this.running = false;
         this.params = normalizeParams({
             ...this.params,
-            sourceMode: 'static',
-            mediaUrl: DEFAULT_PARAMS.mediaUrl,
-            mediaType: DEFAULT_PARAMS.mediaType,
-            sourceName: DEFAULT_PARAMS.sourceName
+            ...defaultStaticSourceParams()
         });
         this._syncInputs();
         this._applyVisualState();

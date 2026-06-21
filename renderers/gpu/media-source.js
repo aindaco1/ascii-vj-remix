@@ -28,6 +28,11 @@ function isTiff(url) {
     return TIFF_EXTENSIONS.some(ext => lower.endsWith(ext));
 }
 
+function shouldUseAnonymousCrossOrigin(url) {
+    const value = String(url || '');
+    return /^https?:\/\//i.test(value) && !/^https?:\/\/asset\.localhost(?::\d+)?\//i.test(value);
+}
+
 /**
  * Load a media source (video or image) and return a normalized interface
  * @param {string} url - URL of the media file
@@ -145,11 +150,11 @@ async function loadCameraSource(stream, options = {}) {
 
 async function loadVideoSource(url, options = {}) {
     const video = document.createElement('video');
+    if (shouldUseAnonymousCrossOrigin(url)) video.crossOrigin = 'anonymous';
     video.src = url;
     video.loop = options.loop !== false;
     video.muted = options.muted !== false;
     video.playsInline = true;
-    video.crossOrigin = 'anonymous';
     video.preload = 'auto';
     video.style.display = 'none';
     document.body.appendChild(video);
@@ -224,7 +229,7 @@ async function loadImageSource(url, options = {}) {
     }
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (shouldUseAnonymousCrossOrigin(url)) img.crossOrigin = 'anonymous';
 
     await new Promise((resolve, reject) => {
         img.onload = resolve;
