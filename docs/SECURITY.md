@@ -52,6 +52,9 @@ The current release line includes these security hardening rules:
   and Tauri packaging steps. Do not place `TAURI_SIGNING_PRIVATE_KEY`,
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
+- GitHub Actions macOS jobs are pinned to `macos-26` instead of
+  `macos-latest`. The native `wgpu`/`apple-metal` stack needs the macOS 26
+  Metal SDK, and the moving `macos-latest` alias can select an older SDK.
 - Selected local media paths should not be retained in frontend app state after
   the app derives the playback URL it needs. Diagnostics should redact file and
   asset URLs before writing `/tmp/asciline-media-diagnostics.log`.

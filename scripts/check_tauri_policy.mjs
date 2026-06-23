@@ -9,6 +9,7 @@ const capabilitiesDir = path.join(root, 'src-tauri', 'capabilities');
 const infoPlistPath = path.join(root, 'src-tauri', 'Info.plist');
 const entitlementsPath = path.join(root, 'src-tauri', 'Entitlements.plist');
 const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-desktop.yml');
+const desktopWorkflowPath = path.join(root, '.github', 'workflows', 'desktop.yml');
 const tauriRoot = path.join(root, 'src-tauri');
 const issues = [];
 
@@ -287,6 +288,7 @@ for (const key of [
 }
 
 const releaseWorkflow = await readFile(releaseWorkflowPath, 'utf8');
+const desktopWorkflow = await readFile(desktopWorkflowPath, 'utf8');
 const bundleJobStart = releaseWorkflow.indexOf('\n  bundle:');
 const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJobStart);
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
@@ -296,6 +298,18 @@ for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'KEYCHAIN_PASS
   const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
   if (pattern.test(bundleJobHeader)) {
     issues.push(`release workflow bundle job env must not define ${forbiddenJobEnvPrefix}*; scope signing env to signing-only steps`);
+  }
+}
+
+for (const [label, workflow] of [
+  ['release-desktop.yml', releaseWorkflow],
+  ['desktop.yml', desktopWorkflow]
+]) {
+  if (workflow.includes('macos-latest')) {
+    issues.push(`${label} must pin macOS jobs to macos-26; apple-metal/wgpu needs the macOS 26 Metal SDK`);
+  }
+  if (!workflow.includes('macos-26')) {
+    issues.push(`${label} must include a macos-26 job for macOS desktop validation`);
   }
 }
 
