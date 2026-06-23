@@ -43,6 +43,7 @@ jobs:
             curl \
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
+            libasound2-dev \
             librsvg2-dev \
             patchelf \
             libssl-dev \

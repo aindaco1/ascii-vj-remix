@@ -36,8 +36,8 @@ Platform-specific desktop prerequisites:
 - macOS: Xcode command line tools.
 - Windows: Visual Studio Build Tools with the C++ workload and WebView2
   runtime.
-- Linux: WebKitGTK 4.1 development packages, appindicator, librsvg, OpenSSL,
-  patchelf, and build tools.
+- Linux: WebKitGTK 4.1 development packages, appindicator, ALSA development
+  headers, librsvg, OpenSSL, patchelf, and build tools.
 
 Optional but useful:
 
