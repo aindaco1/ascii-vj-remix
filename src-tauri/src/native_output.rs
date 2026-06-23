@@ -172,7 +172,7 @@ struct NativeOutputHandle {
     param_version: Arc<AtomicU64>,
     mirror_slot: Option<Arc<NativeMirrorFrameSlot>>,
     #[cfg(target_os = "macos")]
-    display_link: Option<NativeMacDisplayLinkPresenter>,
+    _display_link: Option<NativeMacDisplayLinkPresenter>,
     window: Window,
 }
 
@@ -613,7 +613,7 @@ async fn start_or_update_native_static_output(
         param_version,
         mirror_slot: None,
         #[cfg(target_os = "macos")]
-        display_link,
+        _display_link: display_link,
         window,
     });
 
@@ -709,7 +709,7 @@ async fn start_or_update_native_camera_output(
         param_version,
         mirror_slot: None,
         #[cfg(target_os = "macos")]
-        display_link,
+        _display_link: display_link,
         window,
     });
 
@@ -776,7 +776,7 @@ async fn start_or_update_native_mirror_output(
         param_version,
         mirror_slot: Some(mirror_slot),
         #[cfg(target_os = "macos")]
-        display_link: None,
+        _display_link: None,
         window,
     });
 
@@ -2407,12 +2407,14 @@ fn spawn_render_thread(
     });
 }
 
+#[cfg(not(target_os = "macos"))]
 struct NativeSoftbufferPresenter {
     _context: softbuffer::Context<Window>,
     surface: softbuffer::Surface<Window, Window>,
     last_size: (u32, u32),
 }
 
+#[cfg(not(target_os = "macos"))]
 impl NativeSoftbufferPresenter {
     fn new(window: &Window) -> Result<Self, String> {
         let (context, surface) = create_softbuffer_surface(window)?;
@@ -2451,6 +2453,7 @@ impl NativeSoftbufferPresenter {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn run_render_loop(
     app: AppHandle,
     window: Window,
@@ -2739,6 +2742,7 @@ fn spawn_camera_render_thread(
     });
 }
 
+#[cfg(not(target_os = "macos"))]
 fn run_camera_render_loop(
     app: AppHandle,
     window: Window,
@@ -3207,6 +3211,7 @@ fn sample_dimensions(probe: &VideoProbe) -> (u32, u32) {
     )
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn render_native_frame_to_buffer(
     frame: &DecodedRgbFrame,
     params: &NativeRenderParams,
@@ -3264,12 +3269,14 @@ fn render_native_frame_to_buffer(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg(any(not(target_os = "macos"), test))]
 struct NativeAxisSpan {
     index: usize,
     start: usize,
     end: usize,
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn native_axis_spans(
     cells: u32,
     cell_size: u32,
@@ -3299,6 +3306,7 @@ fn native_axis_spans(
     spans
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn native_axis_spans_cover(spans: &[NativeAxisSpan], limit: usize) -> bool {
     if limit == 0 {
         return true;
@@ -3349,6 +3357,7 @@ fn native_grid_dimensions(
     (cols, rows)
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn native_cell_colors(
     frame: &DecodedRgbFrame,
     params: &NativeRenderParams,
@@ -3397,6 +3406,7 @@ fn native_cell_colors(
     out
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn process_gpu_cell_color(r: u8, g: u8, b: u8, params: &NativeRenderParams) -> (u8, u8, u8) {
     let mut rr = r as f64 / 255.0;
     let mut gg = g as f64 / 255.0;
@@ -3436,10 +3446,12 @@ fn rgb_u32(r: u8, g: u8, b: u8) -> u32 {
     (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b)
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn clamp01(value: f64) -> f64 {
     value.clamp(0.0, 1.0)
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn shader_hash(x: f64, y: f64) -> f64 {
     let mut p3x = fract(x * 0.1031);
     let mut p3y = fract(y * 0.1031);
@@ -3451,6 +3463,7 @@ fn shader_hash(x: f64, y: f64) -> f64 {
     fract((p3x + p3y) * p3z)
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn fract(value: f64) -> f64 {
     value - value.floor()
 }

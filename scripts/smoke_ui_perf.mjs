@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nativeLogPath = path.join(tmpdir(), 'asciline-native-output.log');
 const mediaLogPath = '/tmp/asciline-media-diagnostics.log';
-const releaseApp = '/private/tmp/asciline-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
+const releaseApp = '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
 const durationMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_DURATION_MS || '9000');
 const sampleMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_SAMPLE_MS || '500');
 

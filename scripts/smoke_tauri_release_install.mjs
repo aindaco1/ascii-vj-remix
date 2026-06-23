@@ -143,7 +143,9 @@ async function verifyLinuxInstall(packageName, expectedVersion) {
   }
 
   const installedFiles = run('dpkg', ['-L', packageName]).stdout.split(/\r?\n/).filter(Boolean);
-  const exe = installedFiles.find((file) => /\/bin\/asciline-remix$/i.test(file))
+  const exe = installedFiles.find((file) => /\/bin\/ascii-vj-remix$/i.test(file))
+    || installedFiles.find((file) => /\/bin\/asciline-remix$/i.test(file))
+    || installedFiles.find((file) => /ascii-vj-remix$/i.test(file))
     || installedFiles.find((file) => /asciline-remix$/i.test(file));
   if (!exe) throw new Error(`could not locate installed executable for ${packageName}`);
   if (!installedFiles.some((file) => /ffmpeg$/i.test(file))) {
@@ -367,7 +369,8 @@ async function findWindowsExecutable() {
     process.env.LOCALAPPDATA
   ].filter(Boolean);
   for (const root of roots) {
-    const found = await findNestedFile(root, /^(ASCII VJ Remix|asciline-remix)\.exe$/i, 6)
+    const found = await findNestedFile(root, /^(ASCII VJ Remix|ascii-vj-remix|asciline-remix)\.exe$/i, 6)
+      || await findNestedFile(root, /ascii.*vj.*remix.*\.exe$/i, 6)
       || await findNestedFile(root, /asciline.*remix.*\.exe$/i, 6);
     if (found) return found;
   }

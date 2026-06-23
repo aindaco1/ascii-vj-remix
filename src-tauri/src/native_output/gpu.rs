@@ -5,6 +5,7 @@ use super::{
 use std::borrow::Cow;
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
+#[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tauri::{PhysicalSize, Window};
@@ -243,6 +244,7 @@ pub(super) struct NativeGpuFrameTiming {
 }
 
 impl NativeGpuPresenter {
+    #[cfg(not(target_os = "macos"))]
     pub(super) fn new(window: &Window) -> Result<Self, String> {
         let (instance, surface) = create_surface_on_main_thread(window)?;
         Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync)
@@ -372,6 +374,7 @@ impl NativeGpuPresenter {
         })
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub(super) fn render_frame(
         &mut self,
         window: &Window,
@@ -678,6 +681,7 @@ impl NativeGpuPresenter {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn create_surface_on_main_thread(
     window: &Window,
 ) -> Result<(wgpu::Instance, wgpu::Surface<'static>), String> {

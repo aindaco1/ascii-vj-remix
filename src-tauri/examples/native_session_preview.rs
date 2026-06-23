@@ -1,9 +1,9 @@
-use asciline_remix_lib::media_engine::codec::Decoder;
-use asciline_remix_lib::media_engine::ffmpeg::{
+use ascii_vj_remix_lib::media_engine::codec::Decoder;
+use ascii_vj_remix_lib::media_engine::ffmpeg::{
     probe_video, spawn_rgb_reader, DecodeConfig, FfmpegBinaries, VideoProbe,
 };
-use asciline_remix_lib::media_engine::frame_prep::RenderMode;
-use asciline_remix_lib::media_engine::pipeline::{
+use ascii_vj_remix_lib::media_engine::frame_prep::RenderMode;
+use ascii_vj_remix_lib::media_engine::pipeline::{
     checksum_hex, StreamPipelineConfig, StreamPipelineReader,
 };
 use serde::Serialize;

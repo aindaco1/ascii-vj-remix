@@ -11,7 +11,7 @@ const tempDir = mkdtempSync(path.join(tmpdir(), 'asciline-native-output-smoke-')
 const reportPath = path.join(tempDir, 'report.json');
 const logPath = path.join(tmpdir(), 'asciline-native-output.log');
 const defaultReleaseApp =
-  '/private/tmp/asciline-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
+  '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
 const sourceApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 
 function run(command, args, options = {}) {

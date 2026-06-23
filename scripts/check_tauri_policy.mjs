@@ -12,6 +12,12 @@ const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-des
 const tauriRoot = path.join(root, 'src-tauri');
 const issues = [];
 
+const allowedProductionUrlPrefixes = [
+  'http://asset.localhost',
+  'https://asset.localhost',
+  'http://ipc.localhost'
+];
+
 const allowedRemoteDevPrefixes = [
   'http://127.0.0.1',
   'ws://127.0.0.1',
@@ -26,13 +32,9 @@ function matchesRemoteUrl(value) {
   return String(value || '').match(/https?:\/\/[^\s"'<>]+|wss?:\/\/[^\s"'<>]+/gi) || [];
 }
 
-function isAllowedPolicyUrl(url) {
-  return allowedRemoteDevPrefixes.some((prefix) => url.startsWith(prefix));
-}
-
-function checkNoOnlineUrls(label, value) {
+function checkNoOnlineUrls(label, value, allowedPrefixes = allowedRemoteDevPrefixes) {
   for (const url of matchesRemoteUrl(value)) {
-    if (isAllowedPolicyUrl(url)) continue;
+    if (allowedPrefixes.some((prefix) => url.startsWith(prefix))) continue;
     issues.push(`${label} contains online URL ${url}`);
   }
 }
@@ -40,15 +42,25 @@ function checkNoOnlineUrls(label, value) {
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const notarizedConfig = JSON.parse(await readFile(notarizedConfigPath, 'utf8'));
 const security = config?.app?.security || {};
-const updaterEndpoint = 'https://github.com/aindaco1/ascii-live-remix/releases/latest/download/latest.json';
+const updaterEndpoint = 'https://github.com/aindaco1/ascii-vj-remix/releases/latest/download/latest.json';
 
 if (!security.csp || typeof security.csp !== 'string') {
   issues.push('app.security.csp must be a non-empty production CSP string');
 } else {
-  checkNoOnlineUrls('app.security.csp', security.csp);
+  checkNoOnlineUrls('app.security.csp', security.csp, allowedProductionUrlPrefixes);
   if (!security.csp.includes("object-src 'none'")) issues.push("production CSP must include object-src 'none'");
   if (!security.csp.includes("frame-ancestors 'none'")) issues.push("production CSP must include frame-ancestors 'none'");
   if (security.csp.includes("'unsafe-eval'")) issues.push("production CSP must not include 'unsafe-eval'");
+  for (const forbiddenLocalConnect of [
+    'http://127.0.0.1',
+    'http://localhost',
+    'ws://127.0.0.1',
+    'ws://localhost'
+  ]) {
+    if (security.csp.includes(forbiddenLocalConnect)) {
+      issues.push(`production CSP must not allow ${forbiddenLocalConnect}; localhost stream/dev endpoints belong only in devCsp`);
+    }
+  }
 }
 
 if (!security.devCsp || typeof security.devCsp !== 'string') {
@@ -280,10 +292,10 @@ const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJob
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
   ? releaseWorkflow.slice(bundleJobStart, bundleStrategyStart)
   : '';
-for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'KEYCHAIN_PASSWORD']) {
+for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'KEYCHAIN_PASSWORD', 'TAURI_SIGNING_PRIVATE_KEY']) {
   const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
   if (pattern.test(bundleJobHeader)) {
-    issues.push(`release workflow bundle job env must not define ${forbiddenJobEnvPrefix}*; scope Apple notarization env to notarization-only steps`);
+    issues.push(`release workflow bundle job env must not define ${forbiddenJobEnvPrefix}*; scope signing env to signing-only steps`);
   }
 }
 

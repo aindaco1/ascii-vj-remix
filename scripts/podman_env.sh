@@ -94,11 +94,11 @@ ensure_podman_ready() {
     machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
     if [ "$machine_state" != "running" ]; then
       podman_env_warn "Podman machine is not running; starting podman-machine-default."
-      podman machine start podman-machine-default >/tmp/asciline-remix-podman-start.log 2>&1 || true
+      podman machine start podman-machine-default >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
       machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
       if [ "$machine_state" != "running" ]; then
         log_path="$(podman_machine_log_path)"
-        [ -f /tmp/asciline-remix-podman-start.log ] && printf 'podman: start log: /tmp/asciline-remix-podman-start.log\n' >&2
+        [ -f /tmp/ascii-vj-remix-podman-start.log ] && printf 'podman: start log: /tmp/ascii-vj-remix-podman-start.log\n' >&2
         [ -n "$log_path" ] && [ -f "$log_path" ] && printf 'podman: machine log: %s\n' "$log_path" >&2
         podman_env_fail "Podman machine did not stay running after startup."
       fi
@@ -110,8 +110,8 @@ ensure_podman_ready() {
   if ! podman info >/dev/null 2>&1; then
     if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
       podman_env_warn "Podman API is stale; restarting podman-machine-default once."
-      podman machine stop podman-machine-default >/tmp/asciline-remix-podman-stop.log 2>&1 || true
-      podman machine start podman-machine-default >/tmp/asciline-remix-podman-start.log 2>&1 || true
+      podman machine stop podman-machine-default >/tmp/ascii-vj-remix-podman-stop.log 2>&1 || true
+      podman machine start podman-machine-default >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
       configure_podman_connection
     fi
   fi
@@ -138,8 +138,8 @@ ensure_podman_ready() {
   fi
 
   if [ "$run_smoke" = "true" ]; then
-    if ! podman run --rm docker.io/library/alpine:3.20 echo ok >/tmp/asciline-remix-podman-alpine.log 2>&1; then
-      cat /tmp/asciline-remix-podman-alpine.log >&2 || true
+    if ! podman run --rm docker.io/library/alpine:3.20 echo ok >/tmp/ascii-vj-remix-podman-alpine.log 2>&1; then
+      cat /tmp/ascii-vj-remix-podman-alpine.log >&2 || true
       podman_env_fail "Podman could not run a simple container."
     fi
   fi

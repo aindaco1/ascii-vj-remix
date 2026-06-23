@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="${IMAGE:-localhost/asciline-remix-dev:latest}"
+IMAGE="${IMAGE:-localhost/ascii-vj-remix-dev:latest}"
 VENV="${VENV:-.venv-linux}"
 
 source "$ROOT/scripts/podman_env.sh"

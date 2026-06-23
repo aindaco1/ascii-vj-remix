@@ -2,11 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="${IMAGE:-localhost/asciline-remix-dev:latest}"
+IMAGE="${IMAGE:-localhost/ascii-vj-remix-dev:latest}"
 ASCILINE_RESTART="${ASCILINE_RESTART:-${RESTART:-0}}"
 ASCILINE_RESTART_DELAY="${ASCILINE_RESTART_DELAY:-${RESTART_DELAY:-2}}"
 ASCILINE_RESTART_ON_SUCCESS="${ASCILINE_RESTART_ON_SUCCESS:-${RESTART_ON_SUCCESS:-0}}"
-CONTAINER_NAME="${CONTAINER_NAME:-asciline-remix-run-$$}"
+CONTAINER_NAME="${CONTAINER_NAME:-ascii-vj-remix-run-$$}"
 PORT="${PORT:-8000}"
 HOST_PORT="${HOST_PORT:-$PORT}"
 CONTAINER_PORT="${CONTAINER_PORT:-$PORT}"

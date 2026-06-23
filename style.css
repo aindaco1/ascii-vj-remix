@@ -6,19 +6,19 @@
 
 :root {
     color-scheme: dark;
-    --bg: #05003f;
-    --panel: #0a0094;
-    --panel-2: #080078;
-    --panel-3: #1200b0;
-    --border: #8480c9;
-    --border-soft: #403bad;
+    --bg: #040506;
+    --panel: #090a0c;
+    --panel-2: #101216;
+    --panel-3: #171a20;
+    --border: #5d6573;
+    --border-soft: #2c323c;
     --text: #ffffff;
-    --muted: #c2bfe4;
-    --faint: #8480c9;
-    --cyan: #aecfff;
-    --cyan-soft: rgba(174, 207, 255, 0.18);
-    --amber: #ffd900;
-    --green: #4af626;
+    --muted: #c6ccd8;
+    --faint: #7f8795;
+    --cyan: #ffffff;
+    --cyan-soft: rgba(255, 255, 255, 0.18);
+    --amber: #ff2bd6;
+    --green: #00e5ff;
     --red: #ff5f67;
     --canvas-bg: #000000;
     --radius: 0;
@@ -407,7 +407,7 @@ button:disabled {
     padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgba(5, 0, 63, 0.82);
+    background: rgba(4, 5, 6, 0.86);
     color: var(--cyan);
     font: 11px/1.45 var(--font-mono);
     text-transform: uppercase;
@@ -691,6 +691,16 @@ button:disabled {
     color: var(--panel-2);
 }
 
+.source-option:hover .source-option-name,
+.source-option:hover .source-option-detail,
+.source-option:hover .source-option-status {
+    color: var(--panel-2);
+}
+
+.source-option:hover .source-option-status {
+    border-color: var(--panel-2);
+}
+
 .source-option-status {
     border: 1px solid var(--border-soft);
     border-radius: var(--radius);
@@ -849,7 +859,7 @@ button:disabled {
 }
 
 .control-row:hover {
-    background: #0b008a;
+    background: #171b22;
 }
 
 .control-label {

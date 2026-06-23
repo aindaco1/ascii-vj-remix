@@ -1,4 +1,4 @@
-use asciline_remix_lib::media_engine::frame_prep::{
+use ascii_vj_remix_lib::media_engine::frame_prep::{
     prepare_ascii_color_frame, prepare_pixel_frame, prepare_text_frame, RenderMode, RgbFrame,
 };
 use serde::Serialize;

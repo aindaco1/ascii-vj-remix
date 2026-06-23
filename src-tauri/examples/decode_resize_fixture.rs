@@ -1,7 +1,7 @@
-use asciline_remix_lib::media_engine::ffmpeg::{
+use ascii_vj_remix_lib::media_engine::ffmpeg::{
     decode_rgb_preview, probe_video, DecodeConfig, FfmpegBinaries,
 };
-use asciline_remix_lib::media_engine::frame_prep::{
+use ascii_vj_remix_lib::media_engine::frame_prep::{
     prepare_ascii_color_frame, prepare_pixel_frame, RenderMode, RgbFrame,
 };
 use serde::Serialize;

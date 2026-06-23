@@ -19,8 +19,6 @@ jobs:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     strategy:
       fail-fast: false
@@ -102,6 +100,8 @@ jobs:
         run: npm run check:release
 
       - name: Verify updater signing secret
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         shell: bash
         run: |
           if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
@@ -177,6 +177,8 @@ jobs:
       - name: Build notarized macOS bundle
         if: runner.os == 'macOS' && steps.macos_signing.outputs.notarize == 'true'
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -186,6 +188,9 @@ jobs:
 
       - name: Build self-signed desktop bundle
         if: runner.os != 'macOS' || steps.macos_signing.outputs.notarize != 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build
 
       - name: Verify desktop bundle contents
@@ -204,7 +209,7 @@ jobs:
       - name: Upload desktop release assets
         uses: actions/upload-artifact@v4
         with:
-          name: asciline-remix-${{ runner.os }}-${{ runner.arch }}
+          name: ascii-vj-remix-${{ runner.os }}-${{ runner.arch }}
           path: src-tauri/target/release/release-assets/*
           if-no-files-found: error
 

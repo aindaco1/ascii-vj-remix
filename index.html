@@ -22,11 +22,11 @@
             </div>
 
             <div class="topbar-controls">
-                <label class="field compact">
+                <label class="field compact source-mode-field" hidden>
                     <span>Source</span>
                     <select id="source-mode">
-                        <option value="stream">Stream</option>
                         <option value="static">Static</option>
+                        <option value="stream">Stream</option>
                     </select>
                 </label>
                 <label class="field compact">
@@ -46,7 +46,7 @@
                 <button id="check-update" class="update-status-button" type="button" hidden>Update</button>
                 <span id="update-status" class="update-status-text" hidden></span>
                 <span id="backend-status">Backend: idle</span>
-                <span id="connection-status">Disconnected</span>
+                <span id="connection-status" hidden>Disconnected</span>
             </div>
         </header>
 
@@ -55,7 +55,7 @@
                 <div class="preview-toolbar">
                     <div>
                         <strong id="active-preset-label">Point & Click Default</strong>
-                        <span id="source-label">stream source</span>
+                        <span id="source-label">Demo Image</span>
                     </div>
                     <div class="preview-toolbar-right">
                         <button id="popout-window" type="button">Pop Out</button>
@@ -68,7 +68,7 @@
                         <button id="wtf-randomize" type="button" aria-pressed="false">WTF</button>
                         <div class="meter-strip">
                             <span id="fps-meter">FPS 0/24</span>
-                            <span id="buffer-meter">BUF 0</span>
+                            <span id="buffer-meter" hidden>BUF 0</span>
                             <span id="grid-meter">480 x auto</span>
                         </div>
                     </div>
@@ -102,6 +102,8 @@
                         <input id="local-media-file" class="visually-hidden" type="file" accept=".mp4,.webm,.mkv,.jpg,.jpeg,.png,.gif,.svg,video/mp4,video/webm,video/x-matroska,image/jpeg,image/png,image/gif,image/svg+xml" tabindex="-1" aria-hidden="true">
                     </div>
                 </section>
+
+                <div id="camera-controls-slot" class="camera-controls-slot"></div>
 
                 <section class="panel preset-panel">
                     <div class="panel-heading">
@@ -163,7 +165,7 @@
         </main>
     </div>
 
-    <script src="codec.js?v=20260617-live-renderer-crossfade"></script>
+    <script type="module" src="codec.js?v=20260617-live-renderer-crossfade"></script>
     <script type="module" src="app.js?v=20260620-native-system-audio"></script>
 </body>
 

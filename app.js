@@ -80,6 +80,7 @@ const els = {
     sourceList: $('source-list'),
     addCustomFile: $('add-custom-file'),
     localMediaFile: $('local-media-file'),
+    cameraControlsSlot: $('camera-controls-slot'),
     audioReactiveSource: $('audio-reactive-source'),
     audioReactivePreset: $('audio-reactive-preset'),
     audioReactiveInput: $('audio-reactive-input'),
@@ -101,6 +102,7 @@ const PRESET_KEY = 'asciline-remix-user-presets-v1';
 const CUSTOM_SOURCE_KEY = 'asciline-remix-custom-source-v1';
 const OUTPUT_DISPLAY_KEY = 'asciline-remix-output-display-v1';
 const FPS_DEFAULT_MIGRATION_KEY = 'asciline-remix-fps-default-migrated-v1';
+const DEFAULT_SOURCE_MIGRATION_KEY = 'asciline-remix-demo-image-default-migrated-v1';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -124,9 +126,9 @@ const CUSTOM_MEDIA_PICKER_OPTIONS = {
 const DEFAULT_PARAMS = {
     sourceMode: 'static',
     backend: 'auto',
-    mediaUrl: 'media/point-click-test-30s.mp4',
-    mediaType: 'video',
-    sourceName: 'Demo Video 1',
+    mediaUrl: 'media/demo.svg',
+    mediaType: 'image',
+    sourceName: 'Demo Image',
     cameraDeviceId: '',
     cameraSelectedDeviceIds: [],
     cameraFacingMode: 'any',
@@ -186,8 +188,7 @@ const TAURI_RAW_VIDEO_BATCH_SIZE = 2;
 
 const SOURCE_PRESETS = [
     { id: 'demo-image', name: 'Demo Image', mediaUrl: 'media/demo.svg', mediaType: 'image' },
-    { id: 'demo-video-1', name: 'Demo Video 1', mediaUrl: 'media/point-click-test-30s.mp4', mediaType: 'video' },
-    { id: 'demo-video-2', name: 'Demo Video 2', mediaUrl: 'media/demo-video-2.mp4', mediaType: 'video' }
+    { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.mp4', mediaType: 'video' }
 ];
 
 const CAMERA_RESOLUTION_OPTIONS = [
@@ -864,8 +865,257 @@ const BUILTIN_PRESETS = [
             pixel: false,
             codecQuality: 'low'
         }
+    },
+    {
+        id: 'gamma-sinkhole',
+        name: 'Gamma Sinkhole',
+        readonly: true,
+        transitionSeconds: 1.05,
+        params: {
+            cols: 132,
+            cellWidth: 8,
+            cellHeight: 12,
+            saturationBoost: 0.1,
+            contrastBoost: 2.85,
+            brightness: 1.55,
+            gamma: 0.28,
+            bgBlend: 0.03,
+            jitterAmount: 0.9,
+            jitterSpeed: 3.7,
+            quantizeBits: 6,
+            solidMode: false,
+            glyphMode: true,
+            mode: 1,
+            pixel: false,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'candy-fragmenter',
+        name: 'Candy Fragmenter',
+        readonly: true,
+        transitionSeconds: 0.8,
+        params: {
+            cols: 116,
+            cellWidth: 9,
+            cellHeight: 13,
+            saturationBoost: 3,
+            contrastBoost: 2.55,
+            brightness: 1.05,
+            gamma: 0.58,
+            bgBlend: 0.05,
+            jitterAmount: 1,
+            jitterSpeed: 4,
+            quantizeBits: 6,
+            solidMode: true,
+            glyphMode: false,
+            mode: 5,
+            pixel: true,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'white-hot-decoder',
+        name: 'White-Hot Decoder',
+        readonly: true,
+        transitionSeconds: 1.2,
+        params: {
+            cols: 180,
+            cellWidth: 6,
+            cellHeight: 9,
+            saturationBoost: 0.04,
+            contrastBoost: 3,
+            brightness: 0.9,
+            gamma: 2.75,
+            bgBlend: 0.02,
+            jitterAmount: 0.72,
+            jitterSpeed: 3.25,
+            quantizeBits: 6,
+            solidMode: false,
+            glyphMode: true,
+            mode: 1,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
+        id: 'chromatic-meltdown',
+        name: 'Chromatic Meltdown',
+        readonly: true,
+        transitionSeconds: 0.7,
+        params: {
+            cols: 96,
+            cellWidth: 10,
+            cellHeight: 15,
+            saturationBoost: 3,
+            contrastBoost: 3,
+            brightness: 0.84,
+            gamma: 2.35,
+            bgBlend: 0.04,
+            jitterAmount: 1,
+            jitterSpeed: 3.95,
+            quantizeBits: 6,
+            solidMode: true,
+            glyphMode: false,
+            mode: 5,
+            pixel: true,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'dead-channel-confetti',
+        name: 'Dead Channel Confetti',
+        readonly: true,
+        transitionSeconds: 1.35,
+        params: {
+            cols: 150,
+            cellWidth: 7,
+            cellHeight: 11,
+            saturationBoost: 0,
+            contrastBoost: 2.35,
+            brightness: 1.22,
+            gamma: 0.42,
+            bgBlend: 0.06,
+            jitterAmount: 1,
+            jitterSpeed: 4,
+            quantizeBits: 6,
+            solidMode: false,
+            glyphMode: true,
+            mode: 2,
+            pixel: false,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'sugar-voltage',
+        name: 'Sugar Voltage',
+        readonly: true,
+        transitionSeconds: 0.9,
+        params: {
+            cols: 210,
+            cellWidth: 5,
+            cellHeight: 8,
+            saturationBoost: 3,
+            contrastBoost: 1.85,
+            brightness: 0.88,
+            gamma: 3,
+            bgBlend: 0.01,
+            jitterAmount: 0.94,
+            jitterSpeed: 3.8,
+            quantizeBits: 6,
+            solidMode: false,
+            glyphMode: true,
+            mode: 5,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
+        id: 'bitcrush-sunburn',
+        name: 'Bitcrush Sunburn',
+        readonly: true,
+        transitionSeconds: 1,
+        params: {
+            cols: 88,
+            cellWidth: 11,
+            cellHeight: 16,
+            saturationBoost: 2.7,
+            contrastBoost: 2.95,
+            brightness: 1.18,
+            gamma: 0.5,
+            bgBlend: 0.02,
+            jitterAmount: 0.86,
+            jitterSpeed: 3.55,
+            quantizeBits: 6,
+            solidMode: false,
+            glyphMode: true,
+            mode: 4,
+            pixel: false,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'neon-sledgehammer',
+        name: 'Neon Sledgehammer',
+        readonly: true,
+        transitionSeconds: 0.65,
+        params: {
+            cols: 80,
+            cellWidth: 12,
+            cellHeight: 16,
+            saturationBoost: 3,
+            contrastBoost: 2.7,
+            brightness: 0.96,
+            gamma: 2.6,
+            bgBlend: 0,
+            jitterAmount: 1,
+            jitterSpeed: 4,
+            quantizeBits: 6,
+            solidMode: true,
+            glyphMode: false,
+            mode: 5,
+            pixel: true,
+            codecQuality: 'low'
+        }
     }
 ];
+
+const BUILTIN_PRESET_DISPLAY_ORDER = [
+    'point-click-default',
+    'neon-sledgehammer',
+    'arcade-rain',
+    'gamma-sinkhole',
+    'chrome-wound',
+    'candy-fragmenter',
+    'posterized-dream',
+    'dead-channel-confetti',
+    'solar-guillotine',
+    'paper-shredder',
+    'cyberdelic-riot',
+    'night-vision-terminal',
+    'white-hot-decoder',
+    'acid-snowstorm',
+    'pixel-mirage',
+    'chromatic-meltdown',
+    'blacklight-crush',
+    'signal-loss',
+    'sugar-voltage',
+    'teletext-reactor',
+    'bitcrush-sunburn',
+    'ditherpunk-ultra',
+    'terminal-collapse',
+    'infrared-riot',
+    'laser-rot',
+    'static-cathedral',
+    'toxic-halftone',
+    'plasma-bruise',
+    'magma-telemetry',
+    'glitch-orchid',
+    'ultraviolet-siren',
+    'neon-razorstorm'
+];
+
+const EXTREME_WTF_PRESET_IDS = [
+    'neon-sledgehammer',
+    'gamma-sinkhole',
+    'candy-fragmenter',
+    'white-hot-decoder',
+    'chromatic-meltdown',
+    'dead-channel-confetti',
+    'sugar-voltage',
+    'bitcrush-sunburn',
+    'terminal-collapse',
+    'chrome-wound',
+    'paper-shredder',
+    'laser-rot'
+];
+
+const BUILTIN_PRESET_BY_ID = new Map(BUILTIN_PRESETS.map((preset) => [preset.id, preset]));
+const BUILTIN_PRESETS_DISPLAY = [
+    ...BUILTIN_PRESET_DISPLAY_ORDER.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean),
+    ...BUILTIN_PRESETS.filter((preset) => !BUILTIN_PRESET_DISPLAY_ORDER.includes(preset.id))
+];
+const EXTREME_WTF_PRESETS = EXTREME_WTF_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 
 const CONTROL_GROUPS = [
     {
@@ -1081,6 +1331,13 @@ const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'came
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
 const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay']);
+const MAX_USER_PRESETS = 128;
+const MAX_PRESET_NAME_LENGTH = 80;
+const MAX_PRESET_ID_LENGTH = 96;
+const USER_PRESET_KEYS = new Set(['id', 'name', 'readonly', 'transitionSeconds', 'params']);
+const PRESET_PARAM_KEYS = new Set(
+    Object.keys(DEFAULT_PARAMS).filter((key) => !PRESET_EXCLUDED_PARAM_KEYS.has(key))
+);
 const STATIC_GPU_BACKENDS = new Set(['auto', 'webgpu', 'webgl2']);
 const STATIC_CANVAS_BACKENDS = new Set(['canvas2d', 'pixel-canvas']);
 
@@ -1367,16 +1624,50 @@ function normalizeParams(params, options = {}) {
     if (!CAMERA_FIT_OPTIONS.some(([value]) => value === out.cameraFit)) out.cameraFit = 'cover';
     if (isCameraUrl(out.mediaUrl)) out.sourceName = cameraSourceName(out);
     out.codecTolerance = CODEC_TOLERANCE[out.codecQuality] ?? Number(out.codecTolerance || 0);
+    for (const [key, config] of CONTROL_CONFIG_BY_KEY) {
+        if (!(key in out)) continue;
+        if (key === 'rows' && out.autoRows) continue;
+        if (config.type === 'range') {
+            const numeric = Number(out[key]);
+            out[key] = clampParamValue(
+                key,
+                Number.isFinite(numeric) ? numeric : Number(DEFAULT_PARAMS[key] ?? config.min ?? 0)
+            );
+        } else if (config.type === 'checkbox') {
+            out[key] = Boolean(out[key]);
+        } else if (config.type === 'select' && Array.isArray(config.options)) {
+            const allowedValues = config.options.map(([value]) => String(value));
+            const current = String(out[key] ?? '');
+            const next = allowedValues.includes(current) ? current : String(DEFAULT_PARAMS[key] ?? allowedValues[0] ?? '');
+            out[key] = typeof DEFAULT_PARAMS[key] === 'number' ? Number(next) : next;
+        }
+    }
     return out;
 }
 
 function migrateStoredParams(params) {
     const out = { ...(params || {}) };
-    if (localStorage.getItem(FPS_DEFAULT_MIGRATION_KEY) === '1') return out;
-    const isOldStaticDefaultFps = (out.sourceMode || DEFAULT_PARAMS.sourceMode) === 'static' &&
-        (out.fps === undefined || Number(out.fps) === 24);
-    if (isOldStaticDefaultFps) out.fps = DEFAULT_PARAMS.fps;
-    localStorage.setItem(FPS_DEFAULT_MIGRATION_KEY, '1');
+    if (localStorage.getItem(DEFAULT_SOURCE_MIGRATION_KEY) !== '1') {
+        const oldDefaultSource = (
+            out.mediaUrl === 'media/point-click-test-30s.mp4' ||
+            out.mediaUrl === 'media/point-click-test.mp4' ||
+            out.sourceName === 'Demo Video 1' ||
+            out.sourceName === 'Point and Click Test'
+        );
+        if ((out.sourceMode || DEFAULT_PARAMS.sourceMode) === 'static' && oldDefaultSource) {
+            out.mediaUrl = DEFAULT_PARAMS.mediaUrl;
+            out.mediaType = DEFAULT_PARAMS.mediaType;
+            out.sourceName = DEFAULT_PARAMS.sourceName;
+        }
+        localStorage.setItem(DEFAULT_SOURCE_MIGRATION_KEY, '1');
+    }
+
+    if (localStorage.getItem(FPS_DEFAULT_MIGRATION_KEY) !== '1') {
+        const isOldStaticDefaultFps = (out.sourceMode || DEFAULT_PARAMS.sourceMode) === 'static' &&
+            (out.fps === undefined || Number(out.fps) === 24);
+        if (isOldStaticDefaultFps) out.fps = DEFAULT_PARAMS.fps;
+        localStorage.setItem(FPS_DEFAULT_MIGRATION_KEY, '1');
+    }
     return out;
 }
 
@@ -1685,6 +1976,81 @@ function stripPresetExcludedParams(params) {
     const out = clone(params || {});
     for (const key of PRESET_EXCLUDED_PARAM_KEYS) delete out[key];
     return out;
+}
+
+function sanitizePresetText(value, fallback, maxLength) {
+    const cleaned = String(value ?? fallback ?? '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .trim()
+        .slice(0, maxLength);
+    return cleaned || fallback;
+}
+
+function sanitizePresetId(value, fallback) {
+    const cleaned = String(value ?? fallback ?? '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[^A-Za-z0-9._:-]/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, MAX_PRESET_ID_LENGTH);
+    return cleaned || fallback;
+}
+
+function uniquePresetId(id, usedIds) {
+    let next = id;
+    let suffix = 2;
+    while (usedIds.has(next)) {
+        const suffixText = `-${suffix}`;
+        next = `${id.slice(0, Math.max(1, MAX_PRESET_ID_LENGTH - suffixText.length))}${suffixText}`;
+        suffix += 1;
+    }
+    usedIds.add(next);
+    return next;
+}
+
+function validateImportedPresetShape(preset, idx) {
+    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) {
+        throw new Error(`Preset ${idx + 1} must be an object`);
+    }
+    for (const key of Object.keys(preset)) {
+        if (!USER_PRESET_KEYS.has(key)) throw new Error(`Preset ${idx + 1} has unsupported field "${key}"`);
+    }
+    if (preset.params !== undefined && (!preset.params || typeof preset.params !== 'object' || Array.isArray(preset.params))) {
+        throw new Error(`Preset ${idx + 1} params must be an object`);
+    }
+    for (const key of Object.keys(preset.params || {})) {
+        if (!PRESET_PARAM_KEYS.has(key)) throw new Error(`Preset ${idx + 1} has unsupported parameter "${key}"`);
+    }
+}
+
+function sanitizePresetParams(params) {
+    const allowed = {};
+    if (params && typeof params === 'object' && !Array.isArray(params)) {
+        for (const [key, value] of Object.entries(params)) {
+            if (PRESET_PARAM_KEYS.has(key)) allowed[key] = value;
+        }
+    }
+    return stripPresetExcludedParams(normalizeParams(allowed));
+}
+
+function sanitizeUserPreset(preset, idx, fallbackTransitionSeconds, options = {}) {
+    const strict = Boolean(options.strict);
+    const usedIds = options.usedIds || new Set();
+    if (strict) validateImportedPresetShape(preset, idx);
+    const source = preset && typeof preset === 'object' && !Array.isArray(preset) ? preset : {};
+    const fallbackId = `user-${Date.now()}-${idx}`;
+    const fallbackName = `Preset ${idx + 1}`;
+    const transitionSeconds = Number(source.transitionSeconds ?? fallbackTransitionSeconds);
+    return {
+        id: uniquePresetId(sanitizePresetId(source.id, fallbackId), usedIds),
+        name: sanitizePresetText(source.name, fallbackName, MAX_PRESET_NAME_LENGTH),
+        readonly: false,
+        transitionSeconds: clamp(
+            Number.isFinite(transitionSeconds) ? transitionSeconds : DEFAULT_PARAMS.transitionSeconds,
+            CONTROL_CONFIG_BY_KEY.get('transitionSeconds')?.min ?? 0,
+            CONTROL_CONFIG_BY_KEY.get('transitionSeconds')?.max ?? 8
+        ),
+        params: sanitizePresetParams(source.params || {})
+    };
 }
 
 function renderPresetParams(params) {
@@ -4113,6 +4479,7 @@ class RendererLabApp {
         this.audioReactiveRuntime = new AudioReactiveRuntime(this);
         this.userPresets = parseStoredJson(PRESET_KEY, []);
         this.activePresetId = 'point-click-default';
+        this.transitionToken = 0;
         this.staticRuntime = new StaticRuntime(this);
         this.streamRuntime = new StreamRuntime(this);
         this.running = false;
@@ -4690,7 +5057,7 @@ class RendererLabApp {
     _shouldUseTauriRawVideoSource(params) {
         if (!isTauriRuntime() || params.mediaType !== 'video') return false;
         if (!this.customTauriFile?.id || params.mediaUrl !== this.customTauriFile.url) return false;
-        return isMkvName(this.customTauriFile.name || this.customTauriFile.path || params.mediaUrl);
+        return isMkvName(this.customTauriFile.name || params.mediaUrl);
     }
 
     async loadStaticSource(params, options = {}) {
@@ -4836,6 +5203,7 @@ class RendererLabApp {
 
     _buildControls() {
         els.controls.innerHTML = '';
+        if (els.cameraControlsSlot) els.cameraControlsSlot.innerHTML = '';
         for (const group of CONTROL_GROUPS) {
             const section = document.createElement('section');
             section.className = 'control-group';
@@ -4859,7 +5227,10 @@ class RendererLabApp {
                 section.appendChild(row);
                 this.controlInputs.set(config.key, { input, value, config, row, section });
             }
-            els.controls.appendChild(section);
+            const target = group.title === 'Camera' && els.cameraControlsSlot
+                ? els.cameraControlsSlot
+                : els.controls;
+            target.appendChild(section);
         }
     }
 
@@ -5608,6 +5979,9 @@ class RendererLabApp {
 
     async _switchStaticSource(sourceParams, options = {}) {
         clearTimeout(this.rebuildTimer);
+        const resumeWtf = options.interruptTransition !== false
+            ? await this._prepareForSourceSwitch()
+            : false;
         const previousSourceMode = this.params.sourceMode;
         const previousWasCamera = isCameraParams(this.params);
         const nextParams = normalizeParams({
@@ -5628,7 +6002,10 @@ class RendererLabApp {
         this._renderSourceList();
 
         if (previousWasCamera && !nextIsCamera) this._stopCameraStream({ render: false });
-        if (!sourceChanged && this.running) return;
+        if (!sourceChanged && this.running) {
+            if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+            return;
+        }
 
         if (this.starting) {
             this.startToken++;
@@ -5641,11 +6018,44 @@ class RendererLabApp {
         if (this.running && previousSourceMode === 'static') await this._restartStaticSourceFast({ mediaState: null });
         else if (this.running) await this.restart({ mediaState: null });
         else await this.start({ autoStart: true });
+        if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+    }
+
+    async _prepareForSourceSwitch() {
+        const resumeWtf = this.wtfActive;
+        if (resumeWtf) this._stopWtf();
+        if (!this.transitioning) return resumeWtf;
+        this._cancelActiveTransition();
+        await new Promise((resolve) => scheduleResponsiveFrame(resolve));
+        return resumeWtf;
+    }
+
+    _cancelActiveTransition() {
+        this.transitionToken++;
+        this.transitioning = false;
+        this._hideTransitionLayer();
+    }
+
+    _resumeWtfAfterSourceSwitch() {
+        if (this.wtfActive) return;
+        requestAnimationFrame(() => {
+            if (!this.wtfActive) this._startWtf();
+        });
     }
 
     _reloadSource() {
-        if (isCameraParams(this.params)) this._stopCameraStream();
-        this.restart();
+        this._prepareForSourceSwitch()
+            .catch((error) => console.warn('[Source] Transition interrupt failed:', error))
+            .then((resumeWtf) => {
+                if (isCameraParams(this.params)) this._stopCameraStream();
+                return this.restart().then(() => resumeWtf);
+            })
+            .then((resumeWtf) => {
+                if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+            })
+            .catch((error) => {
+                console.warn('[Source] Reload failed:', error);
+            });
     }
 
     _handleControlInput(key) {
@@ -5686,7 +6096,12 @@ class RendererLabApp {
         if (!this.running) return;
 
         if (key === 'sourceMode') {
-            this.restart();
+            this._prepareForSourceSwitch()
+                .then((resumeWtf) => this.restart().then(() => resumeWtf))
+                .then((resumeWtf) => {
+                    if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+                })
+                .catch((error) => console.warn('[Renderer] Source mode switch failed:', error));
             return;
         }
 
@@ -5702,7 +6117,12 @@ class RendererLabApp {
         if (STATIC_REBUILD_KEYS.has(key) || structural) {
             clearTimeout(this.rebuildTimer);
             if (STATIC_SOURCE_KEYS.has(key)) {
-                this.restart({ mediaState: null }).catch((error) => console.warn('[Renderer] Source restart failed:', error));
+                this._prepareForSourceSwitch()
+                    .then((resumeWtf) => this.restart({ mediaState: null }).then(() => resumeWtf))
+                    .then((resumeWtf) => {
+                        if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+                    })
+                    .catch((error) => console.warn('[Renderer] Source restart failed:', error));
                 return;
             }
             const preserveStaticMedia = !STATIC_SOURCE_KEYS.has(key);
@@ -5903,6 +6323,7 @@ class RendererLabApp {
         if (!win) return false;
 
         this.popout = win;
+        try { win.opener = null; } catch {}
         try {
             win.document.open();
             win.document.write(`<!DOCTYPE html>
@@ -6677,15 +7098,17 @@ button:hover{background:#202a35}
         els.sourceMode.value = this.params.sourceMode;
         els.backend.value = this.params.backend;
         els.backend.disabled = this.params.sourceMode === 'stream';
-        const matched = findSourcePreset(this.params.mediaUrl, this.params.mediaType);
-        const sourceName = isCameraParams(this.params) ? cameraSourceName(this.params) : matched?.name || this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl);
-        const nativeStreamName = this.params.sourceMode === 'stream' && this.customTauriFile?.id && this.customSourceStatus === 'present'
-            ? this.customSourceMeta?.name || this.customTauriFile.name
-            : '';
-        els.sourceLabel.textContent = this.params.sourceMode === 'static'
-            ? sourceName
-            : nativeStreamName ? `native stream: ${nativeStreamName}` : 'stream source';
+        els.sourceLabel.textContent = this._currentSourceName();
         this._renderSourceList();
+    }
+
+    _currentSourceName() {
+        if (isCameraParams(this.params)) return cameraSourceName(this.params);
+        if (this.params.sourceMode === 'stream' && this.customTauriFile?.id && this.customSourceStatus === 'present') {
+            return this.customSourceMeta?.name || this.customTauriFile.name || 'Native stream';
+        }
+        const matched = findSourcePreset(this.params.mediaUrl, this.params.mediaType);
+        return matched?.name || this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl);
     }
 
     _applyVisualState() {
@@ -6745,11 +7168,11 @@ button:hover{background:#202a35}
         const rows = stats?.rows || (renderParams.autoRows ? 'auto' : renderParams.rows);
         els.gridMeter.textContent = `${stats?.cols || renderParams.cols} x ${rows}`;
         const overlay = [
-            `source=${this.params.sourceMode}`,
+            `preset=${this._currentPresetName()}`,
+            `source=${this._currentSourceName()}`,
             `backend=${stats?.backend || this.params.backend}`,
             `grid=${stats?.cols || renderParams.cols}x${rows}`,
             `fps=${Math.round(fps)}/${Math.round(target)}`,
-            `codec=${this.params.codec}:${this.params.codecQuality}`,
             `transition=${this.params.transitionSeconds.toFixed(1)}s`,
             `audio=${this.audioReactiveRuntime.active ? this.audioReactive.preset : 'off'}`
         ];
@@ -6789,7 +7212,13 @@ button:hover{background:#202a35}
     }
 
     _allPresets() {
-        return [...BUILTIN_PRESETS, ...this.userPresets];
+        return [...BUILTIN_PRESETS_DISPLAY, ...this.userPresets];
+    }
+
+    _currentPresetName() {
+        if (this.wtfActive) return 'WTF';
+        const active = this._allPresets().find((p) => p.id === this.activePresetId);
+        return active?.name || 'Custom';
     }
 
     _renderPresets() {
@@ -6815,8 +7244,7 @@ button:hover{background:#202a35}
             button.addEventListener('click', () => this.applyPreset(preset.id));
             els.presetList.appendChild(button);
         }
-        const active = this._allPresets().find((p) => p.id === this.activePresetId);
-        els.activePresetLabel.textContent = active?.name || 'Custom';
+        els.activePresetLabel.textContent = this._currentPresetName();
         this._syncPresetToolbar();
     }
 
@@ -6926,7 +7354,8 @@ button:hover{background:#202a35}
             const seconds = randomBetween(1, 5);
             const target = this._makeWtfTarget(seconds);
             try {
-                await this._transitionTo(target, seconds);
+                const completed = await this._transitionTo(target, seconds);
+                if (!completed || !this.wtfActive || token !== this.wtfToken) break;
                 this.activePresetId = null;
                 els.activePresetLabel.textContent = this.wtfActive ? 'WTF' : 'Custom';
             } catch (error) {
@@ -6966,6 +7395,9 @@ button:hover{background:#202a35}
 
     _randomWtfTarget(seconds) {
         const target = { ...this.params, transitionSeconds: seconds };
+        const anchor = randomBool(0.42) ? randomChoice(EXTREME_WTF_PRESETS) : null;
+        const anchorParams = anchor ? stripPresetExcludedParams(anchor.params || {}) : null;
+        if (anchorParams) Object.assign(target, anchorParams);
         const staticMode = target.sourceMode === 'static';
 
         if (staticMode) {
@@ -6976,31 +7408,40 @@ button:hover{background:#202a35}
         target.loop = true;
         target.muted = randomBool(0.72);
 
-        target.cols = randomInt(260, 760);
+        const lowColumnBias = Boolean(anchorParams) || randomBool(0.38);
+        target.cols = lowColumnBias ? randomInt(80, 280) : randomInt(280, 780);
         target.autoRows = true;
         target.rows = 0;
-        const cellScale = randomInt(1, 5);
+        const cellScale = lowColumnBias ? randomInt(5, 12) : randomInt(1, 6);
         target.cellWidth = cellScale;
-        target.cellHeight = Math.max(2, Math.round(cellScale * 1.5));
+        target.cellHeight = Math.max(2, Math.min(16, Math.round(cellScale * randomBetween(1.35, 1.65))));
         target.aspectCorrection = 1;
 
-        target.saturationBoost = snapToStep(randomBetween(0.18, 2.75), 0.01);
-        target.contrastBoost = snapToStep(randomBetween(0.55, 2.45), 0.01);
-        target.brightness = snapToStep(randomBetween(0.48, 1.62), 0.01);
-        target.gamma = snapToStep(randomBetween(0.55, 2.35), 0.01);
-        target.bgBlend = snapToStep(randomBetween(0, 0.72), 0.01);
-        target.quantizeBits = randomInt(0, 5);
+        target.saturationBoost = snapToStep(randomBool(0.54)
+            ? randomChoice([randomBetween(0, 0.22), randomBetween(2.55, 3)])
+            : randomBetween(0.22, 2.65), 0.01);
+        target.contrastBoost = snapToStep(randomBool(0.62)
+            ? randomBetween(2.2, 3)
+            : randomBetween(0.75, 2.35), 0.01);
+        target.brightness = snapToStep(randomBetween(0.72, 1.48), 0.01);
+        target.gamma = snapToStep(randomBool(0.58)
+            ? randomChoice([randomBetween(0.28, 0.68), randomBetween(2.25, 3)])
+            : randomBetween(0.68, 2.25), 0.01);
+        target.bgBlend = snapToStep(randomBool(0.66)
+            ? randomBetween(0, 0.12)
+            : randomBetween(0.12, 0.5), 0.01);
+        target.quantizeBits = randomBool(0.64) ? randomInt(5, 6) : randomInt(0, 5);
 
         if (target.sourceMode === 'stream') {
             target.mode = randomInt(1, 5);
             target.pixel = randomBool(0.4);
         } else {
-            target.pixel = false;
+            target.pixel = Boolean(anchorParams?.pixel) && randomBool(0.72);
         }
 
         target.fps = randomInt(WTF_MIN_SMOOTH_FPS, WTF_MAX_SMOOTH_FPS);
-        target.jitterAmount = snapToStep(randomBetween(0, 1), 0.01);
-        target.jitterSpeed = snapToStep(randomBetween(0, 4), 0.01);
+        target.jitterAmount = snapToStep(randomBool(0.72) ? randomBetween(0.72, 1) : randomBetween(0, 0.72), 0.01);
+        target.jitterSpeed = snapToStep(randomBool(0.72) ? randomBetween(2.7, 4) : randomBetween(0, 2.7), 0.01);
         target.sampleX = snapToStep(randomBetween(0.08, 0.92), 0.01);
         target.sampleY = snapToStep(randomBetween(0.08, 0.92), 0.01);
         target.smoothing = randomBool(0.5);
@@ -7017,8 +7458,8 @@ button:hover{background:#202a35}
         target.fpsCap = randomInt(WTF_MIN_SMOOTH_FPS, WTF_MAX_SMOOTH_FPS);
 
         const canvasBackend = backendKind(target) === 'canvas';
-        target.solidMode = canvasBackend ? randomBool(0.28) : randomBool(0.12);
-        target.glyphMode = target.solidMode ? false : randomBool(0.66);
+        target.solidMode = Boolean(anchorParams?.solidMode) || (canvasBackend ? randomBool(0.34) : randomBool(0.2));
+        target.glyphMode = target.solidMode ? false : (anchorParams?.glyphMode ?? randomBool(0.66));
         target.charset = randomChoice(['point-click', 'asciline', 'blocks']);
         target.fontFamily = randomChoice(['Courier New', 'monospace', 'Menlo', 'Consolas']);
         target.minGlyphIntensity = randomInt(70, 230);
@@ -7119,31 +7560,40 @@ button:hover{background:#202a35}
     }
 
     async _transitionTo(target, seconds) {
+        const token = ++this.transitionToken;
         const before = { ...this.params };
         const changed = Object.keys(target).filter((key) => target[key] !== before[key]);
         const needsRebuild = changed.some((key) => STRUCTURAL_KEYS.has(key));
         if (seconds <= 0) {
+            if (token !== this.transitionToken) return false;
             const mediaState = this._captureStaticMediaState(target);
             this.params = target;
             this._syncInputs();
             this._persist();
             if (this.running) await this.restart({ mediaState });
             else this._applyVisualState();
-            return;
+            return token === this.transitionToken;
         }
         if (needsRebuild) {
-            await this._crossfadeRebuild(target, seconds);
-            return;
+            return this._crossfadeRebuild(target, seconds, token);
         }
-        await this._tweenParams(before, target, seconds);
+        return this._tweenParams(before, target, seconds, {}, token);
     }
 
-    _tweenParams(from, to, seconds, options = {}) {
+    _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
         this.transitioning = true;
         return new Promise((resolve) => {
             const start = performance.now();
             const duration = Math.max(1, seconds * 1000);
+            const cancel = () => {
+                if (!options.keepTransitioning) this.transitioning = false;
+                resolve(false);
+            };
             const step = (now) => {
+                if (token !== this.transitionToken) {
+                    cancel();
+                    return;
+                }
                 const t = clamp((now - start) / duration, 0, 1);
                 const eased = easeInOut(t);
                 for (const key of Object.keys(to)) {
@@ -7161,12 +7611,16 @@ button:hover{background:#202a35}
                 if (t < 1) {
                     scheduleResponsiveFrame(step);
                 } else {
+                    if (token !== this.transitionToken) {
+                        cancel();
+                        return;
+                    }
                     this.params = to;
                     this._syncInputs();
                     this._persist();
                     this._applyEffectiveRendererParams(this.renderParams(), 'transition');
                     if (!options.keepTransitioning) this.transitioning = false;
-                    resolve();
+                    resolve(true);
                 }
             };
             scheduleResponsiveFrame(step);
@@ -7286,30 +7740,57 @@ button:hover{background:#202a35}
         return advanced;
     }
 
-    _crossfadeLiveRenderer(target, seconds) {
+    _crossfadeLiveRenderer(target, seconds, token = this.transitionToken) {
         this.transitioning = true;
         return new Promise((resolve, reject) => {
             const duration = Math.max(80, seconds * 1000);
+            const runtime = this.staticRuntime;
             let prepared = null;
             let finished = false;
+            const active = () => token === this.transitionToken;
+
+            const cancel = () => {
+                if (finished) return;
+                finished = true;
+                runtime.cancelCrossfadeRenderer(prepared);
+                if (active()) this.transitioning = false;
+                resolve(false);
+            };
 
             const finish = () => {
                 if (finished) return;
                 finished = true;
-                this.staticRuntime.finishCrossfadeRenderer(prepared);
+                if (!active()) {
+                    runtime.cancelCrossfadeRenderer(prepared);
+                    resolve(false);
+                    return;
+                }
+                runtime.finishCrossfadeRenderer(prepared);
                 this.transitioning = false;
-                resolve();
+                resolve(true);
             };
 
             const run = async () => {
+                if (!active()) {
+                    cancel();
+                    return;
+                }
                 this.params = target;
                 this._syncInputs();
                 this._persist();
                 this._applyVisualState();
 
-                prepared = await this.staticRuntime.prepareCrossfadeRenderer(target);
+                prepared = await runtime.prepareCrossfadeRenderer(target);
+                if (!active()) {
+                    cancel();
+                    return;
+                }
                 if (!prepared) {
                     await this.restart({ mediaState: this._captureStaticMediaState(target) });
+                    if (!active()) {
+                        cancel();
+                        return;
+                    }
                     finish();
                     return;
                 }
@@ -7327,6 +7808,10 @@ button:hover{background:#202a35}
 
                 const start = performance.now();
                 const step = (now) => {
+                    if (!active()) {
+                        cancel();
+                        return;
+                    }
                     const t = clamp((now - start) / duration, 0, 1);
                     if (prepared?.oldLayer) prepared.oldLayer.style.opacity = String(crossfadeOut(t));
                     if (t < 1) scheduleResponsiveFrame(step);
@@ -7336,21 +7821,21 @@ button:hover{background:#202a35}
             };
 
             run().catch((error) => {
-                this.staticRuntime.cancelCrossfadeRenderer(prepared);
-                this.transitioning = false;
+                runtime.cancelCrossfadeRenderer(prepared);
+                if (active()) this.transitioning = false;
                 reject(error);
             });
         });
     }
 
-    _crossfadeRebuild(target, seconds) {
+    _crossfadeRebuild(target, seconds, token = this.transitionToken) {
         if (
             this.running &&
             this.params.sourceMode === 'static' &&
             target.sourceMode === 'static' &&
             this.staticRuntime.canReuseSource(target)
         ) {
-            return this._crossfadeLiveRenderer(target, seconds);
+            return this._crossfadeLiveRenderer(target, seconds, token);
         }
 
         this.transitioning = true;
@@ -7362,13 +7847,28 @@ button:hover{background:#202a35}
             let rebuildDone = false;
             let finished = false;
             let fadeStarted = false;
+            const active = () => token === this.transitionToken;
+
+            const cancel = () => {
+                if (finished) return;
+                finished = true;
+                if (active()) {
+                    this._hideTransitionLayer();
+                    this.transitioning = false;
+                }
+                resolve(false);
+            };
 
             const finish = () => {
                 if (finished || !fadeDone || !rebuildDone) return;
                 finished = true;
+                if (!active()) {
+                    resolve(false);
+                    return;
+                }
                 this._hideTransitionLayer();
                 this.transitioning = false;
-                resolve();
+                resolve(true);
             };
 
             const startFade = () => {
@@ -7376,6 +7876,10 @@ button:hover{background:#202a35}
                 fadeStarted = true;
                 const start = performance.now();
                 const step = (now) => {
+                    if (!active()) {
+                        cancel();
+                        return;
+                    }
                     const t = clamp((now - start) / duration, 0, 1);
                     const opacity = String(crossfadeOut(t));
                     if (this.transitionFadeCanvas) this.transitionFadeCanvas.style.opacity = opacity;
@@ -7397,6 +7901,11 @@ button:hover{background:#202a35}
                 const fallbackTimer = window.setTimeout(startFade, 90);
                 scheduleResponsiveFrame(() => {
                     window.setTimeout(() => {
+                        if (!active()) {
+                            window.clearTimeout(fallbackTimer);
+                            cancel();
+                            return;
+                        }
                         try {
                             const underlay = this._makeSoftwareTransitionSnapshot(target, width, height, { maxCells: 30000, sampleLimit: 700 });
                             if (underlay) this._insertTransitionUnderlay(underlay);
@@ -7409,11 +7918,19 @@ button:hover{background:#202a35}
             };
 
             const rebuild = async () => {
+                if (!active()) {
+                    cancel();
+                    return;
+                }
                 this.params = target;
                 this._syncInputs();
                 this._persist();
                 if (this.running) {
                     await this.restart({ mediaState });
+                    if (!active()) {
+                        cancel();
+                        return;
+                    }
                     if (this.params.sourceMode === 'static') {
                         const painted = await this._paintCurrentFrame();
                         if (!painted) await new Promise((resolve) => setTimeout(resolve, 120));
@@ -7508,15 +8025,15 @@ button:hover{background:#202a35}
     }
 
     _sanitizedUserPresets() {
-        return (Array.isArray(this.userPresets) ? this.userPresets : []).map((preset, idx) => {
-            const clean = preset && typeof preset === 'object' ? clone(preset) : {};
-            clean.id = clean.id || `user-${Date.now()}-${idx}`;
-            clean.name = clean.name || `Preset ${idx + 1}`;
-            clean.readonly = false;
-            clean.transitionSeconds = Number(clean.transitionSeconds ?? this.params.transitionSeconds);
-            clean.params = stripPresetExcludedParams(clean.params);
-            return clean;
-        });
+        const usedIds = new Set(BUILTIN_PRESETS.map((preset) => preset.id));
+        return (Array.isArray(this.userPresets) ? this.userPresets : [])
+            .slice(0, MAX_USER_PRESETS)
+            .map((preset, idx) => sanitizeUserPreset(
+                preset,
+                idx,
+                this.params.transitionSeconds,
+                { usedIds }
+            ));
     }
 
     async _exportPresets() {
@@ -7536,13 +8053,16 @@ button:hover{background:#202a35}
             const parsed = JSON.parse(raw);
             const incoming = Array.isArray(parsed) ? parsed : parsed.presets;
             if (!Array.isArray(incoming)) throw new Error('Missing presets array');
-            this.userPresets = incoming.map((preset, idx) => ({
-                id: preset.id || `user-import-${Date.now()}-${idx}`,
-                name: preset.name || `Imported ${idx + 1}`,
-                readonly: false,
-                transitionSeconds: Number(preset.transitionSeconds ?? this.params.transitionSeconds),
-                params: stripPresetExcludedParams(normalizeParams(preset.params || {}))
-            }));
+            if (incoming.length > MAX_USER_PRESETS) {
+                throw new Error(`Import is limited to ${MAX_USER_PRESETS} presets`);
+            }
+            const usedIds = new Set(BUILTIN_PRESETS.map((preset) => preset.id));
+            this.userPresets = incoming.map((preset, idx) => sanitizeUserPreset(
+                preset,
+                idx,
+                this.params.transitionSeconds,
+                { strict: true, usedIds }
+            ));
             if (!this._allPresets().some((preset) => preset.id === this.activePresetId)) {
                 this.activePresetId = 'point-click-default';
             }

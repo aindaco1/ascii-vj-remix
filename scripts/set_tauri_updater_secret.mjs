@@ -6,8 +6,10 @@ import {
   requireGhAndRepo,
   setSecret
 } from './lib/github_secrets.mjs';
+import { existsSync } from 'node:fs';
 
-const DEFAULT_KEY_PATH = '/private/tmp/asciline-remix-updater.key';
+const DEFAULT_KEY_PATH = '/private/tmp/ascii-vj-remix-updater.key';
+const DEFAULT_PASSWORD_PATH = '/private/tmp/ascii-vj-remix-updater.password';
 const DEFAULT_SECRET_NAME = 'TAURI_SIGNING_PRIVATE_KEY';
 const DEFAULT_PASSWORD_SECRET_NAME = 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD';
 
@@ -42,7 +44,7 @@ The secret is passed over stdin and is never printed.
 Options:
   --key <path>             Private key path. Default: ${DEFAULT_KEY_PATH}
   --repo <owner/repo>      GitHub repo. Default: parsed from origin remote
-  --password-file <path>   Optional updater key password file
+  --password-file <path>   Updater key password file. Defaults to ${DEFAULT_PASSWORD_PATH} when it exists
   --secret-name <name>     Key secret name. Default: ${DEFAULT_SECRET_NAME}
   --password-secret-name <name>
                            Password secret name. Default: ${DEFAULT_PASSWORD_SECRET_NAME}
@@ -67,8 +69,13 @@ try {
 
   const key = await readTrimmedFile(keyPath, 'updater private key');
   let password = '';
-  if (args.passwordFile) {
-    password = await readTrimmedFile(path.resolve(args.passwordFile), 'updater private key password');
+  const passwordPath = args.passwordFile
+    ? path.resolve(args.passwordFile)
+    : existsSync(DEFAULT_PASSWORD_PATH)
+      ? DEFAULT_PASSWORD_PATH
+      : '';
+  if (passwordPath) {
+    password = await readTrimmedFile(passwordPath, 'updater private key password');
   }
 
   if (args.dryRun) {

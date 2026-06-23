@@ -1,6 +1,6 @@
-use asciline_remix_lib::media_engine::ffmpeg::{DecodeConfig, FfmpegBinaries};
-use asciline_remix_lib::media_engine::frame_prep::RenderMode;
-use asciline_remix_lib::media_engine::pipeline::{run_stream_pipeline, StreamPipelineConfig};
+use ascii_vj_remix_lib::media_engine::ffmpeg::{DecodeConfig, FfmpegBinaries};
+use ascii_vj_remix_lib::media_engine::frame_prep::RenderMode;
+use ascii_vj_remix_lib::media_engine::pipeline::{run_stream_pipeline, StreamPipelineConfig};
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;

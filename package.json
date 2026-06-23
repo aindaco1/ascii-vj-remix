@@ -1,6 +1,6 @@
 {
-  "name": "asciline-remix",
-  "version": "0.1.8",
+  "name": "ascii-vj-remix",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -24,7 +24,7 @@
     "check:media": "npm run test:frame-prep && npm run test:decode-resize && npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 false && npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 true && npm run media:native-session-preview -- media/point-click-test.mp4 96 54 12 5 false 4 && npm run media:native-session-preview -- media/point-click-test.mp4 96 54 12 5 true 4",
     "check:tauri-policy": "node scripts/check_tauri_policy.mjs",
     "bundle:debug": "npm run tauri -- build --debug && npm run check:bundle:debug",
-    "bundle:release": "npm run check:release && npm run tauri:build && npm run check:bundle:release",
+    "bundle:release": "npm run ffmpeg:build-sidecar && npm run check:release && npm run tauri:build && npm run check:bundle:release",
     "desktop:run-local": "bash scripts/run_local_desktop_app.sh",
     "desktop:run-local:foreground": "ASCILINE_FOREGROUND=1 bash scripts/run_local_desktop_app.sh",
     "desktop:run-local:reset": "ASCILINE_RESET_TCC=1 bash scripts/run_local_desktop_app.sh",
@@ -51,7 +51,7 @@
     "test:updater-manifest": "node scripts/test_tauri_update_manifest.mjs",
     "test:macos-secret-args": "node scripts/test_macos_notarization_secret_args.mjs",
     "test:native-output-log": "node scripts/analyze_native_output_log.mjs",
-    "test:vectors": "node experiments/check_vectors.js experiments/vectors && node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example check_codec_vectors -- experiments/vectors",
+    "test:vectors": "node scripts/test_vectors.mjs",
     "test:rust": "node scripts/cargo_env.mjs test --manifest-path src-tauri/Cargo.toml",
     "tauri": "node scripts/tauri_env.mjs",
     "tauri:dev": "node scripts/tauri_env.mjs dev",

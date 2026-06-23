@@ -8,6 +8,7 @@ use crate::media_engine::pipeline::{
     StreamPipelineReader, StreamPipelineSummary,
 };
 use base64::{engine::general_purpose, Engine as _};
+use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -30,7 +31,9 @@ const MAX_RAW_VIDEO_PIXELS: u64 = 1_000_000;
 pub struct RegisteredMediaFile {
     pub id: String,
     pub provider: String,
+    #[serde(skip_serializing)]
     pub path: PathBuf,
+    pub asset_url: String,
     pub name: String,
     pub size: Option<u64>,
     pub last_modified: Option<u128>,
@@ -222,6 +225,7 @@ impl MediaRegistry {
             id: id.clone(),
             provider: "tauri".to_string(),
             path: path.clone(),
+            asset_url: asset_url_for_path(&path),
             name: path
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -250,12 +254,22 @@ impl MediaRegistry {
         Ok(files)
     }
 
-    fn forget(&self, id: &str) -> Result<bool, String> {
+    fn forget(&self, app: &AppHandle, id: &str) -> Result<bool, String> {
         let mut inner = self
             .inner
             .lock()
             .map_err(|_| "media registry lock poisoned".to_string())?;
-        Ok(inner.files.remove(id).is_some())
+        let Some(file) = inner.files.remove(id) else {
+            return Ok(false);
+        };
+        let still_registered = inner.files.values().any(|entry| entry.path == file.path);
+        drop(inner);
+
+        if !still_registered {
+            let _ = app.asset_protocol_scope().forbid_file(&file.path);
+        }
+
+        Ok(true)
     }
 
     pub(crate) fn path_for(&self, id: &str) -> Result<PathBuf, String> {
@@ -268,6 +282,16 @@ impl MediaRegistry {
             .get(id)
             .map(|file| file.path.clone())
             .ok_or_else(|| "registered media source is unavailable".to_string())
+    }
+}
+
+fn asset_url_for_path(path: &Path) -> String {
+    let raw = path.to_string_lossy();
+    let encoded = percent_encode(raw.as_bytes(), NON_ALPHANUMERIC).to_string();
+    if cfg!(target_os = "windows") {
+        format!("http://asset.localhost/{encoded}")
+    } else {
+        format!("asset://localhost/{encoded}")
     }
 }
 
@@ -586,8 +610,12 @@ pub fn list_media_files(
 }
 
 #[tauri::command]
-pub fn forget_media_file(id: String, registry: State<'_, MediaRegistry>) -> Result<bool, String> {
-    registry.forget(&id)
+pub fn forget_media_file(
+    id: String,
+    app: AppHandle,
+    registry: State<'_, MediaRegistry>,
+) -> Result<bool, String> {
+    registry.forget(&app, &id)
 }
 
 #[tauri::command]

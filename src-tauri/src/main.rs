@@ -1,3 +1,3 @@
 fn main() {
-    asciline_remix_lib::run();
+    ascii_vj_remix_lib::run();
 }

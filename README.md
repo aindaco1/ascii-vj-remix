@@ -1,376 +1,428 @@
-# 🌌 ASCILINE Engine
+# ASCII VJ Remix
 
-**ASCILINE** is a high-performance, cross-platform real-time ASCII video rendering engine. **Our core objective is to transform the web into a highly dynamic and interactive typographic canvas.** By mapping pixels to text-based representations, we unlock new possibilities for web media delivery.
+ASCII VJ Remix is a local-first native desktop renderer lab for turning
+images, videos, cameras, and audio-reactive signals into high-performance ASCII
+and cell-based visuals.
 
-| Output | Details |
-| :--- | :--- |
-| <img src="https://github.com/user-attachments/assets/ccc727c9-c697-49f2-85e1-6f8c366f2019" width="400" alt="Original Source" /> | **Original Source**<br>Standard MP4 video file. |
-| <img src="https://github.com/user-attachments/assets/6bd7f5c0-81de-49fe-ba0d-9a8872ec8ae3" width="400" alt="ASCII Mode" /> | **ASCII Mode**<br>Showcases rendered using Mode 3 (32K Colors) from a 30fps source. |
-| <img src="https://github.com/user-attachments/assets/1fd88c3d-97d1-441a-a071-16de24ea82c0" width="400" alt="PIXEL Mode" /> | **PIXEL Mode**<br>Showcases rendered using Mode 5 (16m Colors) combined with the `--pixel` flag for ultra-high fidelity. |
+The app is built for VJ-style experimentation: pick a source, choose a preset,
+push the renderer hard, pop the output onto another display, and keep tuning
+the look live while the media keeps running.
 
-## 🎯 Strategic Vision & Core Capabilities
+Current documentation describes the 0.9.0 feature set.
 
-1. **Pure Typographic Manipulation**: The visual stream is not a standard media file—it's raw HTML/Canvas text. This makes the impossible possible: you can apply real-time CSS filters (neon glows, text shadows, animations) to video content.
-2. **Local AI & LLM Ready**: By reducing complex pixel streams into structured logical strings, ASCILINE acts as a perfect bridge for AI. Instead of feeding heavy computer vision models, lightweight LLMs can process semantic video summaries.
-3. **Ultra-Low Bandwidth & Zero GPU (valid for ASCII MOD)**: Standard codecs (H.264/VP9) require dedicated hardware decoders, choking microcontrollers and weak devices. ASCILINE offloads the heavy lifting to the backend, streaming only lightweight text frames. By scaling down the output quality (using fewer columns), extremely low bandwidth requirements can be achieved. This means you can play fluid, real-time video on devices with constrained networks and zero GPU capabilities (smart appliances, retro terminals, basic microcontrollers).
-4. **Bypassing Browser Constraints**: Modern browsers aggressively throttle autoplay videos, and ad-blockers restrict traditional media frames. To the browser, ASCILINE is simply "JavaScript updating a canvas"—completely invisible to media restrictions.
+## Quick Links
 
-## 🚀 Technical Features
+- [Changelog](CHANGELOG.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Rendering engine guide](docs/RENDERING_ENGINE.md)
+- [Contributor guide](docs/CONTRIBUTORS.md)
+- [LLM agent guide](docs/AGENTS.md)
+- [Security guide](docs/SECURITY.md)
+- [Performance guide](docs/PERFORMANCE.md)
+- [Testing guide](docs/TESTING.md)
+- [Accessibility guide](docs/ACCESSIBILITY.md)
+- [Internationalization guide](docs/I18N.md)
+- [Release and updater notes](docs/CONTRIBUTORS.md#release-and-updater-work)
+- Contact: [alonso@dustwave.xyz](mailto:alonso@dustwave.xyz)
+- Support the project: [shop.dustwave.xyz](https://shop.dustwave.xyz) or [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
--   **Cross-Platform**: Runs seamlessly on Windows, macOS, and Linux.
--   **Real-Time ASCII Streaming**: Low-latency video-to-ASCII conversion.
--   **Real-Time Pixel Streaming**: Replaces characters with colored blocks, approaching 360p video quality.
--   **High Performance**: Uses **HTML5 Canvas** for rendering, optimized for cinematic 24-30 FPS playback. High-FPS sources are automatically decimated for stability.
--   **Master Clock Sync**: The audio track acts as the absolute master clock, guaranteeing perfect A/V synchronization.
--   **Low-Overhead Binary Protocol*: Frames are streamed as raw binary (`Uint8Array`) directly to the canvas, saving bandwidth and CPU.
--   **Multiple Color Modes**: Supports everything from classic B&W to 16M color ultra-fidelity.
--   **Flexible Video Management**: Supports JSON playlists (per-video mode & volume), 
-      folder-based auto-queuing (filesystem order), single-file mode, and infinite loop 
-      playback — all controlled via CLI arguments.
+## What This Project Is
 
-## 🛠️ Architecture
+ASCII VJ Remix is a fork and remix of several related ideas:
 
-1.  **Backend (Python/FastAPI)**: Decodes video using OpenCV, maps pixels to ASCII characters via NumPy, and streams binary data.
-2.  **Frontend (Vanilla JS)**: Receives binary frames via WebSockets, manages a jitter buffer, and renders to a Canvas grid.
-3.  **Communication**: Optimized WebSocket protocol with a custom `INIT` handshake for dynamic resolution/FPS adjustment.
+- It started from [ASCILINE](https://github.com/YusufB5/ASCILINE), which
+  provides a high-performance ASCII video streaming pipeline, Python/FastAPI
+  server code, OpenCV frame preparation, adaptive WebSocket frame encoding,
+  terminal playback experiments, and Canvas rendering fallbacks.
+- It vendors and adapts the renderer from `ascii-point-and-click`, keeping the
+  high-quality WebGPU/WebGL visual output.
+- It keeps the local-first spirit of a standalone creative tool. The Tauri app
+  packages the renderer, demo media, fonts, native output path, and local media
+  adapters so day-to-day use does not require online services.
+- It uses an extreme black, white, grey, neon pink, and neon blue VJ control
+  surface with compact VCR-style typography and sharp rectangular controls.
 
-### Renderer Lab Fork
+The result is a live renderer
+workbench for stylized ASCII/cell video output.
 
-This fork also includes a browser-only renderer lab that vendors the `ascii-point-and-click` GPU renderer. It can render built-in demo media, user-selected local files, and one or more local cameras through WebGPU first, then WebGL2 or Canvas fallbacks. Multi-camera input is composited locally with Canvas2D and exposed to the renderer as a normal local media stream. Local files and camera frames stay in the browser; they are not uploaded to the Python server or fetched through online services.
+## Current Capabilities
 
-For static browser-only testing, serve the repo over localhost and open the page:
+### Sources
+
+- Built-in Demo Image, used as the default startup source.
+- Built-in Demo Video.
+- User-selected local image and video files.
+- MKV selection support in the desktop file picker. Playback depends on the
+  active platform decoder path; the native media path is where broader codec
+  support will continue to improve.
+- Local webcam/camera input.
+- Multiple simultaneous cameras when the operating system and desktop runtime
+  allow it.
+- Camera mixer layouts: grid, split row, stack, and picture-in-picture.
+- Camera controls appear directly under the Source panel while Camera is active.
+- Static media and camera frames stay local. They are not uploaded to a server.
+
+### Rendering
+
+- WebGPU renderer is the primary quality target on capable desktop runtimes.
+- WebGL2 renderer is the main embedded GPU fallback.
+- Canvas2D and pixel Canvas paths remain compatibility fallbacks.
+- Native Tauri output window uses a `wgpu` presenter where available:
+  - Metal on macOS.
+  - D3D12 on Windows.
+  - Vulkan/GLES on Linux.
+- The renderer exposes live controls for grid, cell size, color, gamma,
+  brightness, contrast, saturation, background blend, quantization, jitter,
+  sample position, smoothing, FPS, glyph/cell behavior, and performance status.
+- Stats overlay is enabled by default and remains user-controlled.
+
+### Presets and Live Controls
+
+- Built-in read-only visual presets, including extreme looks such as Neon
+  Sledgehammer, Gamma Sinkhole, Chrome Wound, Candy Fragmenter, Paper Shredder,
+  Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
+- User presets can be saved, duplicated, updated, deleted, imported, and
+  exported.
+- Preset transitions crossfade instead of fading to black.
+- Transition time is configurable.
+- Presets preserve the active media source unless the user explicitly changes
+  it.
+- WTF mode continuously transitions through randomized live-safe settings and
+  leans into the more extreme preset families while avoiding pure white or pure
+  black output.
+
+### Audio Reactivity
+
+- Audio reactivity is on by default.
+- Mic/input is the default audio-reactive source.
+- Local audio files can drive visual modulation.
+- System/display audio is supported where the operating system provides an
+  audio track to the desktop app.
+- Tauri desktop builds include native audio capture paths for system/input
+  audio features.
+- Audio analysis tracks RMS, bass, mid, treble, transient energy, beat pulse,
+  and spectral movement.
+- Audio modulation is non-persistent: it affects live effective render params
+  without rewriting saved presets.
+- Safe clamps prevent high sensitivity from driving the renderer into pure
+  white or pure black screens.
+
+### Pop Out and External Displays
+
+- Pop Out creates a separate output window intended for a projector, capture
+  card, or secondary display.
+- The main control window remains visible and interactive.
+- The desktop output window is native, not a second heavyweight duplicated UI
+  surface.
+- Output display selection is persisted when Tauri can enumerate displays.
+
+### Desktop Packaging and Updates
+
+- Built with Tauri v2.
+- Production runtime is local-only by default.
+- The packaged app blocks arbitrary remote HTTP(S) connections through a
+  production Content Security Policy.
+- The app uses narrow Tauri capabilities split by window:
+  - The main control window can open selected media and manage output.
+  - The output window has a minimal command surface.
+- GitHub Releases updater infrastructure is configured.
+- The only intentional online path is the updater check/download flow.
+
+### Advanced and Development-Only Paths
+
+The legacy ASCILINE stream path and the newer Rust/FFmpeg stream session work
+exist, but stream mode is not currently exposed in the normal Source UI. The
+Static/Streaming selector, stream connection label, and buffer counter remain
+hidden until the stream workflow is ready as a standalone user feature.
+
+MIDI hardware control is planned, with the first target validation rig being an
+Evolution/M-Audio UC33e connected through an iConnectivity mioXC. It is not part
+of the current normal-user feature set.
+
+## System Requirements
+
+These requirements are practical guidance for the current renderer, not a
+contract. Higher grid sizes, multiple cameras, audio reactivity, and native
+output windows all increase load.
+
+### macOS
+
+| Level | Requirement |
+| --- | --- |
+| Minimum | Apple Silicon Mac, macOS 13 Ventura or newer, 8 GB RAM, Metal-capable GPU, 2 GB free disk space. Official macOS builds are Apple Silicon first. |
+| Optimal | M1 Pro/Max, M2 Pro/Max, M3 Pro/Max, or newer; 16 GB RAM or more; macOS 14 Sonoma, macOS 15 Sequoia, or newer; external display/projector for Pop Out. |
+
+Notes:
+
+- Intel Mac support is not the current release target. It may work from source
+  if you build a compatible bundle yourself, but it is not the tested path.
+- Camera, microphone, and audio capture require explicit macOS privacy grants.
+- Downloaded ad-hoc signed builds may still require the normal macOS
+  right-click Open or Open Anyway flow until Developer ID notarization is added.
+
+### Windows
+
+| Level | Requirement |
+| --- | --- |
+| Minimum | Windows 10 22H2 or Windows 11, x64 CPU, WebView2 runtime, D3D12 or WebGL2-capable GPU, 8 GB RAM, 2 GB free disk space. |
+| Optimal | Windows 11, recent Intel/AMD/NVIDIA GPU with current drivers, 16 GB RAM or more, hardware media decode, dedicated output display. |
+
+Notes:
+
+- Most current Windows 10/11 systems already include WebView2. If an installer
+  reports that WebView2 is missing, install the Microsoft WebView2 Runtime once.
+- Windows system audio loopback is planned through WASAPI, but the current
+  audio path should be tested per release before relying on it in production.
+
+### Linux
+
+| Level | Requirement |
+| --- | --- |
+| Minimum | Modern x86_64 Linux distribution, WebKitGTK 4.1 runtime, Mesa or vendor GPU drivers with WebGL2, 8 GB RAM, 2 GB free disk space. |
+| Optimal | Ubuntu 24.04, Fedora 40, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU; PipeWire for future capture work. |
+
+Notes:
+
+- Linux Tauri uses the system WebKitGTK stack, so GPU feature support varies by
+  distribution, WebKitGTK version, and graphics driver.
+- WebGL2 may be the practical Linux fallback even when WebGPU is not available.
+- Native Linux camera/audio/output behavior needs broader hardware testing.
+
+## Hardware Guidance
+
+| Level | Hardware |
+| --- | --- |
+| Minimum | 4-core CPU, 8 GB RAM, integrated GPU with WebGL2/Metal/D3D12/Vulkan/GLES support, 1080p display, one camera or one local media source at a time. |
+| Optimal | 8 or more performance cores, 16 to 32 GB RAM, Apple Silicon Pro/Max or a recent discrete GPU, hardware video decode, SSD storage, external display/projector, USB or HDMI capture hardware, class-compliant audio interface. |
+
+For live camera work, the best upgrade is often not raw CPU. Use stable USB
+cameras, direct USB ports or a powered hub, good lighting, and a machine on AC
+power.
+
+## Battery and Heat Warning
+
+ASCII VJ Remix can be demanding. WebGPU/WebGL rendering, high column counts,
+multiple cameras, audio analysis, and native output windows can keep the CPU,
+GPU, camera, and media decoder active continuously.
+
+On laptops:
+
+- Expect higher battery drain than a normal media player.
+- Use AC power for performances or long sessions.
+- Lower columns, FPS, camera resolution, and jitter if the machine gets hot.
+- Close Pop Out when you do not need a second output surface.
+- Prefer the built-in Demo Image or a single video when testing on battery.
+
+## Install Guide
+
+### 1. Download
+
+Download the latest desktop build from:
+
+[https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
+
+The release page may contain macOS, Windows, and Linux installers plus updater
+artifacts. Install the package for your operating system.
+
+### 2. Install on macOS
+
+1. Download the macOS app archive or DMG.
+2. Move `ASCII VJ Remix.app` to `/Applications` or `~/Applications`.
+3. Open it from Finder.
+4. If macOS blocks the first launch because the app is not notarized yet:
+   - Right-click `ASCII VJ Remix.app`.
+   - Choose Open.
+   - Confirm Open.
+   - If needed, open System Settings -> Privacy & Security and choose Open
+     Anyway for ASCII VJ Remix.
+5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
+   Recording permissions when macOS prompts for them.
+
+### 3. Install on Windows
+
+1. Download the Windows installer from GitHub Releases.
+2. Run the installer.
+3. If Windows SmartScreen warns on a self-signed or new app, choose More info,
+   then Run anyway only if you trust the release source.
+4. Launch ASCII VJ Remix from the Start menu.
+5. Grant camera and microphone permissions if Windows prompts.
+
+### 4. Install on Linux
+
+For an AppImage:
 
 ```bash
-python3 -m http.server 8010 --bind 127.0.0.1
+chmod +x ASCII-VJ-Remix*.AppImage
+./ASCII-VJ-Remix*.AppImage
 ```
 
-Open `http://127.0.0.1:8010/`. The renderer autostarts with Demo Video 1. Select **Camera** in the Source panel to request webcam access; camera support requires `localhost` or another secure browser context and explicit browser permission. After permission is granted, select multiple camera devices in the Camera panel to build a local camera mix with grid, split, stack, or PiP layouts.
-
-The browser/Tauri path is local-only at runtime. TIFF files are intentionally disabled until a decoder is vendored into the app; no CDN decoder is loaded.
-
-The renderer lab also includes an **Audio Reactivity** panel. It can analyze a local audio file, a microphone/input stream, or browser-supported display/tab audio through Web Audio and modulate live visual renderer params without changing saved presets or uploading audio. Browser display audio is permission-gated and platform/browser-dependent; on Chromium/macOS, sharing a browser tab with audio is the reliable path, while app/window capture often provides no audio track. Future Tauri builds should provide native local-file and system-loopback providers behind the same adapter boundary.
-
-### Frontend and Tauri development
-
-The renderer lab now has a minimal Vite build so the same vanilla HTML/CSS/ESM app can run in a browser or be packaged by Tauri.
+For a `.deb` package:
 
 ```bash
-npm install
-npm run dev         # Vite dev server on http://127.0.0.1:8010/
-npm run build       # static production build in dist/
-npm run preview     # preview the production build
-npm run check:offline
-npm run check:desktop
-npm run check:release
-npm run check:bundle:debug
-npm run smoke:static
+sudo apt install ./ascii-vj-remix*.deb
 ```
 
-Tauri v2 scaffolding lives in `src-tauri/`. The desktop shell is intentionally thin: it loads the built renderer lab and keeps browser local-file/camera/audio behavior intact until the native source and output-window adapters are added.
+If the app does not launch, check that WebKitGTK, GPU drivers, and desktop
+portal packages are installed for your distribution.
+
+## First Run
+
+1. Launch the app.
+2. The renderer should start automatically on Demo Image.
+3. Choose a built-in preset from the Presets panel.
+4. Use Source to switch to Demo Video, Camera, or a custom local file.
+5. Use Audio Reactivity to select Mic/Input, Audio File, or System/Display
+   audio.
+6. Use Pop Out to create a separate output window for another screen.
+7. Use WTF when you want the app to keep generating extreme transitions.
+
+If the renderer does not start, press Start once. If it still does not start,
+try a lower backend such as WebGL2 or Canvas2D.
+
+## macOS Permissions and Entitlements
+
+There are two different concepts:
+
+- Entitlements are compiled into the app bundle by the developer. They declare
+  what kinds of protected system resources the app may request.
+- Privacy permissions are granted by you in macOS System Settings after the app
+  asks for access.
+
+ASCII VJ Remix currently includes these macOS entitlements and usage strings:
+
+- Camera access for live camera rendering.
+- Microphone/audio input access for audio-reactive visuals.
+- Screen/audio capture usage descriptions for display or system audio capture.
+
+### Grant Permissions in System Settings
+
+1. Open System Settings.
+2. Go to Privacy & Security.
+3. Open Camera and enable ASCII VJ Remix.
+4. Open Microphone and enable ASCII VJ Remix.
+5. Open Screen & System Audio Recording, Screen Recording, or System Audio
+   Recording, depending on your macOS version, and enable ASCII VJ Remix.
+6. Restart the app after changing these permissions.
+
+macOS may show permission names differently across releases. On newer macOS
+versions, system-audio capture can appear as System Audio Recording or as part
+of Screen & System Audio Recording.
+
+### Reset macOS Permission Prompts
+
+If permissions are stuck, quit the app and run:
 
 ```bash
+tccutil reset Camera com.asciline.remix
+tccutil reset Microphone com.asciline.remix
+tccutil reset ScreenCapture com.asciline.remix
+tccutil reset AudioCapture com.asciline.remix
+```
+
+Then reopen ASCII VJ Remix and try Camera or Audio Reactivity again. If
+`AudioCapture` is not recognized on your macOS version, that reset command can
+be ignored.
+
+Permissions are tied to the bundle identifier and app signature. If you used an
+older build named `ASCILINE Remix.app`, grant permissions again for
+`ASCII VJ Remix.app`.
+
+### Verify Entitlements on macOS
+
+Advanced users can inspect the installed app:
+
+```bash
+codesign -d --entitlements :- "/Applications/ASCII VJ Remix.app"
+plutil -p "/Applications/ASCII VJ Remix.app/Contents/Info.plist" | grep UsageDescription
+```
+
+Do not manually edit the app bundle to add entitlements. Reinstall a properly
+signed build instead. Editing the bundle breaks the signature.
+
+## Privacy and Offline Behavior
+
+ASCII VJ Remix is designed to be local-first.
+
+- Local media files stay on your machine.
+- Camera frames stay local.
+- Audio analysis is local.
+- The packaged app should not download renderer assets, fonts, codecs, models,
+  or media providers at runtime.
+- The Tauri updater is the only intentional online path.
+- Custom desktop file access is session-scoped. If the app says a custom file
+  needs access after restart, reselect the file.
+
+See [docs/SECURITY.md](docs/SECURITY.md) for the full local media, permission,
+updater, Tauri capability, and FFmpeg sidecar security model.
+
+## Troubleshooting
+
+### Camera says blocked or denied
+
+- Confirm the app is in `/Applications` or `~/Applications`.
+- Check System Settings -> Privacy & Security -> Camera.
+- Reset Camera permission with `tccutil reset Camera com.asciline.remix`.
+- Restart the app.
+- Try another camera app to confirm the device is not already locked.
+
+### Microphone or audio input does not start
+
+- Check System Settings -> Privacy & Security -> Microphone.
+- Reset with `tccutil reset Microphone com.asciline.remix`.
+- Restart the app.
+- Select a concrete input device from Audio Reactivity.
+
+### Display or system audio has no audio
+
+Display capture can expose video without an audio track, especially for
+app/window capture on macOS. Use System Audio where available. Future work will
+move macOS system audio toward Core Audio Taps for a narrower permission
+prompt.
+
+### Pop Out is slow
+
+- Lower columns or FPS.
+- Close other GPU-heavy apps.
+- Use AC power on laptops.
+- Try a direct external display connection instead of a wireless display.
+
+### Video format does not play
+
+Try MP4/H.264 first. MKV support depends on the active decode path and platform.
+If the embedded media decode path cannot play a file, future native FFmpeg
+paths may support it more reliably.
+
+## Development
+
+Development instructions live in [docs/CONTRIBUTORS.md](docs/CONTRIBUTORS.md).
+Testing expectations live in [docs/TESTING.md](docs/TESTING.md), and renderer
+performance guidance lives in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
+The short version:
+
+```bash
+npm ci
 npm run tauri:dev
-npm run tauri:build
+npm run check:desktop
 ```
 
-Tauri commands require the Rust toolchain (`cargo`) in addition to Node 24+. The app config points Tauri dev mode at Vite on `http://127.0.0.1:1420` and production builds at `dist/`.
-If `rustup` has installed Rust but `cargo` is not on the shell `PATH`, the npm Tauri scripts will prepend the active Rustup toolchain automatically.
+## Financial Support
 
-The packaged desktop app must be standalone at runtime. Renderer code, demo media, fonts, GPU assets, decoders, native adapters, and future sidecars should be bundled with the app. Online access is reserved for the explicit Tauri updater path hosted by GitHub Releases. Use the offline bundle check before packaging:
+If this project is useful to you, support [Dust Wave](https://dustwave.xyz):
 
-```bash
-npm run check:offline
-```
+- Buy something at [our online shop](https://shop.dustwave.xyz).
+- Support a crowdfunding campaign at [The Pool](https://pool.dustwave.xyz), our very own crowdfunding platform.
 
-Use `npm run check:desktop` before desktop changes. It rebuilds the offline frontend bundle, checks the Tauri local-only security policy, verifies updater metadata generation, and verifies the Tauri shell with a debug no-bundle build. Use `npm run bundle:debug` when you need a local debug `.app`/DMG package.
-Use `npm run check:release` before claiming a standalone desktop release. It runs the offline/Tauri/output-display/updater/Rust gates and requires a reviewed FFmpeg sidecar for the current platform. `npm run bundle:release` runs those release gates before building release-mode desktop bundles.
-Use `npm run check:bundle:debug` or `npm run check:bundle:release` after a Tauri bundle build to verify the platform bundle exists and includes required desktop metadata/resources. On macOS this checks the `.app` executable, icon, privacy usage strings, FFmpeg resource README, staged FFmpeg manifest/NOTICE files when sidecars are present, and codesign validity.
-`npm run test:output-display` runs a deterministic secondary-display simulation for the native output selector and browser pop-out fallback. It covers auto-external placement, explicit display selection, stale preference fallback, and single-display fallback without requiring a real second monitor in CI.
+## Contact
 
-Tauri updater infrastructure is configured for GitHub Releases. Release builds create signed updater artifacts, the release workflow merges platform fragments into `latest.json`, and `plugins.updater.endpoints` points at the latest GitHub release metadata. The private updater signing key must live in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY`; see `docs/TAURI_RELEASES.md`.
-On macOS workspaces stored under iCloud Drive, Tauri build output is redirected to `/private/tmp/asciline-remix-tauri-target` so `.app` signing is not broken by iCloud extended attributes. Non-iCloud and CI builds keep the normal `src-tauri/target` output unless `ASCILINE_TAURI_TARGET_DIR` or `CARGO_TARGET_DIR` is set.
+Email Alonso at [alonso@dustwave.xyz](mailto:alonso@dustwave.xyz).
 
-The desktop build now includes the Tauri dialog plugin for custom media selection. Files selected through the native dialog are exposed to the webview through Tauri's local asset protocol for the current app session. The app stores the display metadata, not a durable broad filesystem grant; after restart, reselect the file if the Source panel shows **Needs access**.
+## License
 
-The packaged Tauri app uses a production Content Security Policy that blocks arbitrary remote HTTP(S) connections, keeps the asset protocol scope empty by default, and relies on Rust to grant session-local access to user-selected media. Development mode has a separate localhost-only CSP for Vite and local stream testing.
-Tauri capabilities are split by window: the main renderer lab can open media files and create/place output windows, while the fallback webview output can only listen for render-state events, close itself, and toggle fullscreen. The preferred desktop output is a plain native window with no webview command surface.
+This repository carries the upstream ASCILINE license text: MIT License with an
+Anti-Advertisement Restriction. See [LICENSE](LICENSE) for the full license.
 
-macOS bundles merge `src-tauri/Info.plist`, which declares camera, microphone, and screen-capture usage strings for the local camera mixer and audio-reactive inputs. Platform-specific system audio loopback providers are still future native-adapter work.
-macOS bundles are ad-hoc self-signed by default with `bundle.macOS.signingIdentity: "-"`. This makes the `.app` codesign-valid, but it is not Apple Developer ID notarization; downloaded public releases may still need Gatekeeper approval until Developer ID signing/notarization is added.
-
-The **Pop Out** command uses a native Tauri output window in desktop builds. The toolbar **Output** selector chooses the target display when Tauri can enumerate monitors, and defaults to an external display when one is available. File-backed video and static PNG/JPEG/GIF/WebP/SVG image output now prefer a native `wgpu` presenter: Metal on macOS, D3D12 on Windows, and Vulkan/GLES on Linux. The presenter uploads the latest decoded source frame, runs the same cell color/jitter math in a GPU compute pass, then presents through a native swapchain surface with `softbuffer` retained as fallback. On macOS, a single selected Camera source uses FFmpeg/AVFoundation directly in Rust before the native GPU/softbuffer presenter so the output window bypasses WebView canvas readback and IPC. Multi-camera mix, stream, and other mirrored sources send bounded raw pixel snapshots of the already-rendered main surface into the native presenter, falling back to encoded snapshots only if raw IPC is unavailable. Browser builds and native-presenter failures keep the old webview output as fallback.
-
-Stream packaging is being ported through the Rust/FFmpeg media engine rather than bundling Python by default. Browser builds and external-server stream mode still work unchanged, while Tauri stream mode can use registered local media sessions backed by the native pipeline.
-
-The initial Rust media-engine prototype owns the FFmpeg process boundary and can probe/decode a local video into RGB frames, then prepare the decoded frames as stream-compatible ASCII color and pixel framebuffers:
-
-```bash
-npm run media:decode-preview -- media/point-click-test.mp4 96 54 2
-npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 false
-```
-
-Development commands use `ASCILINE_FFMPEG` and `ASCILINE_FFPROBE` when set, then `ffmpeg` and `ffprobe` from `PATH`. Packaged Tauri builds should include reviewed binaries under `src-tauri/resources/ffmpeg/`; the desktop bridge prefers those bundled resources before falling back to `PATH`, so production stream mode does not require a runtime download or system package manager install.
-The shared Rust implementation lives behind `media_engine::pipeline`; the desktop bridge calls that module only for selected, registered media sources rather than exposing broad arbitrary-path media commands.
-
-Release CI builds FFmpeg sidecars from the pinned official FFmpeg 8.1.2 source tarball, verifies the source SHA-256, disables network protocols, keeps the build LGPL-compatible, and stages the resulting `ffmpeg`/`ffprobe` binaries before packaging:
-
-```bash
-npm run ffmpeg:build-sidecar
-npm run check:ffmpeg-release
-```
-
-To stage other reviewed FFmpeg binaries into the packaged-resource layout, provide explicit local binary paths and release provenance:
-
-```bash
-npm run ffmpeg:stage -- --ffmpeg /path/to/ffmpeg --ffprobe /path/to/ffprobe --license LGPL-2.1-or-later --source "reviewed reproducible build notes"
-npm run check:ffmpeg-resources
-npm run check:ffmpeg-release
-```
-
-`ffmpeg:stage` copies the binaries into `src-tauri/resources/ffmpeg/{platform}/bin/`, records versions and SHA-256 hashes in `manifest.json`, and writes a `NOTICE.md`. `check:desktop` validates staged sidecars when present; `check:ffmpeg-release` requires the current platform sidecar before claiming standalone stream packaging. Generated sidecar binaries and manifests are intentionally ignored by Git; release runners recreate them.
-On macOS, `check:ffmpeg-resources` also rejects staged binaries that still link to absolute Homebrew/MacPorts-style library paths such as `/opt/homebrew` or `/usr/local`. Use a self-contained build with bundled-relative dylib references or a static build, and make the license choice explicit. The default Homebrew FFmpeg formula is commonly GPL-enabled and dynamically linked, so it is useful for development but should not be treated as a reviewed standalone app sidecar without a deliberate license/distribution review.
-
-## 🗜️ Adaptive Frame Codec (opt-in, backward compatible)
-
-The original binary protocol re-sends the full grid every frame. An opt-in
-adaptive codec picks the smallest of three encodings per frame and tags it in a
-1-byte header — **without changing the rendered output**:
-
-| tag | encoding | best for |
-| :-- | :------- | :------- |
-| `0` RAW | framebuffer as-is (legacy) | incompressible frames |
-| `1` ZLIB | `zlib(framebuffer)` | general motion |
-| `2` DELTA | only the cells that changed since the last frame | static / low-motion |
-
-Clients opt in with `/ws?codec=adaptive`; omit it and you get the **original
-protocol byte-for-byte**, so existing clients are unaffected. A keyframe is
-forced periodically so dropped packets / late joiners resync. The decoder
-(`codec.js`) is shared by the browser and the test suite, so the shipped path is
-the tested one.
-
-**Measured wire savings** (mode 5, 200×80 grid):
-
-| content | vs. legacy |
-| :------ | :--------- |
-| static screen / slideshow | **0.3%** (≈375×) |
-| pixel mode | 11.6% (≈8.6×) |
-| high-motion / full-frame change | 63% (never worse than legacy) |
-
-An optional `--quality {lossless,high,balanced,low}` enables lossy *temporal
-delta*: a colour cell is only re-sent once it drifts past a tolerance from what
-the viewer already sees (the character plane stays exact), cutting the hard
-cases a further ~15–30% at imperceptible quality. Default is `lossless`
-(bit-exact).
-
-**Monitor Bandwidth in Real-Time:**
-You can append the `--debug` flag when launching the server to see live bandwidth comparisons (RAW vs WIRE bytes) and the exact compression ratio in your terminal. This is highly useful for measuring the real-time savings of the adaptive codec on your specific video sources.
-
-> Verified through generated vectors and live comparison: Python-encoded vectors
-> decode bit-exactly through the shipped browser decoder (`experiments/gen_vectors.py`
-> -> `experiments/check_vectors.js`) and the Rust decoder
-> (`npm run test:vectors` after vectors exist), and the live
-> `adaptive`-vs-`legacy` WebSocket diff remains in `experiments/test_e2e.js`.
-> Generate the test clips with `experiments/make_test_clips.sh`.
-
-**LAN / Network Streaming:**
-To stream the video on your local network (Wi-Fi), use the `--host` flag:
-> python stream_server.py video.mp4 --host 0.0.0.0
-
-## 📦 Installation
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/YusufB5/ASCILINE.git
-cd ASCILINE
-```
-
-### 2. Install dependencies
-```bash
-pip install fastapi uvicorn opencv-python numpy websockets
-```
-
-### Podman dev environment on macOS/Linux
-This fork includes a Podman-backed setup for reproducible local development and codec experiments. It follows the same macOS pattern as the sibling `pool` repo: prefer Podman app install paths, repair the macOS machine socket, require rootless mode, smoke-test container execution, and use Node 24+ for JavaScript tooling.
-
-```bash
-scripts/podman-doctor.sh      # verify Podman CLI, machine, engine, and rootless container execution
-scripts/podman_build.sh       # build localhost/asciline-remix-dev:latest
-scripts/podman_venv.sh        # create .venv-linux inside the repo from inside the container
-scripts/podman_run.sh bash    # enter the container, activating .venv-linux when present
-```
-
-The generated `.venv-linux/` is intentionally ignored by Git. It is a Linux virtualenv for container use, not a host macOS Python environment.
-
-For a long-running renderer or static server, enable the run wrapper's supervisor so the command restarts if it exits unexpectedly while the wrapper is still running:
-
-```bash
-PORT=8000 ASCILINE_RESTART=1 scripts/podman_run.sh python stream_server.py video.mp4 --host 0.0.0.0 --port 8000
-PORT=8010 ASCILINE_RESTART=1 scripts/podman_run.sh python -m http.server 8010 --bind 0.0.0.0
-```
-
-Set `ASCILINE_RESTART_DELAY=1` to change the restart pause in seconds. Exit code `0` is treated as an intentional stop; set `ASCILINE_RESTART_ON_SUCCESS=1` to restart after clean exits too. `RESTART=1`, `RESTART_DELAY=1`, and `RESTART_ON_SUCCESS=1` are accepted as shorter aliases.
-
-The wrapper checks that the requested host port is free before starting Podman. If another process owns the port, stop it or use a different host port:
-
-```bash
-HOST_PORT=8011 CONTAINER_PORT=8010 ASCILINE_RESTART=1 scripts/podman_run.sh python -m http.server 8010 --bind 0.0.0.0
-```
-
-Run the codec/vector suite through the same container:
-
-```bash
-scripts/podman_codec_tests.sh
-```
-
-After vectors have been generated, the host-side Rust decoder can validate the
-same fixtures:
-
-```bash
-npm run test:vectors
-```
-
-Rust frame-prep parity against the Python/OpenCV stream behavior can be checked
-through the Podman-backed reference harness:
-
-```bash
-npm run test:frame-prep
-npm run test:decode-resize
-npm run check:media
-```
-
-The image defaults to Node 24 LTS. To smoke-test against the current even-numbered release, rebuild with:
-
-```bash
-NODE_MAJOR=26 scripts/podman_build.sh
-```
-
-### 🔈 Audio Support (FFmpeg Required)
-To enable server-side audio processing (Volume 1-5), you must have FFmpeg installed.
-
-**Option 1: Package Manager (Recommended)**
-- **Windows:** `winget install ffmpeg`
-- **macOS:** `brew install ffmpeg`
-- **Linux:** `sudo apt install ffmpeg`
-
-**Option 2: Manual Installation (Windows)**
-If you get a `FileNotFoundError` or don't want to modify system variables:
-1. Download [FFmpeg ZIP](https://github.com/BtbN/FFmpeg-Builds/releases/latest).
-2. Extract `ffmpeg.exe` from the `bin` folder.
-3. Drop it directly into your `ASCILINE` project folder alongside `stream_server.py`.
-### 3. Run the Web Server
-
-**Single video:**
-```bash
-python stream_server.py video.mp4 --cols 240
-```
-
-**Folder mode — drop your videos into `videos/` and run:**
-```bash
-python stream_server.py --folder videos --cols 200
-python stream_server.py --folder videos --cols 230 --loop          # infinite loop
-python stream_server.py --folder videos --mode 5 --pixel --cols 320 --vol 2  # all videos same settings
-```
-Videos play in **filesystem order** (top to bottom as they appear in the folder, not alphabetically). Just add/remove files from the `videos/` folder to control the queue.
-
-**JSON Playlist — full control per video:**
-```bash
-python stream_server.py --playlist playlist.json --cols 220
-python stream_server.py --playlist playlist.json --cols 220 --loop
-```
-Use `playlist.json` when you need different `--mode` or `--vol` settings for each video.
-
-
-Open `http://localhost:8000` in your browser.
-
-### 4. Run directly in Terminal (Standalone)
-If you prefer to bypass the web interface, you can render the video directly inside an ANSI-supported terminal (zero-flicker, true color):
-```bash
-python ascii_video_player2.py video.mp4 --cols 100 --quality 0
-```
-
-> ⚠️ **Note:** Do not resize your terminal window during playback, as dynamic text wrapping will corrupt the ASCII layout.
-
-## 🎨 Customization
-
-You can easily customize the look and feel of the engine:
-
-### Styling
-Edit `style.css` to change the accent colors and typography using CSS variables:
-```css
-:root {
-    --accent-color: #00ff41; /* Classic Matrix Green */
-    --bg-color: #050505;
-}
-```
-
-### Rendering Modes
-The engine supports different fidelity levels via the `--mode` flag:
-- `1`: Black & White (DOM mode)
-- `2`: 512 Colors
-- `3`: 32K Colors
-- `4`: 262K Colors
-- `5`: 16M Colors (Ultra)
-
-```bash
-python stream_server.py --mode 5 --cols 240 --rows 100
-```
-### 📐 Resolution & Auto-Scaling
-By default, you only need to specify the width (`--cols`). ASCILINE will automatically calculate the correct `--rows` based on the source video's aspect ratio to prevent stretching.
-
-- **ASCII Mode Recommended:** `--cols 200` to `--cols 240` (Best balance of text detail and cinematic 30 FPS performance).
-- **Pixel Mode Recommended:** `--cols 600` to `--cols 900` (Provides near-HD visual quality. Performance heavily depends on your machine's CPU/VRAM).
-- > **Smart Defaults:** If you do not specify a `--cols` value, ASCILINE automatically defaults to `450` when Pixel Mode is enabled, and `200` for standard ASCII text mode. 
-- > ⚠️ **Hardware Limits & A/V Sync:** If you push the `--cols` too high for your specific hardware (e.g., `1350` on a laptop vs a gaming desktop), the Python backend won't be able to encode and send the massive frames fast enough. When the video stream lags behind the audio, you will experience A/V desync (audio finishing early). If this happens, simply lower your `--cols` value!
-```bash
-python stream_server.py video.mp4 --mode 5 --cols 240
-# Terminal will show: [AUTO] 1920x1080 → grid 240x67
-```
-### Server-Side Volume Control
-Volume is controlled at the server level via the `--vol` flag (scale 0–5).
-When set to `0`, the audio engine (FFmpeg) **never runs**, saving CPU and bandwidth.
-
-| `--vol` | FFmpeg Multiplier | Description |
-|---------|------------------|-------------|
-| `0`     | —                | Muted (no processing) |
-| `1`     | 1.0×             | Normal (default) |
-| `3`     | 1.5×             | Loud |
-| `5`     | 2.0×             | Double volume |
-
-```bash
-python stream_server.py video.mp4 --pixel --cols 560 --vol 0   # Silent
-python stream_server.py video.mp4 --cols 220 --vol 3   # Loud
-```
-
-### Playlist Format (`playlist.json`)
-Each entry can override the global `--mode`, `--pixel`, `--vol`, and `--cols` defaults:
-```json
-[
-    { "video": "intro.mp4",  "mode": 1, "vol": 1 },
-    { "video": "main.mp4",   "mode": 5, "pixel": true, "vol": 3, "cols": 520 },
-    { "video": "outro.mp4",  "mode": 3, "vol": 2, "cols": 240 }
-]
-```
-Video paths are resolved automatically — the engine checks the project root and the `videos/` subfolder, so you can write just the filename.
-
-
-### 🟢 Live Interactive Showcase
-Experience the ASCILINE engine running live directly in your browser with multiple rendering modes. 👉 **[Try it out at asciline.dev](https://www.asciline.dev)**
-
-
-## 📈 Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=YusufB5/ASCILINE&type=Date)](https://star-history.com/#YusufB5/ASCILINE&Date)
-
-### ☕ Support the Project ❤️ 
-If you find this project helpful, you can support me by donating crypto:
-* **Solana (SOL / USDC):** `H1wSQAhjgsu7AxenF4e5ZBYiBjkhDLVzkKaZuVPcrE14`
-* **Ethereum (ETH / USDT):** `0x85B2f970045c0F7c282089Ab6CF897C20230e086`
-* **Bitcoin (BTC):** `bc1qvtcl55v54gkzwnp2zxn70usea3gf5ncncqa0fv`
-
-## 📜 License & Ethical Guardrails
-
-ASCILINE is distributed under the MIT License, but with an anti ad strict ethical guardrail. 
-
-See the [LICENSE](LICENSE) file for the full text, which includes the **ANTI-ADVERTISEMENT RESTRICTION** clause.
-
-## 📬 Contact & Questions
-[asciline.engine@gmail.com](mailto:asciline.engine@gmail.com)
+In plain language: the project is broadly permissive, but the license includes
+an explicit restriction against using the software to serve, deliver, or display
+digital advertisements, sponsored content, or commercial marketing to end users.
+Read the license itself before redistributing or building on this project.

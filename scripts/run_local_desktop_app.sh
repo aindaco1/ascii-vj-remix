@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_APP="${ASCILINE_SOURCE_APP:-/private/tmp/asciline-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app}"
+SOURCE_APP="${ASCILINE_SOURCE_APP:-/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app}"
 INSTALL_DIR="${ASCILINE_INSTALL_DIR:-$HOME/Applications}"
 INSTALL_APP="$INSTALL_DIR/ASCII VJ Remix.app"
 SYSTEM_APP="/Applications/ASCII VJ Remix.app"
@@ -31,7 +31,7 @@ if [[ ! -d "$SOURCE_APP" ]]; then
   exit 1
 fi
 
-pkill -f '/(ASCII VJ Remix|ASCILINE Remix).app/Contents/MacOS/asciline-remix|/debug/asciline-remix' 2>/dev/null || true
+pkill -f '/(ASCII VJ Remix|ASCILINE Remix).app/Contents/MacOS/(ascii-vj-remix|asciline-remix)|/debug/(ascii-vj-remix|asciline-remix)' 2>/dev/null || true
 
 ENTITLEMENTS="$ROOT_DIR/src-tauri/Entitlements.plist"
 
@@ -81,7 +81,7 @@ fi
 echo "ASCILINE local run: $INSTALL_APP"
 echo "ASCILINE local run: codesign identity $CODESIGN_IDENTITY"
 if [[ "${ASCILINE_FOREGROUND:-0}" == "1" ]]; then
-  exec "$INSTALL_APP/Contents/MacOS/asciline-remix"
+  exec "$INSTALL_APP/Contents/MacOS/ascii-vj-remix"
 fi
 
 /usr/bin/open -n "$INSTALL_APP"

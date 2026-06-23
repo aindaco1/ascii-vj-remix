@@ -146,6 +146,15 @@ async function runSmoke() {
     );
     const main = await page.evaluate(() => ({
       status: document.querySelector('#backend-status')?.textContent,
+      sourceModeHidden: Boolean(document.querySelector('.source-mode-field')?.hidden),
+      bufferHidden: Boolean(document.querySelector('#buffer-meter')?.hidden),
+      connectionHidden: Boolean(document.querySelector('#connection-status')?.hidden),
+      defaultSource: {
+        mediaUrl: window.ascilineRemix?.params?.mediaUrl || '',
+        mediaType: window.ascilineRemix?.params?.mediaType || '',
+        active: document.querySelector('#source-list .source-option.active')?.dataset?.sourceId || '',
+        label: document.querySelector('#source-label')?.textContent || ''
+      },
       outputDisplay: {
         value: document.querySelector('#output-display')?.value || '',
         disabled: Boolean(document.querySelector('#output-display')?.disabled),
@@ -163,6 +172,24 @@ async function runSmoke() {
       },
       sources: [...document.querySelectorAll('#source-list [role=option]')].map((el) => el.textContent.trim())
     }));
+    if (!main.sourceModeHidden || !main.bufferHidden || !main.connectionHidden) {
+      throw new Error(`Stream-only UI should be hidden: ${JSON.stringify({
+        sourceModeHidden: main.sourceModeHidden,
+        bufferHidden: main.bufferHidden,
+        connectionHidden: main.connectionHidden
+      })}`);
+    }
+    if (
+      main.defaultSource.mediaUrl !== 'media/demo.svg' ||
+      main.defaultSource.mediaType !== 'image' ||
+      main.defaultSource.active !== 'demo-image' ||
+      main.defaultSource.label !== 'Demo Image'
+    ) {
+      throw new Error(`Demo Image should be the default source: ${JSON.stringify(main.defaultSource)}`);
+    }
+    if (main.sources.some((source) => /Demo Video 1|Demo Video 2/.test(source)) || !main.sources.some((source) => source.includes('Demo Video'))) {
+      throw new Error(`Source list should expose Demo Image, Demo Video, and Camera only: ${JSON.stringify(main.sources)}`);
+    }
     if (main.outputDisplay.value !== 'auto' || !main.outputDisplay.options.includes('Auto')) {
       throw new Error('Main page output-display selector did not initialize to Auto');
     }
@@ -190,8 +217,7 @@ async function runSmoke() {
     await page.waitForFunction(() => window.ascilineRemix?.running && document.querySelector('#toggle-play')?.textContent === 'Stop', null, { timeout: 15000 });
     const sourceSwitches = [
       ['demo-image', 'image'],
-      ['demo-video-1', 'video'],
-      ['demo-video-2', 'video']
+      ['demo-video', 'video']
     ];
     for (const [sourceId, mediaType] of sourceSwitches) {
       await page.click(`#source-list [data-source-id="${sourceId}"]`);
@@ -226,6 +252,31 @@ async function runSmoke() {
         );
       }
     }
+    await page.click('#source-list [data-source-id="camera"]');
+    await page.waitForFunction(
+      () => {
+        const app = window.ascilineRemix;
+        const active = document.querySelector('#source-list [data-source-id="camera"]')?.getAttribute('aria-selected') === 'true';
+        const cameraGroup = document.querySelector('#camera-controls-slot .control-group[data-group="Camera"]');
+        return Boolean(
+          app?.running &&
+          !app?.starting &&
+          app.params?.mediaType === 'camera' &&
+          active &&
+          cameraGroup &&
+          !cameraGroup.classList.contains('control-hidden')
+        );
+      },
+      null,
+      { timeout: 15000 }
+    );
+    await page.click('#source-list [data-source-id="demo-image"]');
+    await page.waitForFunction(
+      () => window.ascilineRemix?.params?.mediaUrl === 'media/demo.svg' &&
+        document.querySelector('#source-list [data-source-id="demo-image"]')?.getAttribute('aria-selected') === 'true',
+      null,
+      { timeout: 15000 }
+    );
 
     await page.evaluate(() => { window.__smokeAudioCapture.display = 0; });
     await page.selectOption('#audio-reactive-source', 'display');

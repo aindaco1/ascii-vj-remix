@@ -44,16 +44,16 @@ const fragment = await createUpdateFragment({
   root,
   bundleRoot: outDir,
   outFile: fragmentPath,
-  repo: 'aindaco1/ascii-live-remix',
+  repo: 'aindaco1/ascii-vj-remix',
   tag: 'v0.1.0',
   version: '0.1.0',
   platform: 'darwin-aarch64',
   pubDate: '2026-06-20T00:00:00.000Z'
 });
 assert.equal(fragment.platforms['darwin-aarch64-app'].signature, 'signed-base64');
-assert.equal(fragment.platforms['darwin-aarch64-app'].url, 'https://github.com/aindaco1/ascii-live-remix/releases/download/v0.1.0/ASCII.VJ.Remix.app.tar.gz');
+assert.equal(fragment.platforms['darwin-aarch64-app'].url, 'https://github.com/aindaco1/ascii-vj-remix/releases/download/v0.1.0/ASCII.VJ.Remix.app.tar.gz');
 assert.equal(fragment.platforms['darwin-aarch64'].signature, 'signed-base64');
-assert.equal(fragment.platforms['darwin-aarch64'].url, 'https://github.com/aindaco1/ascii-live-remix/releases/download/v0.1.0/ASCII.VJ.Remix.app.tar.gz');
+assert.equal(fragment.platforms['darwin-aarch64'].url, 'https://github.com/aindaco1/ascii-vj-remix/releases/download/v0.1.0/ASCII.VJ.Remix.app.tar.gz');
 
 const latestPath = path.join(tempRoot, 'latest.json');
 const { manifest } = await mergeUpdateFragments({

@@ -52,20 +52,30 @@ function mediaTypeFromName(name) {
     return 'video';
 }
 
+function redactDiagnosticText(value) {
+    return String(value ?? '')
+        .replace(/\b(?:asset|file):\/\/[^\s"']+/gi, '[redacted-url]')
+        .replace(/\bhttps?:\/\/asset\.localhost[^\s"']*/gi, '[redacted-asset-url]')
+        .replace(/\/Users\/[^\s"']+/g, '[redacted-path]')
+        .replace(/[A-Za-z]:\\[^\s"']+/g, '[redacted-path]')
+        .slice(0, 1000);
+}
+
 async function openTauriMediaFile() {
     if (!isTauriRuntime()) return { available: false, file: null };
 
     const selected = await invoke('select_media_file');
     if (!selected) return { available: true, file: null };
 
-    const name = selected.name || baseName(selected.path);
+    const selectedPath = selected.path || '';
+    const name = selected.name || baseName(selectedPath);
+    const url = selected.assetUrl || (selectedPath ? convertFileSrc(selectedPath) : '');
     return {
         available: true,
         file: {
             id: selected.id,
             provider: 'tauri',
-            path: selected.path,
-            url: convertFileSrc(selected.path),
+            url,
             name,
             size: selected.size ?? null,
             lastModified: selected.lastModified ?? null,
@@ -155,7 +165,7 @@ async function requestTauriMediaPermission(kind) {
 
 async function recordTauriMediaDiagnostic(message) {
     if (!isTauriRuntime()) return false;
-    await invoke('record_media_diagnostic', { message: String(message || '') });
+    await invoke('record_media_diagnostic', { message: redactDiagnosticText(message) });
     return true;
 }
 
@@ -303,8 +313,9 @@ async function watchNativeOutputClosed(onClosed) {
 async function openNativeSurfaceOutput(payload, options = {}) {
     if (!isTauriRuntime() || options.show === false) return false;
     try {
+        const params = payload?.params || {};
         await recordTauriMediaDiagnostic(
-            `[TauriOutput] native-open start mode=${payload?.outputMode || 'unknown'} media=${payload?.params?.mediaUrl || ''}`
+            `[TauriOutput] native-open start mode=${payload?.outputMode || 'unknown'} sourceMode=${params.sourceMode || 'unknown'} mediaType=${params.mediaType || 'unknown'}`
         ).catch(() => {});
         const result = await invoke('open_native_output_window', {
             request: {

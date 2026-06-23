@@ -1,4 +1,4 @@
-use asciline_remix_lib::media_engine::codec::Decoder;
+use ascii_vj_remix_lib::media_engine::codec::Decoder;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};

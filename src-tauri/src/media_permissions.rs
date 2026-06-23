@@ -34,7 +34,8 @@ pub async fn request_media_permission<R: Runtime>(
 
 #[tauri::command]
 pub fn record_media_diagnostic(message: String) -> Result<(), String> {
-    let line = format!("[ASCILINE media] {message}\n");
+    let sanitized = sanitize_media_diagnostic(&message);
+    let line = format!("[ASCILINE media] {sanitized}\n");
     eprint!("{line}");
     let mut file = OpenOptions::new()
         .create(true)
@@ -43,6 +44,25 @@ pub fn record_media_diagnostic(message: String) -> Result<(), String> {
         .map_err(|error| format!("Could not open media diagnostics log: {error}"))?;
     file.write_all(line.as_bytes())
         .map_err(|error| format!("Could not write media diagnostics log: {error}"))
+}
+
+fn sanitize_media_diagnostic(message: &str) -> String {
+    message
+        .split_whitespace()
+        .take(80)
+        .map(|part| {
+            if part.contains("://")
+                || part.starts_with('/')
+                || part.starts_with('~')
+                || part.contains(":\\")
+            {
+                "[redacted]"
+            } else {
+                part
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(target_os = "macos")]

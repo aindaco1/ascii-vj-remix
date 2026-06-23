@@ -7,7 +7,7 @@ function isICloudWorkspace(cwd) {
 function tauriTargetDir(root, env = process.env) {
   if (env.CARGO_TARGET_DIR) return path.resolve(env.CARGO_TARGET_DIR);
   if (env.ASCILINE_TAURI_TARGET_DIR) return path.resolve(env.ASCILINE_TAURI_TARGET_DIR);
-  if (isICloudWorkspace(root)) return '/private/tmp/asciline-remix-tauri-target';
+  if (isICloudWorkspace(root)) return '/private/tmp/ascii-vj-remix-tauri-target';
   return path.join(root, 'src-tauri', 'target');
 }
 
