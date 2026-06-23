@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
@@ -57,7 +57,9 @@ jobs:
 
       - name: Install macOS FFmpeg build prerequisites
         if: runner.os == 'macOS'
-        run: brew install nasm
+        run: |
+          brew untap aws/tap azure/bicep || true
+          brew install --formula nasm
 
       - name: Install Windows FFmpeg build prerequisites
         if: runner.os == 'Windows'
@@ -81,7 +83,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
@@ -212,7 +214,7 @@ jobs:
         run: node scripts/create_tauri_update_fragment.mjs --profile release --repo "${{ github.repository }}" --tag "${{ env.RELEASE_TAG }}" --out "src-tauri/target/release/release-assets/updater-fragment-${{ runner.os }}-${{ runner.arch }}.json"
 
       - name: Upload desktop release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ascii-vj-remix-${{ runner.os }}-${{ runner.arch }}
           path: src-tauri/target/release/release-assets/*
@@ -226,18 +228,18 @@ jobs:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
       - name: Download platform assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-artifacts
 
@@ -280,13 +282,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || env.RELEASE_TAG }}
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
