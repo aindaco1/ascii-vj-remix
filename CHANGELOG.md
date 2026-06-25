@@ -36,6 +36,8 @@ ASCII VJ Remix feature set.
   camera sources instead of flattening glyph presets into solid cell blocks.
 - Static smoke coverage now asserts that the Glyph/Cell group remains visible
   and compact while rendering the new traditional ASCII presets.
+- Hardened media diagnostic redaction for embedded local paths and bounded
+  diagnostic message size.
 
 ## [0.9.0] - 2026-06-23
 

@@ -7,6 +7,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Runtime};
 
+const MAX_MEDIA_DIAGNOSTIC_TOKENS: usize = 80;
+const MAX_MEDIA_DIAGNOSTIC_CHARS: usize = 4096;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPermissionResponse {
@@ -49,22 +52,43 @@ pub fn record_media_diagnostic(message: String) -> Result<(), String> {
 }
 
 fn sanitize_media_diagnostic(message: &str) -> String {
-    message
+    let sanitized = message
         .split_whitespace()
-        .take(80)
+        .take(MAX_MEDIA_DIAGNOSTIC_TOKENS)
         .map(|part| {
-            if part.contains("://")
-                || part.starts_with('/')
-                || part.starts_with('~')
-                || part.contains(":\\")
-            {
+            if is_sensitive_diagnostic_part(part) {
                 "[redacted]"
             } else {
                 part
             }
         })
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    if sanitized.chars().count() <= MAX_MEDIA_DIAGNOSTIC_CHARS {
+        return sanitized;
+    }
+    let mut bounded = sanitized
+        .chars()
+        .take(MAX_MEDIA_DIAGNOSTIC_CHARS)
+        .collect::<String>();
+    bounded.push_str(" [truncated]");
+    bounded
+}
+
+fn is_sensitive_diagnostic_part(part: &str) -> bool {
+    part.contains("://")
+        || part.starts_with('/')
+        || part.starts_with('~')
+        || part.contains(":\\")
+        || part.contains("\"/")
+        || part.contains("'/")
+        || part.contains("=/")
+        || part.contains("file:")
+        || part.contains("/Users/")
+        || part.contains("/Volumes/")
+        || part.contains("/private/")
+        || part.contains("/tmp/")
+        || part.contains("\\Users\\")
 }
 
 #[cfg(target_os = "macos")]
@@ -82,6 +106,52 @@ async fn request_platform_media_permission<R: Runtime>(
     })
     .await
     .map_err(|error| format!("Media permission task failed: {error}"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        sanitize_media_diagnostic, MAX_MEDIA_DIAGNOSTIC_CHARS, MAX_MEDIA_DIAGNOSTIC_TOKENS,
+    };
+
+    #[test]
+    fn diagnostic_sanitizer_redacts_embedded_json_paths() {
+        let sanitized = sanitize_media_diagnostic(
+            r#"[ASCILINE_UI_PERF_REPORT] {"path":"/Users/alice/private.mov","status":"ok"}"#,
+        );
+
+        assert!(sanitized.contains("[redacted]"));
+        assert!(!sanitized.contains("/Users/alice"));
+    }
+
+    #[test]
+    fn diagnostic_sanitizer_preserves_relative_media_reports() {
+        let sanitized = sanitize_media_diagnostic(
+            r#"[ASCILINE_UI_PERF_REPORT] {"mediaUrl":"media/point-click-test-30s.mp4","ok":true}"#,
+        );
+
+        assert!(sanitized.contains("media/point-click-test-30s.mp4"));
+        assert!(sanitized.contains(r#""ok":true"#));
+    }
+
+    #[test]
+    fn diagnostic_sanitizer_bounds_untrusted_messages() {
+        let message = std::iter::repeat("token")
+            .take(MAX_MEDIA_DIAGNOSTIC_TOKENS + 50)
+            .collect::<Vec<_>>()
+            .join(" ");
+        let sanitized = sanitize_media_diagnostic(&message);
+
+        assert_eq!(
+            sanitized.split_whitespace().count(),
+            MAX_MEDIA_DIAGNOSTIC_TOKENS
+        );
+
+        let long_message = "a".repeat(MAX_MEDIA_DIAGNOSTIC_CHARS + 100);
+        let bounded = sanitize_media_diagnostic(&long_message);
+        assert!(bounded.ends_with("[truncated]"));
+        assert!(bounded.len() <= MAX_MEDIA_DIAGNOSTIC_CHARS + " [truncated]".len());
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
