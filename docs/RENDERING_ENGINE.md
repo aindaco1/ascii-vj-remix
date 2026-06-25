@@ -165,8 +165,8 @@ Major parameter groups:
 - color: saturation, contrast, brightness, gamma, background blend,
   quantization.
 - sampling: FPS, jitter amount, jitter speed, sample X/Y, smoothing.
-- glyph/cell: glyph mode, solid mode, character set, font family, minimum glyph
-  intensity.
+- glyph/cell: glyph mode, solid mode, compact character set and font family
+  menus, minimum glyph intensity.
 - stream: codec, quality, tolerance, buffer settings, frame timing.
 - UI/performance: stats overlay, transition seconds.
 
@@ -396,6 +396,13 @@ color math, and presents through the native swapchain.
 For macOS single-camera output, AVFoundation captures latest frames directly for
 the native presenter.
 
+For glyph-mode presets, native output consumes the same canonical `glyphMode`
+and `charset` params as the control surface. The native `wgpu` presenter uses a
+bundled fixed bitmap glyph atlas and luminance ramp so traditional ASCII presets
+stay text-like in Pop Out instead of becoming solid color cells.
+`fontFamily` remains a preview/control-surface parameter; the native path does
+not load arbitrary fonts and instead masks cells through the fixed atlas/ramp.
+
 For fallback/mirrored sources, bounded raw pixel snapshots can be sent from the
 main renderer to the native output.
 
@@ -448,7 +455,8 @@ Presets:
 WTF mode:
 
 - creates randomized target params.
-- anchors some random states around extreme preset families.
+- anchors some random states around extreme preset families and traditional
+  ASCII presets.
 - transitions indefinitely until stopped.
 - avoids unsafe all-white/all-black states.
 

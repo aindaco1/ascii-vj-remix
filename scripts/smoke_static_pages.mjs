@@ -170,6 +170,13 @@ async function runSmoke() {
         active: Boolean(window.ascilineRemix?.audioReactiveRuntime?.active),
         calls: window.__smokeAudioCapture
       },
+      glyphControls: {
+        groupHidden: document.querySelector('.control-group[data-group="Glyph / Cell"]')?.classList.contains('control-hidden') ?? true,
+        charsetHidden: document.querySelector('[data-control-key="charset"]')?.classList.contains('control-hidden') ?? true,
+        fontFamilyHidden: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('control-hidden') ?? true,
+        charsetCompact: document.querySelector('[data-control-key="charset"]')?.classList.contains('compact-select') ?? false,
+        fontFamilyCompact: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('compact-select') ?? false
+      },
       sources: [...document.querySelectorAll('#source-list [role=option]')].map((el) => el.textContent.trim())
     }));
     if (!main.sourceModeHidden || !main.bufferHidden || !main.connectionHidden) {
@@ -192,6 +199,15 @@ async function runSmoke() {
     }
     if (main.outputDisplay.value !== 'auto' || !main.outputDisplay.options.includes('Auto')) {
       throw new Error('Main page output-display selector did not initialize to Auto');
+    }
+    if (
+      main.glyphControls.groupHidden ||
+      main.glyphControls.charsetHidden ||
+      main.glyphControls.fontFamilyHidden ||
+      !main.glyphControls.charsetCompact ||
+      !main.glyphControls.fontFamilyCompact
+    ) {
+      throw new Error(`Glyph controls should stay visible and compact for static output: ${JSON.stringify(main.glyphControls)}`);
     }
     if (
       main.audioReactive.source !== 'input' ||
@@ -277,6 +293,64 @@ async function runSmoke() {
       null,
       { timeout: 15000 }
     );
+
+    const traditionalPresetIds = ['classic-camera-ascii', 'ansi-newsprint', 'terminal-mono', 'dense-typewriter'];
+    for (const presetId of traditionalPresetIds) {
+      await page.evaluate(async (id) => {
+        await window.ascilineRemix.applyPreset(id);
+      }, presetId);
+      await page.waitForFunction(
+        ({ presetId }) => {
+          const app = window.ascilineRemix;
+          return Boolean(
+            app?.running &&
+            !app?.starting &&
+            !app?.transitioning &&
+            app.activePresetId === presetId &&
+            app.params?.mediaUrl === 'media/demo.svg' &&
+            app.params?.mediaType === 'image' &&
+            app.params?.backend === 'canvas2d' &&
+            app.params?.glyphMode &&
+            !app.params?.solidMode
+          );
+        },
+        { presetId },
+        { timeout: 15000 }
+      );
+      const presetSignal = await page.evaluate(() => {
+        const surface = window.ascilineRemix?._activeRenderSurface?.();
+        const canvas = surface?.tagName === 'CANVAS' ? surface : document.querySelector('#gpu-stage canvas, #ascii-canvas');
+        if (!canvas?.width || !canvas?.height) return { visible: false, reason: 'missing canvas' };
+
+        const sample = document.createElement('canvas');
+        sample.width = Math.min(120, canvas.width);
+        sample.height = Math.min(90, canvas.height);
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return { visible: false, reason: 'missing context' };
+
+        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
+        let foreground = 0;
+        let background = 0;
+        let maxLuma = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const luma = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          maxLuma = Math.max(maxLuma, luma);
+          if (luma > 24) foreground += 1;
+          if (data[i] <= 8 && data[i + 1] <= 10 && data[i + 2] <= 12) background += 1;
+        }
+
+        return {
+          visible: maxLuma > 28 && foreground > 5 && background > 5,
+          foreground,
+          background,
+          maxLuma
+        };
+      });
+      if (!presetSignal.visible) {
+        throw new Error(`Traditional ASCII preset did not render a glyph-like signal for ${presetId}: ${JSON.stringify(presetSignal)}`);
+      }
+    }
 
     await page.evaluate(() => { window.__smokeAudioCapture.display = 0; });
     await page.selectOption('#audio-reactive-source', 'display');

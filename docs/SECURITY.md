@@ -63,6 +63,8 @@ The current release line includes these security hardening rules:
 - Preset imports must be bounded, schema-checked, clamped through the shared
   control metadata, and stripped of source/media fields before they can affect
   renderer state.
+- Glyph-mode native output should treat `charset` as allowlisted data and keep
+  `fontFamily` out of native font-loading/resource lookup paths.
 - Dependency audits should include npm and Rust. `cargo audit` warnings from
   Tauri's current GTK/WebKit transitive stack are tracked as upstream desktop
   framework risk; actionable direct/transitive advisories should be fixed before
@@ -211,6 +213,7 @@ Import rules:
 - Parse as JSON data only.
 - Validate schema version and supported fields.
 - Clamp numeric values through the same live-control metadata used by the UI.
+- Keep character sets allowlisted and bounded before they reach native output.
 - Reject unknown structural fields instead of silently applying them.
 - Do not let imported presets disable Stats Overlay unless the user imported
   that choice intentionally and the UI makes it clear.

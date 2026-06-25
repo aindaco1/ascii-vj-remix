@@ -1,7 +1,41 @@
 # Changelog
 
-Version 0.9.0 is the first documentation
-baseline for the current ASCII VJ Remix feature set.
+Version 0.9.1 adds traditional ASCII preset work and native Pop Out glyph
+parity. Version 0.9.0 remains the first documentation baseline for the current
+ASCII VJ Remix feature set.
+
+## [0.9.1] - 2026-06-24
+
+### Added
+
+- Added traditional ASCII-style built-in presets:
+  - Classic Camera ASCII.
+  - ANSI Newsprint.
+  - Terminal Mono.
+  - Dense Typewriter.
+- Added a Classic Camera character set inspired by the small luminance ramp used
+  by `idevelop/ascii-camera`.
+- Added native `wgpu` Pop Out glyph rendering for `glyphMode` presets:
+  - native output now accepts `glyphMode` and `charset` from the canonical
+    renderer params.
+  - native GPU output uses a bundled fixed bitmap glyph atlas and charset ramp.
+  - native software fallback/test rendering uses the same glyph ramp logic.
+- Added Rust coverage for native glyph metadata parsing, render-uniform layout,
+  and glyph-mask output.
+
+### Changed
+
+- Traditional ASCII presets select Canvas2D for the main preview so glyphs are
+  visible immediately across demo image, demo video, custom media, and camera
+  sources while native Pop Out renders matching glyph masks.
+- WTF mode can now anchor randomized live-safe targets around the traditional
+  ASCII presets as well as the extreme preset families.
+- Character Set and Font Family select menus now use the compact select layout
+  used by Audio Reactivity controls.
+- Native output now preserves text/glyph style for static media and single
+  camera sources instead of flattening glyph presets into solid cell blocks.
+- Static smoke coverage now asserts that the Glyph/Cell group remains visible
+  and compact while rendering the new traditional ASCII presets.
 
 ## [0.9.0] - 2026-06-23
 

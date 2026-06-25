@@ -84,8 +84,8 @@ The current control model includes:
 - Color: saturation, contrast, brightness, gamma, background blend,
   quantization, stream color mode where relevant.
 - Sampling: target FPS, jitter amount, jitter speed, sample X/Y, smoothing.
-- Glyph/Cell: glyph mode, solid mode, character set, font family, minimum glyph
-  intensity.
+- Glyph/Cell: glyph mode, solid mode, compact character set and font family
+  menus, minimum glyph intensity.
 - Performance: stats overlay, backend status, FPS, grid size.
 - Audio Reactivity: source, preset, input device, sensitivity, smoothing, beat,
   bass, mid, treble, live meters.
@@ -123,6 +123,10 @@ source/backend.
   unchanged.
 - Current built-ins include:
   - Point & Click Default.
+  - Classic Camera ASCII.
+  - ANSI Newsprint.
+  - Terminal Mono.
+  - Dense Typewriter.
   - Neon Sledgehammer.
   - Arcade Rain.
   - Gamma Sinkhole.
@@ -159,7 +163,8 @@ source/backend.
 
 - WTF mode toggles continuous randomized transitions.
 - It uses randomized transition durations.
-- It leans into extreme preset families and randomized live-safe controls.
+- It leans into extreme preset families, traditional ASCII preset anchors, and
+  randomized live-safe controls.
 - It avoids pure black and pure white output states.
 - It does not turn off Stats Overlay.
 - Source switching cancels and resumes safely without leaving the renderer stuck
@@ -193,6 +198,10 @@ source/backend.
 - Linux targets Vulkan/GLES through `wgpu`.
 - Static images, SVGs, video files, and single-camera sources can use native
   output paths.
+- Traditional glyph-mode presets preserve their character-set masks in native
+  `wgpu` output.
+- Native glyph output uses bounded fixed atlas/ramp resources rather than
+  loading user-selected fonts in the native path.
 - macOS single-camera Pop Out uses a native AVFoundation capture path to reduce
   camera latency.
 - Native-output failures retain a webview/canvas fallback.

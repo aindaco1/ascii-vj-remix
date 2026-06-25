@@ -95,6 +95,9 @@ npm run test:rust
 ```
 
 Use an optimized app build before making performance conclusions.
+For glyph-mode changes, include at least one traditional ASCII preset in manual
+Pop Out checks and confirm Character Set/Font Family changes do not hide the
+Glyph/Cell controls.
 
 ### Tauri Commands, Permissions, or Capabilities
 
@@ -153,12 +156,15 @@ Use this after user-facing renderer, source, audio, or output changes:
 8. Trigger Display/System Audio where supported and confirm errors are useful
    when the selected source has no audio track.
 9. Click several presets and confirm smooth transitions.
-10. Toggle WTF mode on and off and confirm it remains responsive.
-11. Open Pop Out and confirm the main preview stays responsive.
-12. Confirm Pop Out reflects presets, WTF mode, and audio reactivity while fully
+10. Select a traditional ASCII preset and confirm Character Set and Font Family
+    remain compact and visible.
+11. Toggle WTF mode on and off and confirm it remains responsive and can visit
+    traditional ASCII-looking states.
+12. Open Pop Out and confirm the main preview stays responsive.
+13. Confirm Pop Out reflects presets, WTF mode, and audio reactivity while fully
     visible.
-13. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
-14. Close Pop Out and confirm CPU/GPU usage settles.
+14. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
+15. Close Pop Out and confirm CPU/GPU usage settles.
 
 ## Hardware and Platform Checks
 

@@ -112,6 +112,9 @@ Rules:
 - Use native `wgpu` output when available.
 - Keep output-window permissions minimal.
 - Prefer direct frame transfer or latest-frame native capture paths.
+- Keep glyph-mode resources bounded. Character-set changes should update the
+  small glyph ramp/params, not trigger unbounded font loading or large dynamic
+  atlas allocation.
 - Avoid blocking the main UI while the output window presents.
 - Keep counters/logs available for frame acquisition, presentation, param
   version, source version, and pacing regressions.
@@ -227,6 +230,8 @@ Before shipping renderer, source, output, or audio changes, manually verify:
 - Demo Video plays without manual renderer start.
 - Switching Demo Image and Demo Video is fast.
 - Preset transitions are smooth and do not flash original media frames.
+- At least one traditional ASCII preset, such as Classic Camera ASCII, renders
+  correctly in the main preview and Pop Out.
 - WTF mode runs indefinitely and source switching does not wedge the renderer.
 - Audio reactivity visibly changes output with Mic/Input selected.
 - Pop Out keeps the main preview responsive.

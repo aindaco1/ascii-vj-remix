@@ -1,6 +1,8 @@
 use super::{
-    native_grid_dimensions, DecodedRgbFrame, NativeRenderParams, DEFAULT_OUTPUT_HEIGHT,
-    DEFAULT_OUTPUT_WIDTH,
+    native_glyph_atlas_bytes, native_glyph_atlas_size, native_glyph_ramp_bytes,
+    native_glyph_ramp_len, native_grid_dimensions, native_render_uses_glyphs, DecodedRgbFrame,
+    NativeRenderParams, DEFAULT_OUTPUT_HEIGHT, DEFAULT_OUTPUT_WIDTH,
+    NATIVE_GLYPH_RAMP_TEXTURE_WIDTH, NATIVE_GLYPH_TILE_HEIGHT, NATIVE_GLYPH_TILE_WIDTH,
 };
 use std::borrow::Cow;
 #[cfg(target_os = "macos")]
@@ -80,7 +82,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let sampleY = clamp(i32(cellCenterY + jitterY), 0, i32(params.srcH) - 1);
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(processColor(c.rgb), 1.0));
+    let processed = processColor(c.rgb);
+    let luma = dot(processed, vec3<f32>(0.2126, 0.7152, 0.0722));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(processed, luma));
 }
 "#;
 
@@ -109,12 +113,18 @@ struct RenderParams {
     cellH: u32,
     surfaceW: u32,
     surfaceH: u32,
+    glyphMode: u32,
+    glyphCount: u32,
+    glyphTileW: u32,
+    glyphTileH: u32,
     _pad0: u32,
     _pad1: u32,
 };
 
 @group(0) @binding(0) var cellColorTex: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: RenderParams;
+@group(0) @binding(2) var glyphAtlasTex: texture_2d<f32>;
+@group(0) @binding(3) var glyphRampTex: texture_2d<f32>;
 
 @fragment
 fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
@@ -132,9 +142,30 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
         return vec4<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0, 1.0);
     }
 
-    let cx = min(u32(renderX) / params.cellW, params.cols - 1u);
-    let cy = min(u32(renderY) / params.cellH, params.rows - 1u);
-    return textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    let cellX = u32(renderX) / params.cellW;
+    let cellY = u32(renderY) / params.cellH;
+    let cx = min(cellX, params.cols - 1u);
+    let cy = min(cellY, params.rows - 1u);
+    let cell = textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    if (params.glyphMode == 0u || params.glyphCount == 0u) {
+        return vec4<f32>(cell.rgb, 1.0);
+    }
+
+    let localX = renderX - f32(cellX * params.cellW);
+    let localY = renderY - f32(cellY * params.cellH);
+    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(params.glyphTileW)), params.glyphTileW - 1u);
+    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(params.glyphTileH)), params.glyphTileH - 1u);
+    let rampX = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
+    let glyphIndex = u32(textureLoad(glyphRampTex, vec2<i32>(i32(rampX), 0), 0).r * 255.0 + 0.5);
+    let alpha = textureLoad(
+        glyphAtlasTex,
+        vec2<i32>(i32(glyphIndex * params.glyphTileW + glyphX), i32(glyphY)),
+        0
+    ).r;
+    if (alpha <= 0.5) {
+        return vec4<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0, 1.0);
+    }
+    return vec4<f32>(cell.rgb, 1.0);
 }
 "#;
 
@@ -219,6 +250,10 @@ pub(super) struct NativeGpuPresenter {
     cell_texture: Option<wgpu::Texture>,
     cell_view: Option<wgpu::TextureView>,
     cell_size: (u32, u32),
+    _glyph_atlas_texture: wgpu::Texture,
+    glyph_atlas_view: wgpu::TextureView,
+    glyph_ramp_texture: wgpu::Texture,
+    glyph_ramp_view: wgpu::TextureView,
     compute_bind_group: Option<wgpu::BindGroup>,
     render_bind_group: Option<wgpu::BindGroup>,
     rgba_frame: Vec<u8>,
@@ -348,10 +383,62 @@ impl NativeGpuPresenter {
         });
         let render_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU render params"),
-            size: 32,
+            size: 48,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let (glyph_atlas_width, glyph_atlas_height) = native_glyph_atlas_size();
+        let glyph_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("ASCILINE native GPU glyph atlas"),
+            size: wgpu::Extent3d {
+                width: glyph_atlas_width,
+                height: glyph_atlas_height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &glyph_atlas_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &native_glyph_atlas_bytes(),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(glyph_atlas_width),
+                rows_per_image: Some(glyph_atlas_height),
+            },
+            wgpu::Extent3d {
+                width: glyph_atlas_width,
+                height: glyph_atlas_height,
+                depth_or_array_layers: 1,
+            },
+        );
+        let glyph_atlas_view =
+            glyph_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let glyph_ramp_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("ASCILINE native GPU glyph ramp"),
+            size: wgpu::Extent3d {
+                width: NATIVE_GLYPH_RAMP_TEXTURE_WIDTH,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let glyph_ramp_view =
+            glyph_ramp_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         Ok(Self {
             surface,
@@ -368,6 +455,10 @@ impl NativeGpuPresenter {
             cell_texture: None,
             cell_view: None,
             cell_size: (0, 0),
+            _glyph_atlas_texture: glyph_atlas_texture,
+            glyph_atlas_view,
+            glyph_ramp_texture,
+            glyph_ramp_view,
             compute_bind_group: None,
             render_bind_group: None,
             rgba_frame: Vec::new(),
@@ -414,6 +505,25 @@ impl NativeGpuPresenter {
         let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
         self.ensure_source_texture(frame)?;
         self.ensure_cell_texture(cols, rows);
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.glyph_ramp_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &native_glyph_ramp_bytes(params),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: NATIVE_GLYPH_RAMP_TEXTURE_WIDTH,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
 
         let source_view = self
             .source_view
@@ -457,6 +567,14 @@ impl NativeGpuPresenter {
                         wgpu::BindGroupEntry {
                             binding: 1,
                             resource: self.render_params_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&self.glyph_atlas_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: wgpu::BindingResource::TextureView(&self.glyph_ramp_view),
                         },
                     ],
                 }));
@@ -748,14 +866,18 @@ fn render_params_bytes(
     rows: u32,
     surface_width: u32,
     surface_height: u32,
-) -> [u8; 32] {
-    let mut bytes = [0u8; 32];
+) -> [u8; 48] {
+    let mut bytes = [0u8; 48];
     put_u32(&mut bytes, 0, cols);
     put_u32(&mut bytes, 4, rows);
     put_u32(&mut bytes, 8, params.cell_width.max(1));
     put_u32(&mut bytes, 12, params.cell_height.max(1));
     put_u32(&mut bytes, 16, surface_width.max(1));
     put_u32(&mut bytes, 20, surface_height.max(1));
+    put_u32(&mut bytes, 24, u32::from(native_render_uses_glyphs(params)));
+    put_u32(&mut bytes, 28, native_glyph_ramp_len(params));
+    put_u32(&mut bytes, 32, NATIVE_GLYPH_TILE_WIDTH);
+    put_u32(&mut bytes, 36, NATIVE_GLYPH_TILE_HEIGHT);
     bytes
 }
 
@@ -795,6 +917,10 @@ mod tests {
             mirror_x: true,
             pixel: false,
             solid_mode: false,
+            glyph_mode: true,
+            charset: "point-click".to_string(),
+            font_family: "Courier New".to_string(),
+            min_glyph_intensity: 180,
             native_wtf_active: false,
             audio_reactive_active: false,
             audio_reactive_source: String::new(),
@@ -818,5 +944,24 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[44..48].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(bytes[68..72].try_into().unwrap()), 1);
         assert_eq!(bytes.len(), 80);
+
+        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080);
+        assert_eq!(
+            u32::from_le_bytes(render_bytes[24..28].try_into().unwrap()),
+            1
+        );
+        assert_eq!(
+            u32::from_le_bytes(render_bytes[28..32].try_into().unwrap()),
+            native_glyph_ramp_len(&params)
+        );
+        assert_eq!(
+            u32::from_le_bytes(render_bytes[32..36].try_into().unwrap()),
+            6
+        );
+        assert_eq!(
+            u32::from_le_bytes(render_bytes[36..40].try_into().unwrap()),
+            9
+        );
+        assert_eq!(render_bytes.len(), 48);
     }
 }

@@ -10,7 +10,7 @@ Read these in order before making non-trivial changes:
 
 1. [README](../README.md): product overview, current user-facing feature set,
    install notes, system requirements, license/support/contact information.
-2. [Changelog](../CHANGELOG.md): current 0.9.0 feature baseline and recent
+2. [Changelog](../CHANGELOG.md): current release feature baseline and recent
    behavioral expectations.
 3. [Roadmap](ROADMAP.md): current capabilities, planned work, deferred work, and
    product direction.
@@ -86,7 +86,7 @@ surface for live ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-Current docs describe the 0.9.0 feature set.
+Current docs describe the 0.9.1 feature set.
 
 Sources:
 
@@ -106,6 +106,10 @@ Rendering:
 - Native Pop Out output uses `wgpu` where available, with Metal on macOS and
   corresponding GPU backends on Windows/Linux.
 - The active renderer is controlled by one canonical parameter model.
+- Native Pop Out preserves glyph-mode and character-set params for traditional
+  ASCII presets.
+- Native glyph output should keep using bounded fixed atlas/ramp resources;
+  `fontFamily` is UI/preview metadata, not a native font-loading sink.
 
 Live behavior:
 
@@ -113,7 +117,7 @@ Live behavior:
 - Preset transitions should be smooth crossfades, not fade-to-black.
 - Presets should preserve the active media source unless explicitly changed.
 - WTF mode runs indefinitely while active and transitions through live-safe
-  randomized settings.
+  randomized settings, including anchors from traditional ASCII presets.
 - Audio reactivity is enabled by default, starts from Mic/Input by default, and
   modulates live effective params without rewriting saved presets.
 - Safe clamps should prevent pure black or pure white outputs from randomized or

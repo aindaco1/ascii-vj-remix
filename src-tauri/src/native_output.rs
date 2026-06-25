@@ -17,7 +17,7 @@ use std::io::Write;
 use std::num::NonZeroU32;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, Window,
@@ -98,6 +98,10 @@ pub struct NativeOutputParams {
     pub mirror_x: Option<bool>,
     pub pixel: Option<bool>,
     pub solid_mode: Option<bool>,
+    pub glyph_mode: Option<bool>,
+    pub charset: Option<String>,
+    pub font_family: Option<String>,
+    pub min_glyph_intensity: Option<f64>,
     pub camera_device_label: Option<String>,
     pub camera_selected_device_labels: Option<Vec<String>>,
     pub camera_resolution: Option<String>,
@@ -292,6 +296,12 @@ struct NativeRenderParams {
     mirror_x: bool,
     pixel: bool,
     solid_mode: bool,
+    glyph_mode: bool,
+    charset: String,
+    #[allow(dead_code)]
+    font_family: String,
+    #[allow(dead_code)]
+    min_glyph_intensity: u8,
     native_wtf_active: bool,
     audio_reactive_active: bool,
     audio_reactive_source: String,
@@ -301,6 +311,339 @@ struct NativeRenderParams {
     audio_reactive_bass_amount: f64,
     audio_reactive_mid_amount: f64,
     audio_reactive_treble_amount: f64,
+}
+
+const NATIVE_GLYPH_TILE_WIDTH: u32 = 6;
+const NATIVE_GLYPH_TILE_HEIGHT: u32 = 9;
+const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH: u32 = 96;
+const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE: usize = NATIVE_GLYPH_RAMP_TEXTURE_WIDTH as usize;
+const NATIVE_ASCII_POINT_CLICK_CHARS: &str =
+    " .'`^\":;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+const NATIVE_ASCII_ASCILINE_CHARS: &str = " .:-=+*#%@";
+const NATIVE_ASCII_CLASSIC_CAMERA_CHARS: &str = " .,:;i1tfLCG08@";
+const NATIVE_ASCII_BLOCK_CHARS: &str = " ░▒▓█";
+const NATIVE_GLYPH_ATLAS_CHARS: &str =
+    " .,'`^\":;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$░▒▓█";
+
+fn native_glyph_chars() -> &'static [char] {
+    static GLYPH_CHARS: OnceLock<Vec<char>> = OnceLock::new();
+    GLYPH_CHARS
+        .get_or_init(|| NATIVE_GLYPH_ATLAS_CHARS.chars().collect())
+        .as_slice()
+}
+
+fn native_render_uses_glyphs(params: &NativeRenderParams) -> bool {
+    params.glyph_mode && !params.solid_mode && !params.pixel
+}
+
+fn native_charset_chars(charset: &str) -> &'static str {
+    match charset {
+        "asciline" => NATIVE_ASCII_ASCILINE_CHARS,
+        "classic-camera" => NATIVE_ASCII_CLASSIC_CAMERA_CHARS,
+        "blocks" => NATIVE_ASCII_BLOCK_CHARS,
+        _ => NATIVE_ASCII_POINT_CLICK_CHARS,
+    }
+}
+
+fn native_glyph_index_for_char(value: char) -> u8 {
+    let normalized = if value.is_ascii_lowercase() {
+        value.to_ascii_uppercase()
+    } else {
+        value
+    };
+    for (index, candidate) in native_glyph_chars().iter().copied().enumerate() {
+        if candidate == value || candidate == normalized {
+            return index.min(u8::MAX as usize) as u8;
+        }
+    }
+    0
+}
+
+fn native_glyph_char(index: u8) -> char {
+    native_glyph_chars()
+        .get(index as usize)
+        .copied()
+        .unwrap_or(' ')
+}
+
+fn native_glyph_pattern(value: char) -> [u8; 7] {
+    match value {
+        '█' => [0b11111; 7],
+        '▓' => [
+            0b11111, 0b10101, 0b11111, 0b10101, 0b11111, 0b10101, 0b11111,
+        ],
+        '▒' => [
+            0b10101, 0b01010, 0b10101, 0b01010, 0b10101, 0b01010, 0b10101,
+        ],
+        '░' => [
+            0b10001, 0b00000, 0b00100, 0b00000, 0b10001, 0b00000, 0b00100,
+        ],
+        _ => match value.to_ascii_uppercase() {
+            'A' => [
+                0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+            ],
+            'B' => [
+                0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110,
+            ],
+            'C' => [
+                0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110,
+            ],
+            'D' => [
+                0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110,
+            ],
+            'E' => [
+                0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111,
+            ],
+            'F' => [
+                0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
+            ],
+            'G' => [
+                0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110,
+            ],
+            'H' => [
+                0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+            ],
+            'I' => [
+                0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b11111,
+            ],
+            'J' => [
+                0b00111, 0b00010, 0b00010, 0b00010, 0b10010, 0b10010, 0b01100,
+            ],
+            'K' => [
+                0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001,
+            ],
+            'L' => [
+                0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111,
+            ],
+            'M' => [
+                0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001,
+            ],
+            'N' => [
+                0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001,
+            ],
+            'O' | '0' => [
+                0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110,
+            ],
+            'P' => [
+                0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000,
+            ],
+            'Q' => [
+                0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101,
+            ],
+            'R' => [
+                0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001,
+            ],
+            'S' => [
+                0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110,
+            ],
+            'T' => [
+                0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100,
+            ],
+            'U' => [
+                0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
+            ],
+            'V' => [
+                0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100,
+            ],
+            'W' => [
+                0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010,
+            ],
+            'X' => [
+                0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001,
+            ],
+            'Y' => [
+                0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100,
+            ],
+            'Z' => [
+                0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111,
+            ],
+            '1' => [
+                0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+            ],
+            '2' => [
+                0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111,
+            ],
+            '3' => [
+                0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110,
+            ],
+            '4' => [
+                0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
+            ],
+            '5' => [
+                0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110,
+            ],
+            '6' => [
+                0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
+            ],
+            '7' => [
+                0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
+            ],
+            '8' => [
+                0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
+            ],
+            '9' => [
+                0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100,
+            ],
+            '@' => [
+                0b01110, 0b10001, 0b10111, 0b10101, 0b10111, 0b10000, 0b01110,
+            ],
+            '$' => [
+                0b00100, 0b01111, 0b10100, 0b01110, 0b00101, 0b11110, 0b00100,
+            ],
+            '%' => [
+                0b11001, 0b11010, 0b00010, 0b00100, 0b01000, 0b01011, 0b10011,
+            ],
+            '&' => [
+                0b01100, 0b10010, 0b10100, 0b01000, 0b10101, 0b10010, 0b01101,
+            ],
+            '#' => [
+                0b01010, 0b01010, 0b11111, 0b01010, 0b11111, 0b01010, 0b01010,
+            ],
+            '*' => [
+                0b00100, 0b10101, 0b01110, 0b11111, 0b01110, 0b10101, 0b00100,
+            ],
+            '+' => [
+                0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000,
+            ],
+            '-' | '_' => [
+                0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b11111,
+            ],
+            '=' => [
+                0b00000, 0b11111, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000,
+            ],
+            '?' => [
+                0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b00000, 0b00100,
+            ],
+            '!' => [
+                0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100,
+            ],
+            ':' => [
+                0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b00000,
+            ],
+            ';' => [
+                0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b01000,
+            ],
+            '.' => [
+                0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00100, 0b00100,
+            ],
+            ',' => [
+                0b00000, 0b00000, 0b00000, 0b00000, 0b00100, 0b00100, 0b01000,
+            ],
+            '\'' | '`' => [
+                0b00100, 0b00100, 0b01000, 0b00000, 0b00000, 0b00000, 0b00000,
+            ],
+            '"' => [
+                0b01010, 0b01010, 0b01010, 0b00000, 0b00000, 0b00000, 0b00000,
+            ],
+            '^' => [
+                0b00100, 0b01010, 0b10001, 0b00000, 0b00000, 0b00000, 0b00000,
+            ],
+            '~' => [
+                0b00000, 0b00000, 0b01000, 0b10101, 0b00010, 0b00000, 0b00000,
+            ],
+            '>' => [
+                0b10000, 0b01000, 0b00100, 0b00010, 0b00100, 0b01000, 0b10000,
+            ],
+            '<' => [
+                0b00001, 0b00010, 0b00100, 0b01000, 0b00100, 0b00010, 0b00001,
+            ],
+            '[' | ']' | '(' | ')' | '{' | '}' | '|' | '/' => [
+                0b01110, 0b01000, 0b01000, 0b01000, 0b01000, 0b01000, 0b01110,
+            ],
+            '\\' => [
+                0b10000, 0b01000, 0b01000, 0b00100, 0b00010, 0b00010, 0b00001,
+            ],
+            ' ' => [0; 7],
+            _ => [
+                0b00000, 0b01110, 0b10001, 0b00110, 0b10001, 0b01110, 0b00000,
+            ],
+        },
+    }
+}
+
+fn native_glyph_alpha(index: u8, tile_x: u32, tile_y: u32) -> bool {
+    let value = native_glyph_char(index);
+    if matches!(value, '█' | '▓' | '▒' | '░') {
+        let pattern = native_glyph_pattern(value);
+        let row = pattern[(tile_y.min(6)) as usize];
+        let bit = 4_u32.saturating_sub(tile_x.min(4));
+        return (row & (1_u8 << bit)) != 0;
+    }
+    if tile_y == 0 || tile_y >= NATIVE_GLYPH_TILE_HEIGHT - 1 || tile_x >= 5 {
+        return false;
+    }
+    let pattern = native_glyph_pattern(value);
+    let row = pattern[(tile_y - 1) as usize];
+    let bit = 4_u32.saturating_sub(tile_x);
+    (row & (1_u8 << bit)) != 0
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn native_glyph_ramp_indices(params: &NativeRenderParams) -> Vec<u8> {
+    native_charset_chars(&params.charset)
+        .chars()
+        .map(native_glyph_index_for_char)
+        .collect()
+}
+
+fn native_glyph_ramp_len(params: &NativeRenderParams) -> u32 {
+    native_charset_chars(&params.charset)
+        .chars()
+        .count()
+        .max(1)
+        .min(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE) as u32
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn native_glyph_index_for_luma(luma: f64, ramp: &[u8]) -> u8 {
+    if ramp.is_empty() {
+        return 0;
+    }
+    let index = (luma.clamp(0.0, 255.0) / 256.0 * ramp.len() as f64).floor() as usize;
+    ramp[index.min(ramp.len() - 1)]
+}
+
+fn native_glyph_atlas_size() -> (u32, u32) {
+    (
+        NATIVE_GLYPH_TILE_WIDTH * native_glyph_chars().len() as u32,
+        NATIVE_GLYPH_TILE_HEIGHT,
+    )
+}
+
+fn native_glyph_atlas_bytes() -> Vec<u8> {
+    let (width, height) = native_glyph_atlas_size();
+    let mut out = vec![0; width as usize * height as usize];
+    for glyph_index in 0..native_glyph_chars().len() {
+        let glyph_index = glyph_index as u8;
+        for y in 0..NATIVE_GLYPH_TILE_HEIGHT {
+            for x in 0..NATIVE_GLYPH_TILE_WIDTH {
+                let dst = y as usize * width as usize
+                    + glyph_index as usize * NATIVE_GLYPH_TILE_WIDTH as usize
+                    + x as usize;
+                out[dst] = if native_glyph_alpha(glyph_index, x, y) {
+                    255
+                } else {
+                    0
+                };
+            }
+        }
+    }
+    out
+}
+
+fn native_glyph_ramp_bytes(
+    params: &NativeRenderParams,
+) -> [u8; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE] {
+    let mut out = [0; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE];
+    for (index, glyph_index) in native_charset_chars(&params.charset)
+        .chars()
+        .map(native_glyph_index_for_char)
+        .take(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE)
+        .enumerate()
+    {
+        out[index] = glyph_index;
+    }
+    out
 }
 
 #[tauri::command]
@@ -477,6 +820,10 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             mirror_x: Some(false),
             pixel: Some(false),
             solid_mode: Some(false),
+            glyph_mode: Some(true),
+            charset: Some("point-click".to_string()),
+            font_family: Some("Courier New".to_string()),
+            min_glyph_intensity: Some(180.0),
             camera_device_label: None,
             camera_selected_device_labels: None,
             camera_resolution: None,
@@ -2277,6 +2624,21 @@ impl NativeRenderParams {
                 .unwrap_or(false),
             pixel: params.pixel.unwrap_or(false),
             solid_mode: params.solid_mode.unwrap_or(false),
+            glyph_mode: params.glyph_mode.unwrap_or(true),
+            charset: match params.charset.as_deref() {
+                Some("asciline") => "asciline",
+                Some("classic-camera") => "classic-camera",
+                Some("blocks") => "blocks",
+                _ => "point-click",
+            }
+            .to_string(),
+            font_family: params
+                .font_family
+                .clone()
+                .unwrap_or_else(|| "Courier New".to_string()),
+            min_glyph_intensity: f64_param(params.min_glyph_intensity, 180.0)
+                .clamp(0.0, 255.0)
+                .round() as u8,
             native_wtf_active: params.native_wtf_active.unwrap_or(false),
             audio_reactive_active: params.audio_reactive_active.unwrap_or(false),
             audio_reactive_source: params.audio_reactive_source.clone().unwrap_or_default(),
@@ -3201,6 +3563,10 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     mirror_x: Some(false),
                     pixel: Some(false),
                     solid_mode: Some(false),
+                    glyph_mode: Some(true),
+                    charset: Some("point-click".to_string()),
+                    font_family: Some("Courier New".to_string()),
+                    min_glyph_intensity: Some(180.0),
                     camera_device_label: None,
                     camera_selected_device_labels: None,
                     camera_resolution: None,
@@ -3286,13 +3652,39 @@ fn render_native_frame_to_buffer(
     }
 
     let cols_usize = cols as usize;
+    let glyph_mode = native_render_uses_glyphs(params);
+    let glyph_ramp = if glyph_mode {
+        native_glyph_ramp_indices(params)
+    } else {
+        Vec::new()
+    };
+
     for span_y in y_spans {
         let src_row = span_y.index * cols_usize;
+        let span_height = span_y.end.saturating_sub(span_y.start).max(1);
         for y in span_y.start..span_y.end {
+            let tile_y = (((y - span_y.start) as u32 * NATIVE_GLYPH_TILE_HEIGHT)
+                / span_height as u32)
+                .min(NATIVE_GLYPH_TILE_HEIGHT - 1);
             let dst_row = y * width_usize;
             let dst = &mut buffer[dst_row..dst_row + width_usize];
             for span_x in &x_spans {
-                dst[span_x.start..span_x.end].fill(cell_colors[src_row + span_x.index]);
+                let color = cell_colors[src_row + span_x.index];
+                if !glyph_mode {
+                    dst[span_x.start..span_x.end].fill(color);
+                    continue;
+                }
+
+                let glyph_index = native_glyph_index_for_luma(rgb_u32_luma(color), &glyph_ramp);
+                let span_width = span_x.end.saturating_sub(span_x.start).max(1);
+                for x in span_x.start..span_x.end {
+                    let tile_x = (((x - span_x.start) as u32 * NATIVE_GLYPH_TILE_WIDTH)
+                        / span_width as u32)
+                        .min(NATIVE_GLYPH_TILE_WIDTH - 1);
+                    if native_glyph_alpha(glyph_index, tile_x, tile_y) {
+                        dst[x] = color;
+                    }
+                }
             }
         }
     }
@@ -3477,6 +3869,14 @@ fn rgb_u32(r: u8, g: u8, b: u8) -> u32 {
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
+fn rgb_u32_luma(color: u32) -> f64 {
+    let r = ((color >> 16) & 0xff) as f64;
+    let g = ((color >> 8) & 0xff) as f64;
+    let b = (color & 0xff) as f64;
+    0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
 fn clamp01(value: f64) -> f64 {
     value.clamp(0.0, 1.0)
 }
@@ -3534,6 +3934,10 @@ mod tests {
                 mirror_x: Some(false),
                 pixel: Some(false),
                 solid_mode: Some(false),
+                glyph_mode: Some(true),
+                charset: Some("point-click".to_string()),
+                font_family: Some("Courier New".to_string()),
+                min_glyph_intensity: Some(180.0),
                 camera_device_label: None,
                 camera_selected_device_labels: None,
                 camera_resolution: None,
@@ -3581,6 +3985,22 @@ mod tests {
         let params = NativeRenderParams::from_payload(&payload);
 
         assert!(params.mirror_x);
+    }
+
+    #[test]
+    fn native_params_accept_glyph_metadata() {
+        let mut payload = base_payload();
+        payload.params.glyph_mode = Some(true);
+        payload.params.charset = Some("classic-camera".to_string());
+        payload.params.font_family = Some("Menlo".to_string());
+        payload.params.min_glyph_intensity = Some(96.0);
+
+        let params = NativeRenderParams::from_payload(&payload);
+
+        assert!(params.glyph_mode);
+        assert_eq!(params.charset, "classic-camera");
+        assert_eq!(params.font_family, "Menlo");
+        assert_eq!(params.min_glyph_intensity, 96);
     }
 
     #[test]
@@ -3674,6 +4094,7 @@ mod tests {
     #[test]
     fn native_render_expands_cells_to_output_buffer() {
         let mut params = params();
+        params.glyph_mode = false;
         params.auto_rows = false;
         params.rows = 1;
         params.cell_width = 2;
@@ -3691,6 +4112,44 @@ mod tests {
         assert_eq!(buffer[1], rgb_u32(255, 0, 0));
         assert_eq!(buffer[2], rgb_u32(0, 0, 255));
         assert_eq!(buffer[3], rgb_u32(0, 0, 255));
+    }
+
+    #[test]
+    fn native_render_masks_cells_with_glyph_ramp() {
+        let mut params = params();
+        params.glyph_mode = true;
+        params.charset = "asciline".to_string();
+        params.auto_rows = false;
+        params.rows = 1;
+        params.cols = 1;
+        params.cell_width = NATIVE_GLYPH_TILE_WIDTH;
+        params.cell_height = NATIVE_GLYPH_TILE_HEIGHT;
+        let frame = DecodedRgbFrame {
+            index: 0,
+            width: 1,
+            height: 1,
+            data: vec![255, 255, 255],
+        };
+        let mut buffer = vec![0; (NATIVE_GLYPH_TILE_WIDTH * NATIVE_GLYPH_TILE_HEIGHT) as usize];
+        render_native_frame_to_buffer(
+            &frame,
+            &params,
+            &mut buffer,
+            NATIVE_GLYPH_TILE_WIDTH,
+            NATIVE_GLYPH_TILE_HEIGHT,
+            0,
+        );
+
+        let lit = buffer
+            .iter()
+            .filter(|color| **color == rgb_u32(255, 255, 255))
+            .count();
+        let background = buffer
+            .iter()
+            .filter(|color| **color == rgb_u32(3, 4, 5))
+            .count();
+        assert!(lit > 0, "glyph should draw some foreground pixels");
+        assert!(background > 0, "glyph should leave background holes");
     }
 
     #[test]

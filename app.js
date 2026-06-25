@@ -186,6 +186,21 @@ const TAURI_RAW_VIDEO_MAX_DIMENSION = 960;
 const TAURI_RAW_VIDEO_MAX_PIXELS = 640 * 360;
 const TAURI_RAW_VIDEO_BATCH_SIZE = 2;
 
+const CHARACTER_SET_OPTIONS = Object.freeze([
+    ['point-click', 'Point & Click'],
+    ['classic-camera', 'Classic Camera'],
+    ['asciline', 'ASCILINE'],
+    ['blocks', 'Blocks']
+]);
+const CHARACTER_SET_IDS = Object.freeze(CHARACTER_SET_OPTIONS.map(([id]) => id));
+const FONT_FAMILY_OPTIONS = Object.freeze([
+    ['Courier New', 'Courier New'],
+    ['monospace', 'Monospace'],
+    ['Menlo', 'Menlo'],
+    ['Consolas', 'Consolas']
+]);
+const FONT_FAMILY_IDS = Object.freeze(FONT_FAMILY_OPTIONS.map(([id]) => id));
+
 const SOURCE_PRESETS = [
     { id: 'demo-image', name: 'Demo Image', mediaUrl: 'media/demo.svg', mediaType: 'image' },
     { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.mp4', mediaType: 'video' }
@@ -353,6 +368,130 @@ const BUILTIN_PRESETS = [
             mode: 5,
             pixel: false,
             codecQuality: 'lossless'
+        }
+    },
+    {
+        id: 'classic-camera-ascii',
+        name: 'Classic Camera ASCII',
+        readonly: true,
+        transitionSeconds: 1.1,
+        params: {
+            backend: 'canvas2d',
+            cols: 170,
+            autoRows: true,
+            cellWidth: 6,
+            cellHeight: 9,
+            saturationBoost: 0,
+            contrastBoost: 1.75,
+            brightness: 1.08,
+            gamma: 1,
+            bgBlend: 0.04,
+            quantizeBits: 0,
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'classic-camera',
+            fontFamily: 'Courier New',
+            mode: 1,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
+        id: 'ansi-newsprint',
+        name: 'ANSI Newsprint',
+        readonly: true,
+        transitionSeconds: 1.35,
+        params: {
+            backend: 'canvas2d',
+            cols: 210,
+            autoRows: true,
+            cellWidth: 5,
+            cellHeight: 8,
+            saturationBoost: 0.08,
+            contrastBoost: 2.15,
+            brightness: 1.18,
+            gamma: 0.92,
+            bgBlend: 0.1,
+            quantizeBits: 1,
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'asciline',
+            fontFamily: 'Courier New',
+            mode: 1,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
+        id: 'terminal-mono',
+        name: 'Terminal Mono',
+        readonly: true,
+        transitionSeconds: 1.2,
+        params: {
+            backend: 'canvas2d',
+            cols: 140,
+            autoRows: true,
+            cellWidth: 7,
+            cellHeight: 11,
+            saturationBoost: 0,
+            contrastBoost: 2.55,
+            brightness: 0.9,
+            gamma: 1.35,
+            bgBlend: 0.28,
+            quantizeBits: 2,
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'classic-camera',
+            fontFamily: 'Menlo',
+            mode: 1,
+            pixel: false,
+            codecQuality: 'low'
+        }
+    },
+    {
+        id: 'dense-typewriter',
+        name: 'Dense Typewriter',
+        readonly: true,
+        transitionSeconds: 1.4,
+        params: {
+            backend: 'canvas2d',
+            cols: 260,
+            autoRows: true,
+            cellWidth: 4,
+            cellHeight: 7,
+            saturationBoost: 0.18,
+            contrastBoost: 1.95,
+            brightness: 1.05,
+            gamma: 0.86,
+            bgBlend: 0.08,
+            quantizeBits: 0,
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'point-click',
+            fontFamily: 'Courier New',
+            mode: 2,
+            pixel: false,
+            codecQuality: 'balanced'
         }
     },
     {
@@ -1062,6 +1201,10 @@ const BUILTIN_PRESETS = [
 
 const BUILTIN_PRESET_DISPLAY_ORDER = [
     'point-click-default',
+    'classic-camera-ascii',
+    'ansi-newsprint',
+    'terminal-mono',
+    'dense-typewriter',
     'neon-sledgehammer',
     'arcade-rain',
     'gamma-sinkhole',
@@ -1109,13 +1252,24 @@ const EXTREME_WTF_PRESET_IDS = [
     'paper-shredder',
     'laser-rot'
 ];
+const ASCII_WTF_PRESET_IDS = [
+    'classic-camera-ascii',
+    'ansi-newsprint',
+    'terminal-mono',
+    'dense-typewriter'
+];
+const WTF_ANCHOR_PRESET_IDS = [
+    ...EXTREME_WTF_PRESET_IDS,
+    ...ASCII_WTF_PRESET_IDS
+];
+const ASCII_WTF_PRESET_ID_SET = new Set(ASCII_WTF_PRESET_IDS);
 
 const BUILTIN_PRESET_BY_ID = new Map(BUILTIN_PRESETS.map((preset) => [preset.id, preset]));
 const BUILTIN_PRESETS_DISPLAY = [
     ...BUILTIN_PRESET_DISPLAY_ORDER.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean),
     ...BUILTIN_PRESETS.filter((preset) => !BUILTIN_PRESET_DISPLAY_ORDER.includes(preset.id))
 ];
-const EXTREME_WTF_PRESETS = EXTREME_WTF_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
+const WTF_ANCHOR_PRESETS = WTF_ANCHOR_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 
 const CONTROL_GROUPS = [
     {
@@ -1193,8 +1347,8 @@ const CONTROL_GROUPS = [
         controls: [
             { key: 'glyphMode', label: 'Glyph mode', type: 'checkbox' },
             { key: 'solidMode', label: 'Solid mode', type: 'checkbox' },
-            { key: 'charset', label: 'Character set', type: 'select', options: [['point-click', 'Point & Click'], ['asciline', 'ASCILINE'], ['blocks', 'Blocks']] },
-            { key: 'fontFamily', label: 'Font family', type: 'select', options: [['Courier New', 'Courier New'], ['monospace', 'Monospace'], ['Menlo', 'Menlo'], ['Consolas', 'Consolas']] },
+            { key: 'charset', label: 'Character set', type: 'select', compactSelect: true, options: CHARACTER_SET_OPTIONS },
+            { key: 'fontFamily', label: 'Font family', type: 'select', compactSelect: true, options: FONT_FAMILY_OPTIONS },
             { key: 'minGlyphIntensity', label: 'Min glyph intensity', type: 'range', min: 0, max: 255, step: 1 }
         ]
     }
@@ -1389,10 +1543,10 @@ const CONTROL_APPLIES = {
     futureWaitThreshold: ({ params }) => params.sourceMode === 'stream',
     fpsCap: ({ params }) => params.sourceMode === 'stream',
 
-    glyphMode: ({ params, kind }) => kind !== 'gpu' && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
-    solidMode: ({ params, kind }) => kind !== 'gpu' && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
-    charset: ({ params, kind }) => kind !== 'gpu' && params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
-    fontFamily: ({ params, kind }) => kind !== 'gpu' && params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    glyphMode: ({ params }) => !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    solidMode: ({ params }) => !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    charset: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    fontFamily: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
     minGlyphIntensity: () => false
 };
 
@@ -2384,6 +2538,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
 function charsetChars(params) {
     if (params.charset === 'blocks') return ' ░▒▓█';
     if (params.charset === 'asciline') return ' .:-=+*#%@';
+    if (params.charset === 'classic-camera') return ' .,:;i1tfLCG08@';
     return ASCII_CHARS;
 }
 
@@ -5214,6 +5369,7 @@ class RendererLabApp {
             for (const config of group.controls) {
                 const row = document.createElement('div');
                 row.className = 'control-row';
+                if (config.compactSelect) row.classList.add('compact-select');
                 row.dataset.controlKey = config.key;
                 const label = document.createElement('label');
                 label.className = 'control-label';
@@ -5584,7 +5740,11 @@ class RendererLabApp {
         } finally {
             this._stopWtf();
             this.uiPerfSmokeActive = false;
-            await recordTauriMediaDiagnostic(`[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(report)}`).catch(() => {});
+            const { samples, ...summary } = report;
+            await recordTauriMediaDiagnostic(`[ASCILINE_UI_PERF_REPORT] ${JSON.stringify({
+                ...summary,
+                sampleCount: samples.length
+            })}`).catch(() => {});
         }
     }
 
@@ -7395,7 +7555,8 @@ button:hover{background:#202a35}
 
     _randomWtfTarget(seconds) {
         const target = { ...this.params, transitionSeconds: seconds };
-        const anchor = randomBool(0.42) ? randomChoice(EXTREME_WTF_PRESETS) : null;
+        const anchor = randomBool(0.48) ? randomChoice(WTF_ANCHOR_PRESETS) : null;
+        const asciiAnchor = anchor ? ASCII_WTF_PRESET_ID_SET.has(anchor.id) : false;
         const anchorParams = anchor ? stripPresetExcludedParams(anchor.params || {}) : null;
         if (anchorParams) Object.assign(target, anchorParams);
         const staticMode = target.sourceMode === 'static';
@@ -7408,7 +7569,7 @@ button:hover{background:#202a35}
         target.loop = true;
         target.muted = randomBool(0.72);
 
-        const lowColumnBias = Boolean(anchorParams) || randomBool(0.38);
+        const lowColumnBias = asciiAnchor || Boolean(anchorParams) || randomBool(0.38);
         target.cols = lowColumnBias ? randomInt(80, 280) : randomInt(280, 780);
         target.autoRows = true;
         target.rows = 0;
@@ -7460,11 +7621,55 @@ button:hover{background:#202a35}
         const canvasBackend = backendKind(target) === 'canvas';
         target.solidMode = Boolean(anchorParams?.solidMode) || (canvasBackend ? randomBool(0.34) : randomBool(0.2));
         target.glyphMode = target.solidMode ? false : (anchorParams?.glyphMode ?? randomBool(0.66));
-        target.charset = randomChoice(['point-click', 'asciline', 'blocks']);
-        target.fontFamily = randomChoice(['Courier New', 'monospace', 'Menlo', 'Consolas']);
+        target.charset = randomChoice(CHARACTER_SET_IDS);
+        target.fontFamily = randomChoice(FONT_FAMILY_IDS);
         target.minGlyphIntensity = randomInt(70, 230);
+        if (asciiAnchor && anchorParams) {
+            const reusableStaticBackend = staticMode &&
+                this.running &&
+                this.staticRuntime?.canReuseSource?.({ ...target, backend: this.params.backend });
+            this._applyAsciiWtfAnchor(target, anchorParams, {
+                preserveBackend: reusableStaticBackend ? this.params.backend : null
+            });
+        }
 
         return normalizeParams(target, { preserveBlob: true });
+    }
+
+    _applyAsciiWtfAnchor(target, anchorParams, options = {}) {
+        const around = (key, spread, min, max) => {
+            const base = Number(anchorParams[key] ?? target[key]);
+            const value = Number.isFinite(base) ? base : Number(DEFAULT_PARAMS[key] || 0);
+            return snapToStep(clamp(value + randomBetween(-spread, spread), min, max), 0.01);
+        };
+        const nudgeInt = (key, spread, min, max) => {
+            const base = Number(anchorParams[key] ?? target[key]);
+            const value = Number.isFinite(base) ? base : Number(DEFAULT_PARAMS[key] || min);
+            return Math.round(clamp(value + randomInt(-spread, spread), min, max));
+        };
+
+        target.backend = options.preserveBackend || anchorParams.backend || 'canvas2d';
+        target.cols = Math.round(clamp(Number(anchorParams.cols || target.cols) * randomBetween(0.9, 1.12), 80, 320));
+        target.cellWidth = nudgeInt('cellWidth', 1, 2, 9);
+        target.cellHeight = nudgeInt('cellHeight', 1, 3, 13);
+        target.saturationBoost = around('saturationBoost', 0.12, 0, 3);
+        target.contrastBoost = around('contrastBoost', 0.28, 0, 3);
+        target.brightness = around('brightness', 0.12, 0.4, 2);
+        target.gamma = around('gamma', 0.16, 0.2, 3);
+        target.bgBlend = around('bgBlend', 0.06, 0, 1);
+        target.quantizeBits = nudgeInt('quantizeBits', 1, 0, 6);
+        target.jitterAmount = around('jitterAmount', 0.08, 0, 0.22);
+        target.jitterSpeed = around('jitterSpeed', 0.18, 0, 0.5);
+        target.sampleX = Number(anchorParams.sampleX ?? 0.5);
+        target.sampleY = Number(anchorParams.sampleY ?? 0.5);
+        target.smoothing = Boolean(anchorParams.smoothing);
+        target.solidMode = false;
+        target.glyphMode = true;
+        target.charset = anchorParams.charset || target.charset;
+        target.fontFamily = anchorParams.fontFamily || target.fontFamily;
+        target.pixel = false;
+        target.mode = Number(anchorParams.mode ?? target.mode);
+        target.codecQuality = anchorParams.codecQuality || target.codecQuality;
     }
 
     _isSafeWtfTarget(target) {

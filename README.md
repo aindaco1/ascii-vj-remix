@@ -8,7 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-Current documentation describes the 0.9.0 feature set.
+Current documentation describes the 0.9.1 feature set.
 
 ## Quick Links
 
@@ -71,6 +71,8 @@ workbench for stylized ASCII/cell video output.
   - Metal on macOS.
   - D3D12 on Windows.
   - Vulkan/GLES on Linux.
+- Native Pop Out preserves glyph-mode and character-set params for traditional
+  ASCII presets instead of flattening them into solid cells.
 - The renderer exposes live controls for grid, cell size, color, gamma,
   brightness, contrast, saturation, background blend, quantization, jitter,
   sample position, smoothing, FPS, glyph/cell behavior, and performance status.
@@ -81,6 +83,10 @@ workbench for stylized ASCII/cell video output.
 - Built-in read-only visual presets, including extreme looks such as Neon
   Sledgehammer, Gamma Sinkhole, Chrome Wound, Candy Fragmenter, Paper Shredder,
   Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
+- Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
+  Newsprint, Terminal Mono, and Dense Typewriter.
+- Character Set and Font Family controls stay compact so traditional ASCII
+  tuning does not crowd the dense live-control surface.
 - User presets can be saved, duplicated, updated, deleted, imported, and
   exported.
 - Preset transitions crossfade instead of fading to black.
@@ -88,8 +94,8 @@ workbench for stylized ASCII/cell video output.
 - Presets preserve the active media source unless the user explicitly changes
   it.
 - WTF mode continuously transitions through randomized live-safe settings and
-  leans into the more extreme preset families while avoiding pure white or pure
-  black output.
+  leans into both extreme and traditional ASCII preset families while avoiding
+  pure white or pure black output.
 
 ### Audio Reactivity
 
@@ -274,7 +280,8 @@ portal packages are installed for your distribution.
 5. Use Audio Reactivity to select Mic/Input, Audio File, or System/Display
    audio.
 6. Use Pop Out to create a separate output window for another screen.
-7. Use WTF when you want the app to keep generating extreme transitions.
+7. Use WTF when you want the app to keep generating extreme or traditional
+   ASCII-flavored transitions.
 
 If the renderer does not start, press Start once. If it still does not start,
 try a lower backend such as WebGL2 or Canvas2D.
