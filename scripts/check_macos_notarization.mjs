@@ -2,10 +2,9 @@
 import { readdir, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { tauriTargetDir } from './lib/tauri_target_dir.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
+const root = path.resolve(process.env.ASCILINE_RELEASE_ROOT || process.cwd());
 const args = parseArgs(process.argv.slice(2));
 const profile = args.profile || process.env.ASCILINE_TAURI_PROFILE || 'release';
 const bundleRoot = path.join(tauriTargetDir(root), profile, 'bundle');
@@ -83,6 +82,31 @@ function checkCodesign(appPath) {
   }
 }
 
+function checkDmgCodesign(dmgPath) {
+  const verify = run('/usr/bin/codesign', ['--verify', '--verbose=2', dmgPath]);
+  if (verify.status !== 0) {
+    issues.push(`DMG codesign verification failed: ${outputOf(verify)}`);
+    return;
+  }
+
+  const details = run('/usr/bin/codesign', ['-dvvv', dmgPath]);
+  const text = outputOf(details);
+  if (details.status !== 0) {
+    issues.push(`DMG codesign details failed: ${text}`);
+    return;
+  }
+  if (!text.includes('Authority=Developer ID Application')) {
+    issues.push('macOS DMG is not signed with a Developer ID Application identity');
+  }
+}
+
+function checkStapler(label, targetPath) {
+  const result = run('xcrun', ['stapler', 'validate', targetPath]);
+  if (result.status !== 0) {
+    issues.push(`${label} stapler validation failed: ${outputOf(result)}`);
+  }
+}
+
 function checkSpctl(label, args) {
   const result = run('/usr/sbin/spctl', args);
   const text = outputOf(result);
@@ -106,6 +130,7 @@ if (appDirs.length === 0) {
 } else {
   const appPath = appDirs[0];
   checkCodesign(appPath);
+  checkStapler('.app', appPath);
   checkSpctl('.app', ['-a', '-vv', '--type', 'execute', appPath]);
 }
 
@@ -113,7 +138,9 @@ const dmgFiles = (await files(path.join(bundleRoot, 'dmg'))).filter((file) => fi
 if (dmgFiles.length === 0) {
   issues.push(`no macOS DMG found under ${path.relative(root, path.join(bundleRoot, 'dmg'))}`);
 } else if (await exists(dmgFiles[0])) {
-  checkSpctl('DMG', ['-a', '-vv', '--type', 'open', dmgFiles[0]]);
+  checkDmgCodesign(dmgFiles[0]);
+  checkStapler('DMG', dmgFiles[0]);
+  checkSpctl('DMG', ['-a', '-vv', '--type', 'open', '--context', 'context:primary-signature', dmgFiles[0]]);
 }
 
 if (issues.length > 0) {

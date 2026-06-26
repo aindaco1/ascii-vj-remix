@@ -338,6 +338,8 @@ if (releaseWorkflow.includes('npm run check:windows-authenticode')) {
 const macosFfmpegSignIndex = releaseWorkflow.indexOf('sign_macos_ffmpeg_sidecars.mjs');
 const macosFfmpegCheckIndex = releaseWorkflow.indexOf('npm run check:ffmpeg-release', macosFfmpegSignIndex);
 const macosNotarizedBuildIndex = releaseWorkflow.indexOf('src-tauri/tauri.notarized.conf.json');
+const macosDmgNotarizeIndex = releaseWorkflow.indexOf('notarize_macos_dmg.mjs');
+const macosNotarizationCheckIndex = releaseWorkflow.indexOf('check_macos_notarization.mjs');
 if (
   macosFfmpegSignIndex < 0 ||
   macosNotarizedBuildIndex < 0 ||
@@ -351,6 +353,20 @@ if (
   macosFfmpegCheckIndex > macosNotarizedBuildIndex
 ) {
   issues.push('release workflow must verify signed macOS FFmpeg sidecar manifests before notarized packaging');
+}
+if (
+  macosDmgNotarizeIndex < 0 ||
+  macosNotarizedBuildIndex < 0 ||
+  macosDmgNotarizeIndex < macosNotarizedBuildIndex
+) {
+  issues.push('release workflow must notarize and staple macOS DMGs after notarized app packaging');
+}
+if (
+  macosNotarizationCheckIndex < 0 ||
+  macosDmgNotarizeIndex < 0 ||
+  macosNotarizationCheckIndex < macosDmgNotarizeIndex
+) {
+  issues.push('release workflow must verify macOS app and DMG notarization after DMG stapling');
 }
 
 for (const [label, workflow] of [

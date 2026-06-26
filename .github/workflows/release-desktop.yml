@@ -23,6 +23,8 @@ jobs:
       # GitHub-hosted macOS 26 images can include unrelated untrusted taps.
       # Keep this CI-scoped instead of untapping or trusting runner-managed taps.
       HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
+      CARGO_NET_RETRY: '10'
+      CARGO_HTTP_MULTIPLEXING: 'false'
     strategy:
       fail-fast: false
       matrix:
@@ -252,6 +254,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build -- --config src-tauri/tauri.notarized.conf.json
 
+      - name: Notarize macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          tooling_script="scripts/notarize_macos_dmg.mjs"
+          if [ ! -f "$tooling_script" ]; then
+            tooling_script=".release-tooling/scripts/notarize_macos_dmg.mjs"
+          fi
+          node "$tooling_script" --profile release
+
       - name: Build Linux desktop bundle
         if: runner.os == 'Linux'
         env:
@@ -271,7 +283,13 @@ jobs:
 
       - name: Verify macOS notarization
         if: runner.os == 'macOS'
-        run: npm run check:macos-notarization
+        shell: bash
+        run: |
+          tooling_script="scripts/check_macos_notarization.mjs"
+          if [ -f ".release-tooling/scripts/check_macos_notarization.mjs" ]; then
+            tooling_script=".release-tooling/scripts/check_macos_notarization.mjs"
+          fi
+          node "$tooling_script" --profile release
 
       - name: Collect release assets
         run: node scripts/collect_tauri_release_assets.mjs --profile release
