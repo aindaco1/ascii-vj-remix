@@ -89,7 +89,8 @@ The current control model includes:
   menus, minimum glyph intensity.
 - Performance: stats overlay, backend status, FPS, grid size.
 - Audio Reactivity: source, preset, input device, sensitivity, smoothing, beat,
-  bass, mid, treble, live meters.
+  bass, mid, treble, transient/flux, presence, density dampening, noise floor,
+  and live meters.
 - Output: Pop Out, output display selector, fullscreen-capable output window.
 
 Controls are conditionally hidden when they are not relevant to the active
@@ -181,8 +182,10 @@ source/backend.
 - Browser display/tab audio works when the platform provides audio tracks.
 - Tauri desktop builds include native audio capture providers for desktop
   testing.
-- Analysis extracts RMS, bass, mid, treble, spectral flux, beat pulse, and a
-  phase clock.
+- Analysis extracts RMS, bass, low-mid, mid, high-mid, treble, presence,
+  brightness, density, spectral flux, beat pulse, and a phase clock.
+- Dense-mix controls reduce broadband overreaction on busy songs while keeping
+  sparse transients responsive.
 - Modulation is applied as effective params and does not persist back into
   saved presets.
 - Safe clamps prevent high sensitivity from causing pure black or pure white
@@ -221,8 +224,11 @@ source/backend.
 - Output window has minimal listen/close/fullscreen permissions.
 - macOS camera, microphone, screen capture, and audio capture usage strings are
   present.
-- macOS builds are ad-hoc self-signed by default.
-- Developer ID signing/notarization workflow scaffolding exists but is deferred.
+- macOS local builds are ad-hoc self-signed by default; public release CI
+  requires Developer ID signing and notarization.
+- Windows 0.9.3 release CI publishes unsigned preview artifacts. Signed Windows
+  public distribution is deferred until SignPath Foundation, Azure Artifact
+  Signing, or another signing backend is proven.
 - GitHub Releases updater infrastructure is configured.
 - Release CI builds signed updater artifacts when the private key is present.
 - Production crash reporting captures bounded sanitized frontend, Tauri command,
@@ -379,6 +385,18 @@ Scope:
 
 Move from local/self-signed packages to a smoother public distribution path.
 
+0.9.3 status:
+
+- macOS public release CI requires Developer ID signing/notarization credentials
+  and verifies codesign, hardened runtime, DMG/app Gatekeeper acceptance, and
+  notarization state before publishing.
+- Windows 0.9.3 release CI publishes unsigned preview artifacts instead of
+  blocking on paid Azure Artifact Signing.
+- Local development keeps ad-hoc/default signing paths.
+- Real clean-machine Windows install behavior remains a manual release check for
+  preview artifacts and a required validation point once Windows signing is
+  enabled.
+
 Scope:
 
 - macOS Developer ID signing and notarization:
@@ -405,6 +423,31 @@ Scope:
     building.
   - smoke-test install/open/update behavior on clean Windows machines, not only
     hosted CI runners.
+- Future SignPath Foundation / OSI-license distribution track:
+  - treat SignPath Foundation as the preferred no-recurring-cost Windows
+    signing path if the project can satisfy its open-source, policy, and
+    reproducible-build requirements.
+  - do not change the project license to plain MIT until ASCILINE-derived
+    source has either been relicensed with upstream permission or replaced by
+    behavior-preserving clean-room implementations.
+  - first freeze the current behavior with regression coverage for startup,
+    static media, camera, Canvas2D/pixel Canvas output, audio-reactive vectors,
+    native output, stream compatibility where retained, updater assets, and
+    release smoke flows.
+  - rewrite inherited product-surface files from documented behavior/specs
+    rather than refactoring copied implementation in place.
+  - remove or clearly de-scope legacy Python/streaming files from public
+    release eligibility if they remain under the current upstream license.
+  - publish a code-signing policy covering release authority, SignPath signing
+    flow, source/release traceability, maintainer identities, and vulnerability
+    disclosure.
+  - update privacy documentation for production crash reports before submitting
+    a SignPath Foundation application.
+  - restructure Windows release CI so SignPath-signed artifacts and Tauri
+    updater `.sig` files are generated in the correct order, then verify
+    Authenticode signatures and updater signatures before publishing.
+  - keep Azure Artifact Signing or unsigned Windows preview artifacts as a
+    fallback until SignPath acceptance and release CI are proven.
 - Windows installer smoke tests on real machines beyond CI.
 - Linux AppImage/deb validation across common distributions.
 - End-to-end updater hop tests from an older installed release to a newer one.
@@ -474,7 +517,7 @@ Scope:
 - macOS release artifacts are Developer ID signed, notarized, stapled, and
   Gatekeeper-validated for public distribution, or the release is explicitly
   marked as a local/test build.
-- Windows release artifacts are Authenticode signed, timestamped, and tested
-  against SmartScreen behavior on clean machines, with remaining first-install
-  warnings documented.
+- Windows release artifacts are either explicitly marked as unsigned previews or
+  are Authenticode signed, timestamped, and tested against SmartScreen behavior
+  on clean machines, with remaining first-install warnings documented.
 - Rendering-engine docs, contributor docs, and changelog match the release.

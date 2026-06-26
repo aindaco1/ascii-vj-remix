@@ -341,11 +341,16 @@ Set/check the updater key with GitHub CLI:
 npm run updater:secret:check
 npm run updater:secret:set
 npm run release:secrets:check
+npm run release:secrets:check:public
 ```
 
 The updater secret script passes values to `gh secret set` over stdin, not as
 command-line arguments. Use `-- --repo owner/repo` or `-- --key /path/to/key`
 after the npm script if the defaults are wrong.
+
+For 0.9.3, `release:secrets:check:public` requires updater signing and macOS
+Developer ID notarization readiness. Windows artifacts are published as unsigned
+previews and do not require Windows signing secrets.
 
 For a local debug bundle with the generated updater key:
 
@@ -355,9 +360,9 @@ TAURI_SIGNING_PRIVATE_KEY="$(cat /private/tmp/ascii-vj-remix-updater.key)" TAURI
 
 Current macOS local/default builds are ad-hoc signed by
 `bundle.macOS.signingIdentity = "-"` in `src-tauri/tauri.conf.json`. That keeps
-local bundles code-sign-valid but is not Apple notarization. A GitHub-downloaded
-app can still show Gatekeeper warnings until Developer ID signing and
-notarization are enabled.
+local bundles code-sign-valid but is not Apple notarization. Public macOS
+release builds use `src-tauri/tauri.notarized.conf.json` and fail if Developer
+ID signing and notarization credentials are missing.
 
 Local macOS media privacy grants can be sensitive to the final app signature.
 `scripts/run_local_desktop_app.sh` accepts
@@ -369,11 +374,11 @@ npm run desktop:codesign:local
 ASCILINE_CODESIGN_IDENTITY="ASCII VJ Remix Local Code Signing" npm run desktop:run-local
 ```
 
-Developer ID signing and notarization are prepared but deferred. Required
-inputs are Apple Developer Program membership, a base64 Developer ID
-Application `.p12`, its password, a CI keychain password, and either App Store
-Connect API credentials or Apple ID notarization credentials. Check readiness or
-upload App Store Connect API credentials with:
+Developer ID signing and notarization require Apple Developer Program
+membership, a base64 Developer ID Application `.p12`, its password, a CI
+keychain password, and either App Store Connect API credentials or Apple ID
+notarization credentials. Check readiness or upload App Store Connect API
+credentials with:
 
 ```bash
 npm run release:secrets:check:notarized
@@ -398,6 +403,31 @@ npm run release:secrets:set:macos -- \
 
 When `--keychain-password-file` is omitted, the script generates a random
 temporary keychain password and stores it in `KEYCHAIN_PASSWORD`.
+
+Future signed Windows releases can use Azure Artifact Signing through
+`src-tauri/tauri.windows-signed.conf.json`, which invokes
+`src-tauri/windows-artifact-sign.cmd`; that wrapper calls
+`scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
+creates updater signatures. The active 0.9.3 Windows release path does not use
+this config and publishes unsigned preview artifacts. Configure the Azure values
+only if Azure becomes the chosen Windows signing backend:
+
+```bash
+npm run release:secrets:set:windows -- \
+  --client-id "<app-client-id>" \
+  --tenant-id "<tenant-id>" \
+  --client-secret-file /path/to/azure-client-secret.txt \
+  --endpoint "https://<region>.codesigning.azure.net/" \
+  --account "<signing-account-name>" \
+  --certificate-profile "<certificate-profile-name>"
+node scripts/check_github_release_secrets.mjs --require-windows-signing
+```
+
+The helper stores `AZURE_CLIENT_SECRET` as a GitHub Actions secret and the other
+Azure IDs as GitHub repository variables. The Azure client secret is the only
+required Windows signing secret; keep it out of shell history and chat logs.
+Prefer the future SignPath Foundation/license-cleanup track before enabling paid
+Azure signing for routine public releases.
 
 Use these checks before publishing release changes:
 

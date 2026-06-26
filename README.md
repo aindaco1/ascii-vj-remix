@@ -8,7 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-Current documentation describes the 0.9.2 feature set.
+Current documentation describes the 0.9.3 feature set.
 
 ## Quick Links
 
@@ -106,8 +106,10 @@ workbench for stylized ASCII/cell video output.
   audio track to the desktop app.
 - Tauri desktop builds include native audio capture paths for system/input
   audio features.
-- Audio analysis tracks RMS, bass, mid, treble, transient energy, beat pulse,
-  and spectral movement.
+- Audio analysis tracks RMS, bass, low-mid, mid, high-mid, treble, presence,
+  brightness, density, transient energy, beat pulse, and spectral movement.
+- Dense-mix dampening and noise-floor controls help busy songs stay reactive
+  without pinning jitter and beat response at maximum.
 - Audio modulation is non-persistent: it affects live effective render params
   without rewriting saved presets.
 - Safe clamps prevent high sensitivity from driving the renderer into pure
@@ -132,6 +134,9 @@ workbench for stylized ASCII/cell video output.
   - The main control window can open selected media and manage output.
   - The output window has a minimal command surface.
 - GitHub Releases updater infrastructure is configured.
+- Public release CI requires Developer ID notarized macOS artifacts. Windows
+  0.9.3 artifacts are published as unsigned previews until SignPath Foundation,
+  Azure Artifact Signing, or another signing backend is proven.
 - Intentional online paths are limited to the updater check/download flow and
   production-only reviewed/sanitized crash report submission.
 - Crash report submission goes through the Rust desktop layer to the
@@ -167,8 +172,9 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Downloaded ad-hoc signed builds may still require the normal macOS
-  right-click Open or Open Anyway flow until Developer ID notarization is added.
+- Public release builds should be Developer ID signed and notarized. Local or
+  test builds may still require the normal macOS right-click Open or Open
+  Anyway flow.
 
 ### Windows
 
@@ -232,19 +238,17 @@ Download the latest desktop build from:
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
 The release page may contain macOS, Windows, and Linux installers plus updater
-artifacts. Install the package for your operating system.
+artifacts. macOS 0.9.3 artifacts are signed/notarized; Windows 0.9.3 artifacts
+are unsigned previews.
 
 ### 2. Install on macOS
 
 1. Download the macOS app archive or DMG.
 2. Move `ASCII VJ Remix.app` to `/Applications` or `~/Applications`.
 3. Open it from Finder.
-4. If macOS blocks the first launch because the app is not notarized yet:
-   - Right-click `ASCII VJ Remix.app`.
-   - Choose Open.
-   - Confirm Open.
-   - If needed, open System Settings -> Privacy & Security and choose Open
-     Anyway for ASCII VJ Remix.
+4. Public 0.9.3-and-newer macOS release artifacts should be Developer ID signed,
+   notarized, stapled, and accepted by Gatekeeper. Local or test builds may
+   still require the normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
    Recording permissions when macOS prompts for them.
 
@@ -252,8 +256,9 @@ artifacts. Install the package for your operating system.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. If Windows SmartScreen warns on a self-signed or new app, choose More info,
-   then Run anyway only if you trust the release source.
+3. Windows 0.9.3 artifacts are unsigned previews. Windows may show Unknown
+   Publisher, SmartScreen, or Defender warnings. Only continue if the installer
+   came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.
 5. Grant camera and microphone permissions if Windows prompts.
 

@@ -1,9 +1,98 @@
 # Changelog
 
-Version 0.9.2 adds reviewed/sanitized crash reporting through a Cloudflare
-GitHub issue relay and starts renderer math consolidation without changing
-Canvas or stream visuals. Version 0.9.0 remains the first documentation
+Version 0.9.3 moves public desktop releases to signed/notarized macOS
+distribution, publishes Windows as an unsigned preview while signing is
+deferred, and expands audio reactivity with dense-mix controls that reduce
+overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
+
+## [0.9.3] - 2026-06-26
+
+### Added
+
+- Added future Windows signing tooling through Azure Artifact Signing and
+  Tauri's Windows `signCommand`; the active 0.9.3 Windows release path remains
+  an unsigned preview.
+- Added Windows Authenticode verification tooling for future signed release
+  artifacts, including signer and timestamp checks.
+- Added `src-tauri/tauri.windows-signed.conf.json` for future signed Windows
+  release work while keeping the default config suitable for local development
+  and the unsigned 0.9.3 Windows preview.
+- Added a shared audio-reactive module for defaults, control metadata, presets,
+  feature normalization, dense-mix dampening, and render-parameter modulation.
+- Added audio-reactive controls for transient/flux amount, presence amount,
+  density dampening, and noise floor.
+- Added flux and density meters plus a Dense Mix Control audio-reactive preset.
+- Added bounded audio feature channels for low-mid, high-mid, presence,
+  brightness, and density across browser and native audio paths.
+
+### Changed
+
+- Public macOS release builds now require Developer ID signing and notarization
+  instead of falling back to ad-hoc signing.
+- Windows 0.9.3 release artifacts are published as unsigned preview builds
+  until SignPath Foundation, Azure Artifact Signing, or another signing backend
+  is proven.
+- Release CI keeps signing credentials scoped to signing steps and gives the
+  publishing job the only write-capable GitHub token.
+- Audio-reactive beat detection is more conservative during dense, broadband
+  passages while preserving strong response for sparse transients.
+- Default Pulse Reactor audio settings are stronger and less over-damped so
+  modest or dense tracks still produce visible movement without changing saved
+  user presets.
+- Existing audio-reactive slider ranges are expanded, with matching browser and
+  native clamps.
+- Browser preview, Pop Out, stream paths, and native output now consume the same
+  shared audio-reactive modulation rules.
+- Live camera Pop Out keeps the fast native camera path for glyph, solid, and
+  pixel presets; browser mirror transport remains reserved for fallback sources
+  where native capture is unavailable.
+- Native Pop Out now disables glyph masking for WebGL/WebGPU-style presets so
+  non-Canvas2D presets keep the same solid cell shape as the main preview.
+- Static video/camera transitions can now crossfade between GPU, solid/pixel,
+  and Canvas2D glyph renderers without destroying the shared media source.
+- Traditional Canvas2D ASCII presets now default to visible static-image jitter
+  and migrate saved zero-jitter copies of those built-ins.
+- WTF mode now lets ASCII/glyph anchors use their Canvas2D backend again, so
+  solid-to-glyph random transitions are visible instead of becoming GPU
+  solid-cell variants.
+
+### Fixed
+
+- Fixed a WTF-mode `ReferenceError` when solid/pixel presets biased the next
+  random target toward the traditional ASCII anchor presets.
+- Fixed Tauri event listener cleanup permissions for the main window and made
+  native Pop Out close-listener cleanup rejection-safe, preventing
+  `event.unlisten not allowed` crash reports.
+
+### Security
+
+- Future Windows signing uses environment-scoped signing credentials and does
+  not commit certificate files, client secrets, or private signing material.
+- Audio reactivity still sends only bounded feature vectors through IPC; raw
+  audio, frames, media files, and paths remain local.
+- Release signing and updater signing checks now treat macOS public
+  distribution as a fail-closed path. Windows 0.9.3 artifacts are explicitly
+  unsigned previews.
+
+### Validation
+
+- Added `npm run test:audio-reactive`.
+- Added `npm run check:windows-authenticode`.
+- `npm run check:desktop` and `npm run check:release` now include the
+  audio-reactive helper tests.
+- Static smoke coverage now asserts that live camera presets do not fall back to
+  mirror transport by default.
+- Static smoke coverage now asserts that native glyph masking follows the active
+  backend family instead of leaking Canvas2D-style glyph output into GPU presets.
+- Static smoke coverage now asserts that solid-to-glyph video transitions keep
+  playback live instead of pausing during renderer-family rebuilds.
+- Static smoke coverage now asserts that WTF solid/pixel targets can
+  deterministically bias into ASCII anchors without throwing.
+- Static smoke coverage now asserts that traditional Canvas2D ASCII presets
+  animate their default static-image jitter and expose the jitter control.
+- Tauri policy checks now require main-window event cleanup permission while
+  keeping that permission out of the presentation-only output window.
 
 ## [0.9.2] - 2026-06-25
 

@@ -14,9 +14,14 @@ pub struct SystemAudioFeatures {
     pub source_label: String,
     pub rms: f32,
     pub bass: f32,
+    pub low_mid: f32,
     pub mid: f32,
+    pub high_mid: f32,
     pub treble: f32,
+    pub presence: f32,
+    pub brightness: f32,
     pub flux: f32,
+    pub density: f32,
     pub beat_pulse: f32,
     pub phase: f32,
     pub frames: u64,
@@ -31,9 +36,14 @@ impl SystemAudioFeatures {
             source_label: "Native system audio".to_string(),
             rms: 0.0,
             bass: 0.0,
+            low_mid: 0.0,
             mid: 0.0,
+            high_mid: 0.0,
             treble: 0.0,
+            presence: 0.0,
+            brightness: 0.0,
             flux: 0.0,
+            density: 0.0,
             beat_pulse: 0.0,
             phase: 0.0,
             frames: 0,
@@ -53,9 +63,14 @@ impl SystemAudioFeatures {
             source_label: source_label.into(),
             rms: 0.0,
             bass: 0.0,
+            low_mid: 0.0,
             mid: 0.0,
+            high_mid: 0.0,
             treble: 0.0,
+            presence: 0.0,
+            brightness: 0.0,
             flux: 0.0,
+            density: 0.0,
             beat_pulse: 0.0,
             phase: 0.0,
             frames: 0,
@@ -68,8 +83,11 @@ struct AudioFeatureAnalyzer {
     source_label: String,
     low_160: f32,
     low_250: f32,
+    low_650: f32,
     low_2200: f32,
     low_2400: f32,
+    low_3000: f32,
+    low_6200: f32,
     previous_sample: f32,
     energy_history: VecDeque<f32>,
     beat_pulse: f32,
@@ -88,9 +106,14 @@ impl AudioFeatureAnalyzer {
                 source_label: source_label.clone(),
                 rms: 0.0,
                 bass: 0.0,
+                low_mid: 0.0,
                 mid: 0.0,
+                high_mid: 0.0,
                 treble: 0.0,
+                presence: 0.0,
+                brightness: 0.0,
                 flux: 0.0,
+                density: 0.0,
                 beat_pulse: 0.0,
                 phase: 0.0,
                 frames: 0,
@@ -99,8 +122,11 @@ impl AudioFeatureAnalyzer {
             source_label,
             low_160: 0.0,
             low_250: 0.0,
+            low_650: 0.0,
             low_2200: 0.0,
             low_2400: 0.0,
+            low_3000: 0.0,
+            low_6200: 0.0,
             previous_sample: 0.0,
             energy_history: VecDeque::with_capacity(BEAT_HISTORY),
             beat_pulse: 0.0,
@@ -114,40 +140,65 @@ impl AudioFeatureAnalyzer {
         let sample_rate = sample_rate.max(1.0);
         let alpha_160 = filter_alpha(160.0, sample_rate);
         let alpha_250 = filter_alpha(250.0, sample_rate);
+        let alpha_650 = filter_alpha(650.0, sample_rate);
         let alpha_2200 = filter_alpha(2_200.0, sample_rate);
         let alpha_2400 = filter_alpha(2_400.0, sample_rate);
+        let alpha_3000 = filter_alpha(3_000.0, sample_rate);
+        let alpha_6200 = filter_alpha(6_200.0, sample_rate);
 
         let mut rms_sum = 0.0;
         let mut bass_sum = 0.0;
+        let mut low_mid_sum = 0.0;
         let mut mid_sum = 0.0;
+        let mut high_mid_sum = 0.0;
         let mut treble_sum = 0.0;
+        let mut presence_sum = 0.0;
         let mut flux_sum = 0.0;
+        let mut active_samples = 0usize;
 
         for &sample in samples {
             let x = sample.clamp(-1.0, 1.0);
             self.low_160 += alpha_160 * (x - self.low_160);
             self.low_250 += alpha_250 * (x - self.low_250);
+            self.low_650 += alpha_650 * (x - self.low_650);
             self.low_2200 += alpha_2200 * (x - self.low_2200);
             self.low_2400 += alpha_2400 * (x - self.low_2400);
+            self.low_3000 += alpha_3000 * (x - self.low_3000);
+            self.low_6200 += alpha_6200 * (x - self.low_6200);
 
             let bass = self.low_160;
+            let low_mid = self.low_650 - self.low_160;
             let mid = self.low_2200 - self.low_250;
+            let high_mid = self.low_2400 - self.low_650;
             let treble = x - self.low_2400;
+            let presence = self.low_6200 - self.low_3000;
             rms_sum += x * x;
             bass_sum += bass * bass;
+            low_mid_sum += low_mid * low_mid;
             mid_sum += mid * mid;
+            high_mid_sum += high_mid * high_mid;
             treble_sum += treble * treble;
+            presence_sum += presence * presence;
             flux_sum += (x - self.previous_sample).abs();
+            if x.abs() > 0.16 {
+                active_samples += 1;
+            }
             self.previous_sample = x;
         }
 
         let n = samples.len().max(1) as f32;
         let rms = ((rms_sum / n).sqrt() * 2.4).clamp(0.0, 1.0);
         let bass = ((bass_sum / n).sqrt() * 5.0).clamp(0.0, 1.0);
+        let low_mid = ((low_mid_sum / n).sqrt() * 3.6).clamp(0.0, 1.0);
         let mid = ((mid_sum / n).sqrt() * 3.1).clamp(0.0, 1.0);
+        let high_mid = ((high_mid_sum / n).sqrt() * 3.0).clamp(0.0, 1.0);
         let treble = ((treble_sum / n).sqrt() * 2.4).clamp(0.0, 1.0);
+        let presence = ((presence_sum / n).sqrt() * 2.8).clamp(0.0, 1.0);
         let flux = ((flux_sum / n) * 7.5).clamp(0.0, 1.0);
-        let beat_pulse = self.detect_beat(rms, flux);
+        let brightness = (treble * 0.52 + presence * 0.38 + high_mid * 0.1).clamp(0.0, 1.0);
+        let density = ((active_samples as f32 / n) * 1.25 + rms * 0.25 + flux * 0.22)
+            .clamp(0.0, 1.0);
+        let beat_pulse = self.detect_beat(rms, flux, density);
 
         self.phase += (samples.len() as f32 / sample_rate) * 14.0;
         self.frames = self.frames.saturating_add(1);
@@ -157,9 +208,14 @@ impl AudioFeatureAnalyzer {
             source_label: self.source_label.clone(),
             rms,
             bass,
+            low_mid,
             mid,
+            high_mid,
             treble,
+            presence,
+            brightness,
             flux,
+            density,
             beat_pulse,
             phase: self.phase,
             frames: self.frames,
@@ -167,22 +223,24 @@ impl AudioFeatureAnalyzer {
         };
     }
 
-    fn detect_beat(&mut self, rms: f32, flux: f32) -> f32 {
+    fn detect_beat(&mut self, rms: f32, flux: f32, density: f32) -> f32 {
         self.energy_history.push_back(rms);
         if self.energy_history.len() > BEAT_HISTORY {
             self.energy_history.pop_front();
         }
         let avg = self.energy_history.iter().copied().sum::<f32>()
             / self.energy_history.len().max(1) as f32;
-        let threshold = avg.mul_add(1.22, 0.0).max(0.035);
+        let dense = density.clamp(0.0, 1.0);
+        let threshold = (avg * (1.22 + dense * 0.3)).max(0.035);
         let now = Instant::now();
-        let beat =
-            now > self.beat_cooldown_until && rms > threshold && (flux > 0.08 || rms > avg * 1.55);
+        let beat = now > self.beat_cooldown_until
+            && rms > threshold
+            && (flux > 0.08 + dense * 0.08 || rms > avg * (1.55 + dense * 0.35));
         if beat {
             self.beat_pulse = 1.0;
-            self.beat_cooldown_until = now + Duration::from_millis(135);
+            self.beat_cooldown_until = now + Duration::from_millis((135.0 + dense * 65.0) as u64);
         } else {
-            self.beat_pulse *= 0.82;
+            self.beat_pulse *= 0.82 - dense * 0.05;
         }
         self.beat_pulse.clamp(0.0, 1.0)
     }

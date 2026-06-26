@@ -37,6 +37,17 @@ function isTauriRuntime() {
     }
 }
 
+function safelyUnlisten(unlisten, label) {
+    try {
+        const result = unlisten?.();
+        if (result?.catch) {
+            result.catch((error) => console.info(`[TauriOutput] ${label} cleanup unavailable:`, error));
+        }
+    } catch (error) {
+        console.info(`[TauriOutput] ${label} cleanup unavailable:`, error);
+    }
+}
+
 function setTauriCrashReportHandler(handler) {
     crashReportHandler = typeof handler === 'function' ? handler : null;
 }
@@ -384,7 +395,7 @@ async function watchNativeOutputClosed(onClosed) {
     if (!isTauriRuntime() || nativeOutputClosedUnlisten) return;
     try {
         nativeOutputClosedUnlisten = await listen(NATIVE_OUTPUT_CLOSED_EVENT, () => {
-            nativeOutputClosedUnlisten?.();
+            safelyUnlisten(nativeOutputClosedUnlisten, 'Native close watcher');
             nativeOutputClosedUnlisten = null;
             outputBackend = null;
             onClosed?.();

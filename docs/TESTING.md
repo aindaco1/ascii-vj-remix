@@ -23,6 +23,7 @@ npm run test:frame-prep          # Rust/JS frame-prep parity
 npm run test:decode-resize       # Decode/resize parity checks
 npm run check:media              # Media pipeline checks
 npm run test:render-math         # Shared renderer math vectors
+npm run test:audio-reactive      # Audio-reactive controls, clamps, dense-mix damping
 npm run test:crash-relay         # Cloudflare crash relay sanitizer/rate-limit tests
 npm run test:vectors             # Adaptive codec vector checks
 npm run test:rust                # Rust tests
@@ -30,6 +31,7 @@ npm run check:desktop            # Main desktop validation gate
 npm run check:release            # Release-oriented gate; expects staged FFmpeg sidecar
 npm run bundle:debug             # Build and validate local debug bundle
 npm run bundle:release           # Release gate, release build, bundle check
+npm run check:windows-authenticode # Future signed Windows release signature check
 npm run smoke:native-output      # Native output performance helper
 npm run smoke:ui-perf            # UI performance helper
 npm run smoke:release-install    # Release artifact install/updater smoke
@@ -230,14 +232,18 @@ Release CI should:
 - generate updater manifest fragments.
 - merge fragments into `latest.json`.
 - upload installers, updater packages, signatures, and `latest.json`.
+- validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
+  acceptance before publishing macOS artifacts.
+- publish Windows 0.9.3 artifacts as unsigned previews; future signed Windows
+  releases must validate Authenticode signer and timestamp state before
+  publishing Windows artifacts.
 - run install smoke checks after publishing.
 
 Future release hardening should add:
 
 - real Windows and Linux install smoke tests on physical or VM machines.
 - end-to-end updater hop from an older installed app to a newer release.
-- macOS Developer ID notarization validation.
-- Windows SmartScreen/AuthentiCode validation.
+- Windows SmartScreen reputation checks on clean machines.
 
 ## Known Gaps
 

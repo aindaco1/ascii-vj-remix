@@ -118,6 +118,10 @@ pub struct NativeOutputParams {
     pub audio_reactive_bass_amount: Option<f64>,
     pub audio_reactive_mid_amount: Option<f64>,
     pub audio_reactive_treble_amount: Option<f64>,
+    pub audio_reactive_flux_amount: Option<f64>,
+    pub audio_reactive_presence_amount: Option<f64>,
+    pub audio_reactive_density_dampening: Option<f64>,
+    pub audio_reactive_noise_floor: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -311,6 +315,10 @@ struct NativeRenderParams {
     audio_reactive_bass_amount: f64,
     audio_reactive_mid_amount: f64,
     audio_reactive_treble_amount: f64,
+    audio_reactive_flux_amount: f64,
+    audio_reactive_presence_amount: f64,
+    audio_reactive_density_dampening: f64,
+    audio_reactive_noise_floor: f64,
 }
 
 const NATIVE_GLYPH_TILE_WIDTH: u32 = 6;
@@ -840,6 +848,10 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             audio_reactive_bass_amount: None,
             audio_reactive_mid_amount: None,
             audio_reactive_treble_amount: None,
+            audio_reactive_flux_amount: None,
+            audio_reactive_presence_amount: None,
+            audio_reactive_density_dampening: None,
+            audio_reactive_noise_floor: None,
         },
         media_state: Some(NativeOutputMediaState {
             current_time: Some(0.0),
@@ -1838,17 +1850,18 @@ fn apply_native_audio_modulation(
 ) {
     let routes = native_audio_routes(&params.audio_reactive_preset);
     let sensitivity = params.audio_reactive_sensitivity;
-    for &(key, feature, scale) in routes.0 {
-        let raw = native_audio_feature(features, feature);
+    for &(key, feature, scale) in routes.routes {
+        let raw = native_audio_feature_value(params, features, feature);
         let amount = raw * sensitivity * native_audio_feature_amount(params, feature);
         add_native_audio_param(params, base, key, amount * scale);
     }
 
-    let sway_amount = sensitivity * routes.1;
+    let sway_amount = sensitivity * routes.sway;
     if sway_amount > 0.0 {
-        let motion = native_audio_feature(features, "flux")
-            .max(native_audio_feature(features, "beatPulse"))
-            .max(native_audio_feature(features, "treble") * 0.65);
+        let motion = native_audio_feature_value(params, features, "flux")
+            .max(native_audio_feature_value(params, features, "beatPulse"))
+            .max(native_audio_feature_value(params, features, "treble") * 0.65)
+            .max(native_audio_feature_value(params, features, "presence") * 0.55);
         let phase = if features.phase.is_finite() {
             f64::from(features.phase)
         } else {
@@ -1860,10 +1873,16 @@ fn apply_native_audio_modulation(
 }
 
 #[cfg(target_os = "macos")]
-fn native_audio_routes(preset: &str) -> (&'static [(&'static str, &'static str, f64)], f64) {
+struct NativeAudioRoutes {
+    routes: &'static [(&'static str, &'static str, f64)],
+    sway: f64,
+}
+
+#[cfg(target_os = "macos")]
+fn native_audio_routes(preset: &str) -> NativeAudioRoutes {
     match preset {
-        "bass-tremor" => (
-            &[
+        "bass-tremor" => NativeAudioRoutes {
+            routes: &[
                 ("bgBlend", "bass", 0.32),
                 ("brightness", "bass", 0.18),
                 ("contrastBoost", "bass", 0.34),
@@ -1871,30 +1890,30 @@ fn native_audio_routes(preset: &str) -> (&'static [(&'static str, &'static str, 
                 ("jitterSpeed", "beatPulse", 0.55),
                 ("gamma", "bass", -0.18),
             ],
-            0.035,
-        ),
-        "snare-shatter" => (
-            &[
+            sway: 0.035,
+        },
+        "snare-shatter" => NativeAudioRoutes {
+            routes: &[
                 ("jitterAmount", "flux", 0.58),
                 ("jitterSpeed", "flux", 1.3),
                 ("contrastBoost", "beatPulse", 0.26),
                 ("brightness", "treble", 0.12),
                 ("saturationBoost", "treble", 0.25),
             ],
-            0.09,
-        ),
-        "spectral-bloom" => (
-            &[
+            sway: 0.09,
+        },
+        "spectral-bloom" => NativeAudioRoutes {
+            routes: &[
                 ("saturationBoost", "treble", 0.72),
                 ("brightness", "mid", 0.18),
                 ("contrastBoost", "rms", 0.24),
                 ("bgBlend", "rms", -0.12),
                 ("gamma", "treble", -0.16),
             ],
-            0.045,
-        ),
-        "chromatic-surge" => (
-            &[
+            sway: 0.045,
+        },
+        "chromatic-surge" => NativeAudioRoutes {
+            routes: &[
                 ("saturationBoost", "beatPulse", 0.95),
                 ("contrastBoost", "bass", 0.3),
                 ("brightness", "beatPulse", 0.18),
@@ -1902,20 +1921,32 @@ fn native_audio_routes(preset: &str) -> (&'static [(&'static str, &'static str, 
                 ("jitterAmount", "treble", 0.22),
                 ("jitterSpeed", "beatPulse", 1.1),
             ],
-            0.07,
-        ),
-        _ => (
-            &[
-                ("brightness", "beatPulse", 0.24),
-                ("contrastBoost", "beatPulse", 0.42),
-                ("bgBlend", "bass", 0.16),
-                ("jitterAmount", "flux", 0.28),
-                ("jitterSpeed", "treble", 0.85),
-                ("saturationBoost", "mid", 0.36),
-                ("gamma", "beatPulse", -0.12),
+            sway: 0.07,
+        },
+        "dense-mix-control" => NativeAudioRoutes {
+            routes: &[
+                ("contrastBoost", "rms", 0.18),
+                ("brightness", "bass", 0.12),
+                ("saturationBoost", "presence", 0.22),
+                ("jitterAmount", "flux", 0.16),
+                ("jitterSpeed", "beatPulse", 0.34),
+                ("bgBlend", "density", -0.08),
+                ("gamma", "density", 0.1),
             ],
-            0.055,
-        ),
+            sway: 0.028,
+        },
+        _ => NativeAudioRoutes {
+            routes: &[
+                ("brightness", "beatPulse", 0.28),
+                ("contrastBoost", "beatPulse", 0.5),
+                ("bgBlend", "bass", 0.2),
+                ("jitterAmount", "flux", 0.36),
+                ("jitterSpeed", "treble", 1.0),
+                ("saturationBoost", "mid", 0.44),
+                ("gamma", "beatPulse", -0.15),
+            ],
+            sway: 0.07,
+        },
     }
 }
 
@@ -1924,9 +1955,14 @@ fn native_audio_feature(features: &SystemAudioFeatures, feature: &str) -> f64 {
     let value = match feature {
         "rms" => features.rms,
         "bass" => features.bass,
+        "lowMid" => features.low_mid,
         "mid" => features.mid,
+        "highMid" => features.high_mid,
         "treble" => features.treble,
+        "presence" => features.presence,
+        "brightness" => features.brightness,
         "flux" => features.flux,
+        "density" => features.density,
         "beatPulse" => features.beat_pulse,
         _ => 0.0,
     };
@@ -1934,11 +1970,45 @@ fn native_audio_feature(features: &SystemAudioFeatures, feature: &str) -> f64 {
 }
 
 #[cfg(target_os = "macos")]
+fn native_audio_feature_value(
+    params: &NativeRenderParams,
+    features: &SystemAudioFeatures,
+    feature: &str,
+) -> f64 {
+    let floor = params.audio_reactive_noise_floor.clamp(0.0, 0.18);
+    let gate = if floor > 0.0 {
+        ((native_audio_feature(features, "rms") - floor) / (floor * 4.0).max(0.001))
+            .clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let mut value = native_audio_feature(features, feature) * gate;
+    let density = native_audio_feature(features, "density") * gate;
+    let dampening = params.audio_reactive_density_dampening.clamp(0.0, 1.0);
+    if dampening > 0.0 && density > 0.0 {
+        value *= match feature {
+            "beatPulse" | "flux" => (1.0 - density * dampening * 0.82).clamp(0.16, 1.0),
+            "treble" | "presence" | "brightness" => {
+                (1.0 - density * dampening * 0.48).clamp(0.32, 1.0)
+            }
+            "rms" | "mid" | "highMid" | "density" => {
+                (1.0 - density * dampening * 0.24).clamp(0.52, 1.0)
+            }
+            "bass" => (1.0 - density * dampening * 0.12).clamp(0.68, 1.0),
+            _ => 1.0,
+        };
+    }
+    value.clamp(0.0, 1.0)
+}
+
+#[cfg(target_os = "macos")]
 fn native_audio_feature_amount(params: &NativeRenderParams, feature: &str) -> f64 {
     match feature {
         "beatPulse" => params.audio_reactive_beat_amount,
         "bass" => params.audio_reactive_bass_amount,
-        "mid" | "rms" | "flux" => params.audio_reactive_mid_amount,
+        "flux" => params.audio_reactive_flux_amount,
+        "presence" | "brightness" => params.audio_reactive_presence_amount,
+        "lowMid" | "mid" | "highMid" | "rms" | "density" => params.audio_reactive_mid_amount,
         "treble" => params.audio_reactive_treble_amount,
         _ => 1.0,
     }
@@ -2646,16 +2716,27 @@ impl NativeRenderParams {
                 .audio_reactive_preset
                 .clone()
                 .unwrap_or_else(|| "pulse-reactor".to_string()),
-            audio_reactive_sensitivity: f64_param(params.audio_reactive_sensitivity, 7.5)
-                .clamp(0.0, 8.0),
-            audio_reactive_beat_amount: f64_param(params.audio_reactive_beat_amount, 1.68)
-                .clamp(0.0, 2.0),
-            audio_reactive_bass_amount: f64_param(params.audio_reactive_bass_amount, 1.25)
-                .clamp(0.0, 2.0),
-            audio_reactive_mid_amount: f64_param(params.audio_reactive_mid_amount, 1.14)
-                .clamp(0.0, 2.0),
-            audio_reactive_treble_amount: f64_param(params.audio_reactive_treble_amount, 1.16)
-                .clamp(0.0, 2.0),
+            audio_reactive_sensitivity: f64_param(params.audio_reactive_sensitivity, 9.0)
+                .clamp(0.0, 12.0),
+            audio_reactive_beat_amount: f64_param(params.audio_reactive_beat_amount, 2.05)
+                .clamp(0.0, 3.0),
+            audio_reactive_bass_amount: f64_param(params.audio_reactive_bass_amount, 1.48)
+                .clamp(0.0, 3.0),
+            audio_reactive_mid_amount: f64_param(params.audio_reactive_mid_amount, 1.34)
+                .clamp(0.0, 3.0),
+            audio_reactive_treble_amount: f64_param(params.audio_reactive_treble_amount, 1.38)
+                .clamp(0.0, 3.0),
+            audio_reactive_flux_amount: f64_param(params.audio_reactive_flux_amount, 1.52)
+                .clamp(0.0, 3.0),
+            audio_reactive_presence_amount: f64_param(params.audio_reactive_presence_amount, 1.28)
+                .clamp(0.0, 3.0),
+            audio_reactive_density_dampening: f64_param(
+                params.audio_reactive_density_dampening,
+                0.14,
+            )
+            .clamp(0.0, 1.0),
+            audio_reactive_noise_floor: f64_param(params.audio_reactive_noise_floor, 0.005)
+                .clamp(0.0, 0.18),
         }
     }
 }
@@ -3583,6 +3664,10 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     audio_reactive_bass_amount: None,
                     audio_reactive_mid_amount: None,
                     audio_reactive_treble_amount: None,
+                    audio_reactive_flux_amount: None,
+                    audio_reactive_presence_amount: None,
+                    audio_reactive_density_dampening: None,
+                    audio_reactive_noise_floor: None,
                 },
                 media_state: None,
             })
@@ -3955,6 +4040,10 @@ mod tests {
                 audio_reactive_bass_amount: None,
                 audio_reactive_mid_amount: None,
                 audio_reactive_treble_amount: None,
+                audio_reactive_flux_amount: None,
+                audio_reactive_presence_amount: None,
+                audio_reactive_density_dampening: None,
+                audio_reactive_noise_floor: None,
             },
             media_state: None,
         }

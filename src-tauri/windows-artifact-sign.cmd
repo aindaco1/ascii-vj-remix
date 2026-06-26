@@ -1,0 +1,4 @@
+@echo off
+setlocal
+set SCRIPT_DIR=%~dp0
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%..\scripts\windows_artifact_sign.ps1" %*

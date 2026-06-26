@@ -12,7 +12,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   bundle:
@@ -131,9 +131,8 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
           if [ -z "$ASCILINE_APPLE_CERTIFICATE" ]; then
-            echo "notarize=false" >> "$GITHUB_OUTPUT"
-            echo "Using ad-hoc macOS signing."
-            exit 0
+            echo "APPLE_CERTIFICATE is required for public macOS releases."
+            exit 1
           fi
 
           if [ -z "$ASCILINE_APPLE_CERTIFICATE_PASSWORD" ]; then
@@ -181,7 +180,7 @@ jobs:
           echo "Using Developer ID signing and notarization for macOS."
 
       - name: Build notarized macOS bundle
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.notarize == 'true'
+        if: runner.os == 'macOS'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -192,8 +191,15 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: npm run tauri:build -- --config src-tauri/tauri.notarized.conf.json
 
-      - name: Build self-signed desktop bundle
-        if: runner.os != 'macOS' || steps.macos_signing.outputs.notarize != 'true'
+      - name: Build Linux desktop bundle
+        if: runner.os == 'Linux'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build
+
+      - name: Build unsigned Windows preview bundle
+        if: runner.os == 'Windows'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -203,7 +209,7 @@ jobs:
         run: npm run check:bundle:release
 
       - name: Verify macOS notarization
-        if: runner.os == 'macOS' && steps.macos_signing.outputs.notarize == 'true'
+        if: runner.os == 'macOS'
         run: npm run check:macos-notarization
 
       - name: Collect release assets
@@ -223,6 +229,8 @@ jobs:
     name: Publish GitHub Release
     needs: bundle
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:

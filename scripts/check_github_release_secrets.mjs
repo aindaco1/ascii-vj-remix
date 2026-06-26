@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   commandWorks,
+  listActionVariables,
   listActionSecrets,
   originRepo,
   requireGhAndRepo
@@ -10,12 +11,28 @@ const REQUIRED_UPDATER_SECRETS = ['TAURI_SIGNING_PRIVATE_KEY', 'TAURI_SIGNING_PR
 const CERTIFICATE_SECRETS = ['APPLE_CERTIFICATE', 'APPLE_CERTIFICATE_PASSWORD', 'KEYCHAIN_PASSWORD'];
 const API_NOTARIZATION_SECRETS = ['APPLE_API_KEY', 'APPLE_API_ISSUER', 'APPLE_API_KEY_P8'];
 const APPLE_ID_NOTARIZATION_SECRETS = ['APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
+const WINDOWS_SIGNING_SECRET_NAMES = ['AZURE_CLIENT_SECRET'];
+const WINDOWS_SIGNING_VALUE_NAMES = [
+  'AZURE_CLIENT_ID',
+  'AZURE_TENANT_ID',
+  'AZURE_ARTIFACT_SIGNING_ENDPOINT',
+  'AZURE_ARTIFACT_SIGNING_ACCOUNT',
+  'AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE'
+];
 
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--require-notarization') {
+      out.requireNotarization = true;
+      continue;
+    }
+    if (arg === '--require-windows-signing') {
+      out.requireWindowsSigning = true;
+      continue;
+    }
+    if (arg === '--require-public-signing') {
       out.requireNotarization = true;
       continue;
     }
@@ -41,6 +58,10 @@ Checks GitHub Actions secret readiness without reading secret values.
 Options:
   --repo <owner/repo>        GitHub repo. Default: parsed from origin remote
   --require-notarization    Fail if Apple Developer ID notarization secrets are absent
+  --require-windows-signing  Fail if Windows Artifact Signing values are absent
+  --require-public-signing   Require current public release signing readiness.
+                             For 0.9.3 this means macOS notarization; Windows
+                             artifacts are published as unsigned previews.
   --help                    Show this help
 `);
 }
@@ -51,6 +72,10 @@ function missingFrom(secrets, names) {
 
 function presentAny(secrets, names) {
   return names.some((name) => secrets.has(name));
+}
+
+function missingFromSecretsOrVariables(secrets, variables, names) {
+  return names.filter((name) => !secrets.has(name) && !variables.has(name));
 }
 
 function describeGroup(secrets, label, names) {
@@ -78,6 +103,7 @@ try {
   requireGhAndRepo(repo);
 
   const secrets = listActionSecrets(repo);
+  const variables = listActionVariables(repo);
   for (const name of missingFrom(secrets, REQUIRED_UPDATER_SECRETS)) {
     issues.push(`missing required updater secret ${name}`);
   }
@@ -104,6 +130,30 @@ try {
     issues.push('Apple Developer ID notarization secrets are present but not complete enough to enable notarized macOS releases');
   } else if (notarizationReady) {
     notes.push(`Apple Developer ID notarization is ready using ${api.complete ? 'App Store Connect API' : 'Apple ID'} credentials.`);
+  }
+
+  const missingWindowsSecrets = missingFrom(secrets, WINDOWS_SIGNING_SECRET_NAMES);
+  const missingWindowsValues = missingFromSecretsOrVariables(secrets, variables, WINDOWS_SIGNING_VALUE_NAMES);
+  const windowsSigningReady = missingWindowsSecrets.length === 0 && missingWindowsValues.length === 0;
+  const anyWindowsSigning =
+    presentAny(secrets, WINDOWS_SIGNING_SECRET_NAMES) ||
+    presentAny(secrets, WINDOWS_SIGNING_VALUE_NAMES) ||
+    presentAny(variables, WINDOWS_SIGNING_VALUE_NAMES);
+
+  if (args.requireWindowsSigning && !windowsSigningReady) {
+    for (const name of missingWindowsSecrets) issues.push(`missing required Windows signing secret ${name}`);
+    if (missingWindowsValues.length > 0) {
+      issues.push(`missing required Windows signing variable or secret ${missingWindowsValues.join(', ')}`);
+    }
+  } else if (!windowsSigningReady && anyWindowsSigning) {
+    for (const name of missingWindowsSecrets) issues.push(`Windows signing is partially configured; missing secret ${name}`);
+    if (missingWindowsValues.length > 0) {
+      issues.push(`Windows signing is partially configured; missing variable or secret ${missingWindowsValues.join(', ')}`);
+    }
+  } else if (!windowsSigningReady) {
+    notes.push('Windows Artifact Signing values are absent; Windows artifacts will be unsigned previews until a signing backend is configured.');
+  } else {
+    notes.push('Windows Artifact Signing is ready.');
   }
 
   if (issues.length > 0) {

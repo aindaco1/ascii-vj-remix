@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   originRepo,
   readBase64File,
@@ -9,7 +10,7 @@ import {
   setSecret
 } from './lib/github_secrets.mjs';
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 function parseArgs(argv) {
   const out = {};

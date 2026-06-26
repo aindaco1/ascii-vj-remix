@@ -120,7 +120,8 @@ Tauri desktop audio sources:
 - browser/Web Audio providers where available.
 - native system/input audio feature providers for desktop builds.
 
-The audio layer outputs features, not raw visual frames.
+The audio layer outputs bounded feature vectors, not raw audio buffers or raw
+visual frames.
 
 ### Stream Sessions
 
@@ -173,6 +174,11 @@ Major parameter groups:
 The control surface, presets, persistence, source changes, WTF mode, audio
 reactivity, native output, and future MIDI all read from or write through this
 model.
+
+Static renderer-family transitions keep media ownership at the `StaticRuntime`
+layer. Canvas2D, pixel Canvas, WebGL, and WebGPU renderers can crossfade over
+the same live video/camera source instead of destroying and reloading media when
+`solidMode`, `glyphMode`, `pixel`, or `backend` changes.
 
 ### Shared Renderer Math
 
@@ -423,12 +429,17 @@ media ids, decodes frames, uploads the latest frame to the GPU, applies cell
 color math, and presents through the native swapchain.
 
 For macOS single-camera output, AVFoundation captures latest frames directly for
-the native presenter.
+the native presenter. Live camera presets should not use browser mirror
+transport by default because canvas readback and IPC frame transfer are too
+expensive for sustained output.
 
-For glyph-mode presets, native output consumes the same canonical `glyphMode`
-and `charset` params as the control surface. The native `wgpu` presenter uses a
-bundled fixed bitmap glyph atlas and luminance ramp so traditional ASCII presets
-stay text-like in Pop Out instead of becoming solid color cells.
+For Canvas2D-style glyph presets, native output consumes the same canonical
+`glyphMode` and `charset` params as the control surface. The native `wgpu`
+presenter uses a bundled fixed bitmap glyph atlas and luminance ramp so
+traditional ASCII presets stay text-like in Pop Out instead of becoming solid
+color cells. WebGL/WebGPU-style presets disable native glyph masking even when
+their saved params still carry `glyphMode`; their main preview renders solid
+GPU cell rectangles, so Pop Out does the same.
 `fontFamily` remains a preview/control-surface parameter; the native path does
 not load arbitrary fonts and instead masks cells through the fixed atlas/ramp.
 
@@ -451,11 +462,19 @@ Features:
 
 - RMS.
 - bass.
+- low-mid.
 - mid.
+- high-mid.
 - treble.
+- presence.
+- brightness.
+- density.
 - spectral flux.
 - beat pulse.
 - phase/sway.
+
+Dense-mix dampening uses the density feature to reduce beat/flux-heavy
+modulation during crowded broadband passages without muting sparse transients.
 
 Modulation targets are live-safe visual controls:
 

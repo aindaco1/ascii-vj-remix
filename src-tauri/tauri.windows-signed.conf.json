@@ -1,0 +1,8 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "windows": {
+      "signCommand": "cmd /c \"if exist windows-artifact-sign.cmd (windows-artifact-sign.cmd %1) else (src-tauri\\windows-artifact-sign.cmd %1)\""
+    }
+  }
+}

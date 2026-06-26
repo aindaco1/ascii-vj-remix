@@ -87,7 +87,7 @@ surface for live ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-Current docs describe the 0.9.2 feature set.
+Current docs describe the 0.9.3 feature set.
 
 Sources:
 
@@ -121,6 +121,9 @@ Live behavior:
   randomized settings, including anchors from traditional ASCII presets.
 - Audio reactivity is enabled by default, starts from Mic/Input by default, and
   modulates live effective params without rewriting saved presets.
+- Audio reactivity uses bounded feature vectors, including RMS, bands,
+  transient/flux, presence, brightness, density, beat pulse, and phase. Do not
+  ship raw audio buffers through IPC or diagnostics.
 - Safe clamps should prevent pure black or pure white outputs from randomized or
   audio-driven states.
 
@@ -214,8 +217,9 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- If Apple Developer ID credentials are absent, Tauri may warn that notarization
-  is skipped. That is expected until notarization is enabled.
+- Public 0.9.3 release CI requires Apple Developer ID notarization for macOS and
+  publishes Windows as an unsigned preview. Local development builds keep the
+  ad-hoc macOS signing fallback.
 - If `TAURI_SIGNING_PRIVATE_KEY` or `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is
   absent while updater artifacts are enabled, release bundling will fail at
   updater signing. Use the local key/password above for local validation, and
@@ -225,8 +229,11 @@ Expected local release-build note:
 
 - Tauri v2 is the desktop shell.
 - `src-tauri/tauri.conf.json` is the default local/ad-hoc signed config.
-- `src-tauri/tauri.notarized.conf.json` is for future Developer ID notarized
-  macOS release builds.
+- `src-tauri/tauri.notarized.conf.json` is for Developer ID notarized macOS
+  release builds.
+- `src-tauri/tauri.windows-signed.conf.json` is retained for future signed
+  Windows release work. The active 0.9.3 Windows release path uses the default
+  unsigned config.
 - macOS builds in iCloud Drive workspaces redirect target output to
   `/private/tmp/ascii-vj-remix-tauri-target` through the helper scripts to avoid
   iCloud extended attributes breaking codesign.
@@ -302,8 +309,8 @@ The roadmap tracks future work. At a high level:
 - Add MIDI control, initially targeting an Evolution/M-Audio UC33e through an
   iConnectivity mioXC.
 - Continue improving native GPU output and platform-native capture paths.
-- Add Apple Developer ID notarization and Windows SmartScreen mitigation.
-- Expand real install and updater-hop tests on Windows/Linux machines.
+- Continue improving Windows SmartScreen reputation validation and real
+  install/updater-hop tests on Windows/Linux machines.
 
 Before implementing any of these, read [Roadmap](ROADMAP.md) and
 [Rendering Engine](RENDERING_ENGINE.md), then inspect the current code paths.

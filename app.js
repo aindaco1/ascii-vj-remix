@@ -7,6 +7,17 @@ import {
     shaderHash
 } from './renderers/shared/render-math.js?v=20260625-render-math';
 import {
+    AUDIO_REACTIVE_CONTROLS,
+    AUDIO_REACTIVE_DEFAULTS,
+    AUDIO_REACTIVE_FEATURE_KEYS,
+    AUDIO_REACTIVE_PRESETS,
+    applyAudioReactiveModulation,
+    audioReactivePrecision,
+    audioReactiveSourceOptions,
+    emptyAudioReactiveFeatures,
+    sanitizeAudioReactiveSettings
+} from './renderers/shared/audio-reactive.js?v=20260626-audio-reactive';
+import {
     clearTauriBrowsingData,
     captureTauriCrashReport,
     checkTauriUpdate,
@@ -118,6 +129,7 @@ const CUSTOM_SOURCE_KEY = 'asciline-remix-custom-source-v1';
 const OUTPUT_DISPLAY_KEY = 'asciline-remix-output-display-v1';
 const FPS_DEFAULT_MIGRATION_KEY = 'asciline-remix-fps-default-migrated-v1';
 const DEFAULT_SOURCE_MIGRATION_KEY = 'asciline-remix-demo-image-default-migrated-v1';
+const CANVAS_ASCII_JITTER_MIGRATION_KEY = 'asciline-remix-canvas-ascii-jitter-migrated-v1';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -195,6 +207,7 @@ const DEFAULT_PARAMS = {
 const RESPONSIVE_FRAME_MS = 1000 / 60;
 const AUDIO_REACTIVE_FRAME_MS = 1000 / 60;
 const NATIVE_OUTPUT_REACTIVE_SYNC_MS = 1000 / 60;
+const CANVAS_STATIC_SAMPLE_MAX_DIMENSION = 960;
 const WTF_MIN_SMOOTH_FPS = 24;
 const WTF_MAX_SMOOTH_FPS = 60;
 const TAURI_RAW_VIDEO_MAX_DIMENSION = 960;
@@ -241,112 +254,7 @@ const CAMERA_FIT_OPTIONS = [
     ['contain', 'Fit']
 ];
 
-const AUDIO_REACTIVE_DEFAULTS = {
-    enabled: true,
-    source: 'input',
-    inputDeviceId: '',
-    preset: 'pulse-reactor',
-    sensitivity: 7.5,
-    smoothing: 0.45,
-    beatAmount: 1.68,
-    bassAmount: 1.25,
-    midAmount: 1.14,
-    trebleAmount: 1.16
-};
-
-const AUDIO_REACTIVE_SOURCE_OPTIONS = [
-    ['file', 'Audio file'],
-    ['input', 'Mic / input'],
-    ['display', isTauriRuntime() ? 'System audio' : 'Display audio']
-];
-
-const AUDIO_REACTIVE_PRESETS = [
-    {
-        id: 'pulse-reactor',
-        name: 'Pulse Reactor',
-        routes: [
-            ['brightness', 'beatPulse', 0.24],
-            ['contrastBoost', 'beatPulse', 0.42],
-            ['bgBlend', 'bass', 0.16],
-            ['jitterAmount', 'flux', 0.28],
-            ['jitterSpeed', 'treble', 0.85],
-            ['saturationBoost', 'mid', 0.36],
-            ['gamma', 'beatPulse', -0.12]
-        ],
-        sway: 0.055
-    },
-    {
-        id: 'bass-tremor',
-        name: 'Bass Tremor',
-        routes: [
-            ['bgBlend', 'bass', 0.32],
-            ['brightness', 'bass', 0.18],
-            ['contrastBoost', 'bass', 0.34],
-            ['jitterAmount', 'bass', 0.38],
-            ['jitterSpeed', 'beatPulse', 0.55],
-            ['gamma', 'bass', -0.18]
-        ],
-        sway: 0.035
-    },
-    {
-        id: 'snare-shatter',
-        name: 'Snare Shatter',
-        routes: [
-            ['jitterAmount', 'flux', 0.58],
-            ['jitterSpeed', 'flux', 1.3],
-            ['contrastBoost', 'beatPulse', 0.26],
-            ['brightness', 'treble', 0.12],
-            ['saturationBoost', 'treble', 0.25]
-        ],
-        sway: 0.09
-    },
-    {
-        id: 'spectral-bloom',
-        name: 'Spectral Bloom',
-        routes: [
-            ['saturationBoost', 'treble', 0.72],
-            ['brightness', 'mid', 0.18],
-            ['contrastBoost', 'rms', 0.24],
-            ['bgBlend', 'rms', -0.12],
-            ['gamma', 'treble', -0.16]
-        ],
-        sway: 0.045
-    },
-    {
-        id: 'chromatic-surge',
-        name: 'Chromatic Surge',
-        routes: [
-            ['saturationBoost', 'beatPulse', 0.95],
-            ['contrastBoost', 'bass', 0.3],
-            ['brightness', 'beatPulse', 0.18],
-            ['gamma', 'mid', -0.22],
-            ['jitterAmount', 'treble', 0.22],
-            ['jitterSpeed', 'beatPulse', 1.1]
-        ],
-        sway: 0.07
-    }
-];
-
-const AUDIO_REACTIVE_CONTROLS = [
-    { key: 'sensitivity', label: 'Sensitivity', min: 0, max: 8, step: 0.05 },
-    { key: 'smoothing', label: 'Smoothing', min: 0, max: 0.95, step: 0.01 },
-    { key: 'beatAmount', label: 'Beat', min: 0, max: 2, step: 0.01 },
-    { key: 'bassAmount', label: 'Bass', min: 0, max: 2, step: 0.01 },
-    { key: 'midAmount', label: 'Mid', min: 0, max: 2, step: 0.01 },
-    { key: 'trebleAmount', label: 'Treble', min: 0, max: 2, step: 0.01 }
-];
-
-const AUDIO_REACTIVE_SAFE_LIMITS = {
-    saturationBoost: [0, 3],
-    contrastBoost: [0.45, 2.85],
-    brightness: [0.55, 1.85],
-    gamma: [0.55, 2.65],
-    bgBlend: [0, 0.72],
-    jitterAmount: [0, 1],
-    jitterSpeed: [0, 4],
-    sampleX: [0.04, 0.96],
-    sampleY: [0.04, 0.96]
-};
+const AUDIO_REACTIVE_SOURCE_OPTIONS = audioReactiveSourceOptions({ tauri: isTauriRuntime() });
 
 const AUDIO_REACTIVE_TRANSIENT_FFT_SIZE = 256;
 const AUDIO_REACTIVE_SPECTRAL_FFT_SIZE = 1024;
@@ -402,8 +310,8 @@ const BUILTIN_PRESETS = [
             gamma: 1,
             bgBlend: 0.04,
             quantizeBits: 0,
-            jitterAmount: 0,
-            jitterSpeed: 0,
+            jitterAmount: 0.32,
+            jitterSpeed: 0.85,
             sampleX: 0.5,
             sampleY: 0.5,
             smoothing: false,
@@ -433,8 +341,8 @@ const BUILTIN_PRESETS = [
             gamma: 0.92,
             bgBlend: 0.1,
             quantizeBits: 1,
-            jitterAmount: 0,
-            jitterSpeed: 0,
+            jitterAmount: 0.28,
+            jitterSpeed: 0.72,
             sampleX: 0.5,
             sampleY: 0.5,
             smoothing: false,
@@ -464,8 +372,8 @@ const BUILTIN_PRESETS = [
             gamma: 1.35,
             bgBlend: 0.28,
             quantizeBits: 2,
-            jitterAmount: 0,
-            jitterSpeed: 0,
+            jitterAmount: 0.24,
+            jitterSpeed: 0.55,
             sampleX: 0.5,
             sampleY: 0.5,
             smoothing: false,
@@ -495,8 +403,8 @@ const BUILTIN_PRESETS = [
             gamma: 0.86,
             bgBlend: 0.08,
             quantizeBits: 0,
-            jitterAmount: 0,
-            jitterSpeed: 0,
+            jitterAmount: 0.38,
+            jitterSpeed: 0.7,
             sampleX: 0.5,
             sampleY: 0.5,
             smoothing: false,
@@ -1284,7 +1192,28 @@ const BUILTIN_PRESETS_DISPLAY = [
     ...BUILTIN_PRESET_DISPLAY_ORDER.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean),
     ...BUILTIN_PRESETS.filter((preset) => !BUILTIN_PRESET_DISPLAY_ORDER.includes(preset.id))
 ];
+const ASCII_WTF_PRESETS = ASCII_WTF_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 const WTF_ANCHOR_PRESETS = WTF_ANCHOR_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
+const CANVAS_ASCII_JITTER_MIGRATIONS = ASCII_WTF_PRESETS.map((preset) => ({
+    id: preset.id,
+    match: {
+        backend: preset.params.backend,
+        cols: preset.params.cols,
+        autoRows: preset.params.autoRows,
+        cellWidth: preset.params.cellWidth,
+        cellHeight: preset.params.cellHeight,
+        glyphMode: preset.params.glyphMode,
+        solidMode: preset.params.solidMode,
+        pixel: preset.params.pixel,
+        charset: preset.params.charset,
+        fontFamily: preset.params.fontFamily,
+        mode: preset.params.mode
+    },
+    jitterAmount: preset.params.jitterAmount,
+    jitterSpeed: preset.params.jitterSpeed,
+    sampleX: preset.params.sampleX,
+    sampleY: preset.params.sampleY
+}));
 
 const CONTROL_GROUPS = [
     {
@@ -1373,8 +1302,6 @@ const CONTROL_CONFIG_BY_KEY = new Map(
     CONTROL_GROUPS.flatMap((group) => group.controls.map((control) => [control.key, control]))
 );
 
-const AUDIO_REACTIVE_PRESET_MAP = new Map(AUDIO_REACTIVE_PRESETS.map((preset) => [preset.id, preset]));
-
 function clampParamValue(key, value) {
     const config = CONTROL_CONFIG_BY_KEY.get(key);
     if (!config || typeof value !== 'number') return value;
@@ -1383,58 +1310,6 @@ function clampParamValue(key, value) {
     if (Number.isFinite(config.max)) next = Math.min(config.max, next);
     if (Number.isFinite(config.step) && Number.isInteger(config.step)) next = Math.round(next);
     return next;
-}
-
-function clampAudioReactiveVisualSafety(params, baseParams = {}) {
-    for (const [key, [min, max]] of Object.entries(AUDIO_REACTIVE_SAFE_LIMITS)) {
-        if (typeof params[key] !== 'number') continue;
-        const base = Number(baseParams[key]);
-        const safeMin = Number.isFinite(base) ? Math.min(min, base) : min;
-        const safeMax = Number.isFinite(base) ? Math.max(max, base) : max;
-        params[key] = clamp(params[key], safeMin, safeMax);
-    }
-
-    const baseBrightness = Number(baseParams.brightness);
-    const brightnessFloor = Number.isFinite(baseBrightness)
-        ? Math.min(1, Math.max(0.72, baseBrightness))
-        : 0.72;
-    if (params.bgBlend > 0.62 && params.brightness < brightnessFloor) {
-        params.brightness = brightnessFloor;
-    }
-    if (params.gamma < 0.7 && params.brightness < Math.max(brightnessFloor, 0.82)) {
-        params.brightness = Math.max(brightnessFloor, 0.82);
-    }
-    return params;
-}
-
-function featureAmount(feature, audioSettings) {
-    if (feature === 'beatPulse') return audioSettings.beatAmount;
-    if (feature === 'bass') return audioSettings.bassAmount;
-    if (feature === 'mid' || feature === 'rms' || feature === 'flux') return audioSettings.midAmount;
-    if (feature === 'treble') return audioSettings.trebleAmount;
-    return 1;
-}
-
-function applyAudioReactiveModulation(baseParams, features, audioSettings) {
-    const preset = AUDIO_REACTIVE_PRESET_MAP.get(audioSettings.preset) || AUDIO_REACTIVE_PRESETS[0];
-    const out = { ...baseParams };
-    const sensitivity = Number(audioSettings.sensitivity || 0);
-
-    for (const [key, feature, scale] of preset.routes) {
-        const raw = Number(features[feature] || 0);
-        const amount = raw * sensitivity * featureAmount(feature, audioSettings);
-        out[key] = clampParamValue(key, Number(baseParams[key] || 0) + amount * scale);
-    }
-
-    const swayAmount = sensitivity * (preset.sway || 0);
-    if (swayAmount > 0) {
-        const motion = Math.max(features.flux || 0, features.beatPulse || 0, features.treble * 0.65 || 0);
-        const phase = Number(features.phase || 0);
-        out.sampleX = clampParamValue('sampleX', Number(baseParams.sampleX || 0.5) + Math.sin(phase) * motion * swayAmount);
-        out.sampleY = clampParamValue('sampleY', Number(baseParams.sampleY || 0.5) + Math.cos(phase * 0.73) * motion * swayAmount);
-    }
-
-    return clampAudioReactiveVisualSafety(out, baseParams);
 }
 
 const CLIENT_TWEEN_KEYS = new Set([
@@ -1534,10 +1409,10 @@ const CONTROL_APPLIES = {
     pixel: ({ params }) => params.sourceMode === 'stream',
 
     fps: ({ params }) => params.sourceMode === 'static',
-    jitterAmount: ({ params, kind }) => params.sourceMode === 'static' && kind === 'gpu',
-    jitterSpeed: ({ params, kind }) => params.sourceMode === 'static' && kind === 'gpu',
-    sampleX: ({ params, kind }) => params.sourceMode === 'static' && kind === 'gpu',
-    sampleY: ({ params, kind }) => params.sourceMode === 'static' && kind === 'gpu',
+    jitterAmount: ({ params }) => params.sourceMode === 'static',
+    jitterSpeed: ({ params }) => params.sourceMode === 'static',
+    sampleX: ({ params }) => params.sourceMode === 'static',
+    sampleY: ({ params }) => params.sourceMode === 'static',
     smoothing: ({ params }) => params.sourceMode === 'static',
 
     cameraSelectedDeviceIds: ({ params }) => isCameraParams(params),
@@ -1718,6 +1593,22 @@ function isCameraParams(params) {
     return params?.sourceMode === 'static' && params?.mediaType === 'camera';
 }
 
+function shouldMirrorNativeCameraOutput(params) {
+    if (!isCameraParams(params)) return false;
+    // Live camera mirror transport requires canvas readback plus IPC every frame.
+    // Keep camera presets on native capture unless a future path can preserve parity without readback.
+    return false;
+}
+
+function nativeOutputGlyphMode(params) {
+    return Boolean(
+        params?.glyphMode &&
+        !params?.solidMode &&
+        !usesPixelCanvas(params) &&
+        backendKind(params) === 'canvas'
+    );
+}
+
 function normalizeStringArray(value) {
     if (!Array.isArray(value)) return [];
     const seen = new Set();
@@ -1814,6 +1705,38 @@ function normalizeParams(params, options = {}) {
     return out;
 }
 
+function storedNumberMatches(params, key, expected) {
+    return Number(params[key] ?? DEFAULT_PARAMS[key]) === Number(expected);
+}
+
+function storedBooleanMatches(params, key, expected) {
+    return Boolean(params[key] ?? DEFAULT_PARAMS[key]) === Boolean(expected);
+}
+
+function storedStringMatches(params, key, expected) {
+    return String(params[key] ?? DEFAULT_PARAMS[key]) === String(expected);
+}
+
+function canvasAsciiJitterMigrationMatch(params, migration) {
+    const amount = Number(params.jitterAmount ?? 0);
+    const speed = Number(params.jitterSpeed ?? 0);
+    const match = migration.match;
+    return (params.sourceMode || DEFAULT_PARAMS.sourceMode) === 'static' &&
+        Number.isFinite(amount) && amount === 0 &&
+        Number.isFinite(speed) && speed === 0 &&
+        storedStringMatches(params, 'backend', match.backend) &&
+        storedNumberMatches(params, 'cols', match.cols) &&
+        storedBooleanMatches(params, 'autoRows', match.autoRows) &&
+        storedNumberMatches(params, 'cellWidth', match.cellWidth) &&
+        storedNumberMatches(params, 'cellHeight', match.cellHeight) &&
+        storedBooleanMatches(params, 'glyphMode', match.glyphMode) &&
+        storedBooleanMatches(params, 'solidMode', match.solidMode) &&
+        storedBooleanMatches(params, 'pixel', match.pixel) &&
+        storedStringMatches(params, 'charset', match.charset) &&
+        storedStringMatches(params, 'fontFamily', match.fontFamily) &&
+        storedNumberMatches(params, 'mode', match.mode);
+}
+
 function migrateStoredParams(params) {
     const out = { ...(params || {}) };
     if (localStorage.getItem(DEFAULT_SOURCE_MIGRATION_KEY) !== '1') {
@@ -1836,6 +1759,17 @@ function migrateStoredParams(params) {
             (out.fps === undefined || Number(out.fps) === 24);
         if (isOldStaticDefaultFps) out.fps = DEFAULT_PARAMS.fps;
         localStorage.setItem(FPS_DEFAULT_MIGRATION_KEY, '1');
+    }
+
+    if (localStorage.getItem(CANVAS_ASCII_JITTER_MIGRATION_KEY) !== '1') {
+        const migration = CANVAS_ASCII_JITTER_MIGRATIONS.find((item) => canvasAsciiJitterMigrationMatch(out, item));
+        if (migration) {
+            out.jitterAmount = migration.jitterAmount;
+            out.jitterSpeed = migration.jitterSpeed;
+            if (!Number.isFinite(Number(out.sampleX))) out.sampleX = migration.sampleX;
+            if (!Number.isFinite(Number(out.sampleY))) out.sampleY = migration.sampleY;
+        }
+        localStorage.setItem(CANVAS_ASCII_JITTER_MIGRATION_KEY, '1');
     }
     return out;
 }
@@ -2624,15 +2558,7 @@ class AudioReactiveRuntime {
     }
 
     _emptyFeatures() {
-        return {
-            rms: 0,
-            bass: 0,
-            mid: 0,
-            treble: 0,
-            flux: 0,
-            beatPulse: 0,
-            phase: 0
-        };
+        return emptyAudioReactiveFeatures();
     }
 
     async start() {
@@ -2899,7 +2825,7 @@ class AudioReactiveRuntime {
         if (!this.analyser || !this.transientAnalyser || !this.frequencyData || !this.timeData || !this.transientFrequencyData) return;
         const features = this._analyze(now);
         this._monitorSignal(features, now);
-        const effectiveParams = applyAudioReactiveModulation(this.app.params, features, this.app.audioReactive);
+        const effectiveParams = applyAudioReactiveModulation(this.app.params, features, this.app.audioReactive, { clampParamValue });
         this.app.applyAudioReactiveFrame(effectiveParams, features);
     }
 
@@ -2919,7 +2845,7 @@ class AudioReactiveRuntime {
             }
             const features = this._smoothExternalFeatures(raw, now);
             this._monitorSignal(features, now);
-            const effectiveParams = applyAudioReactiveModulation(this.app.params, features, this.app.audioReactive);
+            const effectiveParams = applyAudioReactiveModulation(this.app.params, features, this.app.audioReactive, { clampParamValue });
             this.app.applyAudioReactiveFrame(effectiveParams, features);
         } catch (error) {
             if (this.active && (this.nativeDisplayAudio || this.nativeInputAudio)) {
@@ -2935,16 +2861,21 @@ class AudioReactiveRuntime {
         const source = {
             rms: clamp(Number(raw.rms || 0), 0, 1),
             bass: clamp(Number(raw.bass || 0), 0, 1),
+            lowMid: clamp(Number(raw.lowMid || raw.mid || 0), 0, 1),
             mid: clamp(Number(raw.mid || 0), 0, 1),
+            highMid: clamp(Number(raw.highMid || raw.mid || 0), 0, 1),
             treble: clamp(Number(raw.treble || 0), 0, 1),
+            presence: clamp(Number(raw.presence || raw.treble || 0), 0, 1),
+            brightness: clamp(Number(raw.brightness || raw.treble || 0), 0, 1),
             flux: clamp(Number(raw.flux || 0), 0, 1),
+            density: clamp(Number(raw.density || 0), 0, 1),
             beatPulse: clamp(Number(raw.beatPulse || 0), 0, 1),
             phase: Number.isFinite(Number(raw.phase)) ? Number(raw.phase) : now * 0.012
         };
         const smoothAmount = clamp(Number(this.app.audioReactive.smoothing || 0), 0, 0.95);
         const attackAlpha = clamp(0.92 - smoothAmount * 0.28, 0.58, 0.94);
         const releaseAlpha = clamp(0.34 - smoothAmount * 0.28, 0.04, 0.34);
-        for (const key of ['rms', 'bass', 'mid', 'treble', 'flux', 'beatPulse']) {
+        for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
             if (!this.analysisPrimed) {
                 this.smoothed[key] = source[key];
             } else {
@@ -2968,17 +2899,26 @@ class AudioReactiveRuntime {
 
         const sampleRate = this.audioContext?.sampleRate || 48000;
         const bass = this._bandAverage(20, 160, sampleRate);
+        const lowMid = this._bandAverage(160, 650, sampleRate);
         const mid = this._bandAverage(250, 2200, sampleRate);
+        const highMid = this._bandAverage(650, 2400, sampleRate);
         const treble = this._bandAverage(2400, 9000, sampleRate);
+        const presence = this._bandAverage(3000, 6200, sampleRate);
+        const shape = this._spectralShape(sampleRate, rms);
         const flux = this._spectralFlux();
 
-        const beatPulse = this._detectBeat(rms, flux, now);
+        const beatPulse = this._detectBeat(rms, flux, now, shape.density);
         const raw = {
             rms,
             bass,
+            lowMid,
             mid,
+            highMid,
             treble,
+            presence,
+            brightness: shape.brightness,
             flux,
+            density: shape.density,
             beatPulse,
             phase: now * 0.012
         };
@@ -2986,7 +2926,7 @@ class AudioReactiveRuntime {
         const smoothAmount = clamp(Number(this.app.audioReactive.smoothing || 0), 0, 0.95);
         const attackAlpha = clamp(0.92 - smoothAmount * 0.28, 0.58, 0.94);
         const releaseAlpha = clamp(0.34 - smoothAmount * 0.28, 0.04, 0.34);
-        for (const key of ['rms', 'bass', 'mid', 'treble', 'flux', 'beatPulse']) {
+        for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
             if (!this.analysisPrimed) {
                 this.smoothed[key] = raw[key];
             } else {
@@ -3038,6 +2978,25 @@ class AudioReactiveRuntime {
         return clamp(sum / Math.max(1, end - start + 1), 0, 1);
     }
 
+    _spectralShape(sampleRate, rms) {
+        if (!this.frequencyData?.length) return { brightness: 0, density: 0 };
+        let weighted = 0;
+        let sum = 0;
+        let active = 0;
+        for (let i = 0; i < this.frequencyData.length; i++) {
+            const value = this.frequencyData[i] / 255;
+            if (value > 0.16) active++;
+            sum += value;
+            weighted += value * (i / Math.max(1, this.frequencyData.length - 1));
+        }
+        const centroid = sum > 0 ? weighted / sum : 0;
+        const brightness = clamp(centroid * 1.35, 0, 1);
+        const fill = active / this.frequencyData.length;
+        const averageEnergy = sum / this.frequencyData.length;
+        const density = clamp(fill * 1.25 + averageEnergy * 0.55 + rms * 0.25, 0, 1);
+        return { brightness, density };
+    }
+
     _spectralFlux() {
         if (!this.previousTransientFrequencyData) return 0;
         let positive = 0;
@@ -3048,17 +3007,19 @@ class AudioReactiveRuntime {
         return clamp(positive / (255 * this.transientFrequencyData.length * 0.18), 0, 1);
     }
 
-    _detectBeat(rms, flux, now) {
+    _detectBeat(rms, flux, now, density = 0) {
         this.energyHistory.push(rms);
         if (this.energyHistory.length > AUDIO_REACTIVE_BEAT_HISTORY) this.energyHistory.shift();
         const avg = this.energyHistory.reduce((sum, value) => sum + value, 0) / Math.max(1, this.energyHistory.length);
-        const threshold = Math.max(0.035, avg * 1.22);
-        const beat = now > this.beatCooldownUntil && rms > threshold && (flux > 0.08 || rms > avg * 1.55);
+        const dense = clamp(Number(density || 0), 0, 1);
+        const threshold = Math.max(0.035, avg * (1.22 + dense * 0.3));
+        const fluxGate = 0.08 + dense * 0.08;
+        const beat = now > this.beatCooldownUntil && rms > threshold && (flux > fluxGate || rms > avg * (1.55 + dense * 0.35));
         if (beat) {
             this.beatPulse = 1;
-            this.beatCooldownUntil = now + 135;
+            this.beatCooldownUntil = now + 135 + dense * 65;
         } else {
-            this.beatPulse *= 0.82;
+            this.beatPulse *= 0.82 - dense * 0.05;
         }
         return clamp(this.beatPulse, 0, 1);
     }
@@ -3614,6 +3575,8 @@ class CanvasStaticRenderer {
         this.lastFrame = 0;
         this.lastRafAt = 0;
         this.rows = 0;
+        this.sampleWidth = 0;
+        this.sampleHeight = 0;
         this.frameCount = 0;
         this.fpsFrameCount = 0;
         this.lastFpsUpdate = 0;
@@ -3680,8 +3643,11 @@ class CanvasStaticRenderer {
         this.canvas.style.aspectRatio = `${sw} / ${sh}`;
         this.canvas.style.filter = 'none';
         this.canvas.style.imageRendering = this.params.smoothing ? 'auto' : 'pixelated';
-        this.offscreen.width = this.params.cols;
-        this.offscreen.height = this.rows;
+        const sampleScale = Math.min(1, CANVAS_STATIC_SAMPLE_MAX_DIMENSION / Math.max(sw, sh));
+        this.sampleWidth = Math.max(this.params.cols, Math.round(sw * sampleScale));
+        this.sampleHeight = Math.max(this.rows, Math.round(sh * sampleScale));
+        this.offscreen.width = this.sampleWidth;
+        this.offscreen.height = this.sampleHeight;
     }
 
     _loop(ts, fromTimer = false) {
@@ -3714,29 +3680,46 @@ class CanvasStaticRenderer {
     renderFrame() {
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
+        const cols = this.params.cols;
+        const sampleWidth = Math.max(cols, this.sampleWidth || cols);
+        const sampleHeight = Math.max(this.rows, this.sampleHeight || this.rows);
         try {
+            this.offctx.imageSmoothingEnabled = Boolean(this.params.smoothing);
             if (shouldRendererMirrorCamera(this.params)) {
                 this.offctx.save();
-                this.offctx.translate(this.params.cols, 0);
+                this.offctx.translate(sampleWidth, 0);
                 this.offctx.scale(-1, 1);
-                this.offctx.drawImage(sourceEl, 0, 0, this.params.cols, this.rows);
+                this.offctx.drawImage(sourceEl, 0, 0, sampleWidth, sampleHeight);
                 this.offctx.restore();
             } else {
-                this.offctx.drawImage(sourceEl, 0, 0, this.params.cols, this.rows);
+                this.offctx.drawImage(sourceEl, 0, 0, sampleWidth, sampleHeight);
             }
         } catch {
             return;
         }
-        const img = this.offctx.getImageData(0, 0, this.params.cols, this.rows);
+        const img = this.offctx.getImageData(0, 0, sampleWidth, sampleHeight);
         const data = img.data;
         const ctx = this.ctx;
+        const time = this.frameCount / Math.max(1, this.params.fps || DEFAULT_PARAMS.fps);
+        const jitterAmount = Number(this.params.jitterAmount || 0);
+        const jitterSpeed = Number(this.params.jitterSpeed || 0);
+        const sourceCellWidth = sampleWidth / cols;
+        const sourceCellHeight = sampleHeight / this.rows;
+        const sampleXOffset = clamp(Number(this.params.sampleX ?? 0.5), 0, 1);
+        const sampleYOffset = clamp(Number(this.params.sampleY ?? 0.5), 0, 1);
         ctx.fillStyle = '#030405';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.textBaseline = 'top';
         ctx.font = `bold ${Math.max(1, this.params.cellHeight)}px ${this.params.fontFamily}, monospace`;
         for (let y = 0; y < this.rows; y++) {
-            for (let x = 0; x < this.params.cols; x++) {
-                const i = (y * this.params.cols + x) * 4;
+            for (let x = 0; x < cols; x++) {
+                const seedX = x + time * jitterSpeed * 7.13;
+                const seedY = y + time * jitterSpeed * 11.71;
+                const jitterX = (shaderHash(seedX, seedY) - 0.5) * sourceCellWidth * jitterAmount;
+                const jitterY = (shaderHash(seedX + 37, seedY + 91) - 0.5) * sourceCellHeight * jitterAmount;
+                const sampleX = clamp(Math.trunc((x + sampleXOffset) * sourceCellWidth + jitterX), 0, sampleWidth - 1);
+                const sampleY = clamp(Math.trunc((y + sampleYOffset) * sourceCellHeight + jitterY), 0, sampleHeight - 1);
+                const i = (sampleY * sampleWidth + sampleX) * 4;
                 const [r, g, b] = processColor(data[i], data[i + 1], data[i + 2], this.params);
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
                 if (usesPixelCanvas(this.params) || this.params.solidMode || !this.params.glyphMode) {
@@ -3868,6 +3851,19 @@ class StaticRuntime {
         this.source?.updateParams?.(params);
     }
 
+    async _createRendererForParams(params, layer) {
+        if (params.backend === 'canvas2d' || params.backend === 'pixel-canvas') {
+            const renderer = new CanvasStaticRenderer(layer);
+            await renderer.start(params, { source: this.source, ownsSource: false });
+            return { renderer, stats: renderer.getStats(), usingCanvasFallback: true };
+        }
+
+        const renderer = await createRenderer(this._rendererOptions(params, layer));
+        renderer.start();
+        this._applyRendererParams(renderer, params);
+        return { renderer, stats: renderer.getStats?.() || null, usingCanvasFallback: false };
+    }
+
     async start(params, options = {}) {
         this.destroy({ clearStage: options.preserveStage !== true });
         els.gpuStage.classList.add('active');
@@ -3878,9 +3874,10 @@ class StaticRuntime {
 
         if (this.usingCanvasFallback) {
             const source = await this.app.loadStaticSource(params, options);
+            this.source = source;
             const renderer = new CanvasStaticRenderer(layer);
             this.renderer = renderer;
-            await renderer.start(params, { ...options, source, ownsSource: true });
+            await renderer.start(params, { ...options, source, ownsSource: false });
             this.mediaUrl = params.mediaUrl;
             this.mediaType = params.mediaType;
             return renderer.getStats();
@@ -3903,8 +3900,8 @@ class StaticRuntime {
             const renderer = new CanvasStaticRenderer(layer);
             this.renderer = renderer;
             const source = this.source || await this.app.loadStaticSource(params, options);
-            this.source = null;
-            await renderer.start({ ...params, backend: 'canvas2d' }, { ...options, source, ownsSource: true });
+            this.source = source;
+            await renderer.start({ ...params, backend: 'canvas2d' }, { ...options, source, ownsSource: false });
             this.mediaUrl = params.mediaUrl;
             this.mediaType = params.mediaType;
             return renderer.getStats();
@@ -3915,12 +3912,8 @@ class StaticRuntime {
         return Boolean(
             params.sourceMode === 'static' &&
             this.source &&
-            !this.usingCanvasFallback &&
-            !(this.renderer instanceof CanvasStaticRenderer) &&
             this.mediaUrl === params.mediaUrl &&
-            this.mediaType === params.mediaType &&
-            params.backend !== 'canvas2d' &&
-            params.backend !== 'pixel-canvas'
+            this.mediaType === params.mediaType
         );
     }
 
@@ -3935,10 +3928,11 @@ class StaticRuntime {
         oldLayer?.remove?.();
 
         const layer = this._makeRendererLayer('renderer-buffer-current');
-        this.renderer = await createRenderer(this._rendererOptions(params, layer));
-        this.renderer.start();
+        const next = await this._createRendererForParams(params, layer);
+        this.renderer = next.renderer;
+        this.usingCanvasFallback = next.usingCanvasFallback;
         this.updateParams(params);
-        return this.renderer.getStats();
+        return next.stats;
     }
 
     async prepareCrossfadeRenderer(params) {
@@ -3956,20 +3950,19 @@ class StaticRuntime {
         nextLayer.style.opacity = '1';
         els.gpuStage.insertBefore(nextLayer, oldLayer);
 
-        const nextRenderer = await createRenderer(this._rendererOptions(params, nextLayer));
-        nextRenderer.start();
-        this._applyRendererParams(nextRenderer, params);
+        const next = await this._createRendererForParams(params, nextLayer);
+        const nextRenderer = next.renderer;
         this.renderer = nextRenderer;
         this.mediaUrl = params.mediaUrl;
         this.mediaType = params.mediaType;
-        this.usingCanvasFallback = false;
+        this.usingCanvasFallback = next.usingCanvasFallback;
 
         return {
             oldRenderer,
             oldLayer,
             nextRenderer,
             nextLayer,
-            stats: nextRenderer.getStats?.() || null
+            stats: next.stats
         };
     }
 
@@ -5565,7 +5558,7 @@ class RendererLabApp {
             input.value = String(this.audioReactive[config.key]);
 
             const output = document.createElement('output');
-            output.textContent = Number(this.audioReactive[config.key]).toFixed(2);
+            output.textContent = Number(this.audioReactive[config.key]).toFixed(audioReactivePrecision(config));
 
             row.append(name, input, output);
             els.audioReactiveControls.appendChild(row);
@@ -5687,6 +5680,7 @@ class RendererLabApp {
             entry.input.addEventListener('input', () => {
                 const numeric = Number(entry.input.value);
                 this.audioReactive[key] = Number.isFinite(numeric) ? numeric : AUDIO_REACTIVE_DEFAULTS[key];
+                this.audioReactive = sanitizeAudioReactiveSettings(this.audioReactive);
                 this.audioReactiveRuntime.updateSettings();
                 this._syncAudioReactiveUi();
             });
@@ -5904,7 +5898,7 @@ class RendererLabApp {
 
     renderParams() {
         if (this.audioReactiveRuntime?.active && this.audioReactiveFeatures) {
-            this.effectiveParams = applyAudioReactiveModulation(this.params, this.audioReactiveFeatures, this.audioReactive);
+            this.effectiveParams = applyAudioReactiveModulation(this.params, this.audioReactiveFeatures, this.audioReactive, { clampParamValue });
             return this.effectiveParams;
         }
         this.effectiveParams = null;
@@ -6086,11 +6080,12 @@ class RendererLabApp {
         for (const [key, entry] of this.audioReactiveInputs.entries()) {
             const value = Number(this.audioReactive[key]);
             if (force || document.activeElement !== entry.input) entry.input.value = String(value);
-            entry.output.textContent = Number.isFinite(value) ? value.toFixed(2) : '0.00';
+            const precision = audioReactivePrecision(entry.config);
+            entry.output.textContent = Number.isFinite(value) ? value.toFixed(precision) : (0).toFixed(precision);
         }
 
         const features = this.audioReactiveFeatures || {};
-        const labels = { rms: 'RMS', bass: 'Bass', mid: 'Mid', treble: 'Treble' };
+        const labels = { rms: 'RMS', bass: 'Bass', mid: 'Mid', treble: 'Treble', flux: 'Flux', density: 'Dense' };
         els.audioReactiveMeters?.querySelectorAll('[data-meter]').forEach((meter) => {
             const key = meter.dataset.meter;
             const level = clamp(Number(features[key] || 0), 0, 1);
@@ -6710,7 +6705,16 @@ button:hover{background:#202a35}
     _canUseNativeCameraOutputWindow(params = this.params) {
         if (!this._canUseNativeOutputWindow()) return false;
         if (!isCameraParams(params)) return false;
+        if (shouldMirrorNativeCameraOutput(params)) return false;
         return selectedCameraCount(params) === 1;
+    }
+
+    _shouldMirrorNativeCameraOutput(params = this.params) {
+        return shouldMirrorNativeCameraOutput(params);
+    }
+
+    _nativeOutputGlyphMode(params = this.renderParams()) {
+        return nativeOutputGlyphMode(params);
     }
 
     _nativeCameraOutputMeta(params = this.params) {
@@ -6743,6 +6747,7 @@ button:hover{background:#202a35}
             nativeSourceId: this._nativeOutputSourceId(),
             params: {
                 ...params,
+                glyphMode: this._nativeOutputGlyphMode(params),
                 sourceMode: this.params.sourceMode,
                 mediaUrl: this.params.mediaUrl,
                 mediaType: this.params.mediaType,
@@ -6758,7 +6763,8 @@ button:hover{background:#202a35}
                 cameraFps: this.params.cameraFps,
                 cameraMirror: cameraMeta ? this.params.cameraMirror : null,
                 mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
-                nativeWtfActive: Boolean(this.wtfActive),
+                // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
+                nativeWtfActive: false,
                 audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
                 audioReactiveSource: this.audioReactive.source,
                 audioReactivePreset: this.audioReactive.preset,
@@ -6766,7 +6772,11 @@ button:hover{background:#202a35}
                 audioReactiveBeatAmount: this.audioReactive.beatAmount,
                 audioReactiveBassAmount: this.audioReactive.bassAmount,
                 audioReactiveMidAmount: this.audioReactive.midAmount,
-                audioReactiveTrebleAmount: this.audioReactive.trebleAmount
+                audioReactiveTrebleAmount: this.audioReactive.trebleAmount,
+                audioReactiveFluxAmount: this.audioReactive.fluxAmount,
+                audioReactivePresenceAmount: this.audioReactive.presenceAmount,
+                audioReactiveDensityDampening: this.audioReactive.densityDampening,
+                audioReactiveNoiseFloor: this.audioReactive.noiseFloor
             },
             mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null
         };
@@ -7704,7 +7714,13 @@ button:hover{background:#202a35}
 
     _randomWtfTarget(seconds) {
         const target = { ...this.params, transitionSeconds: seconds };
-        const anchor = randomBool(0.48) ? randomChoice(WTF_ANCHOR_PRESETS) : null;
+        const currentSolidVisual = this.params.sourceMode === 'static' &&
+            (Boolean(this.params.solidMode) || usesPixelCanvas(this.params));
+        const anchor = currentSolidVisual && randomBool(0.58)
+            ? randomChoice(ASCII_WTF_PRESETS)
+            : randomBool(0.48)
+                ? randomChoice(WTF_ANCHOR_PRESETS)
+                : null;
         const asciiAnchor = anchor ? ASCII_WTF_PRESET_ID_SET.has(anchor.id) : false;
         const anchorParams = anchor ? stripPresetExcludedParams(anchor.params || {}) : null;
         if (anchorParams) Object.assign(target, anchorParams);
@@ -7774,12 +7790,7 @@ button:hover{background:#202a35}
         target.fontFamily = randomChoice(FONT_FAMILY_IDS);
         target.minGlyphIntensity = randomInt(70, 230);
         if (asciiAnchor && anchorParams) {
-            const reusableStaticBackend = staticMode &&
-                this.running &&
-                this.staticRuntime?.canReuseSource?.({ ...target, backend: this.params.backend });
-            this._applyAsciiWtfAnchor(target, anchorParams, {
-                preserveBackend: reusableStaticBackend ? this.params.backend : null
-            });
+            this._applyAsciiWtfAnchor(target, anchorParams);
         }
 
         return normalizeParams(target, { preserveBlob: true });
@@ -7799,6 +7810,7 @@ button:hover{background:#202a35}
 
         target.backend = options.preserveBackend || anchorParams.backend || 'canvas2d';
         target.cols = Math.round(clamp(Number(anchorParams.cols || target.cols) * randomBetween(0.9, 1.12), 80, 320));
+        target.aspectCorrection = 1;
         target.cellWidth = nudgeInt('cellWidth', 1, 2, 9);
         target.cellHeight = nudgeInt('cellHeight', 1, 3, 13);
         target.saturationBoost = around('saturationBoost', 0.12, 0, 3);
@@ -7934,6 +7946,19 @@ button:hover{background:#202a35}
         return this._tweenParams(before, target, seconds, {}, token);
     }
 
+    _transitionFrameParams(from, to, t) {
+        const eased = easeInOut(clamp(t, 0, 1));
+        const frame = { ...to };
+        for (const key of Object.keys(to)) {
+            if (CLIENT_TWEEN_KEYS.has(key) && typeof from[key] === 'number' && typeof to[key] === 'number') {
+                frame[key] = from[key] + (to[key] - from[key]) * eased;
+            } else if (t < 0.5 && Object.prototype.hasOwnProperty.call(from, key)) {
+                frame[key] = from[key];
+            }
+        }
+        return frame;
+    }
+
     _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
         this.transitioning = true;
         return new Promise((resolve) => {
@@ -7949,14 +7974,7 @@ button:hover{background:#202a35}
                     return;
                 }
                 const t = clamp((now - start) / duration, 0, 1);
-                const eased = easeInOut(t);
-                for (const key of Object.keys(to)) {
-                    if (CLIENT_TWEEN_KEYS.has(key) && typeof from[key] === 'number' && typeof to[key] === 'number') {
-                        this.params[key] = from[key] + (to[key] - from[key]) * eased;
-                    } else if (t >= 0.5) {
-                        this.params[key] = to[key];
-                    }
-                }
+                this.params = this._transitionFrameParams(from, to, t);
                 this._syncInputs();
                 this._applyVisualState();
                 if (this.running) {
@@ -8099,6 +8117,7 @@ button:hover{background:#202a35}
         return new Promise((resolve, reject) => {
             const duration = Math.max(80, seconds * 1000);
             const runtime = this.staticRuntime;
+            const from = { ...this.params };
             let prepared = null;
             let finished = false;
             const active = () => token === this.transitionToken;
@@ -8167,7 +8186,10 @@ button:hover{background:#202a35}
                         return;
                     }
                     const t = clamp((now - start) / duration, 0, 1);
+                    const outputParams = this._transitionFrameParams(from, target, t);
                     if (prepared?.oldLayer) prepared.oldLayer.style.opacity = String(crossfadeOut(t));
+                    this._updatePopoutRendererParams(outputParams);
+                    this._syncNativeOutputWindow(outputParams, NATIVE_OUTPUT_REACTIVE_SYNC_MS);
                     if (t < 1) scheduleResponsiveFrame(step);
                     else finish();
                 };

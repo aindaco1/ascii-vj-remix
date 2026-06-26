@@ -6,6 +6,7 @@
   "permissions": [
     "core:event:allow-emit-to",
     "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:webview:allow-clear-all-browsing-data",
     "core:webview:allow-create-webview-window",
     "core:window:allow-available-monitors",

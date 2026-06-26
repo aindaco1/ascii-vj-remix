@@ -55,6 +55,10 @@ The current release line includes these security hardening rules:
   and Tauri packaging steps. Do not place `TAURI_SIGNING_PRIVATE_KEY`,
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
+- Public 0.9.3 release CI fails closed when Apple Developer ID notarization is
+  incomplete. Windows artifacts are published as unsigned previews until
+  SignPath Foundation, Azure Artifact Signing, or another signing backend is
+  proven.
 - GitHub Actions macOS jobs are pinned to `macos-26` instead of
   `macos-latest`. The native `wgpu`/`apple-metal` stack needs the macOS 26
   Metal SDK, and the moving `macos-latest` alias can select an older SDK.
@@ -198,7 +202,9 @@ Development rules:
 - Prefer narrower native system-audio permissions when the platform exposes
   them.
 - Keep feature frames bounded. Do not ship raw unbounded audio buffers over
-  IPC when feature vectors are enough.
+  IPC when feature vectors are enough. Audio reactivity should use derived
+  features such as RMS, bands, transient/flux, presence, brightness, density,
+  beat pulse, and phase.
 - Avoid capture auto-retry loops that keep prompting or capturing after the user
   denies access.
 
@@ -228,9 +234,12 @@ Security requirements:
 - Release workflows must scope updater signing secrets to signing-only steps,
   never to the whole job.
 
-Future Apple Developer ID signing and Windows Authenticode signing add more
-secrets. Store certificates, passwords, API keys, and CI keychain passwords in
-GitHub secrets only, and keep local test credentials outside the repo.
+Apple Developer ID signing adds more secrets. Store certificates, passwords, API
+keys, and CI keychain passwords in GitHub secrets only, and keep local test
+credentials outside the repo. Future Windows Authenticode signing must follow
+the same rule for Azure client secrets, SignPath tokens, certificates, or other
+signing credentials. Non-secret Azure IDs for Artifact Signing may live in
+GitHub repository variables if Azure Artifact Signing is enabled later.
 
 ## FFmpeg and Codec Sidecars
 
@@ -308,11 +317,12 @@ npm run check:ffmpeg-resources
 
 - macOS privacy prompts can be sensitive to app path, bundle identifier, and
   signing identity.
-- Ad-hoc macOS signing is acceptable for local builds but not ideal for public
-  distribution.
-- Apple Developer ID notarization is planned and documented in the roadmap.
-- Windows SmartScreen mitigation requires Authenticode signing and reputation
-  building.
+- Ad-hoc macOS signing is acceptable for local builds only; public releases are
+  Developer ID signed, notarized, stapled, and Gatekeeper-validated.
+- Windows 0.9.3 artifacts are unsigned previews and may trigger Unknown
+  Publisher, SmartScreen, or Defender warnings. Future public Windows releases
+  should be Authenticode signed and timestamped before being treated as normal
+  public installers.
 - Linux media/camera/audio behavior varies by distribution, WebKitGTK, drivers,
   and portal setup.
 - Stream mode exists in development paths but is hidden from the normal UI until

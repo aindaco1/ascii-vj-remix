@@ -166,6 +166,9 @@ Rules:
 - Keep analyzer windows and smoothing low enough for live response.
 - Use feature vectors such as RMS, bass, mid, treble, flux, beat pulse, and
   phase rather than unbounded raw samples.
+- Keep dense-mix helpers derived from the same bounded analyzer buffers:
+  low-mid/high-mid bands, presence, brightness, and density should not add
+  unbounded history or raw-audio IPC.
 - Clamp modulation so high sensitivity cannot drive pure black or pure white
   screens.
 - Restart capture automatically when the selected input device changes.

@@ -168,6 +168,8 @@ async function runSmoke() {
         toggle: document.querySelector('#audio-reactive-toggle')?.textContent || '',
         pressed: document.querySelector('#audio-reactive-toggle')?.getAttribute('aria-pressed') || '',
         active: Boolean(window.ascilineRemix?.audioReactiveRuntime?.active),
+        controls: [...document.querySelectorAll('#audio-reactive-controls .audio-control-row span:first-child')]
+          .map((node) => node.textContent.trim()),
         calls: window.__smokeAudioCapture
       },
       glyphControls: {
@@ -216,9 +218,25 @@ async function runSmoke() {
       main.audioReactive.pressed !== 'true' ||
       main.audioReactive.calls?.mic < 1 ||
       main.audioReactive.input !== 'mic-a' ||
-      main.audioReactive.inputOptions.includes('Default - Smoke Mic A')
+      main.audioReactive.inputOptions.includes('Default - Smoke Mic A') ||
+      !['Transient / Flux', 'Presence', 'Density Dampening', 'Noise Floor'].every((label) => main.audioReactive.controls.includes(label))
     ) {
       throw new Error(`Audio input should auto-start and request mic capture: ${JSON.stringify(main.audioReactive)}`);
+    }
+
+    const micCallsBeforeSlider = main.audioReactive.calls.mic;
+    await page.evaluate(() => {
+      const slider = document.querySelector('#audio-reactive-densityDampening');
+      slider.value = '0.65';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const afterAudioSlider = await page.evaluate(() => ({
+      mic: window.__smokeAudioCapture?.mic || 0,
+      densityDampening: window.ascilineRemix?.audioReactive?.densityDampening,
+      active: Boolean(window.ascilineRemix?.audioReactiveRuntime?.active)
+    }));
+    if (afterAudioSlider.mic !== micCallsBeforeSlider || afterAudioSlider.densityDampening !== 0.65 || !afterAudioSlider.active) {
+      throw new Error(`Audio slider changes should update live without restarting capture: ${JSON.stringify(afterAudioSlider)}`);
     }
 
     await page.selectOption('#audio-reactive-input', 'mic-b');
@@ -268,6 +286,103 @@ async function runSmoke() {
         );
       }
     }
+    const liveFamilyTransition = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      const source = app?._staticMediaSource?.();
+      const video = source?.isVideo ? source.element : null;
+      if (!app || !video) return { skipped: true, reason: 'missing video source' };
+
+      const transitionOutputFrames = [];
+      const originalSyncNativeOutputWindow = app._syncNativeOutputWindow?.bind(app);
+      const originalUpdatePopoutRendererParams = app._updatePopoutRendererParams?.bind(app);
+      app._syncNativeOutputWindow = (params, minIntervalMs) => {
+        transitionOutputFrames.push({
+          source: 'native',
+          backend: params.backend,
+          solidMode: Boolean(params.solidMode),
+          glyphMode: Boolean(params.glyphMode),
+          cols: params.cols
+        });
+        return originalSyncNativeOutputWindow?.(params, minIntervalMs);
+      };
+      app._updatePopoutRendererParams = (params) => {
+        transitionOutputFrames.push({
+          source: 'popout',
+          backend: params.backend,
+          solidMode: Boolean(params.solidMode),
+          glyphMode: Boolean(params.glyphMode),
+          cols: params.cols
+        });
+        return originalUpdatePopoutRendererParams?.(params);
+      };
+
+      const presetParams = (id) => app._allPresets?.().find((preset) => preset.id === id)?.params || {};
+      const currentUrl = app.params.mediaUrl;
+      const currentType = app.params.mediaType;
+      const currentName = app.params.sourceName;
+      try {
+        const solidTarget = {
+          ...app.params,
+          ...presetParams('neon-sledgehammer'),
+          mediaUrl: currentUrl,
+          mediaType: currentType,
+          sourceName: currentName,
+          sourceMode: 'static',
+          transitionSeconds: app.params.transitionSeconds
+        };
+        await app._transitionTo(solidTarget, 0.15);
+        const beforeGlyph = video.currentTime || 0;
+        const glyphTarget = {
+          ...app.params,
+          ...presetParams('classic-camera-ascii'),
+          mediaUrl: currentUrl,
+          mediaType: currentType,
+          sourceName: currentName,
+          sourceMode: 'static',
+          transitionSeconds: app.params.transitionSeconds
+        };
+        transitionOutputFrames.length = 0;
+        const transition = app._transitionTo(glyphTarget, 0.25);
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const during = {
+          paused: video.paused,
+          currentTime: video.currentTime || 0,
+          transitioning: Boolean(app.transitioning)
+        };
+        await transition;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        const after = {
+          paused: video.paused,
+          currentTime: video.currentTime || 0,
+          backend: app.params.backend,
+          solidMode: app.params.solidMode,
+          glyphMode: app.params.glyphMode
+        };
+        const outputFrameSummary = {
+          count: transitionOutputFrames.length,
+          sawSolid: transitionOutputFrames.some((frame) => frame.solidMode && !frame.glyphMode),
+          sawGlyph: transitionOutputFrames.some((frame) => frame.glyphMode && !frame.solidMode),
+          sample: transitionOutputFrames.slice(0, 8)
+        };
+        return { skipped: false, beforeGlyph, during, after, outputFrameSummary };
+      } finally {
+        app._syncNativeOutputWindow = originalSyncNativeOutputWindow;
+        app._updatePopoutRendererParams = originalUpdatePopoutRendererParams;
+      }
+    });
+    if (
+      liveFamilyTransition.skipped ||
+      liveFamilyTransition.during.paused ||
+      liveFamilyTransition.after.paused ||
+      liveFamilyTransition.after.currentTime <= liveFamilyTransition.beforeGlyph + 0.08 ||
+      liveFamilyTransition.after.backend !== 'canvas2d' ||
+      liveFamilyTransition.after.solidMode ||
+      !liveFamilyTransition.after.glyphMode ||
+      !liveFamilyTransition.outputFrameSummary?.sawSolid ||
+      !liveFamilyTransition.outputFrameSummary?.sawGlyph
+    ) {
+      throw new Error(`Solid-to-glyph static transitions should keep video playback live: ${JSON.stringify(liveFamilyTransition)}`);
+    }
     await page.click('#source-list [data-source-id="camera"]');
     await page.waitForFunction(
       () => {
@@ -286,6 +401,60 @@ async function runSmoke() {
       null,
       { timeout: 15000 }
     );
+    const cameraNativeParity = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const cameraBase = {
+        sourceMode: 'static',
+        mediaUrl: 'camera://local',
+        mediaType: 'camera',
+        sourceName: 'Camera',
+        cameraDeviceId: 'cam-a',
+        cameraSelectedDeviceIds: ['cam-a']
+      };
+      const presetParams = (id) => app?._allPresets?.().find((preset) => preset.id === id)?.params || {};
+      const classic = { ...app.params, ...presetParams('classic-camera-ascii'), ...cameraBase };
+      const pointClick = { ...app.params, backend: 'auto', ...presetParams('point-click-default'), ...cameraBase };
+      const neon = { ...app.params, ...presetParams('neon-sledgehammer'), ...cameraBase };
+      const previousWtfActive = app.wtfActive;
+      app.wtfActive = true;
+      const wtfPayload = app._nativeOutputPayload?.(classic);
+      app.wtfActive = previousWtfActive;
+      return {
+        classicMirrors: app?._shouldMirrorNativeCameraOutput?.(classic) ?? null,
+        classicNativeGlyphs: app?._nativeOutputGlyphMode?.(classic) ?? null,
+        pointClickNativeGlyphs: app?._nativeOutputGlyphMode?.(pointClick) ?? null,
+        neonMirrors: app?._shouldMirrorNativeCameraOutput?.(neon) ?? null,
+        neonNativeGlyphs: app?._nativeOutputGlyphMode?.(neon) ?? null,
+        nativeWtfActive: wtfPayload?.params?.nativeWtfActive,
+        classic: {
+          glyphMode: classic.glyphMode,
+          solidMode: classic.solidMode,
+          pixel: classic.pixel,
+          backend: classic.backend
+        },
+        pointClick: {
+          glyphMode: pointClick.glyphMode,
+          solidMode: pointClick.solidMode,
+          pixel: pointClick.pixel,
+          backend: pointClick.backend
+        },
+        neon: {
+          glyphMode: neon.glyphMode,
+          solidMode: neon.solidMode,
+          pixel: neon.pixel,
+          backend: neon.backend
+        }
+      };
+    });
+    if (cameraNativeParity.classicMirrors || cameraNativeParity.neonMirrors) {
+      throw new Error(`Live camera presets should not use mirror transport by default: ${JSON.stringify(cameraNativeParity)}`);
+    }
+    if (!cameraNativeParity.classicNativeGlyphs || cameraNativeParity.pointClickNativeGlyphs || cameraNativeParity.neonNativeGlyphs) {
+      throw new Error(`Native output glyph masking should follow the active backend family: ${JSON.stringify(cameraNativeParity)}`);
+    }
+    if (cameraNativeParity.nativeWtfActive !== false) {
+      throw new Error(`Native output should consume app-resolved WTF params instead of double-modulating: ${JSON.stringify(cameraNativeParity)}`);
+    }
     await page.click('#source-list [data-source-id="demo-image"]');
     await page.waitForFunction(
       () => window.ascilineRemix?.params?.mediaUrl === 'media/demo.svg' &&
@@ -350,6 +519,244 @@ async function runSmoke() {
       if (!presetSignal.visible) {
         throw new Error(`Traditional ASCII preset did not render a glyph-like signal for ${presetId}: ${JSON.stringify(presetSignal)}`);
       }
+      const presetMotion = await page.evaluate(async () => {
+        const app = window.ascilineRemix;
+        const capture = () => {
+          app?.staticRuntime?.renderer?.renderFrame?.();
+          const surface = app?._activeRenderSurface?.();
+          const canvas = surface?.tagName === 'CANVAS' ? surface : document.querySelector('#gpu-stage canvas, #ascii-canvas');
+          if (!canvas?.width || !canvas?.height) return null;
+
+          const sample = document.createElement('canvas');
+          sample.width = Math.min(120, canvas.width);
+          sample.height = Math.min(90, canvas.height);
+          const ctx = sample.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+          return ctx.getImageData(0, 0, sample.width, sample.height).data;
+        };
+
+        const first = capture();
+        await new Promise((resolve) => setTimeout(resolve, 420));
+        const second = capture();
+        if (!first || !second || first.length !== second.length) return { visible: false, reason: 'missing samples' };
+
+        let changed = 0;
+        let totalDelta = 0;
+        for (let i = 0; i < first.length; i += 4) {
+          const delta = Math.abs(first[i] - second[i]) +
+            Math.abs(first[i + 1] - second[i + 1]) +
+            Math.abs(first[i + 2] - second[i + 2]);
+          totalDelta += delta;
+          if (delta > 18) changed += 1;
+        }
+        const jitterControlHidden = document
+          .querySelector('[data-control-key="jitterAmount"]')
+          ?.classList.contains('control-hidden') ?? true;
+        return {
+          visible: changed > 8 && totalDelta > 900,
+          changed,
+          totalDelta,
+          pixels: first.length / 4,
+          jitterAmount: app?.params?.jitterAmount,
+          jitterSpeed: app?.params?.jitterSpeed,
+          jitterControlHidden
+        };
+      });
+      if (!presetMotion.visible || presetMotion.jitterAmount <= 0 || presetMotion.jitterSpeed <= 0 || presetMotion.jitterControlHidden) {
+        throw new Error(`Traditional ASCII preset should animate default Canvas2D jitter for ${presetId}: ${JSON.stringify(presetMotion)}`);
+      }
+    }
+
+    const canvasJitterMotion = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      if (!app?.staticRuntime?.renderer) return { visible: false, reason: 'missing renderer' };
+      app.params = {
+        ...app.params,
+        backend: 'canvas2d',
+        glyphMode: true,
+        solidMode: false,
+        jitterAmount: 1,
+        jitterSpeed: 4,
+        sampleX: 0.5,
+        sampleY: 0.5
+      };
+      app._applyEffectiveRendererParams(app.renderParams(), 'test');
+
+      const capture = () => {
+        app.staticRuntime.renderer?.renderFrame?.();
+        const surface = app._activeRenderSurface?.();
+        const canvas = surface?.tagName === 'CANVAS' ? surface : document.querySelector('#gpu-stage canvas, #ascii-canvas');
+        if (!canvas?.width || !canvas?.height) return null;
+
+        const sample = document.createElement('canvas');
+        sample.width = Math.min(96, canvas.width);
+        sample.height = Math.min(72, canvas.height);
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        return ctx.getImageData(0, 0, sample.width, sample.height).data;
+      };
+
+      const first = capture();
+      await new Promise((resolve) => setTimeout(resolve, 360));
+      const second = capture();
+      if (!first || !second || first.length !== second.length) return { visible: false, reason: 'missing samples' };
+
+      let changed = 0;
+      let totalDelta = 0;
+      for (let i = 0; i < first.length; i += 4) {
+        const delta = Math.abs(first[i] - second[i]) +
+          Math.abs(first[i + 1] - second[i + 1]) +
+          Math.abs(first[i + 2] - second[i + 2]);
+        totalDelta += delta;
+        if (delta > 24) changed += 1;
+      }
+      return {
+        visible: changed > 12 && totalDelta > 1800,
+        changed,
+        totalDelta,
+        pixels: first.length / 4,
+        backend: app.params.backend,
+        jitterAmount: app.params.jitterAmount,
+        jitterSpeed: app.params.jitterSpeed
+      };
+    });
+    if (!canvasJitterMotion.visible) {
+      throw new Error(`Canvas2D Demo Image jitter should animate static image sampling: ${JSON.stringify(canvasJitterMotion)}`);
+    }
+
+    const migrationContext = await browser.newContext({ viewport: { width: 960, height: 640 } });
+    await migrationContext.addInitScript(() => {
+      localStorage.removeItem('asciline-remix-canvas-ascii-jitter-migrated-v1');
+      localStorage.setItem('asciline-remix-state-v1', JSON.stringify({
+        sourceMode: 'static',
+        backend: 'canvas2d',
+        mediaUrl: 'media/demo.svg',
+        mediaType: 'image',
+        sourceName: 'Demo Image',
+        cols: 170,
+        autoRows: true,
+        cellWidth: 6,
+        cellHeight: 9,
+        jitterAmount: 0,
+        jitterSpeed: 0,
+        sampleX: 0.5,
+        sampleY: 0.5,
+        glyphMode: true,
+        solidMode: false,
+        pixel: false,
+        charset: 'classic-camera',
+        fontFamily: 'Courier New',
+        mode: 1
+      }));
+    });
+    const migrationPage = await migrationContext.newPage();
+    migrationPage.on('console', (msg) => { if (msg.type() === 'error') errors.push(`migration:${msg.text()}`); });
+    const migrationResponse = await migrationPage.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
+    await migrationPage.waitForFunction(
+      () => window.ascilineRemix?.running &&
+        !window.ascilineRemix?.starting &&
+        window.ascilineRemix?.params?.backend === 'canvas2d' &&
+        window.ascilineRemix?.params?.mediaUrl === 'media/demo.svg',
+      null,
+      { timeout: 15000 }
+    );
+    const migratedStoredClassic = await migrationPage.evaluate(async () => {
+      const app = window.ascilineRemix;
+      const capture = () => {
+        app?.staticRuntime?.renderer?.renderFrame?.();
+        const surface = app?._activeRenderSurface?.();
+        const canvas = surface?.tagName === 'CANVAS' ? surface : document.querySelector('#gpu-stage canvas, #ascii-canvas');
+        if (!canvas?.width || !canvas?.height) return null;
+
+        const sample = document.createElement('canvas');
+        sample.width = Math.min(96, canvas.width);
+        sample.height = Math.min(72, canvas.height);
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        return ctx.getImageData(0, 0, sample.width, sample.height).data;
+      };
+
+      const first = capture();
+      await new Promise((resolve) => setTimeout(resolve, 420));
+      const second = capture();
+      let changed = 0;
+      let totalDelta = 0;
+      if (first && second && first.length === second.length) {
+        for (let i = 0; i < first.length; i += 4) {
+          const delta = Math.abs(first[i] - second[i]) +
+            Math.abs(first[i + 1] - second[i + 1]) +
+            Math.abs(first[i + 2] - second[i + 2]);
+          totalDelta += delta;
+          if (delta > 18) changed += 1;
+        }
+      }
+      return {
+        visible: changed > 8 && totalDelta > 900,
+        changed,
+        totalDelta,
+        backend: app?.params?.backend,
+        jitterAmount: app?.params?.jitterAmount,
+        jitterSpeed: app?.params?.jitterSpeed,
+        migrationFlag: localStorage.getItem('asciline-remix-canvas-ascii-jitter-migrated-v1')
+      };
+    });
+    await migrationContext.close();
+    if (
+      migrationResponse.status() >= 400 ||
+      !migratedStoredClassic.visible ||
+      migratedStoredClassic.jitterAmount !== 0.32 ||
+      migratedStoredClassic.jitterSpeed !== 0.85 ||
+      migratedStoredClassic.migrationFlag !== '1'
+    ) {
+      throw new Error(`Stored Classic Camera ASCII zero-jitter state should migrate and animate: ${JSON.stringify(migratedStoredClassic)}`);
+    }
+
+    const wtfAsciiAnchorTarget = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      if (!app?._randomWtfTarget) return { ok: false, reason: 'missing app' };
+      const originalRandom = Math.random;
+      const originalParams = { ...app.params };
+      try {
+        Math.random = () => 0;
+        app.params = {
+          ...app.params,
+          sourceMode: 'static',
+          mediaUrl: 'media/demo.svg',
+          mediaType: 'image',
+          sourceName: 'Demo Image',
+          backend: 'auto',
+          solidMode: true,
+          glyphMode: false,
+          pixel: false
+        };
+        const target = app._randomWtfTarget(0.25);
+        return {
+          ok: true,
+          backend: target.backend,
+          glyphMode: target.glyphMode,
+          solidMode: target.solidMode,
+          aspectCorrection: target.aspectCorrection,
+          cols: target.cols
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          name: error?.name || '',
+          message: error?.message || String(error)
+        };
+      } finally {
+        Math.random = originalRandom;
+        app.params = originalParams;
+      }
+    });
+    if (
+      !wtfAsciiAnchorTarget.ok ||
+      wtfAsciiAnchorTarget.backend !== 'canvas2d' ||
+      !wtfAsciiAnchorTarget.glyphMode ||
+      wtfAsciiAnchorTarget.solidMode ||
+      wtfAsciiAnchorTarget.aspectCorrection !== 1
+    ) {
+      throw new Error(`WTF solid-to-ASCII anchor target should be defined and normalized: ${JSON.stringify(wtfAsciiAnchorTarget)}`);
     }
 
     await page.evaluate(() => { window.__smokeAudioCapture.display = 0; });

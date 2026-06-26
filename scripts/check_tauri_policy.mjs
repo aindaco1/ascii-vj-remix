@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const configPath = path.join(root, 'src-tauri', 'tauri.conf.json');
 const notarizedConfigPath = path.join(root, 'src-tauri', 'tauri.notarized.conf.json');
+const windowsSignedConfigPath = path.join(root, 'src-tauri', 'tauri.windows-signed.conf.json');
 const capabilitiesDir = path.join(root, 'src-tauri', 'capabilities');
 const infoPlistPath = path.join(root, 'src-tauri', 'Info.plist');
 const entitlementsPath = path.join(root, 'src-tauri', 'Entitlements.plist');
@@ -42,6 +43,7 @@ function checkNoOnlineUrls(label, value, allowedPrefixes = allowedRemoteDevPrefi
 
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const notarizedConfig = JSON.parse(await readFile(notarizedConfigPath, 'utf8'));
+const windowsSignedConfig = JSON.parse(await readFile(windowsSignedConfigPath, 'utf8'));
 const security = config?.app?.security || {};
 const updaterEndpoint = 'https://github.com/aindaco1/ascii-vj-remix/releases/latest/download/latest.json';
 
@@ -161,6 +163,16 @@ if (notarizedConfig?.bundle?.macOS?.hardenedRuntime !== true) {
   issues.push('tauri.notarized.conf.json must enable bundle.macOS.hardenedRuntime for notarization');
 }
 
+const windowsSignCommand = windowsSignedConfig?.bundle?.windows?.signCommand || '';
+if (!windowsSignCommand.includes('windows-artifact-sign.cmd')) {
+  issues.push('tauri.windows-signed.conf.json must route Windows signing through src-tauri/windows-artifact-sign.cmd');
+}
+for (const forbidden of ['AZURE_CLIENT_SECRET', 'APPLE_CERTIFICATE', 'TAURI_SIGNING_PRIVATE_KEY']) {
+  if (windowsSignCommand.includes(forbidden)) {
+    issues.push(`tauri.windows-signed.conf.json signCommand must not contain ${forbidden}; use step-scoped environment variables`);
+  }
+}
+
 if (config?.bundle?.createUpdaterArtifacts !== true) {
   issues.push('bundle.createUpdaterArtifacts must be true so release builds generate signed updater packages');
 }
@@ -205,6 +217,7 @@ if (!mainCapability) {
   const permissions = new Set(mainCapability.permissions || []);
   const requiredMainPermissions = [
     'dialog:allow-open',
+    'core:event:allow-unlisten',
     'core:webview:allow-clear-all-browsing-data',
     'core:webview:allow-create-webview-window',
     'process:allow-restart',
@@ -265,6 +278,7 @@ if (!outputCapability) {
   for (const forbidden of [
     'dialog:allow-open',
     'core:event:allow-emit-to',
+    'core:event:allow-unlisten',
     'core:webview:allow-create-webview-window',
     'core:window:allow-available-monitors',
     'core:window:allow-get-all-windows',
@@ -304,11 +318,21 @@ const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJob
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
   ? releaseWorkflow.slice(bundleJobStart, bundleStrategyStart)
   : '';
-for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'KEYCHAIN_PASSWORD', 'TAURI_SIGNING_PRIVATE_KEY']) {
+for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'AZURE_', 'KEYCHAIN_PASSWORD', 'TAURI_SIGNING_PRIVATE_KEY']) {
   const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
   if (pattern.test(bundleJobHeader)) {
     issues.push(`release workflow bundle job env must not define ${forbiddenJobEnvPrefix}*; scope signing env to signing-only steps`);
   }
+}
+
+if (!releaseWorkflow.includes('windows-latest')) {
+  issues.push('release workflow must publish Windows preview artifacts in the 0.9.3 matrix');
+}
+if (releaseWorkflow.includes('tauri.windows-signed.conf.json')) {
+  issues.push('release workflow must not use tauri.windows-signed.conf.json until a Windows signing backend is configured and proven');
+}
+if (releaseWorkflow.includes('npm run check:windows-authenticode')) {
+  issues.push('release workflow must not require Authenticode verification for unsigned Windows preview artifacts');
 }
 
 for (const [label, workflow] of [
@@ -329,4 +353,4 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-console.log('Tauri policy check passed: local-only runtime policy with configured GitHub updater and Rust-only crash relay exceptions.');
+console.log('Tauri policy check passed: local-only runtime policy with configured GitHub updater, notarized macOS release path, unsigned Windows preview path, and Rust-only crash relay exceptions.');

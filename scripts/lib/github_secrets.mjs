@@ -54,6 +54,15 @@ function setSecret({ repo, name, value }) {
   }
 }
 
+function setVariable({ repo, name, value }) {
+  const result = run('gh', ['variable', 'set', name, '--repo', repo, '--body', value]);
+
+  if (result.status !== 0) {
+    const detail = `${result.stdout || ''}${result.stderr || ''}`.trim();
+    throw new Error(`gh variable set ${name} failed${detail ? `: ${detail}` : ''}`);
+  }
+}
+
 function listActionSecrets(repo) {
   const result = run('gh', ['secret', 'list', '--app', 'actions', '--repo', repo]);
   if (result.status !== 0) {
@@ -66,13 +75,27 @@ function listActionSecrets(repo) {
     .filter(Boolean));
 }
 
+function listActionVariables(repo) {
+  const result = run('gh', ['variable', 'list', '--repo', repo]);
+  if (result.status !== 0) {
+    const detail = `${result.stdout || ''}${result.stderr || ''}`.trim();
+    throw new Error(`gh variable list failed${detail ? `: ${detail}` : ''}`);
+  }
+  return new Set(result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/)[0])
+    .filter(Boolean));
+}
+
 export {
   commandWorks,
+  listActionVariables,
   listActionSecrets,
   originRepo,
   readBase64File,
   readTrimmedFile,
   requireGhAndRepo,
   run,
-  setSecret
+  setSecret,
+  setVariable
 };
