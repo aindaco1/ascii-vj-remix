@@ -58,8 +58,7 @@ jobs:
       - name: Install macOS FFmpeg build prerequisites
         if: runner.os == 'macOS'
         run: |
-          brew untap aws/tap azure/bicep || true
-          brew install --formula nasm
+          brew list --formula nasm >/dev/null 2>&1 || brew install --formula nasm
 
       - name: Install Windows FFmpeg build prerequisites
         if: runner.os == 'Windows'
