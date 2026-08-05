@@ -1,13 +1,23 @@
 #!/usr/bin/env node
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, rm, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { tauriTargetDir } from './lib/tauri_target_dir.mjs';
+import {
+  PRODUCTION_MACOS_BUNDLE_ID,
+  PRODUCTION_MACOS_TEAM_ID,
+  assertProductionMacosIdentity,
+  assertSameDesignatedRequirement,
+  extractMacosUpdaterArchive,
+  inspectMacosApp
+} from './lib/macos_app_identity.mjs';
 
 const root = path.resolve(process.env.ASCILINE_RELEASE_ROOT || process.cwd());
 const args = parseArgs(process.argv.slice(2));
 const profile = args.profile || process.env.ASCILINE_TAURI_PROFILE || 'release';
 const bundleRoot = path.join(tauriTargetDir(root), profile, 'bundle');
+const expectedBundleId = args.expectedBundleId || PRODUCTION_MACOS_BUNDLE_ID;
+const expectedTeamId = args.expectedTeamId || PRODUCTION_MACOS_TEAM_ID;
 const issues = [];
 
 function parseArgs(argv) {
@@ -125,6 +135,7 @@ if (process.platform !== 'darwin') {
 }
 
 const appDirs = (await dirs(path.join(bundleRoot, 'macos'))).filter((dir) => dir.endsWith('.app'));
+let appIdentity = null;
 if (appDirs.length === 0) {
   issues.push(`no macOS .app bundle found under ${path.relative(root, path.join(bundleRoot, 'macos'))}`);
 } else {
@@ -132,6 +143,33 @@ if (appDirs.length === 0) {
   checkCodesign(appPath);
   checkStapler('.app', appPath);
   checkSpctl('.app', ['-a', '-vv', '--type', 'execute', appPath]);
+  try {
+    appIdentity = inspectMacosApp(appPath, { checkGatekeeper: false });
+    assertProductionMacosIdentity(appIdentity, { expectedBundleId, expectedTeamId });
+  } catch (error) {
+    issues.push(error.message || String(error));
+  }
+
+  const updaterArchives = (await files(path.join(bundleRoot, 'macos')))
+    .filter((file) => file.endsWith('.app.tar.gz'));
+  if (updaterArchives.length !== 1) {
+    issues.push(`expected exactly one macOS updater .app.tar.gz archive, found ${updaterArchives.length}`);
+  } else {
+    let extracted = null;
+    try {
+      extracted = await extractMacosUpdaterArchive(updaterArchives[0]);
+      const updaterIdentity = inspectMacosApp(extracted.appPath);
+      assertProductionMacosIdentity(updaterIdentity, { expectedBundleId, expectedTeamId });
+      assertSameDesignatedRequirement(appIdentity, updaterIdentity);
+      if (appIdentity?.version !== updaterIdentity.version) {
+        issues.push(`macOS updater archive version ${updaterIdentity.version} does not match app version ${appIdentity?.version || '(missing)'}`);
+      }
+    } catch (error) {
+      issues.push(`macOS updater archive identity check failed: ${error.message || String(error)}`);
+    } finally {
+      if (extracted?.extractionRoot) await rm(extracted.extractionRoot, { recursive: true, force: true });
+    }
+  }
 }
 
 const dmgFiles = (await files(path.join(bundleRoot, 'dmg'))).filter((file) => file.endsWith('.dmg'));

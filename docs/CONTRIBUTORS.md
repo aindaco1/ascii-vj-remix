@@ -238,36 +238,43 @@ npm run check:tauri-policy
 
 ## macOS Permissions During Development
 
-The app uses bundle identifier:
+Production and development use separate app identities:
 
 ```text
-com.asciline.remix
+ASCII VJ Remix      com.asciline.remix
+ASCII VJ Remix Dev  com.asciline.remix.dev
 ```
 
-Reset local privacy grants when needed:
+`npm run tauri:dev`, `npm run bundle:debug`, and
+`npm run tauri:build:dev` automatically apply `src-tauri/tauri.dev.conf.json`.
+Do not use a production-named bundle for local Camera, Microphone, or System
+Audio testing.
 
-```bash
-tccutil reset Camera com.asciline.remix
-tccutil reset Microphone com.asciline.remix
-tccutil reset ScreenCapture com.asciline.remix
-tccutil reset AudioCapture com.asciline.remix
-```
-
-For stable local media permissions across rebuilds, create a local code-signing
-identity once:
+Create the stable local code-signing identity once:
 
 ```bash
 npm run desktop:codesign:local
 ```
 
-Then run:
+Then build, install, and launch the development app:
 
 ```bash
-ASCILINE_CODESIGN_IDENTITY="ASCII VJ Remix Local Code Signing" npm run desktop:run-local
+npm run desktop:run-local -- --build
 ```
 
-Without a stable identity, macOS may treat rebuilds as a different app for
-privacy purposes.
+The local runner installs `~/Applications/ASCII VJ Remix Dev.app`, verifies
+`com.asciline.remix.dev`, and refuses ad-hoc signing by default. For a disposable
+build that will not receive persistent privacy grants, explicitly opt in with
+`ASCILINE_ALLOW_ADHOC_LOCAL=1`.
+
+Reset development privacy grants when needed:
+
+```bash
+tccutil reset Camera com.asciline.remix.dev
+tccutil reset Microphone com.asciline.remix.dev
+tccutil reset ScreenCapture com.asciline.remix.dev
+tccutil reset AudioCapture com.asciline.remix.dev
+```
 
 ## FFmpeg and Media Engine Work
 
@@ -369,26 +376,29 @@ For 0.9.5, `release:secrets:check:public` requires updater signing and macOS
 Developer ID notarization readiness. Windows artifacts are published as unsigned
 previews and do not require Windows signing secrets.
 
-For a local debug bundle with the generated updater key:
+For an updater-disabled local development bundle:
 
 ```bash
-TAURI_SIGNING_PRIVATE_KEY="$(cat /private/tmp/ascii-vj-remix-updater.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(cat /private/tmp/ascii-vj-remix-updater.password)" npm run bundle:debug
+npm run bundle:debug
 ```
 
-Current macOS local/default builds are ad-hoc signed by
-`bundle.macOS.signingIdentity = "-"` in `src-tauri/tauri.conf.json`. That keeps
-local bundles code-sign-valid but is not Apple notarization. Public macOS
-release builds use `src-tauri/tauri.notarized.conf.json` and fail if Developer
-ID signing and notarization credentials are missing.
+Production-shaped release packaging still requires the updater key and must not
+be installed as a local permission-testing build.
 
-Local macOS media privacy grants can be sensitive to the final app signature.
-`scripts/run_local_desktop_app.sh` accepts
-`ASCILINE_CODESIGN_IDENTITY="<identity>"` so local test builds can be re-signed
-with a stable local/self-signed identity instead of a changing ad-hoc signature:
+The base config retains `bundle.macOS.signingIdentity = "-"` for portable
+packaging defaults, but normal local commands layer
+`src-tauri/tauri.dev.conf.json` to change the app name and identifier and disable
+production updates. Public macOS release builds use
+`src-tauri/tauri.notarized.conf.json` and fail if Developer ID signing and
+notarization credentials are missing.
+
+`scripts/run_local_desktop_app.sh` requires the stable local identity by
+default. Override `ASCILINE_CODESIGN_IDENTITY` only when deliberately testing a
+different stable signing identity:
 
 ```bash
 npm run desktop:codesign:local
-ASCILINE_CODESIGN_IDENTITY="ASCII VJ Remix Local Code Signing" npm run desktop:run-local
+npm run desktop:run-local -- --build
 ```
 
 Developer ID signing and notarization require Apple Developer Program
@@ -468,10 +478,13 @@ Runtime builds remain offline; CI may download official source during release
 builds, but the packaged app never downloads FFmpeg, codecs, or renderer assets
 at runtime.
 
-The release workflow also runs `scripts/smoke_tauri_release_install.mjs` after
-publishing. It downloads artifacts from GitHub Releases instead of reusing local
-build directories, catching missing assets, bad `latest.json` URLs, installer
-layout issues, and broken signed updater downloads. CI-only smoke hooks are
+The release workflow also runs `scripts/smoke_tauri_release_install.mjs` on
+macOS, Windows, and Linux after publishing. It downloads artifacts from GitHub
+Releases instead of reusing local build directories, catching missing assets,
+bad `latest.json` URLs, installer layout issues, and broken signed updater
+downloads. macOS additionally extracts consecutive updater archives, requires
+the stable production designated requirement, performs a true updater
+self-replacement, and validates the resulting app identity. CI-only smoke hooks are
 inactive unless these environment variables are set:
 
 The updater-hop smoke defaults to `ASCILINE_UPDATER_SMOKE_MIN_VERSION=0.9.0`.

@@ -34,6 +34,9 @@ baseline for the current ASCII VJ Remix feature set.
   `ASCILINE_SOURCE_APP` for release comparisons.
 - Advanced the desktop/package version to 0.9.6. MIDI remains experimental while
   physical UC-33e/mioXC commissioning is completed.
+- Normal Tauri development and debug-bundle commands now use `ASCII VJ Remix
+  Dev` with bundle identifier `com.asciline.remix.dev`. The production name and
+  `com.asciline.remix` identifier remain exclusive to release packaging.
 
 ### Fixed
 
@@ -60,11 +63,31 @@ baseline for the current ASCII VJ Remix feature set.
 - Renderer shader code, sampling, color processing, glyph math, output
   resolution, source FPS, and quality controls are unchanged.
 
+### Security
+
+- Removed local-runner synchronization into `/Applications/ASCII VJ Remix.app`.
+  The runner now accepts only the development bundle identifier and refuses
+  ad-hoc signing by default, preventing local rebuilds from replacing the
+  production app or contaminating its macOS privacy grants.
+- Development builds disable updater artifacts and production updater endpoints.
+- macOS release validation now requires the exact production bundle identifier,
+  Developer ID Team ID `PWT3Q52LZ2`, hardened runtime, and a stable team-based
+  designated requirement. Code-hash-only/ad-hoc identities fail closed.
+- Release validation extracts the actual `.app.tar.gz` updater payload and
+  verifies that its identity and designated requirement match the notarized
+  application bundle.
+
 ### Validation
 
 - Added a Rust unit test for versioned native source-upload decisions.
 - Added browser smoke coverage for bounded numeric-transition UI work.
 - Extended native output log analysis with source upload and upload-skip rates.
+- Added cross-platform unit coverage for macOS code-signing identity parsing and
+  rejection of ad-hoc, wrong-identifier, wrong-team, and changed-requirement
+  artifacts.
+- Added a macOS 26 published-release smoke job that compares consecutive
+  Developer ID requirements, performs an application-driven updater replacement,
+  and revalidates the updated bundle's identity.
 - Validated the optimized `.app` build plus static rendering, renderer math,
   audio reactivity, all 188 default MIDI bindings, Tauri policy, and 47 Rust
   tests on macOS Apple Silicon.

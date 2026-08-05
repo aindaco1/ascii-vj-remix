@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke as tauriInvoke, isTauri as tauriApiIsTauri } from '@tauri-apps/api/core';
+import { getName } from '@tauri-apps/api/app';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { availableMonitors } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -12,6 +13,7 @@ import {
 
 const OUTPUT_WINDOW_LABEL = 'output';
 const NATIVE_OUTPUT_CLOSED_EVENT = 'asciline-native-output-closed';
+const PRODUCTION_APP_NAME = 'ASCII VJ Remix';
 let outputDestroyedUnlisten = null;
 let nativeOutputClosedUnlisten = null;
 let outputBackend = null;
@@ -32,6 +34,15 @@ function isTauriRuntime() {
             globalThis.__TAURI__ ||
             globalThis.isTauri
         );
+    } catch {
+        return false;
+    }
+}
+
+async function isTauriUpdaterAvailable() {
+    if (!isTauriRuntime()) return false;
+    try {
+        return await getName() === PRODUCTION_APP_NAME;
     } catch {
         return false;
     }
@@ -567,6 +578,7 @@ export {
     getTauriMidiState,
     installTauriUpdate,
     isTauriRuntime,
+    isTauriUpdaterAvailable,
     listenTauriEvent,
     listTauriMidiPorts,
     listTauriOutputDisplays,

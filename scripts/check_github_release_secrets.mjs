@@ -125,7 +125,7 @@ try {
   }
 
   if (!args.requireNotarization && !anyAppleSecret) {
-    notes.push('Apple Developer ID notarization secrets are absent; macOS release workflow will use ad-hoc signing.');
+    notes.push('Apple Developer ID notarization secrets are absent; public macOS release CI will fail closed, while explicit local/default packaging may use ad-hoc signing.');
   } else if (!notarizationReady && anyAppleSecret) {
     issues.push('Apple Developer ID notarization secrets are present but not complete enough to enable notarized macOS releases');
   } else if (notarizationReady) {

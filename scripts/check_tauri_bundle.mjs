@@ -87,6 +87,11 @@ async function checkMacosBundle() {
   if (!(await fileExists(path.join(resources, 'icon.icns')))) issues.push('macOS bundle is missing Contents/Resources/icon.icns');
 
   const plist = await readFile(infoPlistPath, 'utf8').catch(() => '');
+  const identifierMatch = plist.match(/<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/);
+  const expectedBundleId = args.expectedBundleId || '';
+  if (expectedBundleId && identifierMatch?.[1] !== expectedBundleId) {
+    issues.push(`macOS bundle identifier ${identifierMatch?.[1] || '(missing)'} does not match ${expectedBundleId}`);
+  }
   const executableMatch = plist.match(/<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/);
   const executable = executableMatch?.[1] || '';
   if (!executable || !(await fileExists(path.join(macos, executable)))) {

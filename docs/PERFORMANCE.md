@@ -277,7 +277,7 @@ minimum preview FPS plus native output rates and the renderer backends actually
 visited. To compare an exact installed or archived application bundle:
 
 ```bash
-ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix.app" \
+ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix Dev.app" \
 ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
 npm run smoke:ui-perf
 ```

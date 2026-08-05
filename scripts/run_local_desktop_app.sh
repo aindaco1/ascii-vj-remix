@@ -2,19 +2,34 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_APP="${ASCILINE_SOURCE_APP:-/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app}"
+SOURCE_APP="${ASCILINE_SOURCE_APP:-/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app}"
 INSTALL_DIR="${ASCILINE_INSTALL_DIR:-$HOME/Applications}"
-INSTALL_APP="$INSTALL_DIR/ASCII VJ Remix.app"
-SYSTEM_APP="/Applications/ASCII VJ Remix.app"
-LEGACY_INSTALL_APP="$INSTALL_DIR/ASCILINE Remix.app"
-LEGACY_SYSTEM_APP="/Applications/ASCILINE Remix.app"
-SYNC_SYSTEM_APP="${ASCILINE_SYNC_SYSTEM_APP:-1}"
-APP_ID="com.asciline.remix"
-CODESIGN_IDENTITY="${ASCILINE_CODESIGN_IDENTITY:--}"
+INSTALL_APP="$INSTALL_DIR/ASCII VJ Remix Dev.app"
+APP_ID="com.asciline.remix.dev"
+PRODUCTION_APP="/Applications/ASCII VJ Remix.app"
+LOCAL_IDENTITY="${ASCILINE_LOCAL_CODESIGN_IDENTITY:-ASCII VJ Remix Local Code Signing}"
+CODESIGN_IDENTITY="${ASCILINE_CODESIGN_IDENTITY:-$LOCAL_IDENTITY}"
+
+if [[ "$INSTALL_APP" == "$PRODUCTION_APP" || "$(basename "$INSTALL_APP")" == "ASCII VJ Remix.app" ]]; then
+  echo "ASCII VJ Remix local run: refusing to target the production app bundle." >&2
+  exit 1
+fi
+
+if [[ "$CODESIGN_IDENTITY" == "-" && "${ASCILINE_ALLOW_ADHOC_LOCAL:-0}" != "1" ]]; then
+  echo "ASCII VJ Remix local run: ad-hoc signing changes identity on every rebuild." >&2
+  echo "Run npm run desktop:codesign:local once, or set ASCILINE_ALLOW_ADHOC_LOCAL=1 for a permission-disposable build." >&2
+  exit 1
+fi
+
+if [[ "$CODESIGN_IDENTITY" != "-" ]] && ! /usr/bin/security find-identity -v -p codesigning | grep -F "\"$CODESIGN_IDENTITY\"" >/dev/null; then
+  echo "ASCII VJ Remix local run: code-signing identity not found: $CODESIGN_IDENTITY" >&2
+  echo "Run npm run desktop:codesign:local once, then retry." >&2
+  exit 1
+fi
 
 if [[ "${1:-}" == "--build" ]]; then
   set +e
-  (cd "$ROOT_DIR" && npm run tauri -- build --bundles app)
+  (cd "$ROOT_DIR" && npm run tauri:build:dev -- --bundles app)
   build_status=$?
   set -e
   if [[ "$build_status" -ne 0 && ! -d "$SOURCE_APP" ]]; then
@@ -26,12 +41,18 @@ if [[ "${1:-}" == "--build" ]]; then
 fi
 
 if [[ ! -d "$SOURCE_APP" ]]; then
-  echo "ASCILINE local run: missing built app at $SOURCE_APP" >&2
-  echo "Run: npm run tauri -- build --bundles app" >&2
+  echo "ASCII VJ Remix local run: missing development app at $SOURCE_APP" >&2
+  echo "Run: npm run tauri:build:dev -- --bundles app" >&2
   exit 1
 fi
 
-pkill -f '/(ASCII VJ Remix|ASCILINE Remix).app/Contents/MacOS/(ascii-vj-remix|asciline-remix)|/debug/(ascii-vj-remix|asciline-remix)' 2>/dev/null || true
+SOURCE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ "$SOURCE_APP_ID" != "$APP_ID" ]]; then
+  echo "ASCII VJ Remix local run: refusing source bundle id '$SOURCE_APP_ID'; expected '$APP_ID'." >&2
+  exit 1
+fi
+
+pkill -f '/ASCII VJ Remix Dev.app/Contents/MacOS/ascii-vj-remix|/debug/ascii-vj-remix' 2>/dev/null || true
 
 ENTITLEMENTS="$ROOT_DIR/src-tauri/Entitlements.plist"
 
@@ -56,21 +77,17 @@ install_app() {
 
 install_app "$INSTALL_APP"
 
-if [[ "$LEGACY_INSTALL_APP" != "$INSTALL_APP" && -d "$LEGACY_INSTALL_APP" ]]; then
-  rm -rf "$LEGACY_INSTALL_APP"
+INSTALLED_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INSTALL_APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ "$INSTALLED_APP_ID" != "$APP_ID" ]]; then
+  echo "ASCII VJ Remix local run: installed bundle id changed unexpectedly: $INSTALLED_APP_ID" >&2
+  exit 1
 fi
 
-if [[ "$SYNC_SYSTEM_APP" == "1" && "$INSTALL_APP" != "$SYSTEM_APP" && ( -d "$SYSTEM_APP" || -d "$LEGACY_SYSTEM_APP" ) ]]; then
-  if [[ -w "/Applications" && ( ! -d "$SYSTEM_APP" || -w "$SYSTEM_APP" ) ]]; then
-    install_app "$SYSTEM_APP"
-    if [[ "$LEGACY_SYSTEM_APP" != "$SYSTEM_APP" && -d "$LEGACY_SYSTEM_APP" ]]; then
-      rm -rf "$LEGACY_SYSTEM_APP"
-    fi
-    echo "ASCILINE local run: refreshed $SYSTEM_APP"
-  else
-    echo "ASCILINE local run: $SYSTEM_APP exists but is not writable; it may be stale." >&2
-    echo "Set ASCILINE_INSTALL_DIR=/Applications or remove the old copy if Finder opens it." >&2
-  fi
+/usr/bin/codesign --verify --deep --strict --verbose=2 "$INSTALL_APP"
+DESIGNATED_REQUIREMENT="$(/usr/bin/codesign -dr - "$INSTALL_APP" 2>&1)"
+if [[ "$CODESIGN_IDENTITY" != "-" && "$DESIGNATED_REQUIREMENT" == *"cdhash H\""* ]]; then
+  echo "ASCII VJ Remix local run: stable signing produced a code-hash-only identity; refusing to launch." >&2
+  exit 1
 fi
 
 if [[ "${ASCILINE_RESET_TCC:-0}" == "1" ]]; then
@@ -78,8 +95,9 @@ if [[ "${ASCILINE_RESET_TCC:-0}" == "1" ]]; then
   /usr/bin/tccutil reset Microphone "$APP_ID" || true
 fi
 
-echo "ASCILINE local run: $INSTALL_APP"
-echo "ASCILINE local run: codesign identity $CODESIGN_IDENTITY"
+echo "ASCII VJ Remix local run: $INSTALL_APP"
+echo "ASCII VJ Remix local run: bundle id $APP_ID"
+echo "ASCII VJ Remix local run: codesign identity $CODESIGN_IDENTITY"
 if [[ "${ASCILINE_FOREGROUND:-0}" == "1" ]]; then
   exec "$INSTALL_APP/Contents/MacOS/ascii-vj-remix"
 fi

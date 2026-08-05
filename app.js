@@ -43,6 +43,7 @@ import {
     getTauriCrashReportState,
     installTauriUpdate,
     isTauriRuntime,
+    isTauriUpdaterAvailable,
     listenTauriEvent,
     listTauriMidiPorts,
     listTauriOutputDisplays,
@@ -5196,6 +5197,7 @@ class RendererLabApp {
         this.desktopUpdate = null;
         this.desktopUpdateBusy = false;
         this.desktopUpdateStatus = '';
+        this.desktopUpdaterAvailable = false;
         this.crashReportState = null;
         this.crashReportBusy = false;
         this.warmMediaElements = [];
@@ -5203,6 +5205,7 @@ class RendererLabApp {
 
     async init() {
         this._startWebViewKeepalive();
+        this.desktopUpdaterAvailable = await isTauriUpdaterAvailable();
         await this._initCrashReporter();
         await this._detectBackends();
         await this._restoreCustomSource();
@@ -7924,7 +7927,7 @@ button:hover{background:#202a35}
     _syncDesktopUpdateUi() {
         if (!els.checkUpdate) return;
 
-        const available = isTauriRuntime();
+        const available = this.desktopUpdaterAvailable;
         els.checkUpdate.hidden = !available;
         if (els.updateStatus) {
             els.updateStatus.hidden = !available || !this.desktopUpdateStatus;
@@ -7942,7 +7945,7 @@ button:hover{background:#202a35}
     }
 
     async _checkOrInstallDesktopUpdate() {
-        if (!isTauriRuntime() || this.desktopUpdateBusy) return;
+        if (!this.desktopUpdaterAvailable || this.desktopUpdateBusy) return;
         if (this.desktopUpdate) {
             await this._installDesktopUpdate();
             return;

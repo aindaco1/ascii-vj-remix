@@ -23,6 +23,8 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
   repository.
 - Preserve the bundle identifier `com.asciline.remix` unless there is a planned
   migration for existing macOS privacy grants.
+- Keep local development on `com.asciline.remix.dev`; never sign or install an
+  ad-hoc development build under the production identifier.
 
 ## Security Architecture
 
@@ -60,6 +62,12 @@ The current release line includes these security hardening rules:
   incomplete. Windows artifacts are published as unsigned previews until
   SignPath Foundation, Azure Artifact Signing, or another signing backend is
   proven.
+- Public macOS artifacts must retain Team ID `PWT3Q52LZ2` and the stable
+  identifier/team designated requirement. CI validates both the built app and
+  the extracted updater archive and rejects ad-hoc or code-hash-only identity.
+- Local launch tooling requires the separate `ASCII VJ Remix Dev` identity and
+  a stable local signing certificate. It never synchronizes into the production
+  application path.
 - GitHub Actions macOS jobs are pinned to `macos-26` instead of
   `macos-latest`. The native `wgpu`/`apple-metal` stack needs the macOS 26
   Metal SDK, and the moving `macos-latest` alias can select an older SDK.
@@ -187,6 +195,9 @@ Current macOS bundle identifier:
 ```text
 com.asciline.remix
 ```
+
+Development builds use `com.asciline.remix.dev`. Reset development grants with
+that identifier; do not use a production-named ad-hoc bundle for media testing.
 
 Permission reset helpers:
 
@@ -340,8 +351,9 @@ npm run check:ffmpeg-resources
 
 ## Known Risks and Deferred Hardening
 
-- macOS privacy prompts can be sensitive to app path, bundle identifier, and
-  signing identity.
+- macOS privacy prompts remain sensitive to app path, bundle identifier, and
+  signing identity. Production and development identities are isolated, but a
+  deliberately ad-hoc development build still receives build-specific grants.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
 - Windows 0.9.5 artifacts are unsigned previews and may trigger Unknown

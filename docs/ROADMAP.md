@@ -39,6 +39,19 @@ decisions.
 - Retain direct UC-33e USB and physical Windows/Linux validation as follow-on
   work.
 
+### macOS Permission Identity Safeguards
+
+- Keep public releases on `ASCII VJ Remix` / `com.asciline.remix` and normal
+  development on `ASCII VJ Remix Dev` / `com.asciline.remix.dev`.
+- Require a stable local signing identity before launching a development bundle
+  that will request Camera, Microphone, or System Audio access.
+- Prevent local tooling from copying or re-signing the production app.
+- Require public updater archives to retain Developer ID Team ID `PWT3Q52LZ2`,
+  hardened runtime, and the same team-based designated requirement across
+  releases.
+- Run an application-driven macOS updater replacement after publication and
+  revalidate the resulting app identity.
+
 ## Product Direction
 
 ASCII VJ Remix is a local-first renderer lab for live ASCII and cell-based
@@ -305,8 +318,9 @@ within the existing visual/audio-only security boundary.
 - Output window has minimal listen/close/fullscreen permissions.
 - macOS camera, microphone, screen capture, and audio capture usage strings are
   present.
-- macOS local builds are ad-hoc self-signed by default; public release CI
-  requires Developer ID signing and notarization.
+- Normal macOS development builds use a separate `.dev` bundle identity and the
+  local launcher requires stable signing. Public release CI requires Developer
+  ID signing and notarization under the production identity.
 - Windows 0.9.3 release CI publishes unsigned preview artifacts. Signed Windows
   public distribution is deferred until SignPath Foundation, Azure Artifact
   Signing, or another signing backend is proven.
@@ -466,7 +480,14 @@ Move from local/self-signed packages to a smoother public distribution path.
   notarization state before publishing.
 - Windows 0.9.3 release CI publishes unsigned preview artifacts instead of
   blocking on paid Azure Artifact Signing.
-- Local development keeps ad-hoc/default signing paths.
+- Local development keeps an explicitly opted-in, permission-disposable ad-hoc
+  fallback; normal permission testing requires stable signing.
+- Normal local commands isolate the dev product/bundle identity, disable the
+  production updater, and require stable signing before permission testing.
+- macOS release gates verify the exact production Team ID and designated
+  requirement in both the app and extracted updater archive.
+- Published-release CI performs a real macOS updater replacement from the
+  preceding eligible release and revalidates the resulting identity.
 - Real clean-machine Windows install behavior remains a manual release check for
   preview artifacts and a required validation point once Windows signing is
   enabled.
@@ -482,7 +503,8 @@ Scope:
   - staple notarization tickets to shipped artifacts.
   - validate final artifacts with `codesign --verify`, entitlement inspection,
     `spctl -a -vv`, and a first-open smoke test on a clean macOS machine.
-  - keep ad-hoc signing as the local development fallback.
+  - keep ad-hoc signing only as an explicit permission-disposable development
+    fallback.
 - Windows SmartScreen mitigation:
   - sign Windows installers and executables with an Authenticode code-signing
     certificate.
@@ -524,7 +546,8 @@ Scope:
     fallback until SignPath acceptance and release CI are proven.
 - Windows installer smoke tests on real machines beyond CI.
 - Linux AppImage/deb validation across common distributions.
-- End-to-end updater hop tests from an older installed release to a newer one.
+- Manual clean-machine confirmation that TCC grants remain present across the
+  automated, identity-stable updater hop.
 - Fixed WebView2 runtime strategy if the Windows app must install without
   online prerequisites.
 
@@ -569,8 +592,9 @@ Scope:
 - Linux WebGPU support may remain inconsistent for a while.
 - Multi-camera capture depends on OS, camera firmware, USB topology, and browser
   behavior.
-- macOS privacy prompts can be sensitive to bundle identifier and signing
-  identity.
+- macOS privacy prompts remain sensitive to bundle identifier and signing
+  identity; production/dev isolation prevents normal local builds from
+  contaminating public grants.
 - FFmpeg licensing must remain an explicit release gate.
 - Native media decode and GPU interop differ significantly by platform.
 - High-rate MIDI events can still cause renderer churn when users map many

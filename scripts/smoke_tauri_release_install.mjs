@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 
-import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import {
+  assertProductionMacosIdentity,
+  assertSameDesignatedRequirement,
+  extractMacosUpdaterArchive,
+  inspectMacosApp
+} from './lib/macos_app_identity.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const releaseTag = args.releaseTag || process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || '';
@@ -39,12 +45,56 @@ async function main() {
   });
   const previous = await resolvePreviousReleaseContext(current);
 
-  if (process.platform === 'win32') {
+  if (process.platform === 'darwin') {
+    await smokeMacos(current, previous);
+  } else if (process.platform === 'win32') {
     await smokeWindows(current, previous);
   } else if (process.platform === 'linux') {
     await smokeLinux(current, previous);
   } else {
-    throw new Error(`release install smoke only supports Windows and Linux, got ${process.platform}`);
+    throw new Error(`release install smoke only supports macOS, Windows, and Linux, got ${process.platform}`);
+  }
+}
+
+async function smokeMacos(current, previous) {
+  await assertMacosAssets(current);
+  const currentArchive = await findOne(current.assetsDir, /\.app\.tar\.gz$/i, 'macOS updater archive');
+  const currentExtracted = await extractMacosUpdaterArchive(currentArchive);
+  let previousExtracted = null;
+
+  try {
+    const currentIdentity = inspectMacosApp(currentExtracted.appPath);
+    assertProductionMacosIdentity(currentIdentity);
+    if (currentIdentity.version !== current.version) {
+      throw new Error(`macOS updater archive version ${currentIdentity.version} does not match ${current.version}`);
+    }
+
+    if (!previous) {
+      console.log(`macOS release identity smoke passed for ${current.version}: ${currentExtracted.appPath}`);
+      return;
+    }
+
+    await assertMacosAssets(previous);
+    const previousArchive = await findOne(previous.assetsDir, /\.app\.tar\.gz$/i, 'previous macOS updater archive');
+    previousExtracted = await extractMacosUpdaterArchive(previousArchive);
+    const previousIdentity = inspectMacosApp(previousExtracted.appPath);
+    assertProductionMacosIdentity(previousIdentity);
+    assertSameDesignatedRequirement(previousIdentity, currentIdentity);
+
+    const previousExe = macosExecutable(previousExtracted.appPath);
+    await runUpdaterInstallSmoke(previousExe, [], current, previous);
+    await waitForMacosBundleVersion(previousExtracted.appPath, current.version);
+
+    const updatedIdentity = inspectMacosApp(previousExtracted.appPath);
+    assertProductionMacosIdentity(updatedIdentity);
+    assertSameDesignatedRequirement(currentIdentity, updatedIdentity);
+
+    console.log(`macOS updater identity hop passed: ${previous.version} -> ${current.version}`);
+  } finally {
+    await rm(currentExtracted.extractionRoot, { recursive: true, force: true });
+    if (previousExtracted) {
+      await rm(previousExtracted.extractionRoot, { recursive: true, force: true });
+    }
   }
 }
 
@@ -202,11 +252,32 @@ async function runUpdaterInstallSmoke(exe, prefix, current, previous) {
     smokeMode: 'install',
     forceUpdate: false,
     forcedFromVersion: previous.version,
-    silentInstall: true
+    silentInstall: process.platform === 'win32'
   });
   if (!value.install_started) {
     throw new Error(`updater install smoke did not start installation: ${JSON.stringify(value)}`);
   }
+}
+
+async function waitForMacosBundleVersion(appPath, expectedVersion) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  const infoPlist = path.join(appPath, 'Contents', 'Info.plist');
+  while (Date.now() < deadline) {
+    try {
+      const foundVersion = run('/usr/libexec/PlistBuddy', [
+        '-c',
+        'Print :CFBundleShortVersionString',
+        infoPlist
+      ]).stdout.trim();
+      if (foundVersion === expectedVersion) return;
+      lastError = new Error(`found version ${foundVersion || '(missing)'}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(1000);
+  }
+  throw new Error(`macOS updater did not replace the app with ${expectedVersion}: ${lastError?.message || 'timed out'}`);
 }
 
 async function runUpdaterSmoke(exe, prefix, options) {
@@ -278,6 +349,16 @@ async function assertLinuxAssets(context) {
   await findOne(context.assetsDir, /\.AppImage$/i, 'Linux AppImage updater package');
   assertUpdaterEntry(context, 'linux-x86_64-deb', /\.deb$/i);
   assertUpdaterEntry(context, 'linux-x86_64', /\.AppImage$/i);
+}
+
+async function assertMacosAssets(context) {
+  await findOne(context.assetsDir, /\.app\.tar\.gz$/i, 'macOS updater archive');
+  const platform = process.arch === 'arm64' ? 'darwin-aarch64' : 'darwin-x86_64';
+  assertUpdaterEntry(context, platform, /\.app\.tar\.gz$/i);
+}
+
+function macosExecutable(appPath) {
+  return path.join(appPath, 'Contents', 'MacOS', 'ascii-vj-remix');
 }
 
 function linuxAppPrefix() {

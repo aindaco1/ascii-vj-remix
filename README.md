@@ -170,6 +170,9 @@ verified manually.
 - Public release CI requires Developer ID notarized macOS artifacts. Windows
   artifacts are published as unsigned previews until SignPath Foundation,
   Azure Artifact Signing, or another signing backend is proven.
+- Normal development commands use the visibly separate `ASCII VJ Remix Dev`
+  app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
+  replace or inherit privacy grants from the production app.
 - Intentional online paths are limited to the updater check/download flow and
   production-only reviewed/sanitized crash report submission.
 - Crash report submission goes through the Rust desktop layer to the
@@ -342,6 +345,10 @@ ASCII VJ Remix currently includes these macOS entitlements and usage strings:
 - Microphone/audio input access for audio-reactive visuals.
 - Screen/audio capture usage descriptions for display or system audio capture.
 
+Public releases use `com.asciline.remix`. Local development builds use
+`com.asciline.remix.dev` and appear as `ASCII VJ Remix Dev`, so rebuilding the
+development app cannot disturb the public app's privacy grants.
+
 ### Grant Permissions in System Settings
 
 1. Open System Settings.
@@ -374,6 +381,12 @@ be ignored.
 Permissions are tied to the bundle identifier and app signature. If you used an
 older build named `ASCILINE Remix.app`, grant permissions again for
 `ASCII VJ Remix.app`.
+
+If permissions are requested after every rebuild, make sure there is no
+ad-hoc test build named `~/Applications/ASCII VJ Remix.app`. Keep the public app
+at `/Applications/ASCII VJ Remix.app`; current development tooling installs only
+`~/Applications/ASCII VJ Remix Dev.app` and requires a stable local signing
+identity before launching a permission-sensitive build.
 
 ### Verify Entitlements on macOS
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const configPath = path.join(root, 'src-tauri', 'tauri.conf.json');
+const devConfigPath = path.join(root, 'src-tauri', 'tauri.dev.conf.json');
 const notarizedConfigPath = path.join(root, 'src-tauri', 'tauri.notarized.conf.json');
 const windowsSignedConfigPath = path.join(root, 'src-tauri', 'tauri.windows-signed.conf.json');
 const capabilitiesDir = path.join(root, 'src-tauri', 'capabilities');
@@ -11,6 +12,8 @@ const infoPlistPath = path.join(root, 'src-tauri', 'Info.plist');
 const entitlementsPath = path.join(root, 'src-tauri', 'Entitlements.plist');
 const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-desktop.yml');
 const desktopWorkflowPath = path.join(root, '.github', 'workflows', 'desktop.yml');
+const packagePath = path.join(root, 'package.json');
+const localRunnerPath = path.join(root, 'scripts', 'run_local_desktop_app.sh');
 const tauriRoot = path.join(root, 'src-tauri');
 const issues = [];
 
@@ -42,10 +45,56 @@ function checkNoOnlineUrls(label, value, allowedPrefixes = allowedRemoteDevPrefi
 }
 
 const config = JSON.parse(await readFile(configPath, 'utf8'));
+const devConfig = JSON.parse(await readFile(devConfigPath, 'utf8'));
 const notarizedConfig = JSON.parse(await readFile(notarizedConfigPath, 'utf8'));
 const windowsSignedConfig = JSON.parse(await readFile(windowsSignedConfigPath, 'utf8'));
+const packageConfig = JSON.parse(await readFile(packagePath, 'utf8'));
+const localRunner = await readFile(localRunnerPath, 'utf8');
 const security = config?.app?.security || {};
 const updaterEndpoint = 'https://github.com/aindaco1/ascii-vj-remix/releases/latest/download/latest.json';
+
+if (config?.identifier !== 'com.asciline.remix') {
+  issues.push('production Tauri identifier must remain com.asciline.remix');
+}
+
+if (devConfig?.productName !== 'ASCII VJ Remix Dev') {
+  issues.push('tauri.dev.conf.json productName must be ASCII VJ Remix Dev');
+}
+if (devConfig?.identifier !== 'com.asciline.remix.dev') {
+  issues.push('tauri.dev.conf.json identifier must be com.asciline.remix.dev');
+}
+if (devConfig?.bundle?.createUpdaterArtifacts !== false) {
+  issues.push('tauri.dev.conf.json must disable updater artifact creation');
+}
+if (!Array.isArray(devConfig?.plugins?.updater?.endpoints) || devConfig.plugins.updater.endpoints.length !== 0) {
+  issues.push('tauri.dev.conf.json must disable production updater endpoints');
+}
+
+for (const scriptName of ['tauri:dev', 'tauri:build:dev']) {
+  if (!packageConfig?.scripts?.[scriptName]?.includes('src-tauri/tauri.dev.conf.json')) {
+    issues.push(`${scriptName} must use src-tauri/tauri.dev.conf.json`);
+  }
+}
+for (const scriptName of ['check:desktop', 'bundle:debug']) {
+  if (!packageConfig?.scripts?.[scriptName]?.includes('tauri:build:dev')) {
+    issues.push(`${scriptName} must build with the isolated development identity`);
+  }
+}
+for (const required of [
+  'ASCII VJ Remix Dev.app',
+  'APP_ID="com.asciline.remix.dev"',
+  'ASCII VJ Remix Local Code Signing',
+  'ASCILINE_ALLOW_ADHOC_LOCAL'
+]) {
+  if (!localRunner.includes(required)) {
+    issues.push(`local desktop runner is missing safeguard: ${required}`);
+  }
+}
+for (const forbidden of ['INSTALL_APP="$INSTALL_DIR/ASCII VJ Remix.app"', 'install_app "$SYSTEM_APP"', 'ASCILINE_SYNC_SYSTEM_APP']) {
+  if (localRunner.includes(forbidden)) {
+    issues.push(`local desktop runner must not contain production overwrite path: ${forbidden}`);
+  }
+}
 
 if (!security.csp || typeof security.csp !== 'string') {
   issues.push('app.security.csp must be a non-empty production CSP string');
@@ -334,6 +383,14 @@ const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJob
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
   ? releaseWorkflow.slice(bundleJobStart, bundleStrategyStart)
   : '';
+const installSmokeStart = releaseWorkflow.indexOf('\n  install-and-updater-smoke:');
+const installSmokeJob = installSmokeStart >= 0 ? releaseWorkflow.slice(installSmokeStart) : '';
+if (!installSmokeJob.includes('macos-26')) {
+  issues.push('release install/updater smoke must include macos-26');
+}
+if (!installSmokeJob.includes('smoke_tauri_release_install.mjs')) {
+  issues.push('release install/updater smoke must run smoke_tauri_release_install.mjs');
+}
 for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'AZURE_', 'KEYCHAIN_PASSWORD', 'TAURI_SIGNING_PRIVATE_KEY']) {
   const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
   if (pattern.test(bundleJobHeader)) {

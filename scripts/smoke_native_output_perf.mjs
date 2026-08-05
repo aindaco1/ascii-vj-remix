@@ -11,7 +11,7 @@ const tempDir = mkdtempSync(path.join(tmpdir(), 'asciline-native-output-smoke-')
 const reportPath = path.join(tempDir, 'report.json');
 const logPath = path.join(tmpdir(), 'asciline-native-output.log');
 const defaultReleaseApp =
-  '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
+  '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app';
 const sourceApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 
 function run(command, args, options = {}) {
@@ -28,7 +28,7 @@ function run(command, args, options = {}) {
 
 if (!existsSync(sourceApp)) {
   console.error(`native-output-smoke: missing optimized app: ${sourceApp}`);
-  console.error('Build one first, for example: npm run tauri -- build --bundles app');
+  console.error('Build one first, for example: npm run tauri:build:dev -- --bundles app');
   process.exit(1);
 }
 

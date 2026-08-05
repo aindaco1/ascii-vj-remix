@@ -16,6 +16,7 @@ npm run smoke:static             # Static UI/renderer smoke harness
 npm run check:tauri-policy       # Production CSP and local-only runtime policy
 npm run test:output-display      # Secondary-display placement simulation
 npm run test:updater-manifest    # Tauri latest.json/updater manifest tests
+npm run test:macos-identity      # macOS bundle/team/designated-requirement tests
 npm run test:macos-secret-args   # macOS notarization secret argument safety
 npm run test:ffmpeg-policy       # FFmpeg policy checks
 npm run check:ffmpeg-resources   # FFmpeg sidecar resource metadata checks
@@ -54,6 +55,7 @@ git diff --check
 | Tauri policy | `npm run check:tauri-policy` |
 | Output display logic | `npm run test:output-display` |
 | Updater manifests | `npm run test:updater-manifest` |
+| macOS app identity | `npm run test:macos-identity`, release artifact inspection on macOS |
 | macOS secret handling | `npm run test:macos-secret-args` |
 | FFmpeg policy/resources | `npm run test:ffmpeg-policy`, `npm run check:ffmpeg-resources`, `npm run check:ffmpeg-release` |
 | Media frame prep/decode | `npm run test:frame-prep`, `npm run test:decode-resize`, `npm run check:media` |
@@ -184,6 +186,12 @@ layout, bundled assets, signed updater packages, and `latest.json` behavior.
 Updater-hop smoke uses `0.9.0` as the default minimum previous version because
 older `0.1.x` releases were signed with a different updater key.
 
+On macOS, release smoke extracts the current and previous `.app.tar.gz`
+payloads, requires `com.asciline.remix`, Team ID `PWT3Q52LZ2`, hardened runtime,
+Gatekeeper acceptance, and the exact same designated requirement, then runs the
+previous app through the updater and revalidates the replaced bundle. The
+interactive TCC approval itself remains a manual check.
+
 ## Manual Smoke Checklist
 
 Use this after user-facing renderer, source, audio, or output changes:
@@ -269,11 +277,12 @@ Release CI should:
   releases must validate Authenticode signer and timestamp state before
   publishing Windows artifacts.
 - run install smoke checks after publishing.
+- run macOS updater identity/replacement smoke on `macos-26`.
 
 Future release hardening should add:
 
 - real Windows and Linux install smoke tests on physical or VM machines.
-- end-to-end updater hop from an older installed app to a newer release.
+- a clean-machine/manual TCC grant-retention check across a public update.
 - Windows SmartScreen reputation checks on clean machines.
 
 ## Known Gaps

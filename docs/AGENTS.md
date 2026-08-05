@@ -229,7 +229,7 @@ npm run test:rust
 Optimized macOS app build:
 
 ```bash
-TAURI_SIGNING_PRIVATE_KEY="$(cat /private/tmp/ascii-vj-remix-updater.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(cat /private/tmp/ascii-vj-remix-updater.password)" npm run tauri -- build --bundles app
+npm run tauri:build:dev -- --bundles app
 ```
 
 Release packaging:
@@ -243,8 +243,9 @@ npm run bundle:release
 Expected local release-build note:
 
 - Public 0.9.3 release CI requires Apple Developer ID notarization for macOS and
-  publishes Windows as an unsigned preview. Local development builds keep the
-  ad-hoc macOS signing fallback.
+  publishes Windows as an unsigned preview. Normal local builds use
+  `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
+  stable identity before permission testing.
 - If `TAURI_SIGNING_PRIVATE_KEY` or `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is
   absent while updater artifacts are enabled, release bundling will fail at
   updater signing. Use the local key/password above for local validation, and
@@ -253,7 +254,10 @@ Expected local release-build note:
 ## Tauri and Packaging Notes
 
 - Tauri v2 is the desktop shell.
-- `src-tauri/tauri.conf.json` is the default local/ad-hoc signed config.
+- `src-tauri/tauri.conf.json` is the cross-platform production base config; its
+  macOS ad-hoc identity is used only by explicit non-notarized packaging paths.
+- `src-tauri/tauri.dev.conf.json` isolates normal local commands from the
+  production name, bundle identifier, and updater.
 - `src-tauri/tauri.notarized.conf.json` is for Developer ID notarized macOS
   release builds.
 - `src-tauri/tauri.windows-signed.conf.json` is retained for future signed
