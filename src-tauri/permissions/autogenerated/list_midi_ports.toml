@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-midi-ports"
+description = "Enables the list_midi_ports command without any pre-configured scope."
+commands.allow = ["list_midi_ports"]
+
+[[permission]]
+identifier = "deny-list-midi-ports"
+description = "Denies the list_midi_ports command without any pre-configured scope."
+commands.deny = ["list_midi_ports"]

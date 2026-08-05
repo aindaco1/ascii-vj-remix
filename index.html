@@ -163,6 +163,48 @@
                     </div>
                 </section>
 
+                <section id="midi-panel" class="panel midi-panel" hidden>
+                    <div class="panel-heading">
+                        <h2>MIDI Control · Experimental</h2>
+                        <button id="midi-connect" type="button" aria-pressed="false">Connect</button>
+                    </div>
+                    <div class="midi-body">
+                        <div class="midi-device-grid">
+                            <label class="field compact">
+                                <span>Input</span>
+                                <select id="midi-input"></select>
+                            </label>
+                            <label class="field compact">
+                                <span>Output</span>
+                                <select id="midi-output"></select>
+                            </label>
+                        </div>
+                        <div class="midi-status-grid" aria-live="polite">
+                            <span id="midi-status">Disconnected</span>
+                            <span id="midi-page">Page —</span>
+                            <span id="midi-last-message">No MIDI messages</span>
+                        </div>
+                        <div class="midi-option-grid">
+                            <label><input id="midi-soft-takeover" type="checkbox" checked> Soft takeover</label>
+                            <label><input id="midi-ensure-profile" type="checkbox"> Ensure profile on connection</label>
+                        </div>
+                        <div class="midi-sysex-actions">
+                            <button id="midi-capture-profile" type="button">Capture Profile</button>
+                            <button id="midi-install-profile" type="button">Install / Restore</button>
+                            <button id="midi-verify-profile" type="button">Verify</button>
+                        </div>
+                        <div class="midi-learn-grid">
+                            <label class="field compact">
+                                <span>Learn</span>
+                                <select id="midi-learn-target"></select>
+                            </label>
+                            <button id="midi-learn" type="button" aria-pressed="false">Arm Learn</button>
+                            <button id="midi-reset-mappings" type="button">Reset Map</button>
+                        </div>
+                        <div id="midi-mapping-list" class="midi-mapping-list" aria-label="Custom MIDI mappings"></div>
+                    </div>
+                </section>
+
                 <form id="controls" class="controls"></form>
             </aside>
         </main>
@@ -191,7 +233,7 @@
     </div>
 
     <script type="module" src="codec.js?v=20260617-live-renderer-crossfade"></script>
-    <script type="module" src="app.js?v=20260620-native-system-audio"></script>
+    <script type="module" src="app.js?v=20260711-midi-control"></script>
 </body>
 
 </html>

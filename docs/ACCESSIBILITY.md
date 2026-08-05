@@ -50,12 +50,13 @@ The highest-risk accessibility surfaces are:
 2. Camera device list and multi-camera selection.
 3. Preset buttons, user preset actions, and import/export overflow menu.
 4. Sliders and numeric controls across Grid, Color, Sampling, Audio Reactivity,
-   and future MIDI.
+   and MIDI.
 5. WTF mode active/inactive state.
 6. Audio Reactivity source/device/preset controls and permission states.
 7. Pop Out and fullscreen/output-display controls.
 8. Stats Overlay content.
 9. Permission recovery and error messaging.
+10. MIDI device status, soft-takeover state, SysEx actions, and MIDI Learn.
 
 ## UI Control Rules
 
@@ -89,11 +90,16 @@ Minimum keyboard behavior:
 - Opening and closing Pop Out does not steal focus permanently from the main
   controls.
 
-For future MIDI Learn and mapping dialogs:
+For MIDI Learn and mapping controls:
 
 - mappings must be creatable without pointer input.
 - waiting-for-input states must be announced.
 - cancel/clear/reset actions must be keyboard reachable.
+- connection, active-page, last-message, capture, restore, and verification
+  statuses must be exposed through readable live status text.
+- Install/Restore must identify that all 33 UC-33e memories are overwritten.
+- physical controller use must not be required to disconnect MIDI, cancel Learn,
+  remove an override, or reset the built-in map.
 
 ## Motion, Flashing, and Visual Intensity
 
@@ -167,6 +173,8 @@ Before shipping meaningful UI changes:
 - Confirm Pop Out can be opened and closed without losing main-window control.
 - Confirm hover text remains readable on unselected Source entries.
 - Confirm Stats Overlay does not block essential controls.
+- Confirm the MIDI panel is keyboard reachable in the desktop app, Learn exposes
+  pressed state, and changing device/profile options does not trap focus.
 
 ## Accepted Limits
 

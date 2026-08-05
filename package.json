@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.3",
+  "version": "0.9.5",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -16,8 +16,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 8010",
     "check": "npm run check:offline",
     "check:offline": "npm run build && node scripts/check_offline_bundle.mjs",
-    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:crash-relay && npm run test:output-display && npm run test:updater-manifest && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri -- build --debug --no-bundle",
-    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:crash-relay && npm run test:output-display && npm run test:updater-manifest && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run test:ffmpeg-source-build && npm run check:ffmpeg-release && npm run test:rust",
+    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:updater-manifest && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri -- build --debug --no-bundle",
+    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:updater-manifest && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run test:ffmpeg-source-build && npm run check:ffmpeg-release && npm run test:rust",
     "check:bundle": "node scripts/check_tauri_bundle.mjs",
     "check:bundle:debug": "node scripts/check_tauri_bundle.mjs --profile debug",
     "check:bundle:release": "node scripts/check_tauri_bundle.mjs --profile release",
@@ -48,6 +48,7 @@
     "media:decode-preview": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example decode_preview --",
     "media:native-session-preview": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example native_session_preview --",
     "media:pipeline-preview": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example pipeline_preview --",
+    "midi:probe": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example midi_probe --",
     "smoke:static": "npm run build && node scripts/smoke_static_pages.mjs",
     "smoke:native-output": "node scripts/smoke_native_output_perf.mjs",
     "smoke:ui-perf": "node scripts/smoke_ui_perf.mjs",
@@ -61,6 +62,7 @@
     "test:macos-secret-args": "node scripts/test_macos_notarization_secret_args.mjs",
     "test:windows-secret-args": "node scripts/test_windows_artifact_signing_secret_args.mjs",
     "test:audio-reactive": "node scripts/test_audio_reactive.mjs",
+    "test:midi": "node scripts/test_midi_mapping.mjs",
     "test:native-output-log": "node scripts/analyze_native_output_log.mjs",
     "test:render-math": "node scripts/test_render_math.mjs",
     "test:crash-relay": "npm --prefix crash-relay test",

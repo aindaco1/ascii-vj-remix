@@ -35,6 +35,14 @@ fn main() {
             "start_system_audio_capture",
             "read_system_audio_features",
             "stop_system_audio_capture",
+            "list_midi_ports",
+            "connect_midi",
+            "disconnect_midi",
+            "get_midi_state",
+            "read_midi_events",
+            "start_midi_sysex_capture",
+            "finish_midi_sysex_capture",
+            "send_midi_sysex",
         ]),
     ))
     .expect("failed to run Tauri build script")

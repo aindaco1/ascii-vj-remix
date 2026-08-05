@@ -919,6 +919,7 @@ mod tests {
             solid_mode: false,
             glyph_mode: true,
             charset: "point-click".to_string(),
+            charset_ramp: String::new(),
             font_family: "Courier New".to_string(),
             min_glyph_intensity: 180,
             native_wtf_active: false,

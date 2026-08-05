@@ -40,6 +40,7 @@ These are practical targets, not hard guarantees across all hardware.
 | Audio reactivity | Visual response should feel immediate while preserving stable RMS/band/beat analysis. |
 | Source switching | Built-in image/video switches should be bounded and should not leave the renderer stuck. |
 | Control UI | Sliders, preset buttons, source selection, and WTF toggle should remain interactive under render load. |
+| MIDI | Continuous controls should feel frame-immediate without creating one IPC/render update per raw hardware message. |
 
 ## Renderer Performance Model
 
@@ -60,7 +61,7 @@ Performance regressions often happen when one layer bypasses this model.
 Rules:
 
 - Use the canonical parameter model for UI controls, presets, WTF mode, audio
-  modulation, native output sync, and future MIDI.
+  modulation, native output sync, and MIDI.
 - Batch high-frequency control changes to animation frames where possible.
 - Do not rebuild renderer resources for numeric control changes that can be
   updated as uniforms/params.
@@ -187,6 +188,20 @@ Rules:
   sources, opening Pop Out, or applying live controls.
 - In debug/dev builds, capture locally but refuse network submission.
 
+### Experimental MIDI Control
+
+- Rust keeps a bounded event queue and drops the oldest event when full.
+- JavaScript preserves ordered button edges but coalesces continuous events by
+  message/channel/controller before applying a frame.
+- Live-safe params update through existing renderer setters.
+- Structural params keep the existing delayed rebuild path rather than
+  rebuilding for every 7-bit increment.
+- Soft takeover avoids disruptive jumps after preset changes without adding a
+  polling loop per binding.
+- Port monitoring runs at a low fixed cadence; normal event reads are bounded.
+- SysEx capture/restore is an explicit setup operation and never runs on the
+  render thread. Packet restore is paced for older hardware.
+
 ## Battery and Thermal Guidance
 
 The app can be heavy by design.
@@ -240,6 +255,7 @@ Secondary-display simulation:
 
 ```bash
 npm run test:output-display
+npm run test:midi
 ```
 
 ## Manual Performance Checks

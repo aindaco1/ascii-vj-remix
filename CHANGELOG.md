@@ -1,10 +1,92 @@
 # Changelog
 
+Version 0.9.5 adds 23 credited ascii.today-inspired character presets and
+experimental native DIN MIDI control for an Evolution/M-Audio UC-33e through an
+iConnectivity mioXC, including four complete controller pages, soft takeover,
+numeric preset selection, MIDI Learn, and full-bank SysEx capture/restore.
 Version 0.9.3 moves public desktop releases to signed/notarized macOS
 distribution, publishes Windows as an unsigned preview while signing is
 deferred, and expands audio reactivity with dense-mix controls that reduce
 overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
+
+## [0.9.5] - 2026-08-04
+
+### Added
+
+- Added 23 read-only ascii.today-inspired character presets, including Broadway
+  KB, Computer, Doom, Ghost, Modular, Standard, Univers, and Doh.
+- Added a shared bounded character-set catalog with source/author metadata and
+  matching Character Set menu entries for every new preset.
+- Added credited source and adaptation notes in
+  `docs/ASCII_TODAY_PRESETS.md`.
+- Added experimental native cross-platform MIDI input/output through Rust
+  `midir`, with CoreMIDI as the primary macOS Apple Silicon backend and
+  compatible Windows and Linux backends retained for CI and future hardware
+  validation.
+- Added the Evolution/M-Audio UC-33e through iConnectivity mioXC as the first
+  experimental hardware profile. Direct UC-33e USB input remains out of scope.
+- Added four complete 47-control pages: Visual, Audio, Presets, and Fine/User.
+- Added soft takeover, input coalescing, curves, inversion/range support, MIDI
+  Learn overrides, port monitoring, and automatic mioXC reconnection.
+- Added stable MIDI preset slots from 1 through 128 with numeric entry, Enter,
+  Previous, Next, and Clear actions.
+- Added a desktop MIDI panel with input/output status, active page, last-message
+  monitor, mapping reset, profile capture, Install/Restore, and Verify actions.
+- Added bounded full-bank SysEx capture and paced restore through the mioXC
+  return DIN connection, plus optional Ensure Profile on Connection.
+- Added a physical mioXC discovery/connection probe and a complete printable
+  controller map in `docs/MIDI_UC33E.md`.
+
+### Changed
+
+- Native glyph Pop Out now consumes the resolved shared character ramp and
+  accepts it only when it is space-leading, unique, bounded, and fully covered
+  by the fixed bundled glyph atlas.
+- MIDI hardware commissioning is explicitly paused after confirming the
+  controller ids for keypad C34–C43 and transport C44–C47. The software remains
+  implemented; the remaining physical restore and acceptance work is recorded
+  in the Roadmap.
+- MIDI is labeled experimental in the UI and documentation because the full
+  physical control sweep and end-to-end SysEx restore/verification checklist
+  remain incomplete. Ensure Profile on Connection stays disabled by default.
+- UI controls and MIDI now route through the same canonical parameter ranges,
+  clamping, structural-change handling, audio settings, and preset transition
+  behavior.
+- Visual preset changes re-arm soft takeover so non-motorized UC-33e controls
+  cannot jump across the active software value.
+- MIDI is intentionally restricted to visual params, audio-reactive settings,
+  visual presets, and WTF mode. It cannot change sources, Camera, Pop Out, or
+  output displays.
+
+### Security
+
+- MIDI and SysEx commands are granted only to the main control window. The
+  presentation-only output window receives no MIDI permissions.
+- The initial native adapter accepts only ports whose names contain `mioXC`.
+- MIDI queues, SysEx packet counts, decoded bytes, stored mappings, and preset
+  slots are bounded and validated.
+- Captured controller profiles remain local and contain no media paths, frames,
+  audio, credentials, or network data.
+
+### Validation
+
+- Extended renderer-math checks to cover all 23 new catalog entries, including
+  ids, bounds, uniqueness, printable glyphs, attribution metadata, and Broadway
+  KB luminance lookup.
+- Extended static smoke coverage to require ascii.today names in both the
+  Character Set control and built-in Presets panel.
+- Added Rust coverage for native character-ramp acceptance and rejection.
+- Added `npm run test:midi` for the 188 default hardware bindings, value
+  scaling, soft takeover, action edges, event coalescing, and scope exclusions.
+- Added Rust tests for MIDI parsing, fragmented SysEx assembly, transfer
+  validation, and mioXC-only port scoping.
+- Added `npm run midi:probe` and `npm run midi:probe -- --connect` for physical
+  CoreMIDI port and simultaneous input/output validation.
+- Extended static smoke coverage to validate canonical visual/audio MIDI target
+  routing and ensure browser mode keeps the desktop-only MIDI panel hidden.
+- Extended Tauri policy checks to require MIDI permissions on the main window
+  and forbid them on the output window.
 
 ## [0.9.3] - 2026-06-26
 

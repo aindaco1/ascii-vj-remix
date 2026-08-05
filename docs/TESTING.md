@@ -24,6 +24,8 @@ npm run test:decode-resize       # Decode/resize parity checks
 npm run check:media              # Media pipeline checks
 npm run test:render-math         # Shared renderer math vectors
 npm run test:audio-reactive      # Audio-reactive controls, clamps, dense-mix damping
+npm run test:midi                # UC-33e map, scaling, pickup, actions, coalescing
+npm run midi:probe -- --connect  # Physical mioXC input/output open test
 npm run test:crash-relay         # Cloudflare crash relay sanitizer/rate-limit tests
 npm run test:vectors             # Adaptive codec vector checks
 npm run test:rust                # Rust tests
@@ -56,6 +58,7 @@ git diff --check
 | FFmpeg policy/resources | `npm run test:ffmpeg-policy`, `npm run check:ffmpeg-resources`, `npm run check:ffmpeg-release` |
 | Media frame prep/decode | `npm run test:frame-prep`, `npm run test:decode-resize`, `npm run check:media` |
 | Renderer math parity | `npm run test:render-math`, Rust shared-vector tests through `npm run test:rust` |
+| MIDI | `npm run test:midi`, Rust MIDI/SysEx tests, `npm run midi:probe -- --connect` |
 | Crash relay | `npm run test:crash-relay` |
 | Adaptive codec vectors | `npm run test:vectors` |
 | Rust/Tauri modules | `npm run test:rust` |
@@ -105,6 +108,20 @@ Use an optimized app build before making performance conclusions.
 For glyph-mode changes, include at least one traditional ASCII preset in manual
 Pop Out checks and confirm Character Set/Font Family changes do not hide the
 Glyph/Cell controls.
+
+### MIDI, UC-33e, or SysEx Changes
+
+```bash
+npm run test:midi
+npm run check:tauri-policy
+npm run test:rust
+npm run midi:probe -- --connect
+npm run smoke:static
+```
+
+The physical probe verifies that CoreMIDI can enumerate and simultaneously open
+both directions of the mioXC. It does not replace the control sweep and
+full-bank capture/restore checklist in [MIDI_UC33E](MIDI_UC33E.md).
 
 ### Tauri Commands, Permissions, or Capabilities
 
@@ -190,7 +207,8 @@ Important manual matrices:
 - macOS with system audio capture.
 - Windows with WebView2, D3D12/WebGL2, camera, mic, and installer path.
 - Linux with WebKitGTK, GPU acceleration, camera, mic, and AppImage/deb path.
-- Future MIDI rig: Evolution/M-Audio UC33e through iConnectivity mioXC.
+- Experimental macOS Apple Silicon MIDI rig: Evolution/M-Audio UC-33e through
+  both DIN directions of an iConnectivity mioXC, powered separately.
 
 When reporting hardware results, include:
 
@@ -234,7 +252,7 @@ Release CI should:
 - upload installers, updater packages, signatures, and `latest.json`.
 - validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
   acceptance before publishing macOS artifacts.
-- publish Windows 0.9.3 artifacts as unsigned previews; future signed Windows
+- publish Windows 0.9.5 artifacts as unsigned previews; future signed Windows
   releases must validate Authenticode signer and timestamp state before
   publishing Windows artifacts.
 - run install smoke checks after publishing.
@@ -251,5 +269,7 @@ Future release hardening should add:
 - No full i18n/l10n test suite yet.
 - No golden visual output suite for presets yet.
 - No automated camera latency benchmark yet.
-- No automated MIDI controller integration tests yet.
+- Experimental MIDI parsing, mapping, fake events, and SysEx assembly are
+  automated; physical control sweeps and full-bank restore still require the
+  UC-33e/mioXC rig.
 - Linux native media/camera/audio coverage needs broader machine testing.

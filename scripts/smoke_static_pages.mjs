@@ -149,6 +149,7 @@ async function runSmoke() {
       sourceModeHidden: Boolean(document.querySelector('.source-mode-field')?.hidden),
       bufferHidden: Boolean(document.querySelector('#buffer-meter')?.hidden),
       connectionHidden: Boolean(document.querySelector('#connection-status')?.hidden),
+      midiPanelHidden: Boolean(document.querySelector('#midi-panel')?.hidden),
       defaultSource: {
         mediaUrl: window.ascilineRemix?.params?.mediaUrl || '',
         mediaType: window.ascilineRemix?.params?.mediaType || '',
@@ -177,15 +178,18 @@ async function runSmoke() {
         charsetHidden: document.querySelector('[data-control-key="charset"]')?.classList.contains('control-hidden') ?? true,
         fontFamilyHidden: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('control-hidden') ?? true,
         charsetCompact: document.querySelector('[data-control-key="charset"]')?.classList.contains('compact-select') ?? false,
-        fontFamilyCompact: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('compact-select') ?? false
+        fontFamilyCompact: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('compact-select') ?? false,
+        charsetOptions: [...document.querySelectorAll('[data-control-key="charset"] option')].map((option) => option.textContent.trim())
       },
+      presetNames: [...document.querySelectorAll('#preset-list .preset-name')].map((node) => node.textContent.trim()),
       sources: [...document.querySelectorAll('#source-list [role=option]')].map((el) => el.textContent.trim())
     }));
-    if (!main.sourceModeHidden || !main.bufferHidden || !main.connectionHidden) {
+    if (!main.sourceModeHidden || !main.bufferHidden || !main.connectionHidden || !main.midiPanelHidden) {
       throw new Error(`Stream-only UI should be hidden: ${JSON.stringify({
         sourceModeHidden: main.sourceModeHidden,
         bufferHidden: main.bufferHidden,
-        connectionHidden: main.connectionHidden
+        connectionHidden: main.connectionHidden,
+        midiPanelHidden: main.midiPanelHidden
       })}`);
     }
     if (
@@ -211,6 +215,16 @@ async function runSmoke() {
     ) {
       throw new Error(`Glyph controls should stay visible and compact for static output: ${JSON.stringify(main.glyphControls)}`);
     }
+    const asciiTodayNames = ['Broadway KB', 'Computer', 'Doh'];
+    if (
+      !asciiTodayNames.every((name) => main.glyphControls.charsetOptions.includes(name)) ||
+      !asciiTodayNames.every((name) => main.presetNames.includes(name))
+    ) {
+      throw new Error(`ascii.today character sets should appear as controls and presets: ${JSON.stringify({
+        charsetOptions: main.glyphControls.charsetOptions,
+        presetNames: main.presetNames
+      })}`);
+    }
     if (
       main.audioReactive.source !== 'input' ||
       !main.audioReactive.active ||
@@ -222,6 +236,77 @@ async function runSmoke() {
       !['Transient / Flux', 'Presence', 'Density Dampening', 'Noise Floor'].every((label) => main.audioReactive.controls.includes(label))
     ) {
       throw new Error(`Audio input should auto-start and request mic capture: ${JSON.stringify(main.audioReactive)}`);
+    }
+
+    const broadwayPreset = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      await app.applyPreset('ascii-today-broadway-kb');
+      const surface = app?._activeRenderSurface?.();
+      const state = {
+        activePresetId: app?.activePresetId,
+        backend: app?.params?.backend,
+        charset: app?.params?.charset,
+        glyphMode: app?.params?.glyphMode,
+        solidMode: app?.params?.solidMode,
+        surfaceWidth: surface?.width || 0,
+        surfaceHeight: surface?.height || 0
+      };
+      await app.applyPreset('point-click-default');
+      return state;
+    });
+    if (
+      broadwayPreset.activePresetId !== 'ascii-today-broadway-kb' ||
+      broadwayPreset.backend !== 'canvas2d' ||
+      broadwayPreset.charset !== 'ascii-today-broadway-kb' ||
+      !broadwayPreset.glyphMode ||
+      broadwayPreset.solidMode ||
+      broadwayPreset.surfaceWidth <= 0 ||
+      broadwayPreset.surfaceHeight <= 0
+    ) {
+      throw new Error(`Broadway KB should apply as a live Canvas2D glyph preset: ${JSON.stringify(broadwayPreset)}`);
+    }
+
+    const midiRouting = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const beforeSource = {
+        mediaUrl: app.params.mediaUrl,
+        mediaType: app.params.mediaType,
+        sourceMode: app.params.sourceMode
+      };
+      const visualApplied = app.applyMidiTarget('visual.brightness', { kind: 'value', value: 1.23 });
+      const audioApplied = app.applyMidiTarget('audio.fluxAmount', { kind: 'value', value: 1.75 });
+      const targets = app.midiTargetDescriptors().map((target) => target.id);
+      const slotKey = 'ascii-vj-remix-midi-preset-slots-v1';
+      const previousSlots = localStorage.getItem(slotKey);
+      const presetIds = app._allPresets().slice(0, 3).map((preset) => preset.id);
+      localStorage.setItem(slotKey, JSON.stringify([presetIds[0], null, presetIds[2]]));
+      const stableSlots = app._midiPresetSlots();
+      if (previousSlots === null) localStorage.removeItem(slotKey);
+      else localStorage.setItem(slotKey, previousSlots);
+      return {
+        visualApplied,
+        audioApplied,
+        brightness: app.params.brightness,
+        fluxAmount: app.audioReactive.fluxAmount,
+        sourceUnchanged: JSON.stringify(beforeSource) === JSON.stringify({
+          mediaUrl: app.params.mediaUrl,
+          mediaType: app.params.mediaType,
+          sourceMode: app.params.sourceMode
+        }),
+        forbiddenTargets: targets.filter((target) => /source|camera|popout|output/i.test(target)),
+        stableSlotHole: stableSlots[1] === null && stableSlots[0]?.id === presetIds[0] && stableSlots[2]?.id === presetIds[2]
+      };
+    });
+    if (
+      !midiRouting.visualApplied ||
+      !midiRouting.audioApplied ||
+      Math.abs(midiRouting.brightness - 1.23) > 0.001 ||
+      Math.abs(midiRouting.fluxAmount - 1.75) > 0.001 ||
+      !midiRouting.sourceUnchanged ||
+      midiRouting.forbiddenTargets.length ||
+      !midiRouting.stableSlotHole
+    ) {
+      throw new Error(`MIDI target routing should stay visual/audio-only: ${JSON.stringify(midiRouting)}`);
     }
 
     const micCallsBeforeSlider = main.audioReactive.calls.mic;

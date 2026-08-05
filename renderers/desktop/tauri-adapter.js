@@ -69,6 +69,16 @@ const EXPECTED_PERMISSION_COMMANDS = new Set([
     'start_system_audio_capture'
 ]);
 
+const EXPECTED_MIDI_HARDWARE_COMMANDS = new Set([
+    'connect_midi',
+    'disconnect_midi',
+    'list_midi_ports',
+    'read_midi_events',
+    'start_midi_sysex_capture',
+    'finish_midi_sysex_capture',
+    'send_midi_sysex'
+]);
+
 function tauriErrorText(error) {
     return `${error?.name || ''} ${error?.message || error || ''}`.toLowerCase();
 }
@@ -85,9 +95,20 @@ function isExpectedPermissionCommandFailure(command, error) {
         raw.includes('tcc');
 }
 
+function isExpectedMidiHardwareFailure(command, error) {
+    if (!EXPECTED_MIDI_HARDWARE_COMMANDS.has(String(command || ''))) return false;
+    const raw = tauriErrorText(error);
+    return raw.includes('mioxc') ||
+        raw.includes('midi port') ||
+        raw.includes('not connected') ||
+        raw.includes('no longer available') ||
+        raw.includes('disconnected');
+}
+
 function reportTauriCommandFailure(command, error) {
     if (!crashReportHandler || String(command || '').includes('crash_report')) return;
     if (isExpectedPermissionCommandFailure(command, error)) return;
+    if (isExpectedMidiHardwareFailure(command, error)) return;
     crashReportHandler({
         kind: 'tauri-command',
         surface: 'tauri-command',
@@ -226,6 +247,48 @@ async function readTauriInputAudioFeatures() {
 async function stopTauriInputAudioCapture() {
     if (!isTauriRuntime()) return false;
     return invokeTauri('stop_input_audio_capture');
+}
+
+async function listTauriMidiPorts() {
+    if (!isTauriRuntime()) return { inputs: [], outputs: [] };
+    return invokeTauri('list_midi_ports');
+}
+
+async function connectTauriMidi(inputName, outputName) {
+    if (!isTauriRuntime()) return { connected: false };
+    return invokeTauri('connect_midi', { inputName, outputName });
+}
+
+async function disconnectTauriMidi() {
+    if (!isTauriRuntime()) return false;
+    return invokeTauri('disconnect_midi');
+}
+
+async function getTauriMidiState() {
+    if (!isTauriRuntime()) return { connected: false };
+    return invokeTauri('get_midi_state');
+}
+
+async function readTauriMidiEvents(maxEvents = 128) {
+    if (!isTauriRuntime()) return [];
+    return invokeTauri('read_midi_events', { maxEvents });
+}
+
+async function startTauriMidiSysexCapture() {
+    if (!isTauriRuntime()) return false;
+    return invokeTauri('start_midi_sysex_capture');
+}
+
+async function finishTauriMidiSysexCapture() {
+    if (!isTauriRuntime()) return { packets: [], packetCount: 0, totalBytes: 0, overflow: false };
+    return invokeTauri('finish_midi_sysex_capture');
+}
+
+async function sendTauriMidiSysex(packets, packetDelayMs = 12) {
+    if (!isTauriRuntime()) return { packetCount: 0, totalBytes: 0 };
+    return invokeTauri('send_midi_sysex', {
+        request: { packets, packetDelayMs }
+    });
 }
 
 async function requestTauriMediaPermission(kind) {
@@ -498,15 +561,20 @@ export {
     captureTauriCrashReport,
     checkTauriUpdate,
     discardTauriCrashReports,
+    disconnectTauriMidi,
+    finishTauriMidiSysexCapture,
     getTauriCrashReportState,
+    getTauriMidiState,
     installTauriUpdate,
     isTauriRuntime,
     listenTauriEvent,
+    listTauriMidiPorts,
     listTauriOutputDisplays,
     openTauriMediaFile,
     openTauriOutputWindow,
     probeTauriMediaFile,
     readTauriInputAudioFeatures,
+    readTauriMidiEvents,
     readTauriMediaSessionFrame,
     readTauriMediaSessionFrames,
     readTauriRawVideoFrames,
@@ -516,9 +584,11 @@ export {
     sendTauriOutputFrame,
     sendTauriOutputPixels,
     sendTauriOutputState,
+    sendTauriMidiSysex,
     setTauriCrashReportHandler,
     setTauriCrashReportPreference,
     startTauriMediaSession,
+    startTauriMidiSysexCapture,
     startTauriRawVideoSession,
     startTauriInputAudioCapture,
     startTauriSystemAudioCapture,
@@ -526,5 +596,6 @@ export {
     stopTauriSystemAudioCapture,
     stopTauriMediaSession,
     stopTauriRawVideoSession,
+    connectTauriMidi,
     submitTauriCrashReports
 };
