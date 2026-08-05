@@ -21,7 +21,7 @@ Related practice docs:
   and development infrastructure.
 - Keep normal app use local-first and offline.
 - Keep all live controls routed through one canonical parameter model.
-- Allow presets, WTF mode, audio reactivity, and future MIDI control to compose
+- Allow presets, WTF mode, audio reactivity, and MIDI control to compose
   without forking renderer state.
 - Keep Pop Out output as close to latency-free as possible, especially for live
   camera sources.
@@ -172,7 +172,7 @@ Major parameter groups:
 - UI/performance: stats overlay, transition seconds.
 
 The control surface, presets, persistence, source changes, WTF mode, audio
-reactivity, native output, and future MIDI all read from or write through this
+reactivity, native output, and MIDI all read from or write through this
 model.
 
 Static renderer-family transitions keep media ownership at the `StaticRuntime`
@@ -188,6 +188,7 @@ Canvas or stream output.
 Shared JavaScript helpers live in:
 
 ```text
+renderers/shared/character-sets.js
 renderers/shared/render-math.js
 renderers/shared/render-math-vectors.json
 ```
@@ -198,6 +199,8 @@ The shared module currently owns:
 - Legacy Canvas color processing.
 - Legacy stream color processing.
 - shader-style jitter hash helpers.
+- a bounded canonical character-set catalog, including credited ascii.today
+  adaptations.
 - compact charset and luminance-to-glyph helpers.
 
 The legacy Canvas and stream functions are intentionally named separately from
@@ -440,6 +443,10 @@ traditional ASCII presets stay text-like in Pop Out instead of becoming solid
 color cells. WebGL/WebGPU-style presets disable native glyph masking even when
 their saved params still carry `glyphMode`; their main preview renders solid
 GPU cell rectangles, so Pop Out does the same.
+The frontend resolves the selected catalog entry into a bounded `charsetRamp`
+for native output. Rust accepts it only when it begins with a space, contains
+unique glyphs from the fixed atlas, and fits the native ramp texture; otherwise
+the allowlisted built-in ramp for `charset` is used.
 `fontFamily` remains a preview/control-surface parameter; the native path does
 not load arbitrary fonts and instead masks cells through the fixed atlas/ramp.
 
@@ -490,7 +497,7 @@ Modulation targets are live-safe visual controls:
 Structural controls such as source, backend, grid allocation, and camera devices
 are not modulated per beat because they would cause renderer churn.
 
-## Presets, WTF Mode, and Future MIDI
+## Presets, WTF Mode, and MIDI
 
 These are all control layers over the same parameter model.
 
@@ -508,12 +515,33 @@ WTF mode:
 - transitions indefinitely until stopped.
 - avoids unsafe all-white/all-black states.
 
-Future MIDI:
+Experimental MIDI in 0.9.5:
 
-- should use a shared control target registry.
-- should call the same setters as visible UI controls.
-- should respect live-safe vs structural target metadata.
-- should not fork renderer state.
+```text
+UC-33e DIN output
+  -> mioXC/CoreMIDI
+  -> bounded Rust event queue
+  -> frame-coalesced mapping engine
+  -> canonical visual/audio target
+  -> params/effective params
+  -> main preview and native Pop Out synchronization
+```
+
+- Uses the same ranges, clamps, setters, and structural metadata as visible UI
+  controls.
+- Applies base visual or audio-reactive settings; it does not fork renderer
+  state or write audio-derived effective params back into presets.
+- Re-arms soft takeover after visual preset changes.
+- Keeps button edges ordered while coalescing high-rate continuous changes.
+- Restricts actions to visual params, audio-reactive settings, visual presets,
+  and WTF mode. Sources, Camera, Pop Out, and output displays are not targets.
+- Uses four channel-addressed UC-33e pages and stable numeric preset slots.
+- Captures/restores bounded opaque SysEx packets through the selected mioXC
+  output without exposing MIDI permissions to the output window.
+- The mapping and transport layers are automated-test covered, but physical
+  full-bank restore/verification remains an experimental acceptance gap.
+
+See [UC-33e and mioXC MIDI Control](MIDI_UC33E.md) for the physical map.
 
 ## Packaging and Offline Runtime
 
@@ -571,7 +599,8 @@ npm run test:rust
   - Media Foundation/D3D on Windows.
   - PipeWire/V4L2/Vulkan or GLES on Linux.
 - Productize stream mode or keep it hidden.
-- Add MIDI control registry and native MIDI adapter.
+- Extend the MIDI profile system to direct UC-33e USB and additional hardware
+  after the mioXC DIN path is physically validated on more platforms.
 - Improve native system audio capture through narrower platform APIs.
 - Add performance tests that reproduce user-reported Pop Out/main-window
   contention automatically.

@@ -15,7 +15,7 @@ Read these in order before making non-trivial changes:
 3. [Roadmap](ROADMAP.md): current capabilities, planned work, deferred work, and
    product direction.
 4. [Rendering Engine](RENDERING_ENGINE.md): source flow, renderer backends,
-   native output architecture, media engine, audio reactivity, and future MIDI
+   native output architecture, media engine, audio reactivity, and MIDI
    integration.
 5. [Contributor Guide](CONTRIBUTORS.md): development setup, test commands,
    release/updater notes, FFmpeg sidecar policy, and contribution workflow.
@@ -23,6 +23,9 @@ Read these in order before making non-trivial changes:
    [Security](SECURITY.md), [Performance](PERFORMANCE.md),
    [Testing](TESTING.md), [Accessibility](ACCESSIBILITY.md), and
    [Internationalization](I18N.md).
+
+For MIDI, UC-33e mapping, or SysEx work, also read
+[UC-33e and mioXC MIDI Control](MIDI_UC33E.md).
 
 For desktop packaging or permissions work, also inspect:
 
@@ -87,7 +90,7 @@ surface for live ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-Current docs describe the 0.9.3 feature set.
+Current docs describe the 0.9.5 feature set.
 
 Sources:
 
@@ -109,6 +112,8 @@ Rendering:
 - The active renderer is controlled by one canonical parameter model.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets.
+- The shared character-set catalog includes 23 credited ascii.today-derived
+  luminance ramps and matching read-only presets.
 - Native glyph output should keep using bounded fixed atlas/ramp resources;
   `fontFamily` is UI/preview metadata, not a native font-loading sink.
 
@@ -126,6 +131,13 @@ Live behavior:
   ship raw audio buffers through IPC or diagnostics.
 - Safe clamps should prevent pure black or pure white outputs from randomized or
   audio-driven states.
+- The first experimental MIDI rig is the UC-33e through both DIN directions of
+  a mioXC; direct UC USB is out of scope for 0.9.5.
+- MIDI uses four channel-addressed pages, soft takeover, numeric preset slots,
+  MIDI Learn overrides, and bounded full-bank SysEx capture/restore.
+- MIDI targets visual/audio/preset/WTF behavior only. Do not add source, Camera,
+  Pop Out, output-display, file, updater, or crash-report actions.
+- Read [MIDI_UC33E](MIDI_UC33E.md) before changing mappings or hardware policy.
 
 UI:
 
@@ -143,8 +155,10 @@ Use this map to find the likely owner of a change:
 | --- | --- |
 | Main UI, params, presets, source controls, WTF, audio UI | [app.js](../app.js), [index.html](../index.html), [style.css](../style.css) |
 | GPU renderer and media source abstraction | [renderers/gpu/](../renderers/gpu/) |
+| MIDI mapping, soft takeover, UC-33e profile | [midi-mapping.js](../renderers/shared/midi-mapping.js), [MIDI_UC33E](MIDI_UC33E.md) |
 | Tauri adapter and output-display helpers | [renderers/desktop/](../renderers/desktop/) |
 | Tauri shell, commands, permissions, updater, native audio, native output | [src-tauri/](../src-tauri/) |
+| Native MIDI input/output and SysEx | [midi.rs](../src-tauri/src/midi.rs) |
 | Native Pop Out renderer | [native_output.rs](../src-tauri/src/native_output.rs), [gpu.rs](../src-tauri/src/native_output/gpu.rs) |
 | macOS native camera latency path | [native_camera.rs](../src-tauri/src/native_output/native_camera.rs) |
 | Rust media engine, codec, FFmpeg sessions | [src-tauri/src/media_engine/](../src-tauri/src/media_engine/) |
@@ -199,6 +213,14 @@ Rust/Tauri behavior:
 ```bash
 npm run test:rust
 npm run check:desktop
+```
+
+MIDI behavior:
+
+```bash
+npm run test:midi
+npm run midi:probe -- --connect
+npm run test:rust
 ```
 
 Optimized macOS app build:
@@ -306,8 +328,8 @@ The roadmap tracks future work. At a high level:
 
 - Productize local stream mode only when the full standalone source workflow is
   ready.
-- Add MIDI control, initially targeting an Evolution/M-Audio UC33e through an
-  iConnectivity mioXC.
+- Extend MIDI beyond the 0.9.5 UC-33e/mioXC DIN profile only after its current
+  scope, mapping semantics, SysEx safety, and platform validation are preserved.
 - Continue improving native GPU output and platform-native capture paths.
 - Continue improving Windows SmartScreen reputation validation and real
   install/updater-hop tests on Windows/Linux machines.

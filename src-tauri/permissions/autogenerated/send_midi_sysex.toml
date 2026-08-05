@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-send-midi-sysex"
+description = "Enables the send_midi_sysex command without any pre-configured scope."
+commands.allow = ["send_midi_sysex"]
+
+[[permission]]
+identifier = "deny-send-midi-sysex"
+description = "Denies the send_midi_sysex command without any pre-configured scope."
+commands.deny = ["send_midi_sysex"]

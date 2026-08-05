@@ -244,7 +244,15 @@ if (!mainCapability) {
     'allow-update-native-output-pixels',
     'allow-start-system-audio-capture',
     'allow-read-system-audio-features',
-    'allow-stop-system-audio-capture'
+    'allow-stop-system-audio-capture',
+    'allow-list-midi-ports',
+    'allow-connect-midi',
+    'allow-disconnect-midi',
+    'allow-get-midi-state',
+    'allow-read-midi-events',
+    'allow-start-midi-sysex-capture',
+    'allow-finish-midi-sysex-capture',
+    'allow-send-midi-sysex'
   ];
   for (const permission of requiredMainPermissions) {
     if (!permissions.has(permission)) {
@@ -291,7 +299,15 @@ if (!outputCapability) {
     'allow-set-crash-report-preference',
     'allow-capture-crash-report',
     'allow-discard-crash-reports',
-    'allow-submit-crash-reports'
+    'allow-submit-crash-reports',
+    'allow-list-midi-ports',
+    'allow-connect-midi',
+    'allow-disconnect-midi',
+    'allow-get-midi-state',
+    'allow-read-midi-events',
+    'allow-start-midi-sysex-capture',
+    'allow-finish-midi-sysex-capture',
+    'allow-send-midi-sysex'
   ]) {
     if (permissions.has(forbidden)) {
       issues.push(`output capability must not include ${forbidden}`);

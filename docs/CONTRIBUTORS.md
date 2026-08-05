@@ -15,6 +15,7 @@ desktop-only feature is added.
 | `index.html`, `style.css`, `app.js` | Main renderer lab UI and control logic. |
 | `renderers/gpu/` | Vendored/adapted GPU renderer, media source abstraction, WebGPU/WebGL2 backends, and renderer assets. |
 | `renderers/desktop/` | Tauri adapter and output-display helpers. |
+| `renderers/shared/midi-mapping.js` | UC-33e profile, mapping validation, scaling, soft takeover, and event coalescing. |
 | `src-tauri/` | Tauri v2 desktop shell, native output window, media registry, audio providers, FFmpeg media engine, capabilities, icons, and packaging config. |
 | `media/` | Built-in demo image/video and hidden development fixtures. |
 | `experiments/` | Legacy/adaptive codec vector and stream experiments. |
@@ -107,6 +108,8 @@ attributes do not break app signing. You can override the build directory with
 | `npm run test:output-display` | Deterministic secondary-display placement simulation. |
 | `npm run smoke:native-output` | Native output performance smoke helper. |
 | `npm run smoke:ui-perf` | UI performance smoke helper. |
+| `npm run test:midi` | MIDI map, scaling, soft-takeover, action, and scope tests. |
+| `npm run midi:probe` | List physical MIDI inputs/outputs; add `-- --connect` to open both mioXC directions. |
 
 ## Podman Development Shell
 
@@ -197,7 +200,7 @@ When adding a visible control:
 2. Add control metadata.
 3. Add conditional visibility rules if it is not valid for every source/backend.
 4. Route changes through the same setter path as sliders, presets, WTF mode, and
-   future MIDI.
+   MIDI.
 5. Verify it works live without restarting media unless it is explicitly a
    structural renderer/source change.
 
@@ -210,6 +213,20 @@ Keep capabilities narrow:
 
 - Main window: media selection, output management, audio providers, updater.
 - Output window: minimal listen/close/fullscreen permissions only.
+
+The 0.9.5 MIDI command surface is also main-window only. Native MIDI code lives
+in `src-tauri/src/midi.rs`; the first supported port is the DIN-connected
+mioXC. Do not grant MIDI or SysEx commands to the output window. See
+[MIDI_UC33E](MIDI_UC33E.md) before changing the hardware profile.
+
+MIDI checks:
+
+```bash
+npm run test:midi
+npm run midi:probe
+npm run midi:probe -- --connect
+npm run test:rust
+```
 
 The production CSP in `src-tauri/tauri.conf.json` intentionally blocks
 arbitrary remote HTTP(S) connections. If you need a new protocol or resource
@@ -348,7 +365,7 @@ The updater secret script passes values to `gh secret set` over stdin, not as
 command-line arguments. Use `-- --repo owner/repo` or `-- --key /path/to/key`
 after the npm script if the defaults are wrong.
 
-For 0.9.3, `release:secrets:check:public` requires updater signing and macOS
+For 0.9.5, `release:secrets:check:public` requires updater signing and macOS
 Developer ID notarization readiness. Windows artifacts are published as unsigned
 previews and do not require Windows signing secrets.
 
@@ -408,7 +425,7 @@ Future signed Windows releases can use Azure Artifact Signing through
 `src-tauri/tauri.windows-signed.conf.json`, which invokes
 `src-tauri/windows-artifact-sign.cmd`; that wrapper calls
 `scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
-creates updater signatures. The active 0.9.3 Windows release path does not use
+creates updater signatures. The active 0.9.5 Windows release path does not use
 this config and publishes unsigned preview artifacts. Configure the Azure values
 only if Azure becomes the chosen Windows signing backend:
 

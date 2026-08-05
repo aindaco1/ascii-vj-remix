@@ -5,7 +5,13 @@ import {
     processCanvasColorLegacy as processColor,
     processGpuCellColor,
     shaderHash
-} from './renderers/shared/render-math.js?v=20260625-render-math';
+} from './renderers/shared/render-math.js?v=20260804-ascii-today';
+import {
+    ASCII_TODAY_CHARACTER_SETS,
+    CHARACTER_SET_IDS,
+    CHARACTER_SET_OPTIONS,
+    characterSetChars
+} from './renderers/shared/character-sets.js?v=20260804-ascii-today';
 import {
     AUDIO_REACTIVE_CONTROLS,
     AUDIO_REACTIVE_DEFAULTS,
@@ -18,19 +24,33 @@ import {
     sanitizeAudioReactiveSettings
 } from './renderers/shared/audio-reactive.js?v=20260626-audio-reactive';
 import {
+    MIDI_PAGE_NAMES,
+    MidiMappingEngine,
+    UC33E_MIOXC_BINDINGS,
+    UC33E_MIOXC_PROFILE,
+    coalesceMidiEvents,
+    findPreferredMidiPort,
+    sanitizeMidiBinding,
+    sanitizeMidiBindings
+} from './renderers/shared/midi-mapping.js?v=20260711-midi-control';
+import {
     clearTauriBrowsingData,
     captureTauriCrashReport,
     checkTauriUpdate,
     discardTauriCrashReports,
+    disconnectTauriMidi,
+    finishTauriMidiSysexCapture,
     getTauriCrashReportState,
     installTauriUpdate,
     isTauriRuntime,
     listenTauriEvent,
+    listTauriMidiPorts,
     listTauriOutputDisplays,
     openTauriMediaFile,
     openTauriOutputWindow,
     probeTauriMediaFile,
     readTauriInputAudioFeatures,
+    readTauriMidiEvents,
     readTauriMediaSessionFrames,
     readTauriRawVideoFrames,
     readTauriSystemAudioFeatures,
@@ -39,16 +59,19 @@ import {
     sendTauriOutputFrame,
     sendTauriOutputPixels,
     sendTauriOutputState,
+    sendTauriMidiSysex,
     setTauriCrashReportHandler,
     setTauriCrashReportPreference,
     startTauriMediaSession,
     startTauriRawVideoSession,
     startTauriInputAudioCapture,
+    startTauriMidiSysexCapture,
     startTauriSystemAudioCapture,
     stopTauriInputAudioCapture,
     stopTauriSystemAudioCapture,
     stopTauriMediaSession,
     stopTauriRawVideoSession,
+    connectTauriMidi,
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
 import {
@@ -114,6 +137,22 @@ const els = {
     audioReactiveStatus: $('audio-reactive-status'),
     audioReactiveControls: $('audio-reactive-controls'),
     audioReactiveMeters: $('audio-reactive-meters'),
+    midiPanel: $('midi-panel'),
+    midiConnect: $('midi-connect'),
+    midiInput: $('midi-input'),
+    midiOutput: $('midi-output'),
+    midiStatus: $('midi-status'),
+    midiPage: $('midi-page'),
+    midiLastMessage: $('midi-last-message'),
+    midiSoftTakeover: $('midi-soft-takeover'),
+    midiEnsureProfile: $('midi-ensure-profile'),
+    midiCaptureProfile: $('midi-capture-profile'),
+    midiInstallProfile: $('midi-install-profile'),
+    midiVerifyProfile: $('midi-verify-profile'),
+    midiLearnTarget: $('midi-learn-target'),
+    midiLearn: $('midi-learn'),
+    midiResetMappings: $('midi-reset-mappings'),
+    midiMappingList: $('midi-mapping-list'),
     controls: $('controls'),
     crashReportDialog: $('crash-report-dialog'),
     crashReportClose: $('crash-report-close'),
@@ -130,6 +169,10 @@ const OUTPUT_DISPLAY_KEY = 'asciline-remix-output-display-v1';
 const FPS_DEFAULT_MIGRATION_KEY = 'asciline-remix-fps-default-migrated-v1';
 const DEFAULT_SOURCE_MIGRATION_KEY = 'asciline-remix-demo-image-default-migrated-v1';
 const CANVAS_ASCII_JITTER_MIGRATION_KEY = 'asciline-remix-canvas-ascii-jitter-migrated-v1';
+const MIDI_SETTINGS_KEY = 'ascii-vj-remix-midi-settings-v1';
+const MIDI_CUSTOM_BINDINGS_KEY = 'ascii-vj-remix-midi-custom-bindings-v1';
+const MIDI_SYSEX_PROFILE_KEY = 'ascii-vj-remix-uc33e-sysex-v1';
+const MIDI_PRESET_SLOTS_KEY = 'ascii-vj-remix-midi-preset-slots-v1';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -214,13 +257,6 @@ const TAURI_RAW_VIDEO_MAX_DIMENSION = 960;
 const TAURI_RAW_VIDEO_MAX_PIXELS = 640 * 360;
 const TAURI_RAW_VIDEO_BATCH_SIZE = 2;
 
-const CHARACTER_SET_OPTIONS = Object.freeze([
-    ['point-click', 'Point & Click'],
-    ['classic-camera', 'Classic Camera'],
-    ['asciline', 'ASCILINE'],
-    ['blocks', 'Blocks']
-]);
-const CHARACTER_SET_IDS = Object.freeze(CHARACTER_SET_OPTIONS.map(([id]) => id));
 const FONT_FAMILY_OPTIONS = Object.freeze([
     ['Courier New', 'Courier New'],
     ['monospace', 'Monospace'],
@@ -270,6 +306,39 @@ const CODEC_TOLERANCE = {
 };
 const VIDEO_PLAY_TIMEOUT_MS = 900;
 const GPU_QUEUE_SETTLE_TIMEOUT_MS = 160;
+
+const ASCII_TODAY_PRESETS = Object.freeze(ASCII_TODAY_CHARACTER_SETS.map((characterSet) => Object.freeze({
+    id: characterSet.id,
+    name: characterSet.label,
+    readonly: true,
+    transitionSeconds: 1.1,
+    params: Object.freeze({
+        backend: 'canvas2d',
+        cols: 170,
+        autoRows: true,
+        cellWidth: 6,
+        cellHeight: 9,
+        saturationBoost: 0.08,
+        contrastBoost: 1.9,
+        brightness: 1.06,
+        gamma: 1,
+        bgBlend: 0.05,
+        quantizeBits: 0,
+        jitterAmount: 0.3,
+        jitterSpeed: 0.8,
+        sampleX: 0.5,
+        sampleY: 0.5,
+        smoothing: false,
+        solidMode: false,
+        glyphMode: true,
+        charset: characterSet.id,
+        fontFamily: 'Courier New',
+        mode: 1,
+        pixel: false,
+        codecQuality: 'balanced'
+    })
+})));
+const ASCII_TODAY_PRESET_IDS = Object.freeze(ASCII_TODAY_PRESETS.map((preset) => preset.id));
 
 const BUILTIN_PRESETS = [
     {
@@ -417,6 +486,7 @@ const BUILTIN_PRESETS = [
             codecQuality: 'balanced'
         }
     },
+    ...ASCII_TODAY_PRESETS,
     {
         id: 'arcade-rain',
         name: 'Arcade Rain',
@@ -1128,6 +1198,7 @@ const BUILTIN_PRESET_DISPLAY_ORDER = [
     'ansi-newsprint',
     'terminal-mono',
     'dense-typewriter',
+    ...ASCII_TODAY_PRESET_IDS,
     'neon-sledgehammer',
     'arcade-rain',
     'gamma-sinkhole',
@@ -1179,7 +1250,8 @@ const ASCII_WTF_PRESET_IDS = [
     'classic-camera-ascii',
     'ansi-newsprint',
     'terminal-mono',
-    'dense-typewriter'
+    'dense-typewriter',
+    ...ASCII_TODAY_PRESET_IDS
 ];
 const WTF_ANCHOR_PRESET_IDS = [
     ...EXTREME_WTF_PRESET_IDS,
@@ -4592,6 +4664,464 @@ class StreamRuntime {
     }
 }
 
+class MidiControllerRuntime {
+    constructor(app) {
+        this.app = app;
+        const storedSettings = parseStoredJson(MIDI_SETTINGS_KEY, {});
+        this.settings = {
+            inputName: typeof storedSettings?.inputName === 'string' ? storedSettings.inputName.slice(0, 200) : '',
+            outputName: typeof storedSettings?.outputName === 'string' ? storedSettings.outputName.slice(0, 200) : '',
+            softTakeover: storedSettings?.softTakeover !== false,
+            ensureProfile: storedSettings?.ensureProfile === true
+        };
+        this.customBindings = sanitizeMidiBindings(parseStoredJson(MIDI_CUSTOM_BINDINGS_KEY, []));
+        this.sysexProfile = this._sanitizeStoredSysex(parseStoredJson(MIDI_SYSEX_PROFILE_KEY, null));
+        this.ports = { inputs: [], outputs: [] };
+        this.connected = false;
+        this.busy = false;
+        this.captureMode = null;
+        this.learnArmed = false;
+        this.activePage = null;
+        this.lastMessage = '';
+        this.status = 'Disconnected';
+        this.pollToken = 0;
+        this.portWatchTimer = null;
+        this.presetEntry = '';
+        this.mappingSignature = null;
+        this.engine = new MidiMappingEngine({
+            bindings: this._composedBindings(),
+            softTakeover: this.settings.softTakeover,
+            getTarget: (target) => this.app.midiTargetDescriptor(target),
+            applyTarget: (target, payload) => this.app.applyMidiTarget(target, payload)
+        });
+    }
+
+    _sanitizeStoredSysex(profile) {
+        if (!profile || typeof profile !== 'object' || !Array.isArray(profile.packets)) return null;
+        const packets = profile.packets
+            .filter((packet) => typeof packet === 'string' && packet.length > 0 && packet.length <= 400000)
+            .slice(0, 2048);
+        const encodedBytes = packets.reduce((sum, packet) => sum + packet.length, 0);
+        if (!packets.length || encodedBytes > 400000) return null;
+        return {
+            schemaVersion: 1,
+            profileId: UC33E_MIOXC_PROFILE.id,
+            packets,
+            packetCount: packets.length,
+            totalBytes: Math.max(0, Number(profile.totalBytes || 0)),
+            capturedAt: String(profile.capturedAt || '')
+        };
+    }
+
+    _bindingInputKey(binding) {
+        return `${binding.kind}:${binding.channel}:${binding.number}`;
+    }
+
+    _composedBindings() {
+        const overrides = new Set(this.customBindings.map((binding) => this._bindingInputKey(binding)));
+        return [
+            ...UC33E_MIOXC_BINDINGS.filter((binding) => !overrides.has(this._bindingInputKey(binding))),
+            ...this.customBindings
+        ];
+    }
+
+    async init() {
+        if (!els.midiPanel) return;
+        els.midiPanel.hidden = !isTauriRuntime();
+        if (!isTauriRuntime()) return;
+        this._buildTargetOptions();
+        this._bindUi();
+        this._syncUi();
+        await this.refreshPorts();
+        this.portWatchTimer = window.setInterval(() => this._watchPorts(), 2000);
+        const preferredInput = findPreferredMidiPort(this.ports.inputs, UC33E_MIOXC_PROFILE.inputNamePattern);
+        const preferredOutput = findPreferredMidiPort(this.ports.outputs, UC33E_MIOXC_PROFILE.outputNamePattern);
+        if (preferredInput?.name === els.midiInput?.value && preferredOutput?.name === els.midiOutput?.value) {
+            await this.connect({ automatic: true }).catch((error) => {
+                this.status = error?.message || String(error);
+                this._syncUi();
+            });
+        }
+    }
+
+    _buildTargetOptions() {
+        if (!els.midiLearnTarget) return;
+        els.midiLearnTarget.innerHTML = '';
+        for (const target of this.app.midiTargetDescriptors()) {
+            const option = document.createElement('option');
+            option.value = target.id;
+            option.textContent = target.label;
+            els.midiLearnTarget.appendChild(option);
+        }
+    }
+
+    _bindUi() {
+        els.midiConnect?.addEventListener('click', () => {
+            const operation = this.connected ? this.disconnect() : this.connect();
+            operation.catch((error) => {
+                this.status = error?.message || String(error);
+                this._syncUi();
+            });
+        });
+        els.midiInput?.addEventListener('change', () => {
+            this.settings.inputName = els.midiInput.value;
+            this._persistSettings();
+        });
+        els.midiOutput?.addEventListener('change', () => {
+            this.settings.outputName = els.midiOutput.value;
+            this._persistSettings();
+        });
+        els.midiSoftTakeover?.addEventListener('change', () => {
+            this.settings.softTakeover = Boolean(els.midiSoftTakeover.checked);
+            this.engine.setSoftTakeover(this.settings.softTakeover);
+            this._persistSettings();
+            this._syncUi();
+        });
+        els.midiEnsureProfile?.addEventListener('change', () => {
+            this.settings.ensureProfile = Boolean(els.midiEnsureProfile.checked);
+            this._persistSettings();
+            if (this.settings.ensureProfile && !this.sysexProfile) {
+                this.status = 'Capture the UC-33e profile before enabling restore on connection';
+            }
+            this._syncUi();
+        });
+        els.midiCaptureProfile?.addEventListener('click', () => {
+            const operation = this.captureMode ? this.finishCapture() : this.startCapture('capture');
+            operation.catch((error) => this._setError(error));
+        });
+        els.midiVerifyProfile?.addEventListener('click', () => {
+            const operation = this.captureMode === 'verify' ? this.finishCapture() : this.startCapture('verify');
+            operation.catch((error) => this._setError(error));
+        });
+        els.midiInstallProfile?.addEventListener('click', () => {
+            this.installProfile().catch((error) => this._setError(error));
+        });
+        els.midiLearn?.addEventListener('click', () => {
+            this.learnArmed = !this.learnArmed;
+            this.status = this.learnArmed ? 'Move or press one UC-33e control' : (this.connected ? 'Connected' : 'Disconnected');
+            this._syncUi();
+        });
+        els.midiResetMappings?.addEventListener('click', () => {
+            this.customBindings = [];
+            saveJson(MIDI_CUSTOM_BINDINGS_KEY, []);
+            this.engine.setBindings(this._composedBindings());
+            this.status = 'Built-in UC-33e map restored';
+            this._syncUi();
+        });
+    }
+
+    _setError(error) {
+        this.busy = false;
+        this.status = error?.message || String(error || 'MIDI operation failed');
+        this._syncUi();
+    }
+
+    _persistSettings() {
+        saveJson(MIDI_SETTINGS_KEY, this.settings);
+    }
+
+    async refreshPorts() {
+        this.ports = await listTauriMidiPorts();
+        this._fillPortSelect(els.midiInput, this.ports.inputs, this.settings.inputName, 'No MIDI input');
+        this._fillPortSelect(els.midiOutput, this.ports.outputs, this.settings.outputName, 'No MIDI output');
+        const preferredInput = findPreferredMidiPort(this.ports.inputs, UC33E_MIOXC_PROFILE.inputNamePattern);
+        const preferredOutput = findPreferredMidiPort(this.ports.outputs, UC33E_MIOXC_PROFILE.outputNamePattern);
+        if (!els.midiInput.value && preferredInput) els.midiInput.value = preferredInput.name;
+        if (!els.midiOutput.value && preferredOutput) els.midiOutput.value = preferredOutput.name;
+        this.settings.inputName = els.midiInput.value || '';
+        this.settings.outputName = els.midiOutput.value || '';
+        this._persistSettings();
+        this.status = preferredInput && preferredOutput ? 'mioXC ready' : 'Connect the mioXC input and output';
+        this._syncUi();
+    }
+
+    _fillPortSelect(select, ports, preferredName, emptyLabel) {
+        if (!select) return;
+        select.innerHTML = '';
+        if (!ports.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = emptyLabel;
+            select.appendChild(option);
+            select.disabled = true;
+            return;
+        }
+        select.disabled = false;
+        for (const port of ports) {
+            const option = document.createElement('option');
+            option.value = port.name;
+            option.textContent = port.name;
+            select.appendChild(option);
+        }
+        const match = ports.find((port) => port.name === preferredName) ||
+            findPreferredMidiPort(ports, UC33E_MIOXC_PROFILE.inputNamePattern) || ports[0];
+        select.value = match?.name || '';
+    }
+
+    async connect(options = {}) {
+        if (this.busy || this.connected) return;
+        const inputName = els.midiInput?.value || this.settings.inputName;
+        const outputName = els.midiOutput?.value || this.settings.outputName;
+        if (!inputName || !outputName) throw new Error('Select both mioXC MIDI ports');
+        this.busy = true;
+        this.status = 'Connecting to mioXC';
+        this._syncUi();
+        try {
+            const state = await connectTauriMidi(inputName, outputName);
+            this.connected = Boolean(state?.connected);
+            this.settings.inputName = inputName;
+            this.settings.outputName = outputName;
+            this._persistSettings();
+            this.status = this.connected ? 'Connected' : 'Connection failed';
+            this._startPolling();
+            if (this.connected && this.settings.ensureProfile && this.sysexProfile) {
+                await this.installProfile({ automatic: true });
+            }
+        } finally {
+            this.busy = false;
+            this._syncUi();
+        }
+        if (!options.automatic) this._syncUi();
+    }
+
+    async disconnect() {
+        this.pollToken++;
+        await disconnectTauriMidi();
+        this.connected = false;
+        this.captureMode = null;
+        this.status = 'Disconnected';
+        this._syncUi();
+    }
+
+    async destroy() {
+        if (this.portWatchTimer) window.clearInterval(this.portWatchTimer);
+        this.portWatchTimer = null;
+        if (this.connected) await this.disconnect();
+    }
+
+    async _watchPorts() {
+        if (this.busy || this.captureMode) return;
+        try {
+            const ports = await listTauriMidiPorts();
+            const inputAvailable = ports.inputs.some((port) => port.name === this.settings.inputName);
+            const outputAvailable = ports.outputs.some((port) => port.name === this.settings.outputName);
+            if (this.connected && (!inputAvailable || !outputAvailable)) {
+                await this.disconnect();
+                this.status = 'mioXC disconnected — waiting for reconnection';
+                this._syncUi();
+                return;
+            }
+            if (!this.connected && inputAvailable && outputAvailable) {
+                await this.refreshPorts();
+                await this.connect({ automatic: true });
+            }
+        } catch (error) {
+            if (this.connected) {
+                this.status = error?.message || 'MIDI port refresh failed';
+                this._syncUi();
+            }
+        }
+    }
+
+    _startPolling() {
+        const token = ++this.pollToken;
+        const poll = async () => {
+            if (!this.connected || token !== this.pollToken) return;
+            try {
+                const events = await readTauriMidiEvents(256);
+                this._handleEvents(events);
+            } catch (error) {
+                this.connected = false;
+                this.status = error?.message || 'mioXC disconnected';
+                this._syncUi();
+                return;
+            }
+            window.setTimeout(poll, 16);
+        };
+        poll();
+    }
+
+    _handleEvents(events) {
+        if (!Array.isArray(events) || !events.length) return;
+        const last = events.at(-1);
+        this.lastMessage = this._eventLabel(last);
+        if (last.channel >= 1 && last.channel <= 4) this.activePage = last.channel;
+        const mappingEvents = coalesceMidiEvents(events, this.engine.bindings);
+        for (const event of mappingEvents) {
+            if (this.learnArmed && this._learnFromEvent(event)) continue;
+            this.engine.process(event);
+        }
+        this._syncUi();
+    }
+
+    _eventLabel(event) {
+        if (!event) return 'No MIDI messages';
+        if (event.kind === 'sysex') return `SysEx ${event.byteLength || 0} bytes`;
+        const channel = event.channel ? `CH${event.channel}` : 'SYS';
+        const number = event.number === null || event.number === undefined ? '' : ` ${event.number}`;
+        const value = event.value === null || event.value === undefined ? '' : ` = ${event.value}`;
+        return `${channel} ${event.kind}${number}${value}`;
+    }
+
+    _learnFromEvent(event) {
+        if (!event || !['cc', 'noteOn'].includes(event.kind)) return false;
+        if (event.kind === 'cc' && Number(event.value || 0) === 0 && Number(event.number || 0) >= 34) return false;
+        const targetId = els.midiLearnTarget?.value;
+        const target = this.app.midiTargetDescriptor(targetId);
+        if (!target) return false;
+        const binding = sanitizeMidiBinding({
+            id: `learned-${Date.now()}`,
+            channel: event.channel,
+            kind: event.kind,
+            number: event.number,
+            target: targetId,
+            mode: target.type === 'action' ? 'action' : 'continuous',
+            pickup: target.type !== 'action'
+        });
+        const inputKey = this._bindingInputKey(binding);
+        this.customBindings = this.customBindings.filter((item) => this._bindingInputKey(item) !== inputKey);
+        this.customBindings.push(binding);
+        saveJson(MIDI_CUSTOM_BINDINGS_KEY, this.customBindings);
+        this.engine.setBindings(this._composedBindings());
+        this.learnArmed = false;
+        this.status = `Learned ${event.kind} CH${event.channel} ${event.number} → ${target.label}`;
+        return true;
+    }
+
+    async startCapture(mode = 'capture') {
+        if (!this.connected) throw new Error('Connect the mioXC before capturing SysEx');
+        if (mode === 'verify' && !this.sysexProfile) throw new Error('Capture a profile before verification');
+        await startTauriMidiSysexCapture();
+        this.captureMode = mode;
+        this.status = mode === 'verify'
+            ? 'Press UC-33e MEMORY DUMP, then Finish Verify'
+            : 'Press UC-33e MEMORY DUMP, then Finish Capture';
+        this._syncUi();
+    }
+
+    async finishCapture() {
+        if (!this.captureMode) return;
+        const mode = this.captureMode;
+        const dump = await finishTauriMidiSysexCapture();
+        this.captureMode = null;
+        if (dump?.overflow) throw new Error('SysEx capture exceeded the safety limit');
+        if (!dump?.packetCount || !dump?.packets?.length) throw new Error('No complete SysEx packets were captured');
+        if (mode === 'verify') {
+            const matches = this.sysexProfile?.packets?.length === dump.packets.length &&
+                this.sysexProfile.packets.every((packet, index) => packet === dump.packets[index]);
+            this.status = matches
+                ? `Profile verified: ${dump.packetCount} packets, ${dump.totalBytes} bytes`
+                : 'Verification mismatch: the UC-33e dump differs from the stored profile';
+        } else {
+            this.sysexProfile = this._sanitizeStoredSysex({
+                packets: dump.packets,
+                totalBytes: dump.totalBytes,
+                capturedAt: new Date().toISOString()
+            });
+            saveJson(MIDI_SYSEX_PROFILE_KEY, this.sysexProfile);
+            this.status = `Profile captured: ${dump.packetCount} packets, ${dump.totalBytes} bytes`;
+        }
+        this._syncUi();
+    }
+
+    async installProfile(options = {}) {
+        if (!this.connected) throw new Error('Connect the mioXC before restoring SysEx');
+        const packets = this.sysexProfile?.packets?.length
+            ? this.sysexProfile.packets
+            : UC33E_MIOXC_PROFILE.sysexPackets;
+        if (!packets?.length) throw new Error('Capture the canonical UC-33e profile before installing it');
+        if (!options.automatic && !confirm('Install the ASCII VJ Remix profile? This overwrites all 33 UC-33e memories.')) return;
+        this.busy = true;
+        this.status = options.automatic ? 'Ensuring UC-33e profile' : 'Installing UC-33e profile';
+        this._syncUi();
+        try {
+            const result = await sendTauriMidiSysex(packets, UC33E_MIOXC_PROFILE.packetDelayMs);
+            this.status = `Sent ${result.packetCount} packets. Press UC preset 1 to activate.`;
+        } finally {
+            this.busy = false;
+            this._syncUi();
+        }
+    }
+
+    rearmSoftTakeover() {
+        this.engine.rearmPickup();
+        this.status = 'Soft takeover re-armed';
+        this._syncUi();
+    }
+
+    appendPresetDigit(value) {
+        if (!Number.isInteger(value) || value < 0 || value > 9) return;
+        this.presetEntry = `${this.presetEntry}${value}`.slice(-3);
+        this.status = `Preset slot ${this.presetEntry} — press Enter`;
+        this._syncUi();
+    }
+
+    clearPresetEntry() {
+        this.presetEntry = '';
+        this.status = 'Preset entry cleared';
+        this._syncUi();
+    }
+
+    consumePresetEntry() {
+        const value = Number(this.presetEntry);
+        this.presetEntry = '';
+        return Number.isInteger(value) && value >= 1 && value <= 128 ? value : null;
+    }
+
+    _renderMappings() {
+        if (!els.midiMappingList) return;
+        const signature = JSON.stringify(this.customBindings);
+        if (signature === this.mappingSignature) return;
+        this.mappingSignature = signature;
+        els.midiMappingList.innerHTML = '';
+        if (!this.customBindings.length) {
+            const empty = document.createElement('div');
+            empty.className = 'midi-mapping-item';
+            empty.textContent = 'Built-in 4-page UC-33e map active';
+            els.midiMappingList.appendChild(empty);
+            return;
+        }
+        for (const binding of this.customBindings) {
+            const item = document.createElement('div');
+            item.className = 'midi-mapping-item';
+            const label = document.createElement('span');
+            label.textContent = `CH${binding.channel} ${binding.kind} ${binding.number} → ${binding.target}`;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = 'Remove';
+            remove.addEventListener('click', () => {
+                this.customBindings = this.customBindings.filter((candidate) => candidate.id !== binding.id);
+                saveJson(MIDI_CUSTOM_BINDINGS_KEY, this.customBindings);
+                this.engine.setBindings(this._composedBindings());
+                this._syncUi();
+            });
+            item.append(label, remove);
+            els.midiMappingList.appendChild(item);
+        }
+    }
+
+    _syncUi() {
+        if (!els.midiPanel || !isTauriRuntime()) return;
+        els.midiConnect.textContent = this.connected ? 'Disconnect' : 'Connect';
+        els.midiConnect.setAttribute('aria-pressed', this.connected ? 'true' : 'false');
+        els.midiConnect.disabled = this.busy;
+        els.midiStatus.textContent = this.status;
+        els.midiStatus.classList.toggle('connected', this.connected);
+        els.midiPage.textContent = this.activePage ? `Page ${this.activePage} ${MIDI_PAGE_NAMES[this.activePage]}` : 'Page —';
+        els.midiLastMessage.textContent = this.lastMessage || 'No MIDI messages';
+        els.midiSoftTakeover.checked = Boolean(this.settings.softTakeover);
+        els.midiEnsureProfile.checked = Boolean(this.settings.ensureProfile);
+        els.midiCaptureProfile.textContent = this.captureMode === 'capture' ? 'Finish Capture' : 'Capture Profile';
+        els.midiVerifyProfile.textContent = this.captureMode === 'verify' ? 'Finish Verify' : 'Verify';
+        els.midiCaptureProfile.disabled = this.busy || !this.connected || this.captureMode === 'verify';
+        els.midiVerifyProfile.disabled = this.busy || !this.connected || !this.sysexProfile || this.captureMode === 'capture';
+        els.midiInstallProfile.disabled = this.busy || !this.connected || !this.sysexProfile;
+        els.midiLearn.setAttribute('aria-pressed', this.learnArmed ? 'true' : 'false');
+        els.midiLearn.textContent = this.learnArmed ? 'Cancel Learn' : 'Arm Learn';
+        this._renderMappings();
+    }
+}
+
 class RendererLabApp {
     constructor() {
         this.params = startupSafeParams(migrateStoredParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS)));
@@ -4603,6 +5133,8 @@ class RendererLabApp {
         this.audioReactiveFeatures = null;
         this.audioReactiveLastUi = 0;
         this.audioReactiveRuntime = new AudioReactiveRuntime(this);
+        this.midiRuntime = new MidiControllerRuntime(this);
+        this._midiTargetDescriptors = null;
         this.userPresets = parseStoredJson(PRESET_KEY, []);
         this.activePresetId = 'point-click-default';
         this.transitionToken = 0;
@@ -4677,6 +5209,7 @@ class RendererLabApp {
         this._buildControls();
         this._buildAudioReactiveControls();
         this._bindEvents();
+        await this.midiRuntime.init();
         await this._bindTauriSmokeEvents();
         await this._refreshOutputDisplays();
         await this._refreshCameraDevices();
@@ -5703,6 +6236,7 @@ class RendererLabApp {
             this.audioReactiveRuntime.stop();
             this._clearLocalObjectUrl();
             this._stopCameraStream();
+            this.midiRuntime.destroy().catch(() => {});
             this._stopNativeOutputMirror();
             this._closePopout();
         });
@@ -6748,6 +7282,7 @@ button:hover{background:#202a35}
             params: {
                 ...params,
                 glyphMode: this._nativeOutputGlyphMode(params),
+                charsetRamp: characterSetChars(params.charset),
                 sourceMode: this.params.sourceMode,
                 mediaUrl: this.params.mediaUrl,
                 mediaType: this.params.mediaType,
@@ -7922,6 +8457,7 @@ button:hover{background:#202a35}
             this.activePresetId = previousPresetId;
             console.error(error);
         }
+        this.midiRuntime?.rearmSoftTakeover();
         this._renderPresets();
     }
 
@@ -8446,6 +8982,263 @@ button:hover{background:#202a35}
             this._renderPresets();
         } catch (error) {
             alert(`Import failed: ${error.message}`);
+        }
+    }
+
+    midiTargetDescriptors() {
+        if (this._midiTargetDescriptors) return this._midiTargetDescriptors;
+        const targets = [];
+        const excludedGroups = new Set(['Camera', 'Stream']);
+        for (const group of CONTROL_GROUPS) {
+            if (excludedGroups.has(group.title)) continue;
+            for (const config of group.controls) {
+                if (config.type === 'range') {
+                    targets.push({
+                        id: `visual.${config.key}`,
+                        label: `Visual / ${config.label}`,
+                        type: 'range',
+                        min: config.min,
+                        max: config.max,
+                        step: config.step
+                    });
+                } else if (config.type === 'select') {
+                    targets.push({
+                        id: `visual.${config.key}`,
+                        label: `Visual / ${config.label}`,
+                        type: 'enum',
+                        options: config.options.map(([value]) => typeof DEFAULT_PARAMS[config.key] === 'number' ? Number(value) : value)
+                    });
+                }
+            }
+        }
+        targets.push({
+            id: 'visual.backend',
+            label: 'Visual / Backend',
+            type: 'enum',
+            options: ['auto', 'webgpu', 'webgl2', 'canvas2d', 'pixel-canvas']
+        });
+        targets.push({ id: 'macro.visualIntensity', label: 'Macro / Visual Intensity', type: 'range', min: 0, max: 1, step: 0.01 });
+        for (const config of AUDIO_REACTIVE_CONTROLS) {
+            targets.push({
+                id: `audio.${config.key}`,
+                label: `Audio / ${config.label}`,
+                type: 'range',
+                min: config.min,
+                max: config.max,
+                step: config.step
+            });
+        }
+        targets.push({
+            id: 'audio.preset',
+            label: 'Audio / Reactive Preset',
+            type: 'enum',
+            options: AUDIO_REACTIVE_PRESETS.map((preset) => preset.id)
+        });
+        const actions = [
+            ['action.preset.previous', 'Action / Previous Visual Preset'],
+            ['action.preset.next', 'Action / Next Visual Preset'],
+            ['action.preset.clear', 'Action / Clear Preset Entry'],
+            ['action.preset.enter', 'Action / Apply Preset Entry'],
+            ['action.wtf.toggle', 'Action / Toggle WTF'],
+            ['action.audio.toggle', 'Action / Toggle Audio Reactivity'],
+            ['action.visual.glyphMode.toggle', 'Action / Toggle Glyph Mode'],
+            ['action.visual.solidMode.toggle', 'Action / Toggle Solid Mode'],
+            ['action.visual.smoothing.toggle', 'Action / Toggle Smoothing'],
+            ['action.visual.autoRows.toggle', 'Action / Toggle Auto Rows'],
+            ['action.visual.charset.next', 'Action / Next Character Set'],
+            ['action.visual.fontFamily.next', 'Action / Next Font'],
+            ['action.audio.preset.previous', 'Action / Previous Audio Preset'],
+            ['action.audio.preset.next', 'Action / Next Audio Preset'],
+            ['action.audio.reset', 'Action / Reset Audio Settings'],
+            ['action.visual.resetPreset', 'Action / Reset Current Visual Preset'],
+            ['action.midi.rearmPickup', 'Action / Re-arm Soft Takeover']
+        ];
+        for (const [id, label] of actions) targets.push({ id, label, type: 'action' });
+        this._midiTargetDescriptors = targets;
+        return this._midiTargetDescriptors;
+    }
+
+    midiTargetDescriptor(id) {
+        const template = this.midiTargetDescriptors().find((target) => target.id === id);
+        if (!template) return null;
+        const descriptor = { ...template };
+        if (id.startsWith('visual.')) descriptor.value = this.params[id.slice('visual.'.length)];
+        else if (id.startsWith('audio.')) descriptor.value = this.audioReactive[id.slice('audio.'.length)];
+        else if (id === 'macro.visualIntensity') descriptor.value = clamp((Number(this.params.contrastBoost || 1) - 0.55) / 2, 0, 1);
+        return descriptor;
+    }
+
+    _applyMidiVisualValue(key, value) {
+        const config = CONTROL_CONFIG_BY_KEY.get(key);
+        if (key === 'backend') {
+            const allowed = ['auto', 'webgpu', 'webgl2', 'canvas2d', 'pixel-canvas'];
+            if (!allowed.includes(value)) return false;
+            this.params.backend = value;
+        } else if (!config || !['range', 'select', 'checkbox'].includes(config.type)) {
+            return false;
+        } else if (config.type === 'range') {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return false;
+            this.params[key] = clampParamValue(key, numeric);
+        } else if (config.type === 'select') {
+            const allowed = config.options.map(([option]) => typeof DEFAULT_PARAMS[key] === 'number' ? Number(option) : option);
+            if (!allowed.includes(value)) return false;
+            this.params[key] = value;
+        } else {
+            this.params[key] = Boolean(value);
+        }
+        if (this.wtfActive) this._stopWtf();
+        this._syncInputs();
+        this._paramChanged(key, STRUCTURAL_KEYS.has(key));
+        return true;
+    }
+
+    _applyMidiAudioValue(key, value) {
+        if (key === 'preset') {
+            if (!AUDIO_REACTIVE_PRESETS.some((preset) => preset.id === value)) return false;
+            this.audioReactive.preset = value;
+        } else {
+            const config = AUDIO_REACTIVE_CONTROLS.find((control) => control.key === key);
+            if (!config) return false;
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return false;
+            this.audioReactive[key] = clamp(numeric, config.min, config.max);
+        }
+        this.audioReactive = sanitizeAudioReactiveSettings(this.audioReactive);
+        this.audioReactiveRuntime.updateSettings();
+        this._syncAudioReactiveUi(true);
+        return true;
+    }
+
+    _applyMidiVisualIntensity(value) {
+        const amount = clamp(Number(value || 0), 0, 1);
+        this.params.brightness = clampParamValue('brightness', 0.65 + amount * 0.85);
+        this.params.contrastBoost = clampParamValue('contrastBoost', 0.55 + amount * 2);
+        this.params.saturationBoost = clampParamValue('saturationBoost', 0.4 + amount * 2.35);
+        this.params.gamma = clampParamValue('gamma', 1.5 - amount * 0.78);
+        this.params.bgBlend = clampParamValue('bgBlend', 0.52 - amount * 0.4);
+        if (this.wtfActive) this._stopWtf();
+        this._syncInputs();
+        this._persist();
+        this._applyVisualState();
+        if (this.running) this._applyEffectiveRendererParams(this.renderParams(), 'midi-macro');
+        return true;
+    }
+
+    _cycleMidiPreset(direction) {
+        const presets = this._allPresets();
+        if (!presets.length) return false;
+        const current = Math.max(0, presets.findIndex((preset) => preset.id === this.activePresetId));
+        const index = (current + direction + presets.length) % presets.length;
+        this.applyPreset(presets[index].id).catch((error) => console.warn('[MIDI] Preset change failed:', error));
+        return true;
+    }
+
+    _midiPresetSlots() {
+        const presets = this._allPresets();
+        const available = new Map(presets.map((preset) => [preset.id, preset]));
+        const stored = parseStoredJson(MIDI_PRESET_SLOTS_KEY, []);
+        const storedIds = Array.isArray(stored) ? stored.slice(0, 128) : [];
+        const ids = storedIds.map(() => null);
+        const assigned = new Set();
+        for (let index = 0; index < storedIds.length; index++) {
+            const id = storedIds[index];
+            if (typeof id === 'string' && available.has(id) && !assigned.has(id)) {
+                ids[index] = id;
+                assigned.add(id);
+            }
+        }
+        for (const preset of presets) {
+            if (assigned.has(preset.id)) continue;
+            if (ids.length < 128) ids.push(preset.id);
+            else {
+                const open = ids.indexOf(null);
+                if (open < 0) break;
+                ids[open] = preset.id;
+            }
+            assigned.add(preset.id);
+        }
+        saveJson(MIDI_PRESET_SLOTS_KEY, ids);
+        return Array.from({ length: 128 }, (_, index) => available.get(ids[index]) || null);
+    }
+
+    _cycleAudioPreset(direction) {
+        const presets = AUDIO_REACTIVE_PRESETS;
+        const current = Math.max(0, presets.findIndex((preset) => preset.id === this.audioReactive.preset));
+        const index = (current + direction + presets.length) % presets.length;
+        return this._applyMidiAudioValue('preset', presets[index].id);
+    }
+
+    applyMidiTarget(target, payload = {}) {
+        if (payload.kind === 'value') {
+            if (target === 'macro.visualIntensity') return this._applyMidiVisualIntensity(payload.value);
+            if (target.startsWith('visual.')) return this._applyMidiVisualValue(target.slice('visual.'.length), payload.value);
+            if (target.startsWith('audio.')) return this._applyMidiAudioValue(target.slice('audio.'.length), payload.value);
+            return false;
+        }
+        const binding = payload.binding || {};
+        switch (target) {
+            case 'action.preset.previous': return this._cycleMidiPreset(-1);
+            case 'action.preset.next': return this._cycleMidiPreset(1);
+            case 'action.preset.digit':
+                this.midiRuntime.appendPresetDigit(binding.digit);
+                return true;
+            case 'action.preset.clear':
+                this.midiRuntime.clearPresetEntry();
+                return true;
+            case 'action.preset.enter': {
+                const slot = this.midiRuntime.consumePresetEntry();
+                const preset = slot ? this._midiPresetSlots()[slot - 1] : null;
+                if (!preset) {
+                    this.midiRuntime.status = slot ? `Preset slot ${slot} is empty` : 'Enter a preset slot from 1 to 128';
+                    this.midiRuntime._syncUi();
+                    return false;
+                }
+                this.applyPreset(preset.id).catch((error) => console.warn('[MIDI] Preset slot failed:', error));
+                return true;
+            }
+            case 'action.wtf.toggle':
+                this.toggleWtf();
+                return true;
+            case 'action.audio.toggle':
+                this._toggleAudioReactive().catch((error) => console.warn('[MIDI] Audio toggle failed:', error));
+                return true;
+            case 'action.visual.glyphMode.toggle': return this._applyMidiVisualValue('glyphMode', !this.params.glyphMode);
+            case 'action.visual.solidMode.toggle': return this._applyMidiVisualValue('solidMode', !this.params.solidMode);
+            case 'action.visual.smoothing.toggle': return this._applyMidiVisualValue('smoothing', !this.params.smoothing);
+            case 'action.visual.autoRows.toggle': return this._applyMidiVisualValue('autoRows', !this.params.autoRows);
+            case 'action.visual.charset.next': {
+                const current = CHARACTER_SET_IDS.indexOf(this.params.charset);
+                return this._applyMidiVisualValue('charset', CHARACTER_SET_IDS[(current + 1) % CHARACTER_SET_IDS.length]);
+            }
+            case 'action.visual.fontFamily.next': {
+                const current = FONT_FAMILY_IDS.indexOf(this.params.fontFamily);
+                return this._applyMidiVisualValue('fontFamily', FONT_FAMILY_IDS[(current + 1) % FONT_FAMILY_IDS.length]);
+            }
+            case 'action.audio.preset.previous': return this._cycleAudioPreset(-1);
+            case 'action.audio.preset.next': return this._cycleAudioPreset(1);
+            case 'action.audio.preset.select': {
+                const preset = AUDIO_REACTIVE_PRESETS[binding.presetIndex];
+                return preset ? this._applyMidiAudioValue('preset', preset.id) : false;
+            }
+            case 'action.audio.reset': {
+                const preserved = {
+                    enabled: this.audioReactive.enabled,
+                    source: this.audioReactive.source,
+                    inputDeviceId: this.audioReactive.inputDeviceId
+                };
+                this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS, ...preserved };
+                this.audioReactiveRuntime.updateSettings();
+                this._syncAudioReactiveUi(true);
+                return true;
+            }
+            case 'action.visual.resetPreset':
+                if (this.activePresetId) this.applyPreset(this.activePresetId).catch((error) => console.warn('[MIDI] Preset reset failed:', error));
+                return Boolean(this.activePresetId);
+            case 'action.midi.rearmPickup':
+                this.midiRuntime.rearmSoftTakeover();
+                return true;
+            default: return false;
         }
     }
 

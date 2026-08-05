@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-midi-events"
+description = "Enables the read_midi_events command without any pre-configured scope."
+commands.allow = ["read_midi_events"]
+
+[[permission]]
+identifier = "deny-read-midi-events"
+description = "Denies the read_midi_events command without any pre-configured scope."
+commands.deny = ["read_midi_events"]

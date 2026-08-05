@@ -8,7 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-Current documentation describes the 0.9.3 feature set.
+Current documentation describes the 0.9.5 feature set.
 
 ## Quick Links
 
@@ -22,6 +22,7 @@ Current documentation describes the 0.9.3 feature set.
 - [Testing guide](docs/TESTING.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
+- [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
 - [Release and updater notes](docs/CONTRIBUTORS.md#release-and-updater-work)
 - Contact: [alonso@dustwave.xyz](mailto:alonso@dustwave.xyz)
 - Support the project: [shop.dustwave.xyz](https://shop.dustwave.xyz) or [pool.dustwave.xyz](https://pool.dustwave.xyz)
@@ -85,6 +86,10 @@ workbench for stylized ASCII/cell video output.
   Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
 - Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
   Newsprint, Terminal Mono, and Dense Typewriter.
+- Twenty-three read-only character presets adapted from
+  [ascii.today](https://ascii.today/), including Broadway KB, Computer, Doom,
+  Ghost, Modular, Standard, Univers, and Doh. The complete credited pack is in
+  [ascii.today Character Presets](docs/ASCII_TODAY_PRESETS.md).
 - Character Set and Font Family controls stay compact so traditional ASCII
   tuning does not crowd the dense live-control surface.
 - User presets can be saved, duplicated, updated, deleted, imported, and
@@ -124,6 +129,30 @@ workbench for stylized ASCII/cell video output.
   surface.
 - Output display selection is persisted when Tauri can enumerate displays.
 
+### Experimental MIDI Control
+
+- Experimental native DIN MIDI control for an Evolution/M-Audio UC-33e
+  connected through an iConnectivity mioXC.
+- Four hardware pages for Visual, Audio, Presets, and Fine/User control, with
+  all 9 faders, 24 rotary controllers, and 14 assignable buttons mapped.
+- Numeric visual-preset slots from 1 through 128 with Enter, Previous, and Next.
+- Soft takeover is enabled by default to prevent jumps after software preset
+  changes.
+- MIDI Learn overrides, connection monitoring, and automatic mioXC reconnection.
+- Bounded full-bank SysEx capture, explicit Install/Restore, verification, and
+  optional Ensure Profile on Connection.
+- MIDI is restricted to visual parameters, audio-reactive settings, visual
+  presets, and WTF mode. It cannot change media sources, Camera, Pop Out, or
+  output displays.
+- macOS Apple Silicon is the primary 0.9.5 hardware target. Direct UC-33e USB
+  input and physical Windows/Linux validation are deferred.
+
+The 0.9.5 MIDI path is experimental: automated mapping, safety, and native
+transport tests pass, but the full physical control sweep and end-to-end SysEx
+restore/verification checklist are not complete. Keep Ensure Profile on
+Connection disabled until a captured hardware profile has been restored and
+verified manually.
+
 ### Desktop Packaging and Updates
 
 - Built with Tauri v2.
@@ -135,7 +164,7 @@ workbench for stylized ASCII/cell video output.
   - The output window has a minimal command surface.
 - GitHub Releases updater infrastructure is configured.
 - Public release CI requires Developer ID notarized macOS artifacts. Windows
-  0.9.3 artifacts are published as unsigned previews until SignPath Foundation,
+  artifacts are published as unsigned previews until SignPath Foundation,
   Azure Artifact Signing, or another signing backend is proven.
 - Intentional online paths are limited to the updater check/download flow and
   production-only reviewed/sanitized crash report submission.
@@ -150,9 +179,8 @@ exist, but stream mode is not currently exposed in the normal Source UI. The
 Static/Streaming selector, stream connection label, and buffer counter remain
 hidden until the stream workflow is ready as a standalone user feature.
 
-MIDI hardware control is planned, with the first target validation rig being an
-Evolution/M-Audio UC33e connected through an iConnectivity mioXC. It is not part
-of the current normal-user feature set.
+The initial hardware setup and complete controller map live in
+[docs/MIDI_UC33E.md](docs/MIDI_UC33E.md).
 
 ## System Requirements
 
@@ -238,8 +266,8 @@ Download the latest desktop build from:
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
 The release page may contain macOS, Windows, and Linux installers plus updater
-artifacts. macOS 0.9.3 artifacts are signed/notarized; Windows 0.9.3 artifacts
-are unsigned previews.
+artifacts. macOS 0.9.5 artifacts are expected to be signed/notarized; Windows
+0.9.5 artifacts are unsigned previews.
 
 ### 2. Install on macOS
 
@@ -256,7 +284,7 @@ are unsigned previews.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 0.9.3 artifacts are unsigned previews. Windows may show Unknown
+3. Windows 0.9.5 artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.

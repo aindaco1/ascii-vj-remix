@@ -46,6 +46,14 @@
     "allow-start-input-audio-capture",
     "allow-read-input-audio-features",
     "allow-stop-input-audio-capture",
+    "allow-list-midi-ports",
+    "allow-connect-midi",
+    "allow-disconnect-midi",
+    "allow-get-midi-state",
+    "allow-read-midi-events",
+    "allow-start-midi-sysex-capture",
+    "allow-finish-midi-sysex-capture",
+    "allow-send-midi-sysex",
     "process:allow-restart",
     "updater:default"
   ]

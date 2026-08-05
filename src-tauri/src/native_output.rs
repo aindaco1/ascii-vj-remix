@@ -100,6 +100,7 @@ pub struct NativeOutputParams {
     pub solid_mode: Option<bool>,
     pub glyph_mode: Option<bool>,
     pub charset: Option<String>,
+    pub charset_ramp: Option<String>,
     pub font_family: Option<String>,
     pub min_glyph_intensity: Option<f64>,
     pub camera_device_label: Option<String>,
@@ -302,6 +303,7 @@ struct NativeRenderParams {
     solid_mode: bool,
     glyph_mode: bool,
     charset: String,
+    charset_ramp: String,
     #[allow(dead_code)]
     font_family: String,
     #[allow(dead_code)]
@@ -331,7 +333,7 @@ const NATIVE_ASCII_ASCILINE_CHARS: &str = " .:-=+*#%@";
 const NATIVE_ASCII_CLASSIC_CAMERA_CHARS: &str = " .,:;i1tfLCG08@";
 const NATIVE_ASCII_BLOCK_CHARS: &str = " ░▒▓█";
 const NATIVE_GLYPH_ATLAS_CHARS: &str =
-    " .,'`^\":;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$░▒▓█";
+    " .,'`^\":;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$░▒▓█";
 
 fn native_glyph_chars() -> &'static [char] {
     static GLYPH_CHARS: OnceLock<Vec<char>> = OnceLock::new();
@@ -344,8 +346,11 @@ fn native_render_uses_glyphs(params: &NativeRenderParams) -> bool {
     params.glyph_mode && !params.solid_mode && !params.pixel
 }
 
-fn native_charset_chars(charset: &str) -> &'static str {
-    match charset {
+fn native_charset_chars(params: &NativeRenderParams) -> &str {
+    if !params.charset_ramp.is_empty() {
+        return &params.charset_ramp;
+    }
+    match params.charset.as_str() {
         "asciline" => NATIVE_ASCII_ASCILINE_CHARS,
         "classic-camera" => NATIVE_ASCII_CLASSIC_CAMERA_CHARS,
         "blocks" => NATIVE_ASCII_BLOCK_CHARS,
@@ -365,6 +370,27 @@ fn native_glyph_index_for_char(value: char) -> u8 {
         }
     }
     0
+}
+
+fn sanitize_native_charset_ramp(value: Option<&str>) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    let chars = value.chars().collect::<Vec<_>>();
+    if chars.len() < 2
+        || chars.len() > NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE
+        || chars.first() != Some(&' ')
+    {
+        return String::new();
+    }
+    for (index, value) in chars.iter().copied().enumerate() {
+        if (value != ' ' && native_glyph_index_for_char(value) == 0)
+            || chars[..index].contains(&value)
+        {
+            return String::new();
+        }
+    }
+    value.to_string()
 }
 
 fn native_glyph_char(index: u8) -> char {
@@ -588,14 +614,14 @@ fn native_glyph_alpha(index: u8, tile_x: u32, tile_y: u32) -> bool {
 
 #[cfg(any(not(target_os = "macos"), test))]
 fn native_glyph_ramp_indices(params: &NativeRenderParams) -> Vec<u8> {
-    native_charset_chars(&params.charset)
+    native_charset_chars(params)
         .chars()
         .map(native_glyph_index_for_char)
         .collect()
 }
 
 fn native_glyph_ramp_len(params: &NativeRenderParams) -> u32 {
-    native_charset_chars(&params.charset)
+    native_charset_chars(params)
         .chars()
         .count()
         .max(1)
@@ -643,7 +669,7 @@ fn native_glyph_ramp_bytes(
     params: &NativeRenderParams,
 ) -> [u8; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE] {
     let mut out = [0; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE];
-    for (index, glyph_index) in native_charset_chars(&params.charset)
+    for (index, glyph_index) in native_charset_chars(params)
         .chars()
         .map(native_glyph_index_for_char)
         .take(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE)
@@ -830,6 +856,7 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             solid_mode: Some(false),
             glyph_mode: Some(true),
             charset: Some("point-click".to_string()),
+            charset_ramp: None,
             font_family: Some("Courier New".to_string()),
             min_glyph_intensity: Some(180.0),
             camera_device_label: None,
@@ -2702,6 +2729,7 @@ impl NativeRenderParams {
                 _ => "point-click",
             }
             .to_string(),
+            charset_ramp: sanitize_native_charset_ramp(params.charset_ramp.as_deref()),
             font_family: params
                 .font_family
                 .clone()
@@ -3646,6 +3674,7 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     solid_mode: Some(false),
                     glyph_mode: Some(true),
                     charset: Some("point-click".to_string()),
+                    charset_ramp: None,
                     font_family: Some("Courier New".to_string()),
                     min_glyph_intensity: Some(180.0),
                     camera_device_label: None,
@@ -4022,6 +4051,7 @@ mod tests {
                 solid_mode: Some(false),
                 glyph_mode: Some(true),
                 charset: Some("point-click".to_string()),
+                charset_ramp: None,
                 font_family: Some("Courier New".to_string()),
                 min_glyph_intensity: Some(180.0),
                 camera_device_label: None,
@@ -4082,6 +4112,7 @@ mod tests {
         let mut payload = base_payload();
         payload.params.glyph_mode = Some(true);
         payload.params.charset = Some("classic-camera".to_string());
+        payload.params.charset_ramp = Some(" _|\\/@".to_string());
         payload.params.font_family = Some("Menlo".to_string());
         payload.params.min_glyph_intensity = Some(96.0);
 
@@ -4089,8 +4120,25 @@ mod tests {
 
         assert!(params.glyph_mode);
         assert_eq!(params.charset, "classic-camera");
+        assert_eq!(params.charset_ramp, " _|\\/@");
+        assert_eq!(native_charset_chars(&params), " _|\\/@");
         assert_eq!(params.font_family, "Menlo");
         assert_eq!(params.min_glyph_intensity, 96);
+    }
+
+    #[test]
+    fn native_params_reject_unbounded_or_unsupported_charset_ramps() {
+        let mut payload = base_payload();
+        payload.params.charset = Some("asciline".to_string());
+        payload.params.charset_ramp = Some("not-leading-with-space".to_string());
+        let params = NativeRenderParams::from_payload(&payload);
+        assert!(params.charset_ramp.is_empty());
+        assert_eq!(native_charset_chars(&params), NATIVE_ASCII_ASCILINE_CHARS);
+
+        payload.params.charset_ramp = Some(" aa".to_string());
+        assert!(NativeRenderParams::from_payload(&payload)
+            .charset_ramp
+            .is_empty());
     }
 
     #[test]

@@ -3,6 +3,7 @@ pub mod crash_reporter;
 pub mod desktop_bridge;
 pub mod media_engine;
 pub mod media_permissions;
+pub mod midi;
 pub mod native_output;
 pub mod system_audio;
 
@@ -17,6 +18,7 @@ pub fn run() {
         .manage(native_output::NativeOutputState::default())
         .manage(system_audio::SystemAudioCaptureState::default())
         .manage(system_audio::InputAudioCaptureState::default())
+        .manage(midi::MidiState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -58,6 +60,14 @@ pub fn run() {
             system_audio::start_input_audio_capture,
             system_audio::read_input_audio_features,
             system_audio::stop_input_audio_capture,
+            midi::list_midi_ports,
+            midi::connect_midi,
+            midi::disconnect_midi,
+            midi::get_midi_state,
+            midi::read_midi_events,
+            midi::start_midi_sysex_capture,
+            midi::finish_midi_sysex_capture,
+            midi::send_midi_sysex,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASCII VJ Remix");

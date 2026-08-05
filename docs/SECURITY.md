@@ -40,6 +40,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | FFmpeg sidecars | Bundled resources with policy checks and source/provenance metadata | Medium | No runtime downloads. Release sidecars should disable network protocols. |
 | Updater | GitHub Releases endpoint with signed updater packages | High | Private signing key is external. Public key is committed. |
 | Crash reporter | Rust-only POST to `https://crash.dustwave.xyz/v1/reports` in production builds | High | Reports are bounded, sanitized, user-configurable, and relayed to GitHub issues by a Cloudflare Worker. |
+| Experimental MIDI and UC-33e SysEx | Main-window-only Rust commands, mioXC port allowlist, bounded queues and packet limits | Medium | Profiles stay local and cannot target sources, Camera, Pop Out, or output displays. Physical full-bank restore verification remains incomplete. |
 | Logs and smoke reports | Local developer/test artifacts | Low to Medium | Do not log private file paths, raw audio, or sensitive environment values unless needed for explicit debugging. |
 
 ## Release Hardening Notes
@@ -70,8 +71,10 @@ The current release line includes these security hardening rules:
 - Preset imports must be bounded, schema-checked, clamped through the shared
   control metadata, and stripped of source/media fields before they can affect
   renderer state.
-- Glyph-mode native output should treat `charset` as allowlisted data and keep
-  `fontFamily` out of native font-loading/resource lookup paths.
+- Glyph-mode native output should treat `charset` as allowlisted data. Resolved
+  custom catalog ramps must be bounded, space-leading, unique, and restricted
+  to the fixed glyph atlas. Keep `fontFamily` out of native font-loading or
+  resource-lookup paths.
 - Dependency audits should include npm and Rust. `cargo audit` warnings from
   Tauri's current GTK/WebKit transitive stack are tracked as upstream desktop
   framework risk; actionable direct/transitive advisories should be fixed before
@@ -265,7 +268,7 @@ npm run check:ffmpeg-release
 
 ## Presets, MIDI, and Future Profiles
 
-Presets and future MIDI maps are local data, but they can still break the app if
+Presets and MIDI maps are local data, but they can still break the app if
 the import path trusts them.
 
 Import rules:
@@ -273,11 +276,32 @@ Import rules:
 - Parse as JSON data only.
 - Validate schema version and supported fields.
 - Clamp numeric values through the same live-control metadata used by the UI.
-- Keep character sets allowlisted and bounded before they reach native output.
+- Keep character-set ids allowlisted. Any resolved ramp sent to native output
+  must be bounded and restricted to the fixed bundled glyph atlas.
 - Reject unknown structural fields instead of silently applying them.
 - Do not let imported presets disable Stats Overlay unless the user imported
   that choice intentionally and the UI makes it clear.
 - Do not include private absolute media paths in exported packs by default.
+
+### MIDI and SysEx Rules
+
+- The first native adapter accepts only input/output port names containing
+  `mioXC`; direct UC-33e USB is not enabled in 0.9.5.
+- MIDI commands belong only to the main control window. The output window must
+  never enumerate devices, read events, capture dumps, or send SysEx.
+- Event queues, event reads, mapping counts, packet counts, decoded bytes, and
+  stored base64 must remain bounded.
+- Every outbound packet must start with `F0`, end with `F7`, and stay inside the
+  full-transfer byte limit.
+- Profile installation must be explicit unless the user has enabled Ensure
+  Profile on Connection.
+- Ensure-on-connect sends at most once per physical reconnect and must not loop
+  while the interface stays connected.
+- MIDI Learn targets must come from the allowlisted visual/audio/action target
+  registry. Do not add source, Camera, Pop Out, output display, updater, file,
+  or crash-report targets.
+- Captured profiles and learned mappings remain local and must not contain media
+  paths, frames, raw audio, credentials, or network data.
 
 ## Security Validation
 
@@ -289,6 +313,7 @@ General:
 git diff --check
 npm run check:offline
 npm run check:tauri-policy
+npm run test:midi
 ```
 
 Desktop security and packaging:
@@ -319,7 +344,7 @@ npm run check:ffmpeg-resources
   signing identity.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
-- Windows 0.9.3 artifacts are unsigned previews and may trigger Unknown
+- Windows 0.9.5 artifacts are unsigned previews and may trigger Unknown
   Publisher, SmartScreen, or Defender warnings. Future public Windows releases
   should be Authenticode signed and timestamped before being treated as normal
   public installers.
@@ -327,8 +352,8 @@ npm run check:ffmpeg-resources
   and portal setup.
 - Stream mode exists in development paths but is hidden from the normal UI until
   it is productized and security-reviewed.
-- Future MIDI mappings need import validation, mapping scopes, and rate limits
-  before they are treated as user-shareable profile packs.
+- MIDI mapping export/import still needs a user-shareable profile format with
+  the same validation, scopes, and rate limits as local MIDI Learn overrides.
 
 ## Reporting Security Issues
 

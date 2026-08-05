@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-finish-midi-sysex-capture"
+description = "Enables the finish_midi_sysex_capture command without any pre-configured scope."
+commands.allow = ["finish_midi_sysex_capture"]
+
+[[permission]]
+identifier = "deny-finish-midi-sysex-capture"
+description = "Denies the finish_midi_sysex_capture command without any pre-configured scope."
+commands.deny = ["finish_midi_sysex_capture"]

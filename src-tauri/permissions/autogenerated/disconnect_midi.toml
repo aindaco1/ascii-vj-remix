@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-disconnect-midi"
+description = "Enables the disconnect_midi command without any pre-configured scope."
+commands.allow = ["disconnect_midi"]
+
+[[permission]]
+identifier = "deny-disconnect-midi"
+description = "Denies the disconnect_midi command without any pre-configured scope."
+commands.deny = ["disconnect_midi"]

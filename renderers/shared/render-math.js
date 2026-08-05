@@ -1,6 +1,6 @@
-const GPU_BACKGROUND = [3 / 255, 4 / 255, 5 / 255];
+import { ASCII_CHARS, characterSetChars } from './character-sets.js';
 
-const ASCII_CHARS = " .'`^\":;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+const GPU_BACKGROUND = [3 / 255, 4 / 255, 5 / 255];
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -77,10 +77,7 @@ function processGpuCellColor(r, g, b, params) {
 }
 
 function charsetChars(params) {
-    if (params?.charset === 'blocks') return ' ░▒▓█';
-    if (params?.charset === 'asciline') return ' .:-=+*#%@';
-    if (params?.charset === 'classic-camera') return ' .,:;i1tfLCG08@';
-    return ASCII_CHARS;
+    return characterSetChars(params?.charset);
 }
 
 function glyphForLuma(luma, params) {

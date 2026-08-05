@@ -550,7 +550,8 @@ button:disabled {
 
 .preset-panel .panel-heading,
 .source-panel .panel-heading,
-.audio-panel .panel-heading {
+.audio-panel .panel-heading,
+.midi-panel .panel-heading {
     min-height: 30px;
     padding: 5px 8px;
 }
@@ -902,6 +903,104 @@ button:disabled {
 .audio-control-row output {
     color: var(--muted);
     text-align: right;
+}
+
+.midi-body {
+    display: grid;
+    gap: 6px;
+    padding: 6px;
+}
+
+.midi-device-grid,
+.midi-learn-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.midi-status-grid {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 4px;
+}
+
+.midi-status-grid span,
+.midi-mapping-item {
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 5px;
+    border: 1px solid var(--border-soft);
+    color: var(--muted);
+    font: 9px/1.2 var(--font-mono);
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#midi-status.connected {
+    color: var(--green);
+}
+
+#midi-connect[aria-pressed="true"],
+#midi-learn[aria-pressed="true"] {
+    border-color: var(--green);
+    background: var(--green);
+    color: var(--panel-2);
+}
+
+.midi-option-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.midi-option-grid label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 3px 5px;
+    border: 1px solid var(--border-soft);
+    color: var(--text);
+    font: 9px/1.1 var(--font-mono);
+    text-transform: uppercase;
+}
+
+.midi-option-grid input {
+    accent-color: var(--cyan);
+}
+
+.midi-sysex-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.midi-sysex-actions button,
+.midi-learn-grid button {
+    min-height: 26px;
+    padding: 0 5px;
+    font-size: 10px;
+}
+
+.midi-mapping-list {
+    display: grid;
+    gap: 3px;
+    max-height: 90px;
+    overflow-y: auto;
+}
+
+.midi-mapping-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    white-space: normal;
+}
+
+.midi-mapping-item button {
+    min-height: 20px;
+    padding: 0 5px;
+    font-size: 9px;
 }
 
 .control-row {
