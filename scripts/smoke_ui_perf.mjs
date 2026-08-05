@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nativeLogPath = path.join(tmpdir(), 'asciline-native-output.log');
 const mediaLogPath = '/tmp/asciline-media-diagnostics.log';
-const releaseApp = '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
+const defaultReleaseApp = '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix.app';
+const releaseApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 const durationMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_DURATION_MS || '9000');
 const sampleMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_SAMPLE_MS || '500');
 
@@ -47,7 +48,7 @@ if (launch.status !== 0) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let reportLine = null;
-const deadline = Date.now() + Math.max(15000, durationMs + 10000);
+const deadline = Date.now() + Math.max(30000, durationMs + 25000);
 while (Date.now() < deadline) {
   if (existsSync(mediaLogPath)) {
     reportLine = readFileSync(mediaLogPath, 'utf8')
@@ -71,11 +72,13 @@ console.log([
   'UI perf smoke:',
   `ok=${report.ok}`,
   `mainAvg=${Number(report.mainAvgFps || 0).toFixed(1)}fps`,
+  `mainP10=${Number(report.mainP10Fps || 0).toFixed(1)}fps`,
+  `mainP50=${Number(report.mainP50Fps || 0).toFixed(1)}fps`,
   `mainMin=${Number(report.mainMinFps || 0).toFixed(1)}fps`,
   `nativeOk=${Number(report.nativeOkHz || 0).toFixed(1)}hz`,
   `nativeFailed=${report.nativeFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
-  `backend=${report.backend || 'unknown'}`,
+  `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
   `media=${report.mediaUrl || 'unknown'}`
 ].join(' '));
 
@@ -84,6 +87,8 @@ if (report.phases) {
     console.log([
       `  ${phase}:`,
       `mainAvg=${Number(stats.mainAvgFps || 0).toFixed(1)}fps`,
+      `mainP10=${Number(stats.mainP10Fps || 0).toFixed(1)}fps`,
+      `mainP50=${Number(stats.mainP50Fps || 0).toFixed(1)}fps`,
       `mainMin=${Number(stats.mainMinFps || 0).toFixed(1)}fps`,
       `nativeOk=${Number(stats.nativeOkHz || 0).toFixed(1)}hz`
     ].join(' '));

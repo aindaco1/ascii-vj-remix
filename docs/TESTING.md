@@ -63,7 +63,7 @@ git diff --check
 | Adaptive codec vectors | `npm run test:vectors` |
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
-| UI performance | `npm run smoke:ui-perf` |
+| UI performance | `npm run smoke:ui-perf` with fixed defaults/transitions and average/P10/P50/minimum FPS |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -105,6 +105,19 @@ npm run test:rust
 ```
 
 Use an optimized app build before making performance conclusions.
+The UI performance smoke starts from canonical visual defaults, uses fixed
+non-structural numeric transitions, and records each backend visited so repeat
+runs are comparable. Select an exact bundle and a longer sample with:
+
+```bash
+ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix.app" \
+ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
+npm run smoke:ui-perf
+```
+
+Native log analysis reports both source upload and upload-skip rates. A healthy
+24 FPS source on a 60 Hz display should upload near source rate and skip the
+duplicate display ticks while presentation remains near refresh rate.
 For glyph-mode changes, include at least one traditional ASCII preset in manual
 Pop Out checks and confirm Character Set/Font Family changes do not hide the
 Glyph/Cell controls.

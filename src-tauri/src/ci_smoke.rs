@@ -399,7 +399,9 @@ fn spawn_ui_perf_smoke(app: &App) {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());
             thread::sleep(Duration::from_millis(250));
         }
-        thread::sleep(Duration::from_millis(duration_ms + 3500));
+        // Allow source startup, Pop Out creation, backend rebuilds, and a loaded
+        // machine to finish reporting before the CI-smoke process exits.
+        thread::sleep(Duration::from_millis(duration_ms + 15_000));
         finish(
             SmokeReport {
                 ok: true,

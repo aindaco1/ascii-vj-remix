@@ -8,7 +8,8 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-Current documentation describes the 0.9.5 feature set.
+Current development documentation describes 0.9.6, built on the released 0.9.5
+feature set.
 
 ## Quick Links
 
@@ -74,6 +75,9 @@ workbench for stylized ASCII/cell video output.
   - Vulkan/GLES on Linux.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets instead of flattening them into solid cells.
+- Version 0.9.6 removes duplicate native source-frame uploads, reuses stable GPU
+  resources, and bounds transition-time UI work without changing renderer math
+  or quality settings.
 - The renderer exposes live controls for grid, cell size, color, gamma,
   brightness, contrast, saturation, background blend, quantization, jitter,
   sample position, smoothing, FPS, glyph/cell behavior, and performance status.
@@ -144,10 +148,10 @@ workbench for stylized ASCII/cell video output.
 - MIDI is restricted to visual parameters, audio-reactive settings, visual
   presets, and WTF mode. It cannot change media sources, Camera, Pop Out, or
   output displays.
-- macOS Apple Silicon is the primary 0.9.5 hardware target. Direct UC-33e USB
+- macOS Apple Silicon is the primary 0.9.6 hardware target. Direct UC-33e USB
   input and physical Windows/Linux validation are deferred.
 
-The 0.9.5 MIDI path is experimental: automated mapping, safety, and native
+The 0.9.6 MIDI path remains experimental: automated mapping, safety, and native
 transport tests pass, but the full physical control sweep and end-to-end SysEx
 restore/verification checklist are not complete. Keep Ensure Profile on
 Connection disabled until a captured hardware profile has been restored and

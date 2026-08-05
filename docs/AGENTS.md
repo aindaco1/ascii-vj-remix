@@ -90,7 +90,8 @@ surface for live ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-Current docs describe the 0.9.5 feature set.
+Current development docs describe 0.9.6 on top of the released 0.9.5 feature
+set.
 
 Sources:
 
@@ -116,6 +117,8 @@ Rendering:
   luminance ramps and matching read-only presets.
 - Native glyph output should keep using bounded fixed atlas/ramp resources;
   `fontFamily` is UI/preview metadata, not a native font-loading sink.
+- Reuse stable WebGPU/WebGL resources, keep native source uploads keyed to
+  source-frame versions, and do not trade quality/resolution for performance.
 
 Live behavior:
 
@@ -132,7 +135,7 @@ Live behavior:
 - Safe clamps should prevent pure black or pure white outputs from randomized or
   audio-driven states.
 - The first experimental MIDI rig is the UC-33e through both DIN directions of
-  a mioXC; direct UC USB is out of scope for 0.9.5.
+  a mioXC; direct UC USB is out of scope for 0.9.6.
 - MIDI uses four channel-addressed pages, soft takeover, numeric preset slots,
   MIDI Learn overrides, and bounded full-bank SysEx capture/restore.
 - MIDI targets visual/audio/preset/WTF behavior only. Do not add source, Camera,
@@ -328,7 +331,7 @@ The roadmap tracks future work. At a high level:
 
 - Productize local stream mode only when the full standalone source workflow is
   ready.
-- Extend MIDI beyond the 0.9.5 UC-33e/mioXC DIN profile only after its current
+- Extend MIDI beyond the 0.9.6 UC-33e/mioXC DIN profile only after its current
   scope, mapping semantics, SysEx safety, and platform validation are preserved.
 - Continue improving native GPU output and platform-native capture paths.
 - Continue improving Windows SmartScreen reputation validation and real

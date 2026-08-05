@@ -247,6 +247,7 @@ pub(super) struct NativeGpuPresenter {
     source_texture: Option<wgpu::Texture>,
     source_view: Option<wgpu::TextureView>,
     source_size: (u32, u32),
+    uploaded_source_version: Option<u64>,
     cell_texture: Option<wgpu::Texture>,
     cell_view: Option<wgpu::TextureView>,
     cell_size: (u32, u32),
@@ -266,6 +267,7 @@ pub(super) struct NativeGpuPresenter {
 pub(super) struct NativeGpuFrameOutcome {
     pub(super) surface_status: &'static str,
     pub(super) presented: bool,
+    pub(super) source_uploaded: bool,
     pub(super) timing: NativeGpuFrameTiming,
 }
 
@@ -278,6 +280,13 @@ pub(super) struct NativeGpuFrameTiming {
     pub(super) submit_ns: u64,
     pub(super) present_ns: u64,
     pub(super) total_ns: u64,
+}
+
+fn source_frame_needs_upload(
+    uploaded_source_version: Option<u64>,
+    source_frame_version: Option<u64>,
+) -> bool {
+    source_frame_version.is_none() || uploaded_source_version != source_frame_version
 }
 
 impl NativeGpuPresenter {
@@ -452,6 +461,7 @@ impl NativeGpuPresenter {
             source_texture: None,
             source_view: None,
             source_size: (0, 0),
+            uploaded_source_version: None,
             cell_texture: None,
             cell_view: None,
             cell_size: (0, 0),
@@ -475,16 +485,17 @@ impl NativeGpuPresenter {
         params: &NativeRenderParams,
         frame_index: usize,
     ) -> Result<(), String> {
-        self.render_frame_with_outcome(window, frame, params, frame_index)
+        self.render_frame_with_source_version(window, frame, params, frame_index, None)
             .map(|_| ())
     }
 
-    pub(super) fn render_frame_with_outcome(
+    pub(super) fn render_frame_with_source_version(
         &mut self,
         window: &Window,
         frame: &DecodedRgbFrame,
         params: &NativeRenderParams,
         frame_index: usize,
+        source_frame_version: Option<u64>,
     ) -> Result<NativeGpuFrameOutcome, String> {
         let total_started_at = Instant::now();
         let prep_started_at = Instant::now();
@@ -503,7 +514,7 @@ impl NativeGpuPresenter {
         self.configure_surface(width, height);
 
         let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
-        self.ensure_source_texture(frame)?;
+        let source_uploaded = self.ensure_source_texture(frame, source_frame_version)?;
         self.ensure_cell_texture(cols, rows);
         self.queue.write_texture(
             wgpu::TexelCopyTextureInfo {
@@ -599,6 +610,7 @@ impl NativeGpuPresenter {
             return Ok(NativeGpuFrameOutcome {
                 surface_status,
                 presented: false,
+                source_uploaded,
                 timing: NativeGpuFrameTiming {
                     prep_ns,
                     acquire_ns,
@@ -663,6 +675,7 @@ impl NativeGpuPresenter {
         Ok(NativeGpuFrameOutcome {
             surface_status,
             presented: true,
+            source_uploaded,
             timing: NativeGpuFrameTiming {
                 prep_ns,
                 acquire_ns,
@@ -709,7 +722,11 @@ impl NativeGpuPresenter {
         self.surface.configure(&self.device, &self.config);
     }
 
-    fn ensure_source_texture(&mut self, frame: &DecodedRgbFrame) -> Result<(), String> {
+    fn ensure_source_texture(
+        &mut self,
+        frame: &DecodedRgbFrame,
+        source_frame_version: Option<u64>,
+    ) -> Result<bool, String> {
         if self.source_size != (frame.width, frame.height) {
             let texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("ASCILINE native GPU source texture"),
@@ -728,12 +745,16 @@ impl NativeGpuPresenter {
             self.source_view = Some(texture.create_view(&wgpu::TextureViewDescriptor::default()));
             self.source_texture = Some(texture);
             self.source_size = (frame.width, frame.height);
+            self.uploaded_source_version = None;
             self.compute_bind_group = None;
         }
 
         let expected_rgb_len = frame.width as usize * frame.height as usize * 3;
         if frame.data.len() < expected_rgb_len {
             return Err("native GPU source frame has too few RGB bytes".to_string());
+        }
+        if !source_frame_needs_upload(self.uploaded_source_version, source_frame_version) {
+            return Ok(false);
         }
         let expected_rgba_len = frame.width as usize * frame.height as usize * 4;
         if self.rgba_frame.len() != expected_rgba_len {
@@ -772,7 +793,8 @@ impl NativeGpuPresenter {
                 depth_or_array_layers: 1,
             },
         );
-        Ok(())
+        self.uploaded_source_version = source_frame_version;
+        Ok(true)
     }
 
     fn ensure_cell_texture(&mut self, cols: u32, rows: u32) {
@@ -892,6 +914,14 @@ fn put_f32(bytes: &mut [u8], offset: usize, value: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_upload_version_skips_only_identical_versioned_frames() {
+        assert!(source_frame_needs_upload(None, Some(1)));
+        assert!(!source_frame_needs_upload(Some(1), Some(1)));
+        assert!(source_frame_needs_upload(Some(1), Some(2)));
+        assert!(source_frame_needs_upload(Some(2), None));
+    }
 
     #[test]
     fn cell_params_match_webgpu_uniform_layout() {

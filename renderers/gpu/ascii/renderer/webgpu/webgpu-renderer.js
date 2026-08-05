@@ -259,14 +259,22 @@ export class WebGPURenderer {
         this.canvas = null;
         this.context = null;
         this.cellColorTexture = null;
+        this.cellColorView = null;
         this.videoComputePipeline = null;
         this.imageComputePipeline = null;
         this.renderPipeline = null;
         this.paramsBuffer = null;
         this.renderParamsBuffer = null;
+        this.imageComputeBindGroup = null;
+        this.renderBindGroup = null;
+        this.paramsData = new ArrayBuffer(80);
+        this.paramsView = new DataView(this.paramsData);
+        this.renderData = new ArrayBuffer(32);
+        this.renderView = new DataView(this.renderData);
 
         // Image-specific: static source texture (uploaded once)
         this.imageSourceTexture = null;
+        this.imageSourceView = null;
         this.frameCount = 0;
 
         this.rows = 0;
@@ -335,6 +343,8 @@ export class WebGPURenderer {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
+        this._createStableBindGroups();
+
         this.initialized = true;
         console.log(`[WebGPU] ${this.source.type} source, ${this.cols}x${this.rows} cells, ${this.canvasWidth}x${this.canvasHeight}px`);
     }
@@ -348,6 +358,8 @@ export class WebGPURenderer {
             format: 'rgba8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         });
+        this.imageSourceView = this.imageSourceTexture.createView();
+        this.imageComputeBindGroup = null;
 
         const sourceEl = this.source.canvas || this.source.element;
         this.device.queue.copyExternalImageToTexture(
@@ -397,6 +409,30 @@ export class WebGPURenderer {
             format: 'rgba8unorm',
             usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
         });
+        this.cellColorView = this.cellColorTexture.createView();
+        this.imageComputeBindGroup = null;
+        this.renderBindGroup = null;
+    }
+
+    _createStableBindGroups() {
+        if (!this.cellColorView || !this.paramsBuffer || !this.renderParamsBuffer) return;
+        this.renderBindGroup = this.device.createBindGroup({
+            layout: this.renderPipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: this.cellColorView },
+                { binding: 1, resource: { buffer: this.renderParamsBuffer } }
+            ]
+        });
+        if (!this.usesExternalVideoTexture && this.imageComputePipeline && this.imageSourceView) {
+            this.imageComputeBindGroup = this.device.createBindGroup({
+                layout: this.imageComputePipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: this.imageSourceView },
+                    { binding: 1, resource: this.cellColorView },
+                    { binding: 2, resource: { buffer: this.paramsBuffer } }
+                ]
+            });
+        }
     }
 
     _renderFrame() {
@@ -408,8 +444,7 @@ export class WebGPURenderer {
         const sh = this.source.height || 480;
 
         // Update params
-        const paramsData = new ArrayBuffer(80);
-        const pv = new DataView(paramsData);
+        const pv = this.paramsView;
         pv.setUint32(0, sw, true);
         pv.setUint32(4, sh, true);
         pv.setUint32(8, this.cols, true);
@@ -430,18 +465,17 @@ export class WebGPURenderer {
         pv.setFloat32(60, this.sampleY, true);
         pv.setFloat32(64, this.frameCount / Math.max(1, this.fps), true);
         pv.setUint32(68, this.mirrorX ? 1 : 0, true);
-        this.device.queue.writeBuffer(this.paramsBuffer, 0, paramsData);
+        this.device.queue.writeBuffer(this.paramsBuffer, 0, this.paramsData);
 
         // Render params
-        const renderData = new ArrayBuffer(32);
-        const rv = new DataView(renderData);
+        const rv = this.renderView;
         rv.setUint32(0, this.cols, true);
         rv.setUint32(4, this.rows, true);
         rv.setUint32(8, this.cellWidth, true);
         rv.setUint32(12, this.cellHeight, true);
         rv.setUint32(16, this.canvasWidth, true);
         rv.setUint32(20, this.canvasHeight, true);
-        this.device.queue.writeBuffer(this.renderParamsBuffer, 0, renderData);
+        this.device.queue.writeBuffer(this.renderParamsBuffer, 0, this.renderData);
 
         // Create bind groups based on source type
         let computeBG;
@@ -462,29 +496,16 @@ export class WebGPURenderer {
                 layout: computePipeline.getBindGroupLayout(0),
                 entries: [
                     { binding: 0, resource: externalTexture },
-                    { binding: 1, resource: this.cellColorTexture.createView() },
+                    { binding: 1, resource: this.cellColorView },
                     { binding: 2, resource: { buffer: this.paramsBuffer } }
                 ]
             });
         } else {
             computePipeline = this.imageComputePipeline;
-            computeBG = this.device.createBindGroup({
-                layout: computePipeline.getBindGroupLayout(0),
-                entries: [
-                    { binding: 0, resource: this.imageSourceTexture.createView() },
-                    { binding: 1, resource: this.cellColorTexture.createView() },
-                    { binding: 2, resource: { buffer: this.paramsBuffer } }
-                ]
-            });
+            computeBG = this.imageComputeBindGroup;
         }
-
-        const renderBG = this.device.createBindGroup({
-            layout: this.renderPipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: this.cellColorTexture.createView() },
-                { binding: 1, resource: { buffer: this.renderParamsBuffer } }
-            ]
-        });
+        const renderBG = this.renderBindGroup;
+        if (!computeBG || !renderBG) return;
 
         const encoder = this.device.createCommandEncoder();
 
@@ -581,6 +602,10 @@ export class WebGPURenderer {
         if (this.imageSourceTexture) this.imageSourceTexture.destroy();
         if (this.paramsBuffer) this.paramsBuffer.destroy();
         if (this.renderParamsBuffer) this.renderParamsBuffer.destroy();
+        this.cellColorView = null;
+        this.imageSourceView = null;
+        this.imageComputeBindGroup = null;
+        this.renderBindGroup = null;
         this.initialized = false;
     }
 

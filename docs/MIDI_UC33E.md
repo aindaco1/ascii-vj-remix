@@ -1,9 +1,10 @@
 # Experimental UC-33e and mioXC MIDI Control
 
-ASCII VJ Remix 0.9.5 adds experimental native MIDI control for an
+ASCII VJ Remix 0.9.5 added experimental native MIDI control for an
 Evolution/M-Audio UC-33e connected through an iConnectivity mioXC. The initial
 reference path is DIN MIDI on macOS Apple Silicon. Direct UC-33e USB input is
-intentionally out of scope for 0.9.5.
+intentionally out of scope for 0.9.6. Version 0.9.6 keeps the software profile
+and safety boundary intact while physical commissioning resumes.
 
 The software mapping and transport layers are covered by automated tests, but
 the complete physical control sweep and end-to-end full-bank SysEx
@@ -49,8 +50,8 @@ four UC memories:
 | --- | --- |
 | F1-F9 | CC 1-9, value 0-127 |
 | C10-C33 | CC 10-33, value 0-127 |
-| Numeric keys 0-9 | C34-C43 / CC 34-43, release 0, press 127 |
-| Stop, Play, Rewind, Fast-forward | C44-C47 / CC 44-47, release 0, press 127 |
+| Numeric keys 0-9 | UC controls C34-C43 / CC 34-43, release 0, press 127 |
+| Stop, Play, Rewind, Fast-forward | UC controls C44-C47 / CC 44-47, release 0, press 127 |
 
 Assign each control to the UC global channel (`00` at the individual-channel
 level), then store four hardware memories:
@@ -66,6 +67,85 @@ The MIDI monitor is the authority during hardware setup. If the controller's
 printed button numbering or an existing memory differs, use MIDI Learn or
 reassign the underlying transmitted CC so the observed channel/CC matches this
 table.
+
+## Resume Commissioning: Exact Front-Panel Procedure
+
+`CONTROL SELECT` in the manual means the one physical button labeled `SELECT`
+on the UC-33e. Press it once; do not press Control plus Select, do not hold it,
+and do not combine it with another button. The combined functions printed under
+brackets, such as `GLOBAL CHAN` and `MEM. DUMP`, are the ones that require two
+buttons at the same time.
+
+There is no Enter key while editing. After you type a valid value, either begin
+the next function or wait about three seconds for the flashing edit indicator to
+stop.
+
+### 1. Program F1-F9 and C10-C33
+
+For each fader and rotary control:
+
+1. Move the physical control. Its printed F/C number should appear as the small
+   selected-controller number in the LCD.
+2. Press `ASSIGN` once.
+3. Enter the matching CC number on the numeric keypad: F1 becomes CC 01, through
+   F9/CC 09, then C10/CC 10 through C33/CC 33.
+4. Press `CHANNEL` once and enter `00`. Channel 00 means “use this memory's
+   global channel.”
+
+### 2. Program the 14 buttons as momentary CC messages
+
+Do not assign a button directly to standard CC 34-47. On the UC-33e that mode
+toggles between two values on consecutive presses. ASCII VJ Remix needs a 127
+press edge and a 0 release edge, so each button must use extended mode 146.
+
+Repeat this sequence for C34 through C47:
+
+1. Press `SELECT` once, then type the controller number, such as `3`, `4` for
+   C34. This selection method is required for the numeric keys because those
+   keys enter numbers while edit mode is active.
+2. Press `ASSIGN` once, then enter `146` (extended momentary MIDI CC mode).
+3. Press `PROGRAM` twice, then enter the CC number that should be transmitted.
+   Use CC 34 for C34, CC 35 for C35, through CC 47 for C47.
+4. Press `DATA MSB` twice, then enter `127` (button press value).
+5. Press `DATA LSB` twice, then enter `000` (button release value).
+6. Press `CHANNEL` once, then enter `00` (use the memory's global channel).
+
+For the unit already inspected in this project, C34-C43 are physical numeric
+keys 0-9 and C44-C47 are Stop, Play, Rewind, and Fast-forward. The LCD's small
+number identifies the selected UC control; the large value is its assignment or
+current value, depending on edit state.
+
+### 3. Store the four channel pages
+
+The controller assignments are identical on all four pages, so program them
+once and store four copies with different global channels:
+
+1. Press `ASSIGN` and `CHANNEL` simultaneously, release them, and enter `01`.
+2. Press `STORE` once and enter `01`.
+3. Press `ASSIGN` and `CHANNEL` simultaneously and enter `02`; press `STORE`
+   and enter `02`.
+4. Repeat for global channel/memory `03`, then global channel/memory `04`.
+5. Press quick preset buttons 1, 2, 3, and 4 in turn. Move F1 after each recall
+   and confirm the app's MIDI monitor reports channels 1, 2, 3, and 4.
+
+Do not hold the `+` and `-` keys while powering on; that restores factory
+presets and erases the work above.
+
+### 4. Verify messages before capturing SysEx
+
+1. In ASCII VJ Remix, open **MIDI Control · Experimental** and click `Connect`.
+2. Recall quick preset 1.
+3. Move F1 and confirm the monitor reports channel 1, CC 1, with changing
+   values.
+4. Press and release numeric 0 and confirm channel 1, CC 34, value 127 followed
+   by value 0.
+5. Press and release Stop and confirm channel 1, CC 44, value 127 followed by
+   value 0.
+6. Repeat one fader and one button on quick presets 2-4 and confirm channels
+   2-4.
+
+If a button alternates 127/0 only on separate presses, reprogram it with mode
+146; it is still in standard toggle mode.
 
 ## Page 1: Visual
 
@@ -194,23 +274,36 @@ The desktop-only MIDI Control panel provides:
 Custom bindings, device preferences, captured SysEx, and preset-slot order are
 stored locally. They do not contain media paths and are never uploaded.
 
+The front-panel sequences in this guide are cross-checked against the
+[UC-33e Advanced User Guide](https://cf3.zzounds.com/media/uc-33e_advanced_user_guide_snglpg-0140c97029f79a42f54172fa10108e55.pdf)
+and the
+[UC-33e Getting Started guide](https://www.manuallib.com/download/EVOLUTION-UC-33-GETTING-STARTED.PDF).
+
 ## SysEx Capture and Restore
 
 The UC-33e public documentation describes full-memory transfer but not the
 proprietary byte layout. ASCII VJ Remix therefore treats the verified dump as
 opaque bounded packets.
 
-To create the canonical profile:
+To create and prove the canonical profile:
 
-1. Program and store memories 01-04.
-2. Connect both mioXC DIN directions.
-3. Connect MIDI in ASCII VJ Remix.
-4. Press Capture Profile.
-5. Trigger MEMORY DUMP on the UC-33e.
-6. Press Finish Capture.
-7. Press Install / Restore and confirm the full-bank overwrite.
-8. Press quick preset 1 on the UC-33e.
-9. Press Verify, trigger MEMORY DUMP again, and finish verification.
+1. Leave **Ensure profile on connection** off.
+2. Program, test, and store memories 01-04 using the procedure above.
+3. Confirm both mioXC DIN directions are connected and click `Connect` in the
+   app.
+4. Click `Capture Profile`.
+5. On the UC-33e, press `DATA MSB` and `STORE` simultaneously. The bracket
+   beneath those buttons is labeled `MEM. DUMP`.
+6. Wait until the dump activity stops, then click `Finish Capture`.
+7. Click `Install / Restore` and confirm the warning that all 33 UC memories
+   will be overwritten.
+8. Wait for restore completion, then press quick preset 1. A received dump does
+   not alter the active surface until a preset is recalled.
+9. Click `Verify`, press `DATA MSB` and `STORE` simultaneously again, wait for
+   the dump to finish, and click `Finish Verify`.
+10. Only after verification succeeds, optionally enable **Ensure profile on
+    connection**, disconnect/reconnect the mioXC once, recall quick preset 1,
+    and repeat the F1/numeric-0/Stop message checks.
 
 Ensure Profile on Connection sends the stored verified profile once after each
 mioXC reconnection. It never sends repeatedly while the interface remains

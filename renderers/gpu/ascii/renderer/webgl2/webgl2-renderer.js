@@ -145,6 +145,8 @@ export class WebGL2Renderer {
         this.gl = null;
         this.cellProgram = null;
         this.renderProgram = null;
+        this.cellUniforms = null;
+        this.renderUniforms = null;
         this.sourceTexture = null;
         this.cellColorTexture = null;
         this.cellFramebuffer = null;
@@ -177,6 +179,28 @@ export class WebGL2Renderer {
 
         this.cellProgram = this._createProgram(CELL_PASS_VERT, CELL_PASS_FRAG);
         this.renderProgram = this._createProgram(RENDER_PASS_VERT, RENDER_PASS_FRAG);
+        this.cellUniforms = this._uniformLocations(this.cellProgram, [
+            'u_source',
+            'u_gridSize',
+            'u_saturationBoost',
+            'u_contrastBoost',
+            'u_brightness',
+            'u_gamma',
+            'u_bgBlend',
+            'u_quantizeBits',
+            'u_jitterAmount',
+            'u_jitterSpeed',
+            'u_sampleX',
+            'u_sampleY',
+            'u_time',
+            'u_mirrorX'
+        ]);
+        this.renderUniforms = this._uniformLocations(this.renderProgram, [
+            'u_cellColors',
+            'u_gridSize',
+            'u_cellSize',
+            'u_canvasSize'
+        ]);
 
         // Fullscreen quad VAO
         this.quadVAO = gl.createVertexArray();
@@ -239,6 +263,10 @@ export class WebGL2Renderer {
         gl.deleteShader(vert);
         gl.deleteShader(frag);
         return prog;
+    }
+
+    _uniformLocations(program, names) {
+        return Object.fromEntries(names.map((name) => [name, this.gl.getUniformLocation(program, name)]));
     }
 
     _updateDimensions() {
@@ -306,23 +334,24 @@ export class WebGL2Renderer {
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.cellFramebuffer);
         gl.viewport(0, 0, this.cols, this.rows);
         gl.useProgram(this.cellProgram);
+        const cellUniforms = this.cellUniforms;
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
-        gl.uniform1i(gl.getUniformLocation(this.cellProgram, 'u_source'), 0);
-        gl.uniform2f(gl.getUniformLocation(this.cellProgram, 'u_gridSize'), this.cols, this.rows);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_saturationBoost'), this.saturationBoost);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_contrastBoost'), this.contrastBoost);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_brightness'), this.brightness);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_gamma'), this.gamma);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_bgBlend'), this.bgBlend);
-        gl.uniform1i(gl.getUniformLocation(this.cellProgram, 'u_quantizeBits'), this.quantizeBits);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_jitterAmount'), this.jitterAmount);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_jitterSpeed'), this.jitterSpeed);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_sampleX'), this.sampleX);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_sampleY'), this.sampleY);
-        gl.uniform1f(gl.getUniformLocation(this.cellProgram, 'u_time'), this.frameCount / Math.max(1, this.fps));
-        gl.uniform1i(gl.getUniformLocation(this.cellProgram, 'u_mirrorX'), this.mirrorX ? 1 : 0);
+        gl.uniform1i(cellUniforms.u_source, 0);
+        gl.uniform2f(cellUniforms.u_gridSize, this.cols, this.rows);
+        gl.uniform1f(cellUniforms.u_saturationBoost, this.saturationBoost);
+        gl.uniform1f(cellUniforms.u_contrastBoost, this.contrastBoost);
+        gl.uniform1f(cellUniforms.u_brightness, this.brightness);
+        gl.uniform1f(cellUniforms.u_gamma, this.gamma);
+        gl.uniform1f(cellUniforms.u_bgBlend, this.bgBlend);
+        gl.uniform1i(cellUniforms.u_quantizeBits, this.quantizeBits);
+        gl.uniform1f(cellUniforms.u_jitterAmount, this.jitterAmount);
+        gl.uniform1f(cellUniforms.u_jitterSpeed, this.jitterSpeed);
+        gl.uniform1f(cellUniforms.u_sampleX, this.sampleX);
+        gl.uniform1f(cellUniforms.u_sampleY, this.sampleY);
+        gl.uniform1f(cellUniforms.u_time, this.frameCount / Math.max(1, this.fps));
+        gl.uniform1i(cellUniforms.u_mirrorX, this.mirrorX ? 1 : 0);
 
         gl.bindVertexArray(this.quadVAO);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -331,13 +360,14 @@ export class WebGL2Renderer {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
         gl.useProgram(this.renderProgram);
+        const renderUniforms = this.renderUniforms;
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.cellColorTexture);
-        gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_cellColors'), 0);
-        gl.uniform2f(gl.getUniformLocation(this.renderProgram, 'u_gridSize'), this.cols, this.rows);
-        gl.uniform2f(gl.getUniformLocation(this.renderProgram, 'u_cellSize'), this.cellWidth, this.cellHeight);
-        gl.uniform2f(gl.getUniformLocation(this.renderProgram, 'u_canvasSize'), this.canvasWidth, this.canvasHeight);
+        gl.uniform1i(renderUniforms.u_cellColors, 0);
+        gl.uniform2f(renderUniforms.u_gridSize, this.cols, this.rows);
+        gl.uniform2f(renderUniforms.u_cellSize, this.cellWidth, this.cellHeight);
+        gl.uniform2f(renderUniforms.u_canvasSize, this.canvasWidth, this.canvasHeight);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         gl.bindVertexArray(null);
@@ -418,6 +448,8 @@ export class WebGL2Renderer {
             if (this.cellProgram) gl.deleteProgram(this.cellProgram);
             if (this.renderProgram) gl.deleteProgram(this.renderProgram);
         }
+        this.cellUniforms = null;
+        this.renderUniforms = null;
         this.initialized = false;
     }
 

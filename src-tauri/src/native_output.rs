@@ -1366,6 +1366,8 @@ struct NativeMacDisplayLinkContext {
     modulated_frames: AtomicU64,
     no_surface_frames: AtomicU64,
     gpu_failures: AtomicU64,
+    source_frame_uploads: AtomicU64,
+    source_frame_upload_skips: AtomicU64,
     main_dispatch_count: AtomicU64,
     main_dispatch_total_ns: AtomicU64,
     last_main_dispatch_ns: AtomicU64,
@@ -1412,6 +1414,8 @@ impl NativeMacDisplayLinkContext {
             modulated_frames: AtomicU64::new(0),
             no_surface_frames: AtomicU64::new(0),
             gpu_failures: AtomicU64::new(0),
+            source_frame_uploads: AtomicU64::new(0),
+            source_frame_upload_skips: AtomicU64::new(0),
             main_dispatch_count: AtomicU64::new(0),
             main_dispatch_total_ns: AtomicU64::new(0),
             last_main_dispatch_ns: AtomicU64::new(0),
@@ -1550,10 +1554,22 @@ impl NativeMacDisplayLinkContext {
         let result = presenter
             .as_mut()
             .expect("display-link GPU presenter initialized")
-            .render_frame_with_outcome(&self.window, &frame, &current_params, frame_index);
+            .render_frame_with_source_version(
+                &self.window,
+                &frame,
+                &current_params,
+                frame_index,
+                Some(frame_version),
+            );
         match result {
             Ok(outcome) => {
                 self.record_gpu_timing(outcome.timing);
+                if outcome.source_uploaded {
+                    self.source_frame_uploads.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    self.source_frame_upload_skips
+                        .fetch_add(1, Ordering::Relaxed);
+                }
                 if let Ok(mut status) = self.last_surface_status.lock() {
                     *status = outcome.surface_status;
                 }
@@ -1652,7 +1668,7 @@ impl NativeMacDisplayLinkContext {
             .unwrap_or_default();
         let elapsed_ms = now.duration_since(self.started_at).as_secs_f64() * 1000.0;
         let line = format!(
-            "[NativeOutputDisplayLinkStats] elapsedMs={:.3} ticks={} pendingSkips={} noFrame={} fpsSkips={} attempts={} presented={} modulated={} noSurface={} gpuFailures={} surface={} paramVersion={} frameVersion={} presentFps={:.3} dispatchMs={:.3}/{:.3} renderMs={:.3}/{:.3}/{:.3} gpuLastMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuAvgMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuMaxMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3}",
+            "[NativeOutputDisplayLinkStats] elapsedMs={:.3} ticks={} pendingSkips={} noFrame={} fpsSkips={} attempts={} presented={} modulated={} noSurface={} gpuFailures={} surface={} paramVersion={} frameVersion={} sourceUploads={} sourceUploadSkips={} presentFps={:.3} dispatchMs={:.3}/{:.3} renderMs={:.3}/{:.3}/{:.3} gpuLastMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuAvgMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuMaxMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3}",
             elapsed_ms,
             self.ticks.load(Ordering::Relaxed),
             self.pending_skips.load(Ordering::Relaxed),
@@ -1666,6 +1682,8 @@ impl NativeMacDisplayLinkContext {
             surface_status,
             self.last_param_version_seen.load(Ordering::Relaxed),
             self.last_frame_version_seen.load(Ordering::Relaxed),
+            self.source_frame_uploads.load(Ordering::Relaxed),
+            self.source_frame_upload_skips.load(Ordering::Relaxed),
             self.last_present_fps_x1000.load(Ordering::Relaxed) as f64 / 1000.0,
             ns_to_ms(self.last_main_dispatch_ns.load(Ordering::Relaxed)),
             avg_dispatch_ms,

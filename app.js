@@ -6302,7 +6302,10 @@ class RendererLabApp {
             samples: [],
             phases: {},
             mainAvgFps: 0,
+            mainP10Fps: 0,
+            mainP50Fps: 0,
             mainMinFps: 0,
+            actualBackends: [],
             nativeSyncHz: 0,
             nativeOkHz: 0,
             nativeFailed: 0,
@@ -6337,9 +6340,20 @@ class RendererLabApp {
             const fpsValues = samples.map((item) => item.measuredFps).filter(Number.isFinite);
             const syncValues = samples.map((item) => item.nativeSyncHz).filter(Number.isFinite);
             const okValues = samples.map((item) => item.nativeOkHz).filter(Number.isFinite);
+            const percentile = (values, fraction) => {
+                if (!values.length) return 0;
+                const sorted = [...values].sort((left, right) => left - right);
+                const index = (sorted.length - 1) * fraction;
+                const lower = Math.floor(index);
+                const upper = Math.ceil(index);
+                if (lower === upper) return sorted[lower];
+                return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+            };
             return {
                 count: samples.length,
                 mainAvgFps: fpsValues.length ? fpsValues.reduce((sum, value) => sum + value, 0) / fpsValues.length : 0,
+                mainP10Fps: percentile(fpsValues, 0.1),
+                mainP50Fps: percentile(fpsValues, 0.5),
                 mainMinFps: fpsValues.length ? Math.min(...fpsValues) : 0,
                 nativeSyncHz: syncValues.length ? syncValues.reduce((sum, value) => sum + value, 0) / syncValues.length : 0,
                 nativeOkHz: okValues.length ? okValues.reduce((sum, value) => sum + value, 0) / okValues.length : 0
@@ -6353,7 +6367,7 @@ class RendererLabApp {
 
             this._stopWtf();
             this.params = normalizeParams({
-                ...this.params,
+                ...DEFAULT_PARAMS,
                 sourceMode: 'static',
                 backend,
                 mediaUrl,
@@ -6391,25 +6405,64 @@ class RendererLabApp {
             await wait(1000);
             await collectPhase('popout', phaseDurationMs);
 
-            if (!this.wtfActive) this.toggleWtf();
-            await collectPhase('wtf', phaseDurationMs);
+            const transitionTargets = [
+                {
+                    brightness: 0.76,
+                    contrastBoost: 1.85,
+                    saturationBoost: 1.95,
+                    gamma: 1.32,
+                    bgBlend: 0.18,
+                    jitterAmount: 0.82,
+                    jitterSpeed: 2.1,
+                    sampleX: 0.35,
+                    sampleY: 0.65
+                },
+                {
+                    brightness: 1.18,
+                    contrastBoost: 0.9,
+                    saturationBoost: 0.85,
+                    gamma: 0.78,
+                    bgBlend: 0.46,
+                    jitterAmount: 0.24,
+                    jitterSpeed: 0.7,
+                    sampleX: 0.62,
+                    sampleY: 0.38
+                }
+            ];
+            const transitionDeadline = performance.now() + phaseDurationMs;
+            const transitionChurn = (async () => {
+                let targetIndex = 0;
+                while (performance.now() < transitionDeadline) {
+                    const target = normalizeParams({
+                        ...this.params,
+                        ...transitionTargets[targetIndex % transitionTargets.length]
+                    }, { preserveBlob: true });
+                    await this._transitionTo(target, 0.55);
+                    targetIndex += 1;
+                }
+            })();
+            await collectPhase('transition', phaseDurationMs);
+            await transitionChurn;
 
             const usable = report.samples.filter((item) => item.t > 1500);
-            report.phases = ['main', 'popout', 'wtf'].reduce((phases, phase) => {
+            report.phases = ['main', 'popout', 'transition'].reduce((phases, phase) => {
                 phases[phase] = summarizeSamples(usable.filter((item) => item.phase === phase));
                 return phases;
             }, {});
             const overall = summarizeSamples(usable);
             report.mainAvgFps = overall.mainAvgFps;
+            report.mainP10Fps = overall.mainP10Fps;
+            report.mainP50Fps = overall.mainP50Fps;
             report.mainMinFps = overall.mainMinFps;
+            report.actualBackends = [...new Set(usable.map((item) => item.backend).filter(Boolean))];
             report.nativeSyncHz = overall.nativeSyncHz;
             report.nativeOkHz = overall.nativeOkHz;
             report.nativeFailed = Math.max(0, this.nativeOutputSyncFailedCount - syncStart.failed);
             report.ok = (
                 report.phases.main.mainAvgFps >= 30 &&
                 report.phases.popout.mainAvgFps >= 24 &&
-                report.phases.wtf.mainAvgFps >= 24 &&
-                (!hasSecondaryOutput || report.phases.wtf.nativeOkHz >= 30) &&
+                report.phases.transition.mainAvgFps >= 24 &&
+                (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
                 report.nativeFailed === 0
             );
         } catch (error) {
@@ -6418,10 +6471,17 @@ class RendererLabApp {
             this._stopWtf();
             this.uiPerfSmokeActive = false;
             const { samples, ...summary } = report;
-            await recordTauriMediaDiagnostic(`[ASCILINE_UI_PERF_REPORT] ${JSON.stringify({
+            const compactSummary = JSON.parse(JSON.stringify({
                 ...summary,
                 sampleCount: samples.length
-            })}`).catch(() => {});
+            }, (_key, value) => (
+                typeof value === 'number' && !Number.isInteger(value)
+                    ? Math.round(value * 1000) / 1000
+                    : value
+            )));
+            await recordTauriMediaDiagnostic(
+                `[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(compactSummary)}`
+            ).catch(() => {});
         }
     }
 
@@ -7970,8 +8030,12 @@ button:hover{background:#202a35}
         this._syncSourceControls();
         this._updateControlVisibility();
         els.statsOverlay.classList.toggle('hidden', !this.params.statsOverlay);
-        els.container.style.backgroundColor = `rgba(3, 4, 5, ${clamp(1 - params.bgBlend * 0.35, 0.65, 1)})`;
+        this._updateRendererBackground(params);
         this.updateMeters();
+    }
+
+    _updateRendererBackground(params = this.renderParams()) {
+        els.container.style.backgroundColor = `rgba(3, 4, 5, ${clamp(1 - params.bgBlend * 0.35, 0.65, 1)})`;
     }
 
     _controlContext() {
@@ -8036,13 +8100,19 @@ button:hover{background:#202a35}
     _syncInputs() {
         this._syncSourceControls();
         this._syncCameraDeviceOptions();
-        for (const key of this.controlInputs.keys()) {
+        this._syncInputValues(this.controlInputs.keys());
+    }
+
+    _syncInputValues(keys) {
+        for (const key of keys) {
             const entry = this.controlInputs.get(key);
             if (!entry) continue;
             const { input, config } = entry;
             if (config.type === 'checkbox') input.checked = Boolean(this.params[key]);
-            else if (config.type === 'device-list') this._syncControlValue(key);
-            else input.value = String(this.params[key]);
+            else if (config.type === 'device-list') {
+                this._syncControlValue(key);
+                continue;
+            } else input.value = String(this.params[key]);
             this._syncControlValue(key);
         }
     }
@@ -8500,6 +8570,11 @@ button:hover{background:#202a35}
         return new Promise((resolve) => {
             const start = performance.now();
             const duration = Math.max(1, seconds * 1000);
+            const changedKeys = Object.keys(to).filter((key) => to[key] !== from[key]);
+            const tweenInputKeys = changedKeys.filter((key) => CLIENT_TWEEN_KEYS.has(key));
+            const discreteInputKeys = changedKeys.filter((key) => !CLIENT_TWEEN_KEYS.has(key));
+            const updatesBackground = changedKeys.includes('bgBlend');
+            let discreteInputsSynced = false;
             const cancel = () => {
                 if (!options.keepTransitioning) this.transitioning = false;
                 resolve(false);
@@ -8511,8 +8586,14 @@ button:hover{background:#202a35}
                 }
                 const t = clamp((now - start) / duration, 0, 1);
                 this.params = this._transitionFrameParams(from, to, t);
-                this._syncInputs();
-                this._applyVisualState();
+                this._syncInputValues(tweenInputKeys);
+                if (!discreteInputsSynced && t >= 0.5) {
+                    this._syncInputValues(discreteInputKeys);
+                    discreteInputsSynced = true;
+                }
+                if (updatesBackground) {
+                    this._updateRendererBackground(this.renderParams());
+                }
                 if (this.running) {
                     this._applyEffectiveRendererParams(this.renderParams(), 'transition');
                 }
@@ -8526,6 +8607,7 @@ button:hover{background:#202a35}
                     this.params = to;
                     this._syncInputs();
                     this._persist();
+                    this._applyVisualState();
                     this._applyEffectiveRendererParams(this.renderParams(), 'transition');
                     if (!options.keepTransitioning) this.transitioning = false;
                     resolve(true);

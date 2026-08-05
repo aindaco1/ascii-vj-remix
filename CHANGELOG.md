@@ -1,6 +1,8 @@
 # Changelog
 
-Version 0.9.5 adds 23 credited ascii.today-inspired character presets and
+Version 0.9.6 continues the experimental MIDI commissioning work and removes
+measured renderer/output hot-path overhead without changing visual math or
+quality. Version 0.9.5 adds 23 credited ascii.today-inspired character presets and
 experimental native DIN MIDI control for an Evolution/M-Audio UC-33e through an
 iConnectivity mioXC, including four complete controller pages, soft takeover,
 numeric preset selection, MIDI Learn, and full-bank SysEx capture/restore.
@@ -9,6 +11,63 @@ distribution, publishes Windows as an unsigned preview while signing is
 deferred, and expands audio reactivity with dense-mix controls that reduce
 overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
+
+## [0.9.6] - Unreleased
+
+### Changed
+
+- Native macOS Pop Out now converts and uploads a decoded RGB source frame only
+  when its source-frame version changes. The display link can continue presenting
+  and applying live visual/audio parameters at display refresh without uploading
+  the same video frame again.
+- WebGPU reuses uniform backing storage, texture views, and stable bind groups;
+  per-frame browser-video external-texture binding remains dynamic as required.
+- WebGL2 resolves shader uniform locations at initialization instead of looking
+  up all 18 locations on every rendered frame.
+- Numeric preset/WTF transitions update only controls whose values are changing.
+  Source lists, camera choices, visibility, meters, and the rest of the control
+  surface are synchronized once at completion rather than on every animation
+  frame.
+- Optimized UI performance smoke uses clean defaults and fixed non-structural
+  transition targets, records P10/P50 as well as average FPS, reports the
+  backends actually visited, and accepts an exact app bundle through
+  `ASCILINE_SOURCE_APP` for release comparisons.
+- Advanced the desktop/package version to 0.9.6. MIDI remains experimental while
+  physical UC-33e/mioXC commissioning is completed.
+
+### Fixed
+
+- Corrected the UC-33e commissioning guide to use extended button mode 146 for
+  distinct press/release values. A plain standard-CC assignment toggles between
+  two values and does not provide the momentary edges expected by the app.
+- Clarified that Control Select is the single physical `SELECT` button and added
+  exact front-panel programming, store, SysEx capture/restore, and verification
+  steps.
+
+### Performance
+
+- On the optimized macOS Apple Silicon test build, a 24 FPS video presented at
+  60 FPS in native Pop Out with about 23.8 source uploads and 36.3 upload skips
+  per second: roughly 60% of the former duplicate conversion/upload work was
+  removed while presentation stayed at 60.1 FPS.
+- Steady optimized-build phases remained quality-equivalent and non-regressed:
+  the published 0.9.5 reference measured 35.8 FPS main / 39.3 FPS with Pop Out,
+  while the final 0.9.6 candidate measured 38.6 / 39.0 FPS and sustained 35.9
+  FPS during its fixed numeric-transition phase.
+- The static smoke harness now asserts that a numeric transition performs no
+  more than two source-control synchronizations and one camera/full-visual
+  synchronization, instead of repeating full UI work throughout the tween.
+- Renderer shader code, sampling, color processing, glyph math, output
+  resolution, source FPS, and quality controls are unchanged.
+
+### Validation
+
+- Added a Rust unit test for versioned native source-upload decisions.
+- Added browser smoke coverage for bounded numeric-transition UI work.
+- Extended native output log analysis with source upload and upload-skip rates.
+- Validated the optimized `.app` build plus static rendering, renderer math,
+  audio reactivity, all 188 default MIDI bindings, Tauri policy, and 47 Rust
+  tests on macOS Apple Silicon.
 
 ## [0.9.5] - 2026-08-04
 

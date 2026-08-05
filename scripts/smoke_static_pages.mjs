@@ -334,6 +334,55 @@ async function runSmoke() {
     );
 
     await page.waitForFunction(() => window.ascilineRemix?.running && document.querySelector('#toggle-play')?.textContent === 'Stop', null, { timeout: 15000 });
+    const numericTransitionUiWork = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      const counters = { source: 0, camera: 0, visual: 0, values: 0 };
+      const originals = {
+        source: app._syncSourceControls,
+        camera: app._syncCameraDeviceOptions,
+        visual: app._applyVisualState,
+        values: app._syncInputValues
+      };
+      app._syncSourceControls = function (...args) {
+        counters.source += 1;
+        return originals.source.apply(this, args);
+      };
+      app._syncCameraDeviceOptions = function (...args) {
+        counters.camera += 1;
+        return originals.camera.apply(this, args);
+      };
+      app._applyVisualState = function (...args) {
+        counters.visual += 1;
+        return originals.visual.apply(this, args);
+      };
+      app._syncInputValues = function (...args) {
+        counters.values += 1;
+        return originals.values.apply(this, args);
+      };
+      try {
+        const target = {
+          ...app.params,
+          brightness: Math.min(1.7, app.params.brightness + 0.12),
+          bgBlend: Math.min(0.8, app.params.bgBlend + 0.08)
+        };
+        const completed = await app._transitionTo(target, 0.25);
+        return { completed, ...counters };
+      } finally {
+        app._syncSourceControls = originals.source;
+        app._syncCameraDeviceOptions = originals.camera;
+        app._applyVisualState = originals.visual;
+        app._syncInputValues = originals.values;
+      }
+    });
+    if (
+      !numericTransitionUiWork.completed ||
+      numericTransitionUiWork.source > 2 ||
+      numericTransitionUiWork.camera > 1 ||
+      numericTransitionUiWork.visual > 1 ||
+      numericTransitionUiWork.values < 2
+    ) {
+      throw new Error(`Numeric transitions should avoid full UI/source work per frame: ${JSON.stringify(numericTransitionUiWork)}`);
+    }
     const sourceSwitches = [
       ['demo-image', 'image'],
       ['demo-video', 'video']

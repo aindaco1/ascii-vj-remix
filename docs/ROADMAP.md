@@ -1,8 +1,43 @@
 # ASCII VJ Remix Roadmap
 
-This roadmap separates the current 0.9.5 feature baseline from planned work.
+This roadmap separates the released 0.9.5 feature baseline, active 0.9.6 work,
+and planned follow-on work.
 It is meant to guide product, renderer, desktop packaging, and contribution
 decisions.
+
+## Active Release Work: 0.9.6
+
+### Performance Without Quality Reduction
+
+- Reuse WebGPU uniform storage, texture views, and stable bind groups instead
+  of recreating them per frame.
+- Cache WebGL2 uniform locations after program linking.
+- Keep numeric transition frames on the small control/value update path; run
+  source, camera, visibility, meter, and complete control-surface refreshes only
+  at the final state boundary.
+- Version native Pop Out source frames so display-refresh presentation and live
+  param modulation do not repeatedly convert and upload an unchanged 24 FPS
+  video frame at 60 FPS.
+- Preserve shader code, renderer math, source/output resolution, glyph quality,
+  and every visible quality control.
+- Keep optimized-build measurement repeatable with clean defaults, fixed
+  non-structural transition targets, P10/P50 metrics, exact bundle selection,
+  and native upload/skip counters.
+
+### MIDI Commissioning Resumed
+
+- Keep MIDI labeled experimental and keep Ensure Profile on Connection off
+  until manual restore and byte-for-byte verification succeed.
+- Program faders/rotaries as matching CC 1-33 on individual channel 00.
+- Program C34-C47 with extended mode 146, matching CC 34-47, press 127,
+  release 0, and individual channel 00. Plain standard-CC button mode is a
+  toggle and is not acceptable.
+- Store the common surface in memories 01-04 with global channels 1-4.
+- Complete full-bank capture, explicit restore, recall, verification, physical
+  sweep, reconnect, soft-takeover, numeric-slot, and forbidden-action checks on
+  macOS Apple Silicon.
+- Retain direct UC-33e USB and physical Windows/Linux validation as follow-on
+  work.
 
 ## Product Direction
 
@@ -231,18 +266,18 @@ source/backend.
 - The full controller map and hardware procedure live in
   [MIDI_UC33E](MIDI_UC33E.md).
 
-#### Hardware Commissioning Status: Paused
+#### Hardware Commissioning Status: Resuming in 0.9.6
 
-MIDI ships as experimental and feature development is frozen at the implemented
-and automated-test-passing state. The physical session
+MIDI remains experimental at the implemented and automated-test-passing state. The physical session
 confirmed that this UC-33e identifies the numeric keypad as C34–C43 and the
 Stop, Play, Rewind, and Fast-forward transport buttons as C44–C47. Those ids
 are now the canonical Page 3 mapping.
 
 Resume checklist:
 
-1. Program C34–C47 as momentary Control Change messages whose CC number matches
-   the controller id, with release value 0 and press value 127.
+1. Program C34–C47 with UC-33e extended button mode 146 as momentary Control
+   Change messages whose CC number matches the controller id, with release
+   value 0 and press value 127.
 2. Store UC memories 01–04 with global MIDI channels 1–4 and the documented
    Visual, Audio, Presets, and Fine/User maps.
 3. Capture a verified full-bank SysEx dump from the powered, bidirectionally
@@ -255,8 +290,8 @@ Resume checklist:
 7. Perform physical Windows and Linux validation later; direct UC-33e USB stays
    deferred.
 
-No additional MIDI behavior or mapping changes are planned while this workstream
-is paused, except regressions exposed by the ongoing 0.9.5 test suite.
+No new MIDI scope is planned during commissioning; failures should be fixed
+within the existing visual/audio-only security boundary.
 
 ### Desktop Security and Packaging
 
@@ -319,8 +354,8 @@ runtime security model lives in [Security](SECURITY.md).
 
 ### MIDI Follow-On Work
 
-The native MIDI foundation and UC-33e/mioXC profile ship as experimental in
-0.9.5. Remaining work:
+The native MIDI foundation and UC-33e/mioXC profile shipped as experimental in
+0.9.5 and commissioning continues in 0.9.6. Follow-on work after that:
 
 - Direct UC-33e USB support after the DIN/mioXC path is stable.
 - Physical Windows and Linux validation beyond CI builds and fake event tests.

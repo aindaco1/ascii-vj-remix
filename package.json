@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "private": true,
   "workspaces": [
     "crash-relay"

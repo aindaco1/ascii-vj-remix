@@ -276,6 +276,12 @@ Color processing includes:
 Jitter uses a deterministic hash seeded by cell position and time, so static
 images can animate without changing source media.
 
+Uniform ArrayBuffers/DataViews, texture views, and bind groups whose resources
+do not change are created once and reused. Browser video still imports an
+external texture and creates its source-dependent compute binding per frame;
+that resource is frame-scoped by WebGPU. Grid/source rebuilds create a new
+renderer and therefore a new complete resource set.
+
 ## WebGL2 Renderer
 
 The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
@@ -285,6 +291,8 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
 - first pass samples one color per cell into a cell-color texture.
 - second pass expands the cell-color texture to the visible canvas.
 - shader uniforms match the WebGPU parameter set where possible.
+- all 18 shader uniform locations are cached after program linking rather than
+  queried again during each frame.
 
 WebGL2 is the most important browser fallback because it is widely available on
 machines that do not expose WebGPU.
@@ -332,6 +340,13 @@ old renderer stays visible
 ```
 
 This avoids black frames during preset transitions.
+
+For a non-structural numeric tween, only controls whose values are changing are
+synchronized during animation frames. Source lists, camera-device options,
+visibility, meters, persistence, and the complete control surface are reconciled
+at the final state boundary. This is a UI-work optimization only; effective
+renderer params and native/Pop Out synchronization still advance during the
+tween.
 
 ## Stream Runtime
 
@@ -430,6 +445,12 @@ main UI params/source state
 For file-backed images/videos, Rust resolves bundled resources or registered
 media ids, decodes frames, uploads the latest frame to the GPU, applies cell
 color math, and presents through the native swapchain.
+
+On the macOS display-link path, the decoded source-frame version is passed to
+the presenter. When that version and the frame dimensions have not changed, the
+presenter reuses the existing source texture while still encoding/presenting
+with the latest visual and audio-reactive params. Unversioned fallback callers
+retain unconditional uploads. Logs expose source upload and skip counters.
 
 For macOS single-camera output, AVFoundation captures latest frames directly for
 the native presenter. Live camera presets should not use browser mirror
