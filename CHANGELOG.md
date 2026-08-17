@@ -82,8 +82,9 @@ baseline for the current ASCII VJ Remix feature set.
   application bundle.
 - Release validation verifies DMG integrity, mounts the image read-only under a
   private temporary root, accepts only the app, exact `/Applications` link, and
-  reviewed Tauri Finder metadata, and applies the existing app structure and
-  production identity checks to the mounted copy.
+  reviewed Tauri metadata (the required volume icon plus an optional regular
+  `.DS_Store`), and applies the existing app structure and production identity
+  checks to the mounted copy.
 - Published-release smoke now requires and revalidates the downloaded DMG before
   exercising the updater hop. Publishing refuses to replace existing artifact
   bytes for the same release tag.

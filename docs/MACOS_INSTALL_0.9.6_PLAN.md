@@ -69,9 +69,11 @@ The app in that image reported `com.asciline.remix` and version `0.9.5`.
 and Applications icons as its standard DMG installation UI.
 
 The first local 0.9.6 canary built with Tauri 2.11.3 added a regular
-`.DS_Store` file containing the Finder window/icon arrangement. The 0.9.6
-contract therefore accepts that reviewed metadata alongside `.VolumeIcon.icns`
-and rejects all other top-level entries.
+`.DS_Store` file containing the Finder window/icon arrangement. The signed and
+notarized macOS 26 CI candidate omitted that file while retaining the reviewed
+app, Applications link, and volume icon layout. The 0.9.6 contract therefore
+accepts `.DS_Store` as optional reviewed metadata alongside the required
+`.VolumeIcon.icns` and rejects all other top-level entries.
 
 The remaining gap is therefore validation, not image creation: the layout is
 implicit, the release checks do not mount the DMG, and the post-publication
@@ -110,8 +112,9 @@ The module should:
 - require a real `ASCII VJ Remix.app` directory;
 - require `Applications` to be a symbolic link whose exact target is
   `/Applications`;
-- require `.DS_Store` and `.VolumeIcon.icns` to be non-empty regular files and
-  reject every other top-level entry;
+- require `.VolumeIcon.icns` to be a non-empty regular file, accept an optional
+  `.DS_Store` only when it is also a non-empty regular file, and reject every
+  other top-level entry;
 - detach normally, fall back to forced detach only for cleanup, and remove the
   private directory in `finally`; and
 - return a small structured report containing schema version, byte size, app
@@ -156,6 +159,8 @@ Add a cross-platform Node test, for example
 - reject Applications as a regular directory;
 - reject a symlinked app bundle;
 - reject a missing or symlinked volume icon;
+- accept the reviewed layout both with and without `.DS_Store`;
+- reject `.DS_Store` when it is present as a symlink or empty file;
 - reject extra top-level entries; and
 - accept only valid absolute mount points from representative `hdiutil` plist
   data.
@@ -208,8 +213,8 @@ The work is complete only when all of the following are true:
 
 - A 0.9.6 candidate DMG opens with one visible app and one visible Applications
   destination.
-- The top level contains exactly the app, the `/Applications` link, and the
-  reviewed Tauri volume icon metadata.
+- The top level contains exactly the app, the `/Applications` link, the reviewed
+  Tauri volume icon metadata, and optionally a valid `.DS_Store`.
 - The app and Applications entries cannot redirect outside the mounted image or
   `/Applications` contract.
 - The image passes integrity, Developer ID signature, notarization-ticket, and

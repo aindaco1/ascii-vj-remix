@@ -74,6 +74,15 @@ try {
     entries: ['.DS_Store', '.VolumeIcon.icns', 'ASCII VJ Remix.app', 'Applications']
   });
 
+  const withoutFinderMetadata = await layoutFixture();
+  await unlink(path.join(withoutFinderMetadata, '.DS_Store'));
+  assert.deepEqual(await validateMacosDmgLayout(withoutFinderMetadata), {
+    schemaVersion: 'ascii-vj-remix-macos-dmg-layout-v1',
+    appName: 'ASCII VJ Remix.app',
+    applicationsLink: '/Applications',
+    entries: ['.VolumeIcon.icns', 'ASCII VJ Remix.app', 'Applications']
+  });
+
   const missingApplications = await layoutFixture();
   await unlink(path.join(missingApplications, 'Applications'));
   await assert.rejects(validateMacosDmgLayout(missingApplications), /entries are invalid/);
@@ -108,6 +117,10 @@ try {
   await unlink(path.join(linkedFinderMetadata, '.DS_Store'));
   await symlink('/tmp/.DS_Store', path.join(linkedFinderMetadata, '.DS_Store'));
   await assert.rejects(validateMacosDmgLayout(linkedFinderMetadata), /Finder metadata must be/);
+
+  const emptyFinderMetadata = await layoutFixture();
+  await writeFile(path.join(emptyFinderMetadata, '.DS_Store'), '');
+  await assert.rejects(validateMacosDmgLayout(emptyFinderMetadata), /Finder metadata must be/);
 
   const extraEntry = await layoutFixture();
   await writeFile(path.join(extraEntry, 'Read Me.txt'), 'unexpected');

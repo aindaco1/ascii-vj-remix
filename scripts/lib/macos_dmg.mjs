@@ -19,11 +19,14 @@ export const MACOS_DMG_APPLICATIONS_LINK_TARGET = '/Applications';
 export const MACOS_DMG_FINDER_METADATA_NAME = '.DS_Store';
 export const MACOS_DMG_VOLUME_ICON_NAME = '.VolumeIcon.icns';
 
-const EXPECTED_ENTRIES = Object.freeze([
+const REQUIRED_ENTRIES = Object.freeze([
   MACOS_DMG_APP_NAME,
   MACOS_DMG_APPLICATIONS_LINK_NAME,
-  MACOS_DMG_FINDER_METADATA_NAME,
   MACOS_DMG_VOLUME_ICON_NAME
+].sort());
+const ALLOWED_ENTRIES = Object.freeze([
+  ...REQUIRED_ENTRIES,
+  MACOS_DMG_FINDER_METADATA_NAME
 ].sort());
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 16 * 1024 * 1024;
@@ -93,8 +96,8 @@ export async function validateMacosDmgLayout(layoutInput) {
   }
 
   const entries = (await readdir(layoutRoot)).sort();
-  if (entries.length !== EXPECTED_ENTRIES.length
-      || entries.some((entry, index) => entry !== EXPECTED_ENTRIES[index])) {
+  if (REQUIRED_ENTRIES.some((entry) => !entries.includes(entry))
+      || entries.some((entry) => !ALLOWED_ENTRIES.includes(entry))) {
     throw new Error(`macOS DMG layout entries are invalid: ${entries.join(', ') || 'none'}`);
   }
 
@@ -123,8 +126,8 @@ export async function validateMacosDmgLayout(layoutInput) {
 
   const finderMetadataPath = path.join(layoutRoot, MACOS_DMG_FINDER_METADATA_NAME);
   const finderMetadataStat = await lstat(finderMetadataPath).catch(() => null);
-  if (!finderMetadataStat || finderMetadataStat.isSymbolicLink()
-      || !finderMetadataStat.isFile() || finderMetadataStat.size < 1) {
+  if (finderMetadataStat && (finderMetadataStat.isSymbolicLink()
+      || !finderMetadataStat.isFile() || finderMetadataStat.size < 1)) {
     throw new Error('macOS DMG Finder metadata must be a non-empty regular file');
   }
 
