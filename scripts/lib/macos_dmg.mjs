@@ -65,6 +65,16 @@ async function validateDmgPath(dmgInput) {
   return { dmgPath, dmgStat };
 }
 
+export function applicationsLinkTargetIsValid(target, platform = process.platform) {
+  if (target === MACOS_DMG_APPLICATIONS_LINK_TARGET) return true;
+  if (platform !== 'win32') return false;
+
+  // Windows normalizes the POSIX-absolute symlink used by the cross-platform
+  // fixture. Real DMG mounting is Darwin-only and still requires the exact
+  // target above.
+  return /^(?:[A-Za-z]:)?[\\/]Applications$/.test(target);
+}
+
 export async function findSingleMacosDmg(bundleRoot) {
   if (!bundleRoot || !path.isAbsolute(bundleRoot)) {
     throw new Error('macOS bundle root must be absolute');
@@ -113,8 +123,8 @@ export async function validateMacosDmgLayout(layoutInput) {
     throw new Error('macOS DMG Applications entry must be a symbolic link');
   }
   const applicationsTarget = await readlink(applicationsPath);
-  if (applicationsTarget !== MACOS_DMG_APPLICATIONS_LINK_TARGET) {
-    throw new Error('macOS DMG Applications link target is invalid');
+  if (!applicationsLinkTargetIsValid(applicationsTarget)) {
+    throw new Error(`macOS DMG Applications link target is invalid: ${applicationsTarget}`);
   }
 
   const volumeIconPath = path.join(layoutRoot, MACOS_DMG_VOLUME_ICON_NAME);

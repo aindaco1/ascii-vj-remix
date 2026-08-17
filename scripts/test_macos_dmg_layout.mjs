@@ -17,6 +17,7 @@ import {
 } from './lib/macos_app_bundle.mjs';
 import {
   MACOS_DMG_APP_NAME,
+  applicationsLinkTargetIsValid,
   findSingleMacosDmg,
   mountPointsFromAttachPlist,
   validateMacosDmgLayout
@@ -66,6 +67,12 @@ async function appBundleFixture() {
 }
 
 try {
+  assert.equal(applicationsLinkTargetIsValid('/Applications', 'darwin'), true);
+  assert.equal(applicationsLinkTargetIsValid('D:\\Applications', 'win32'), true);
+  assert.equal(applicationsLinkTargetIsValid('\\Applications', 'win32'), true);
+  assert.equal(applicationsLinkTargetIsValid('D:\\tmp', 'win32'), false);
+  assert.equal(applicationsLinkTargetIsValid('Applications', 'win32'), false);
+
   const valid = await layoutFixture();
   assert.deepEqual(await validateMacosDmgLayout(valid), {
     schemaVersion: 'ascii-vj-remix-macos-dmg-layout-v1',
