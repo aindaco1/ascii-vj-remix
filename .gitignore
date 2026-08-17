@@ -27,6 +27,9 @@ venv/
 .vscode/
 .idea/
 
+# Local tool state
+.wrangler/
+
 # Tauri / Rust build output
 src-tauri/target/
 src-tauri/gen/
