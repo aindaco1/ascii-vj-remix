@@ -472,11 +472,12 @@ breaking `codesign`. Normal CI and non-iCloud workspaces continue to use
 
 Release builds run `npm run ffmpeg:build-sidecar` before
 `npm run check:release`. That builds from the pinned official FFmpeg 8.1.2
-source tarball, verifies the source SHA-256, disables FFmpeg network protocols,
-and stages LGPL-compatible FFmpeg/ffprobe binaries as local Tauri resources.
-Runtime builds remain offline; CI may download official source during release
-builds, but the packaged app never downloads FFmpeg, codecs, or renderer assets
-at runtime.
+source tarball, retries bounded transient transport failures, promotes only a
+completed download, verifies the source SHA-256, disables FFmpeg network
+protocols, and stages LGPL-compatible FFmpeg/ffprobe binaries as local Tauri
+resources. Runtime builds remain offline; CI may download official source during
+release builds, but the packaged app never downloads FFmpeg, codecs, or renderer
+assets at runtime.
 
 The release workflow also runs `scripts/smoke_tauri_release_install.mjs` on
 macOS, Windows, and Linux after publishing. It downloads artifacts from GitHub

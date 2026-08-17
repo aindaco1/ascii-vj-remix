@@ -1,6 +1,7 @@
 # Changelog
 
-Version 0.9.6 continues the experimental MIDI commissioning work, removes
+Version 0.9.7 development begins with release transport resilience. Version
+0.9.6 continues the experimental MIDI commissioning work, removes
 measured renderer/output hot-path overhead without changing visual math or
 quality, and hardens the macOS drag-to-Applications release path. Version 0.9.5
 adds 23 credited ascii.today-inspired character presets and
@@ -12,6 +13,15 @@ distribution, publishes Windows as an unsigned preview while signing is
 deferred, and expands audio reactivity with dense-mix controls that reduce
 overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
+
+## [0.9.7] - Unreleased
+
+### Fixed
+
+- Release source downloads now retry bounded transient transport failures and
+  promote only completed FFmpeg tarballs before the pinned SHA-256 check.
+- Automatic desktop-release dispatch now retries transient GitHub API failures
+  with bounded backoff.
 
 ## [0.9.6] - 2026-08-17
 

@@ -24,6 +24,10 @@ assert.equal(config.sha256, '464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb40822317
 assert.equal(config.license, 'LGPL-2.1-or-later');
 assert.match(config.url, /^https:\/\/ffmpeg\.org\/releases\/ffmpeg-8\.1\.2\.tar\.xz$/);
 assert.match(config.source, /Official FFmpeg 8\.1\.2 source release/);
+assert.match(config.download_flags, /--fail/);
+assert.match(config.download_flags, /--retry 5/);
+assert.match(config.download_flags, /--retry-all-errors/);
+assert.match(config.download_flags, /--connect-timeout 30/);
 assert.match(config.flags, /--disable-network/);
 assert.match(config.flags, /--disable-autodetect/);
 assert.doesNotMatch(config.flags, /--enable-gpl/);

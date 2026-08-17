@@ -12,7 +12,20 @@ SOURCE_PARENT="$WORK_DIR/source"
 SOURCE_DIR="$SOURCE_PARENT/ffmpeg-$VERSION"
 PREFIX="${ASCILINE_FFMPEG_PREFIX:-$WORK_DIR/install}"
 TARBALL="$WORK_DIR/ffmpeg-$VERSION.tar.xz"
+PARTIAL_TARBALL="${TARBALL}.partial"
+DOWNLOAD_RETRIES="${ASCILINE_FFMPEG_DOWNLOAD_RETRIES:-5}"
+DOWNLOAD_RETRY_DELAY="${ASCILINE_FFMPEG_DOWNLOAD_RETRY_DELAY:-5}"
+DOWNLOAD_CONNECT_TIMEOUT="${ASCILINE_FFMPEG_DOWNLOAD_CONNECT_TIMEOUT:-30}"
 PRINT_CONFIG=0
+
+DOWNLOAD_FLAGS=(
+  "--fail"
+  "--location"
+  "--retry" "$DOWNLOAD_RETRIES"
+  "--retry-delay" "$DOWNLOAD_RETRY_DELAY"
+  "--retry-all-errors"
+  "--connect-timeout" "$DOWNLOAD_CONNECT_TIMEOUT"
+)
 
 if [ "${1:-}" = "--print-config" ]; then
   PRINT_CONFIG=1
@@ -59,6 +72,7 @@ if [ "$PRINT_CONFIG" -eq 1 ]; then
   printf "license=%s\n" "$LICENSE"
   printf "variant=%s\n" "$VARIANT"
   printf "source=%s\n" "$SOURCE_NOTE"
+  printf "download_flags=%s\n" "${DOWNLOAD_FLAGS[*]}"
   printf "flags=%s\n" "${CONFIG_FLAGS[*]}"
   exit 0
 fi
@@ -86,7 +100,12 @@ cpu_jobs() {
 mkdir -p "$WORK_DIR" "$SOURCE_PARENT"
 
 if [ ! -f "$TARBALL" ]; then
-  curl -L "$SOURCE_URL" -o "$TARBALL"
+  rm -f "$PARTIAL_TARBALL"
+  if ! curl "${DOWNLOAD_FLAGS[@]}" "$SOURCE_URL" -o "$PARTIAL_TARBALL"; then
+    rm -f "$PARTIAL_TARBALL"
+    exit 1
+  fi
+  mv "$PARTIAL_TARBALL" "$TARBALL"
 fi
 
 ACTUAL_SHA256="$(hash_file "$TARBALL")"
