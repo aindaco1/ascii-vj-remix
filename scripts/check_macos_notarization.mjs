@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdir, rm, stat } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { tauriTargetDir } from './lib/tauri_target_dir.mjs';
@@ -11,6 +11,11 @@ import {
   extractMacosUpdaterArchive,
   inspectMacosApp
 } from './lib/macos_app_identity.mjs';
+import {
+  findSingleMacosDmg,
+  verifyMacosDmgTrust,
+  withMountedMacosDmg
+} from './lib/macos_dmg.mjs';
 
 const root = path.resolve(process.env.ASCILINE_RELEASE_ROOT || process.cwd());
 const args = parseArgs(process.argv.slice(2));
@@ -54,15 +59,6 @@ async function dirs(parent) {
   }
 }
 
-async function exists(filePath) {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function run(command, args) {
   return spawnSync(command, args, { encoding: 'utf8' });
 }
@@ -92,24 +88,6 @@ function checkCodesign(appPath) {
   }
 }
 
-function checkDmgCodesign(dmgPath) {
-  const verify = run('/usr/bin/codesign', ['--verify', '--verbose=2', dmgPath]);
-  if (verify.status !== 0) {
-    issues.push(`DMG codesign verification failed: ${outputOf(verify)}`);
-    return;
-  }
-
-  const details = run('/usr/bin/codesign', ['-dvvv', dmgPath]);
-  const text = outputOf(details);
-  if (details.status !== 0) {
-    issues.push(`DMG codesign details failed: ${text}`);
-    return;
-  }
-  if (!text.includes('Authority=Developer ID Application')) {
-    issues.push('macOS DMG is not signed with a Developer ID Application identity');
-  }
-}
-
 function checkStapler(label, targetPath) {
   const result = run('xcrun', ['stapler', 'validate', targetPath]);
   if (result.status !== 0) {
@@ -136,8 +114,8 @@ if (process.platform !== 'darwin') {
 
 const appDirs = (await dirs(path.join(bundleRoot, 'macos'))).filter((dir) => dir.endsWith('.app'));
 let appIdentity = null;
-if (appDirs.length === 0) {
-  issues.push(`no macOS .app bundle found under ${path.relative(root, path.join(bundleRoot, 'macos'))}`);
+if (appDirs.length !== 1) {
+  issues.push(`expected exactly one macOS .app bundle under ${path.relative(root, path.join(bundleRoot, 'macos'))}, found ${appDirs.length}`);
 } else {
   const appPath = appDirs[0];
   checkCodesign(appPath);
@@ -172,13 +150,22 @@ if (appDirs.length === 0) {
   }
 }
 
-const dmgFiles = (await files(path.join(bundleRoot, 'dmg'))).filter((file) => file.endsWith('.dmg'));
-if (dmgFiles.length === 0) {
-  issues.push(`no macOS DMG found under ${path.relative(root, path.join(bundleRoot, 'dmg'))}`);
-} else if (await exists(dmgFiles[0])) {
-  checkDmgCodesign(dmgFiles[0]);
-  checkStapler('DMG', dmgFiles[0]);
-  checkSpctl('DMG', ['-a', '-vv', '--type', 'open', '--context', 'context:primary-signature', dmgFiles[0]]);
+try {
+  const dmgPath = await findSingleMacosDmg(bundleRoot);
+  await verifyMacosDmgTrust(dmgPath);
+  await withMountedMacosDmg(dmgPath, async ({ appPath }) => {
+    checkCodesign(appPath);
+    checkStapler('mounted .app', appPath);
+    checkSpctl('mounted .app', ['-a', '-vv', '--type', 'execute', appPath]);
+    const mountedIdentity = inspectMacosApp(appPath, { checkGatekeeper: false });
+    assertProductionMacosIdentity(mountedIdentity, { expectedBundleId, expectedTeamId });
+    assertSameDesignatedRequirement(appIdentity, mountedIdentity);
+    if (appIdentity?.version !== mountedIdentity.version) {
+      throw new Error(`mounted app version ${mountedIdentity.version} does not match loose app version ${appIdentity?.version || '(missing)'}`);
+    }
+  });
+} catch (error) {
+  issues.push(`macOS DMG verification failed: ${error.message || String(error)}`);
 }
 
 if (issues.length > 0) {

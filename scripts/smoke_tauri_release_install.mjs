@@ -11,6 +11,10 @@ import {
   extractMacosUpdaterArchive,
   inspectMacosApp
 } from './lib/macos_app_identity.mjs';
+import {
+  verifyMacosDmgTrust,
+  withMountedMacosDmg
+} from './lib/macos_dmg.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const releaseTag = args.releaseTag || process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || '';
@@ -58,6 +62,17 @@ async function main() {
 
 async function smokeMacos(current, previous) {
   await assertMacosAssets(current);
+  const currentDmg = await findOne(current.assetsDir, /\.dmg$/i, 'macOS DMG installer');
+  await verifyMacosDmgTrust(currentDmg);
+  const dmgVerification = await withMountedMacosDmg(currentDmg, async ({ appPath }) => {
+    const mountedIdentity = inspectMacosApp(appPath);
+    assertProductionMacosIdentity(mountedIdentity);
+    if (mountedIdentity.version !== current.version) {
+      throw new Error(`mounted DMG app version ${mountedIdentity.version} does not match ${current.version}`);
+    }
+    return mountedIdentity;
+  });
+  const mountedIdentity = dmgVerification.callbackResult;
   const currentArchive = await findOne(current.assetsDir, /\.app\.tar\.gz$/i, 'macOS updater archive');
   const currentExtracted = await extractMacosUpdaterArchive(currentArchive);
   let previousExtracted = null;
@@ -65,6 +80,7 @@ async function smokeMacos(current, previous) {
   try {
     const currentIdentity = inspectMacosApp(currentExtracted.appPath);
     assertProductionMacosIdentity(currentIdentity);
+    assertSameDesignatedRequirement(mountedIdentity, currentIdentity);
     if (currentIdentity.version !== current.version) {
       throw new Error(`macOS updater archive version ${currentIdentity.version} does not match ${current.version}`);
     }
@@ -352,6 +368,7 @@ async function assertLinuxAssets(context) {
 }
 
 async function assertMacosAssets(context) {
+  await findOne(context.assetsDir, /\.dmg$/i, 'macOS DMG installer');
   await findOne(context.assetsDir, /\.app\.tar\.gz$/i, 'macOS updater archive');
   const platform = process.arch === 'arm64' ? 'darwin-aarch64' : 'darwin-x86_64';
   assertUpdaterEntry(context, platform, /\.app\.tar\.gz$/i);
@@ -493,9 +510,11 @@ async function findNestedFile(root, pattern, maxDepth) {
 
 async function findOne(root, pattern, label) {
   const files = await walkFiles(root);
-  const found = files.find((file) => pattern.test(path.basename(file)));
-  if (!found) throw new Error(`missing ${label} under ${root}`);
-  return found;
+  const matches = files.filter((file) => pattern.test(path.basename(file)));
+  if (matches.length !== 1) {
+    throw new Error(`expected exactly one ${label} under ${root}, found ${matches.length}`);
+  }
+  return matches[0];
 }
 
 async function walkFiles(root) {

@@ -1,8 +1,9 @@
 # Changelog
 
-Version 0.9.6 continues the experimental MIDI commissioning work and removes
+Version 0.9.6 continues the experimental MIDI commissioning work, removes
 measured renderer/output hot-path overhead without changing visual math or
-quality. Version 0.9.5 adds 23 credited ascii.today-inspired character presets and
+quality, and hardens the macOS drag-to-Applications release path. Version 0.9.5
+adds 23 credited ascii.today-inspired character presets and
 experimental native DIN MIDI control for an Evolution/M-Audio UC-33e through an
 iConnectivity mioXC, including four complete controller pages, soft takeover,
 numeric preset selection, MIDI Learn, and full-bank SysEx capture/restore.
@@ -12,7 +13,7 @@ deferred, and expands audio reactivity with dense-mix controls that reduce
 overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
 
-## [0.9.6] - Unreleased
+## [0.9.6] - 2026-08-17
 
 ### Changed
 
@@ -37,6 +38,9 @@ baseline for the current ASCII VJ Remix feature set.
 - Normal Tauri development and debug-bundle commands now use `ASCII VJ Remix
   Dev` with bundle identifier `com.asciline.remix.dev`. The production name and
   `com.asciline.remix` identifier remain exclusive to release packaging.
+- The macOS DMG keeps Tauri as its single packager, makes the standard
+  app-to-Applications layout explicit, and documents the DMG as the primary
+  manual installer. The `.app.tar.gz` remains an updater artifact.
 
 ### Fixed
 
@@ -76,6 +80,13 @@ baseline for the current ASCII VJ Remix feature set.
 - Release validation extracts the actual `.app.tar.gz` updater payload and
   verifies that its identity and designated requirement match the notarized
   application bundle.
+- Release validation verifies DMG integrity, mounts the image read-only under a
+  private temporary root, accepts only the app, exact `/Applications` link, and
+  reviewed Tauri Finder metadata, and applies the existing app structure and
+  production identity checks to the mounted copy.
+- Published-release smoke now requires and revalidates the downloaded DMG before
+  exercising the updater hop. Publishing refuses to replace existing artifact
+  bytes for the same release tag.
 
 ### Validation
 
@@ -85,12 +96,17 @@ baseline for the current ASCII VJ Remix feature set.
 - Added cross-platform unit coverage for macOS code-signing identity parsing and
   rejection of ad-hoc, wrong-identifier, wrong-team, and changed-requirement
   artifacts.
+- Added cross-platform DMG layout, mount-point, artifact-discovery, and mounted
+  app-structure contract tests.
 - Added a macOS 26 published-release smoke job that compares consecutive
   Developer ID requirements, performs an application-driven updater replacement,
   and revalidates the updated bundle's identity.
 - Validated the optimized `.app` build plus static rendering, renderer math,
   audio reactivity, all 188 default MIDI bindings, Tauri policy, and 47 Rust
   tests on macOS Apple Silicon.
+- Built and mounted an optimized local 0.9.6 app/DMG canary and passed the shared
+  bundle/resource/layout check. This local artifact is ad-hoc signed; the final
+  Developer ID signed and notarized canary remains required before publication.
 
 ## [0.9.5] - 2026-08-04
 

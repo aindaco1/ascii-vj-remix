@@ -351,7 +351,7 @@ jobs:
             exit 1
           fi
 
-          gh release upload "$RELEASE_TAG" "${ASSETS[@]}" --clobber
+          gh release upload "$RELEASE_TAG" "${ASSETS[@]}"
 
   install-and-updater-smoke:
     name: ${{ matrix.os }} install and updater smoke

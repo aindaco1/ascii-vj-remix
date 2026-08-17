@@ -52,6 +52,23 @@ decisions.
 - Run an application-driven macOS updater replacement after publication and
   revalidate the resulting app identity.
 
+### macOS DMG Installation Hardening
+
+- Tauri remains the single owner of DMG creation, with its app-to-Applications
+  layout explicit in the committed configuration.
+- The shared mounted-image contract verifies integrity, the real app bundle,
+  `Applications -> /Applications`, and reviewed Tauri metadata.
+- Reuse the existing app identity, signing, stapling, Gatekeeper, and updater
+  archive checks against the app mounted from the final notarized DMG.
+- Published-release smoke requires the downloaded DMG before exercising the
+  existing updater hop.
+- Keep EasyDMG and similar cautious handlers optional; do not add an automatic
+  installer or runtime dependency.
+- The optimized local app/DMG canary passes the shared mounted bundle check. A
+  Developer ID signed/notarized one-DMG canary remains required before claiming
+  the 0.9.6 install work is release-ready. See
+  [macOS Installation Hardening Plan for 0.9.6](MACOS_INSTALL_0.9.6_PLAN.md).
+
 ## Product Direction
 
 ASCII VJ Remix is a local-first renderer lab for live ASCII and cell-based

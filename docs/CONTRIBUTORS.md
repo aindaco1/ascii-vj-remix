@@ -483,9 +483,13 @@ macOS, Windows, and Linux after publishing. It downloads artifacts from GitHub
 Releases instead of reusing local build directories, catching missing assets,
 bad `latest.json` URLs, installer layout issues, and broken signed updater
 downloads. macOS additionally extracts consecutive updater archives, requires
-the stable production designated requirement, performs a true updater
-self-replacement, and validates the resulting app identity. CI-only smoke hooks are
-inactive unless these environment variables are set:
+the DMG to contain the real app, exact `/Applications` link, and reviewed Tauri
+Finder metadata; validates the downloaded DMG and mounted app; extracts
+consecutive updater archives; requires the stable production designated
+requirement; performs a true updater self-replacement; and validates the
+resulting app identity. Release upload does not replace already-published
+artifact bytes for the same tag. CI-only smoke hooks are inactive unless these
+environment variables are set:
 
 The updater-hop smoke defaults to `ASCILINE_UPDATER_SMOKE_MIN_VERSION=0.9.0`.
 Older `0.1.x` releases used an incompatible updater signing key, so they can be
@@ -541,6 +545,7 @@ Release packaging:
 ```bash
 npm run check:release
 npm run bundle:release
+npm run test:macos-dmg-layout
 ```
 
 ## Contribution Flow

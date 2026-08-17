@@ -56,6 +56,13 @@ const updaterEndpoint = 'https://github.com/aindaco1/ascii-vj-remix/releases/lat
 if (config?.identifier !== 'com.asciline.remix') {
   issues.push('production Tauri identifier must remain com.asciline.remix');
 }
+const dmgConfig = config?.bundle?.macOS?.dmg;
+if (dmgConfig?.windowSize?.width !== 660 || dmgConfig?.windowSize?.height !== 400
+    || dmgConfig?.appPosition?.x !== 180 || dmgConfig?.appPosition?.y !== 170
+    || dmgConfig?.applicationFolderPosition?.x !== 480
+    || dmgConfig?.applicationFolderPosition?.y !== 170) {
+  issues.push('production Tauri config must keep the reviewed app-to-Applications DMG layout explicit');
+}
 
 if (devConfig?.productName !== 'ASCII VJ Remix Dev') {
   issues.push('tauri.dev.conf.json productName must be ASCII VJ Remix Dev');
@@ -406,6 +413,9 @@ if (releaseWorkflow.includes('tauri.windows-signed.conf.json')) {
 }
 if (releaseWorkflow.includes('npm run check:windows-authenticode')) {
   issues.push('release workflow must not require Authenticode verification for unsigned Windows preview artifacts');
+}
+if (/gh release upload[^\n]*--clobber/.test(releaseWorkflow)) {
+  issues.push('release workflow must not replace already-published artifact bytes');
 }
 
 const macosFfmpegSignIndex = releaseWorkflow.indexOf('sign_macos_ffmpeg_sidecars.mjs');

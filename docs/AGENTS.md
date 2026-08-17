@@ -33,6 +33,7 @@ For desktop packaging or permissions work, also inspect:
 - [Tauri capabilities](../src-tauri/capabilities/default.json)
 - [macOS Info.plist](../src-tauri/Info.plist)
 - [macOS entitlements](../src-tauri/Entitlements.plist)
+- [0.9.6 macOS installation plan](MACOS_INSTALL_0.9.6_PLAN.md)
 
 For renderer or Pop Out work, also inspect:
 

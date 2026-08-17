@@ -21,6 +21,7 @@ feature set.
 - [Security guide](docs/SECURITY.md)
 - [Performance guide](docs/PERFORMANCE.md)
 - [Testing guide](docs/TESTING.md)
+- [0.9.6 macOS installation plan](docs/MACOS_INSTALL_0.9.6_PLAN.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -278,9 +279,10 @@ artifacts. macOS 0.9.5 artifacts are expected to be signed/notarized; Windows
 
 ### 2. Install on macOS
 
-1. Download the macOS app archive or DMG.
-2. Move `ASCII VJ Remix.app` to `/Applications` or `~/Applications`.
-3. Open it from Finder.
+1. Download the macOS DMG. The `.app.tar.gz` file on the release is an updater
+   artifact, not the primary manual installer.
+2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
+3. Eject the DMG, then open the installed app from `/Applications` in Finder.
 4. Public 0.9.3-and-newer macOS release artifacts should be Developer ID signed,
    notarized, stapled, and accepted by Gatekeeper. Local or test builds may
    still require the normal right-click Open or Open Anyway flow.

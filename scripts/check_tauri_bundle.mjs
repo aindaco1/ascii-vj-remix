@@ -1,7 +1,14 @@
-import { access, readFile, readdir, stat } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { access, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertMacosAppBundleInspection,
+  inspectMacosAppBundle
+} from './lib/macos_app_bundle.mjs';
+import {
+  findSingleMacosDmg,
+  withMountedMacosDmg
+} from './lib/macos_dmg.mjs';
 import { tauriTargetDir } from './lib/tauri_target_dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -72,69 +79,40 @@ async function stagedFfmpegPlatforms() {
 
 async function checkMacosBundle() {
   const appDirs = (await dirs(path.join(bundleRoot, 'macos'))).filter((dir) => dir.endsWith('.app'));
-  if (appDirs.length === 0) {
-    issues.push(`no macOS .app bundle found under ${path.relative(root, path.join(bundleRoot, 'macos'))}`);
+  if (appDirs.length !== 1) {
+    issues.push(`expected exactly one macOS .app bundle under ${path.relative(root, path.join(bundleRoot, 'macos'))}, found ${appDirs.length}`);
     return;
   }
 
   const appDir = appDirs[0];
-  const contents = path.join(appDir, 'Contents');
-  const infoPlistPath = path.join(contents, 'Info.plist');
-  const resources = path.join(contents, 'Resources');
-  const macos = path.join(contents, 'MacOS');
-
-  if (!(await fileExists(infoPlistPath))) issues.push('macOS bundle is missing Contents/Info.plist');
-  if (!(await fileExists(path.join(resources, 'icon.icns')))) issues.push('macOS bundle is missing Contents/Resources/icon.icns');
-
-  const plist = await readFile(infoPlistPath, 'utf8').catch(() => '');
-  const identifierMatch = plist.match(/<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/);
   const expectedBundleId = args.expectedBundleId || '';
-  if (expectedBundleId && identifierMatch?.[1] !== expectedBundleId) {
-    issues.push(`macOS bundle identifier ${identifierMatch?.[1] || '(missing)'} does not match ${expectedBundleId}`);
-  }
-  const executableMatch = plist.match(/<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/);
-  const executable = executableMatch?.[1] || '';
-  if (!executable || !(await fileExists(path.join(macos, executable)))) {
-    issues.push('macOS bundle executable declared in Info.plist is missing');
-  }
+  const requiredFfmpegPlatforms = await stagedFfmpegPlatforms();
+  const looseInspection = await inspectMacosAppBundle(appDir, {
+    expectedBundleId,
+    requiredFfmpegPlatforms
+  });
+  issues.push(...looseInspection.issues);
 
-  for (const key of [
-    'NSCameraUsageDescription',
-    'NSMicrophoneUsageDescription',
-    'NSScreenCaptureUsageDescription'
-  ]) {
-    if (!plist.includes(`<key>${key}</key>`)) issues.push(`macOS bundle Info.plist is missing ${key}`);
-  }
-
-  const bundledFfmpegRoot = path.join(resources, 'resources', 'ffmpeg');
-  if (!(await fileExists(path.join(bundledFfmpegRoot, 'README.md')))) {
-    issues.push('macOS bundle is missing resources/ffmpeg/README.md');
-  }
-  for (const platform of await stagedFfmpegPlatforms()) {
-    const platformDir = path.join(bundledFfmpegRoot, platform);
-    for (const required of ['manifest.json', 'NOTICE.md']) {
-      if (!(await fileExists(path.join(platformDir, required)))) {
-        issues.push(`macOS bundle is missing resources/ffmpeg/${platform}/${required}`);
-      }
+  if (profile === 'release') {
+    try {
+      const dmgPath = await findSingleMacosDmg(bundleRoot);
+      await withMountedMacosDmg(dmgPath, async ({ appPath }) => {
+        const mountedInspection = assertMacosAppBundleInspection(
+          await inspectMacosAppBundle(appPath, {
+            expectedBundleId,
+            requiredFfmpegPlatforms
+          }),
+          'mounted macOS app bundle'
+        );
+        for (const field of ['bundleIdentifier', 'version', 'executable']) {
+          if (mountedInspection[field] !== looseInspection[field]) {
+            throw new Error(`mounted macOS app ${field} does not match loose app bundle`);
+          }
+        }
+      });
+    } catch (error) {
+      issues.push(`release macOS DMG verification failed: ${error.message || String(error)}`);
     }
-  }
-
-  const verify = spawnSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appDir], { encoding: 'utf8' });
-  if (verify.status !== 0) {
-    issues.push(`macOS .app bundle is not codesign-valid: ${(verify.stderr || verify.stdout || '').trim()}`);
-  }
-
-  const details = spawnSync('/usr/bin/codesign', ['-dv', '--verbose=4', appDir], { encoding: 'utf8' });
-  const signatureDetails = `${details.stdout || ''}${details.stderr || ''}`;
-  if (details.status !== 0) {
-    issues.push(`macOS .app bundle signature details could not be read: ${signatureDetails.trim()}`);
-  } else if (!/Signature=adhoc|Authority=/.test(signatureDetails)) {
-    issues.push('macOS .app bundle does not report an ad-hoc or certificate authority signature');
-  }
-
-  const dmgFiles = (await files(path.join(bundleRoot, 'dmg'))).filter((file) => file.endsWith('.dmg'));
-  if (profile === 'release' && dmgFiles.length === 0) {
-    issues.push('release macOS bundle is missing a DMG artifact');
   }
 }
 
