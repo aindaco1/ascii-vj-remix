@@ -12,8 +12,8 @@ Use a Cloudflare API token with Workers deploy access and Workers KV edit access
 The Pool token can list namespaces, but it currently cannot create the crash
 relay KV namespaces.
 
-Create dedicated KV namespaces; do not reuse The Pool's generic `RATELIMIT`
-namespace:
+`wrangler.jsonc` contains dedicated production and preview KV bindings for rate
+limits and crash-fingerprint indexing. To provision replacement namespaces, use:
 
 ```bash
 wrangler kv namespace create ASCII_VJ_CRASH_RATELIMIT
@@ -22,11 +22,11 @@ wrangler kv namespace create ASCII_VJ_CRASH_INDEX
 wrangler kv namespace create ASCII_VJ_CRASH_INDEX --preview
 ```
 
-Update the `RATELIMIT` and `CRASH_INDEX` bindings in `wrangler.jsonc` with
-those IDs.
+Update the `RATELIMIT` and `CRASH_INDEX` bindings in `wrangler.jsonc` only when
+replacing those namespaces.
 
-The GitHub Actions deploy workflow is manual-only until those KV IDs and the
-`crash.dustwave.xyz` custom domain are provisioned.
+The KV ids and `crash.dustwave.xyz` custom domain are configured. The GitHub
+Actions deploy workflow remains manual-only.
 
 Set secrets:
 

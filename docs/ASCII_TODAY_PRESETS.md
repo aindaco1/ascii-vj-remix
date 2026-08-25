@@ -1,6 +1,6 @@
 # ascii.today Character Presets
 
-ASCII VJ Remix 0.9.5 includes 23 read-only character presets inspired by the
+ASCII VJ Remix includes 23 read-only character presets inspired by the
 curated FIGlet fonts at [ascii.today](https://ascii.today/). Each preset is
 named after its source character set and is also available in the compact
 Character Set menu.
@@ -61,9 +61,9 @@ those files are not redistributed by ASCII VJ Remix.
 - `npm run test:render-math` validates catalog ids, bounds, uniqueness, source
   metadata, and luminance lookup. Rust tests validate native ramp filtering.
 
-## Future Expansion
+## Selection Boundary
 
-The initial pack favors source fonts whose drawing-symbol vocabularies produce
-useful ramps with at least eight distinct luminance steps. Additional
-ascii.today sets can be added after visual review; very sparse or duplicate
-symbol vocabularies should not be added merely to increase the preset count.
+The pack favors source fonts whose drawing-symbol vocabularies produce useful
+ramps with at least eight distinct luminance steps. Sparse or duplicate symbol
+vocabularies are excluded because they do not provide a useful luminance ramp.
+Prospective preset expansion belongs in the [Roadmap](ROADMAP.md).

@@ -8,8 +8,9 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-Current development documentation describes 0.9.6, built on the released 0.9.5
-feature set.
+The current packaged version and latest public release are 0.9.6. Unreleased
+changes are recorded in the [Changelog](CHANGELOG.md); prospective work belongs
+in the [Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
 
@@ -21,7 +22,6 @@ feature set.
 - [Security guide](docs/SECURITY.md)
 - [Performance guide](docs/PERFORMANCE.md)
 - [Testing guide](docs/TESTING.md)
-- [0.9.6 macOS installation plan](docs/MACOS_INSTALL_0.9.6_PLAN.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -31,22 +31,21 @@ feature set.
 
 ## What This Project Is
 
-ASCII VJ Remix is a fork and remix of several related ideas:
+ASCII VJ Remix combines several renderer and desktop-tooling ideas:
 
 - It started from [ASCILINE](https://github.com/YusufB5/ASCILINE), which
   provides a high-performance ASCII video streaming pipeline, Python/FastAPI
   server code, OpenCV frame preparation, adaptive WebSocket frame encoding,
   terminal playback experiments, and Canvas rendering fallbacks.
-- It vendors and adapts the renderer from `ascii-point-and-click`, keeping the
-  high-quality WebGPU/WebGL visual output.
+- It includes high-quality WebGPU/WebGL rendering alongside Canvas compatibility
+  paths.
 - It keeps the local-first spirit of a standalone creative tool. The Tauri app
   packages the renderer, demo media, fonts, native output path, and local media
   adapters so day-to-day use does not require online services.
 - It uses an extreme black, white, grey, neon pink, and neon blue VJ control
   surface with compact VCR-style typography and sharp rectangular controls.
 
-The result is a live renderer
-workbench for stylized ASCII/cell video output.
+The result is a live renderer workbench for stylized ASCII/cell video output.
 
 ## Current Capabilities
 
@@ -56,8 +55,8 @@ workbench for stylized ASCII/cell video output.
 - Built-in Demo Video.
 - User-selected local image and video files.
 - MKV selection support in the desktop file picker. Playback depends on the
-  active platform decoder path; the native media path is where broader codec
-  support will continue to improve.
+  active platform decoder path; MP4/H.264 is the most consistently supported
+  format.
 - Local webcam/camera input.
 - Multiple simultaneous cameras when the operating system and desktop runtime
   allow it.
@@ -149,14 +148,13 @@ workbench for stylized ASCII/cell video output.
 - MIDI is restricted to visual parameters, audio-reactive settings, visual
   presets, and WTF mode. It cannot change media sources, Camera, Pop Out, or
   output displays.
-- macOS Apple Silicon is the primary 0.9.6 hardware target. Direct UC-33e USB
-  input and physical Windows/Linux validation are deferred.
+- Current physical hardware validation covers macOS Apple Silicon with the
+  UC-33e connected by DIN through a mioXC. Direct UC-33e USB is not supported,
+  and Windows/Linux physical validation is not complete.
 
-The 0.9.6 MIDI path remains experimental: automated mapping, safety, and native
-transport tests pass, but the full physical control sweep and end-to-end SysEx
-restore/verification checklist are not complete. Keep Ensure Profile on
-Connection disabled until a captured hardware profile has been restored and
-verified manually.
+MIDI remains experimental. Automated mapping, safety, native transport, and
+bounded SysEx tests pass. Ensure Profile on Connection stays disabled by default
+and requires a manually captured and verified hardware profile.
 
 ### Desktop Packaging and Updates
 
@@ -168,9 +166,8 @@ verified manually.
   - The main control window can open selected media and manage output.
   - The output window has a minimal command surface.
 - GitHub Releases updater infrastructure is configured.
-- Public release CI requires Developer ID notarized macOS artifacts. Windows
-  artifacts are published as unsigned previews until SignPath Foundation,
-  Azure Artifact Signing, or another signing backend is proven.
+- Public 0.9.6 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.6 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
   app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
   replace or inherit privacy grants from the production app.
@@ -182,10 +179,10 @@ verified manually.
 
 ### Advanced and Development-Only Paths
 
-The legacy ASCILINE stream path and the newer Rust/FFmpeg stream session work
-exist, but stream mode is not currently exposed in the normal Source UI. The
-Static/Streaming selector, stream connection label, and buffer counter remain
-hidden until the stream workflow is ready as a standalone user feature.
+The legacy ASCILINE stream path and the Rust/FFmpeg stream-session code are
+development infrastructure. Stream mode, the Static/Streaming selector, the
+connection label, and the buffer counter are not exposed in the normal Source
+UI.
 
 The initial hardware setup and complete controller map live in
 [docs/MIDI_UC33E.md](docs/MIDI_UC33E.md).
@@ -208,9 +205,9 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Public release builds should be Developer ID signed and notarized. Local or
-  test builds may still require the normal macOS right-click Open or Open
-  Anyway flow.
+- Public 0.9.6 release builds are Developer ID signed, notarized, stapled, and
+  accepted by Gatekeeper. Local or test builds may require the normal macOS
+  right-click Open or Open Anyway flow.
 
 ### Windows
 
@@ -223,22 +220,24 @@ Notes:
 
 - Most current Windows 10/11 systems already include WebView2. If an installer
   reports that WebView2 is missing, install the Microsoft WebView2 Runtime once.
-- Windows system audio loopback is planned through WASAPI, but the current
-  audio path should be tested per release before relying on it in production.
+- Native WASAPI system-audio loopback is not implemented. Current system/display
+  audio behavior depends on the capture path exposed by the runtime; verify it
+  on the target machine before a live session.
 
 ### Linux
 
 | Level | Requirement |
 | --- | --- |
 | Minimum | Modern x86_64 Linux distribution, WebKitGTK 4.1 runtime, Mesa or vendor GPU drivers with WebGL2, 8 GB RAM, 2 GB free disk space. |
-| Optimal | Ubuntu 24.04, Fedora 40, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU; PipeWire for future capture work. |
+| Optimal | Ubuntu 24.04, Fedora 40, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU. |
 
 Notes:
 
 - Linux Tauri uses the system WebKitGTK stack, so GPU feature support varies by
   distribution, WebKitGTK version, and graphics driver.
 - WebGL2 may be the practical Linux fallback even when WebGPU is not available.
-- Native Linux camera/audio/output behavior needs broader hardware testing.
+- Native Linux camera/audio/output coverage is limited outside CI and varies by
+  distribution and hardware.
 
 ## Hardware Guidance
 
@@ -273,9 +272,9 @@ Download the latest desktop build from:
 
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
-The release page may contain macOS, Windows, and Linux installers plus updater
-artifacts. macOS 0.9.5 artifacts are expected to be signed/notarized; Windows
-0.9.5 artifacts are unsigned previews.
+The 0.9.6 release contains a notarized Apple Silicon macOS DMG, Windows
+EXE/MSI installers, Linux AppImage/deb/rpm packages, and signed updater
+metadata. The Windows installers are unsigned previews.
 
 ### 2. Install on macOS
 
@@ -283,9 +282,9 @@ artifacts. macOS 0.9.5 artifacts are expected to be signed/notarized; Windows
    artifact, not the primary manual installer.
 2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
 3. Eject the DMG, then open the installed app from `/Applications` in Finder.
-4. Public 0.9.3-and-newer macOS release artifacts should be Developer ID signed,
-   notarized, stapled, and accepted by Gatekeeper. Local or test builds may
-   still require the normal right-click Open or Open Anyway flow.
+4. The public 0.9.6 macOS release is Developer ID signed, notarized, stapled,
+   and accepted by Gatekeeper. Local or test builds may still require the
+   normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
    Recording permissions when macOS prompts for them.
 
@@ -293,7 +292,7 @@ artifacts. macOS 0.9.5 artifacts are expected to be signed/notarized; Windows
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 0.9.5 artifacts are unsigned previews. Windows may show Unknown
+3. Windows 0.9.6 artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.
@@ -320,7 +319,7 @@ portal packages are installed for your distribution.
 ## First Run
 
 1. Launch the app.
-2. The renderer should start automatically on Demo Image.
+2. The renderer starts automatically on Demo Image.
 3. Choose a built-in preset from the Presets panel.
 4. Use Source to switch to Demo Video, Camera, or a custom local file.
 5. Use Audio Reactivity to select Mic/Input, Audio File, or System/Display
@@ -409,8 +408,8 @@ ASCII VJ Remix is designed to be local-first.
 - Local media files stay on your machine.
 - Camera frames stay local.
 - Audio analysis is local.
-- The packaged app should not download renderer assets, fonts, codecs, models,
-  or media providers at runtime.
+- The packaged app does not download renderer assets, fonts, codecs, models, or
+  media providers at runtime.
 - Intentional online paths are limited to the Tauri updater and production-only
   reviewed/sanitized crash reports.
 - Custom desktop file access is session-scoped. If the app says a custom file
@@ -439,9 +438,8 @@ updater, Tauri capability, and FFmpeg sidecar security model.
 ### Display or system audio has no audio
 
 Display capture can expose video without an audio track, especially for
-app/window capture on macOS. Use System Audio where available. Future work will
-move macOS system audio toward Core Audio Taps for a narrower permission
-prompt.
+app/window capture on macOS. Use System Audio where available. Native Core
+Audio Tap capture is not implemented in the current release.
 
 ### Pop Out is slow
 
@@ -452,9 +450,9 @@ prompt.
 
 ### Video format does not play
 
-Try MP4/H.264 first. MKV support depends on the active decode path and platform.
-If the embedded media decode path cannot play a file, future native FFmpeg
-paths may support it more reliably.
+Try MP4/H.264 first. MKV support depends on the active decode path and platform;
+an MKV accepted by the file picker may still be unsupported by the active
+decoder.
 
 ## Development
 

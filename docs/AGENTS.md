@@ -12,8 +12,7 @@ Read these in order before making non-trivial changes:
    install notes, system requirements, license/support/contact information.
 2. [Changelog](../CHANGELOG.md): current release feature baseline and recent
    behavioral expectations.
-3. [Roadmap](ROADMAP.md): current capabilities, planned work, deferred work, and
-   product direction.
+3. [Roadmap](ROADMAP.md): prospective work only.
 4. [Rendering Engine](RENDERING_ENGINE.md): source flow, renderer backends,
    native output architecture, media engine, audio reactivity, and MIDI
    integration.
@@ -33,7 +32,6 @@ For desktop packaging or permissions work, also inspect:
 - [Tauri capabilities](../src-tauri/capabilities/default.json)
 - [macOS Info.plist](../src-tauri/Info.plist)
 - [macOS entitlements](../src-tauri/Entitlements.plist)
-- [0.9.6 macOS installation plan](MACOS_INSTALL_0.9.6_PLAN.md)
 
 For renderer or Pop Out work, also inspect:
 
@@ -50,19 +48,10 @@ ASCII VJ Remix is a local-first native desktop renderer lab for macOS, Windows,
 and Linux. The intended product is the Tauri desktop app, not a hosted web app
 or browser-only build.
 
-The project combines three lineages:
-
-- [ASCILINE](https://github.com/YusufB5/ASCILINE): high-performance ASCII video
-  streaming, adaptive frame encoding, Python/OpenCV experiments, terminal ideas,
-  and Canvas fallback lineage.
-- `ascii-point-and-click`: high-quality WebGPU/WebGL visual output and local
-  browser media-source architecture.
-- This repo's Tauri desktop work: standalone packaging, native media/audio
-  adapters, native Pop Out output, local release/update infrastructure, and the
-  dense VJ control surface.
-
-The point-and-click game UI is out of scope. The app is a creative control
-surface for live ASCII/cell visuals.
+The repository combines high-quality WebGPU/WebGL rendering, Canvas
+compatibility paths, ASCILINE-derived stream and codec infrastructure, and
+Tauri desktop packaging. The app is a creative control surface for live
+ASCII/cell visuals.
 
 ## Non-Negotiable Constraints
 
@@ -75,24 +64,22 @@ surface for live ASCII/cell visuals.
 - Preserve the native app direction for macOS, Windows, and Linux.
 - Do not reframe browser mode as the product. Browser/Vite paths are useful for
   development, smoke tests, and renderer portability.
-- Keep renderer quality high. WebGPU/WebGL output from the point-and-click
-  renderer lineage is the visual quality target.
+- Keep renderer quality high. WebGPU/WebGL output is the visual quality target.
 - Preserve fallback paths unless a replacement is implemented and tested.
 - Treat Pop Out performance and latency as critical user-facing behavior.
 - Keep user-selected local media local. Do not upload files or camera/audio data.
-- Keep stats overlay user-owned. Random presets, WTF mode, and audio presets
-  should not turn it off unless the user explicitly does.
-- Stream infrastructure exists but is not a normal visible source mode yet.
-  Hidden streaming UI should stay hidden until stream mode is productized end to
-  end.
+- Keep stats overlay user-owned. Random presets, WTF mode, and audio presets do
+  not turn it off unless the user explicitly does.
+- Stream infrastructure exists but is not a normal visible source mode. Keep
+  its UI hidden; prospective productization belongs in the roadmap.
 - Security, performance, accessibility, and i18n guidance live in dedicated
   practice docs under `docs/`; update them when architectural assumptions
   change.
 
 ## Current User-Facing Baseline
 
-Current development docs describe 0.9.6 on top of the released 0.9.5 feature
-set.
+The current packaged version and latest public release are 0.9.6. The Changelog
+is the only current-state document that includes unreleased changes.
 
 Sources:
 
@@ -116,7 +103,7 @@ Rendering:
   ASCII presets.
 - The shared character-set catalog includes 23 credited ascii.today-derived
   luminance ramps and matching read-only presets.
-- Native glyph output should keep using bounded fixed atlas/ramp resources;
+- Native glyph output uses bounded fixed atlas/ramp resources;
   `fontFamily` is UI/preview metadata, not a native font-loading sink.
 - Reuse stable WebGPU/WebGL resources, keep native source uploads keyed to
   source-frame versions, and do not trade quality/resolution for performance.
@@ -124,8 +111,8 @@ Rendering:
 Live behavior:
 
 - Presets are read-only unless created by the user.
-- Preset transitions should be smooth crossfades, not fade-to-black.
-- Presets should preserve the active media source unless explicitly changed.
+- Preset transitions are smooth crossfades, not fade-to-black.
+- Presets preserve the active media source unless explicitly changed.
 - WTF mode runs indefinitely while active and transitions through live-safe
   randomized settings, including anchors from traditional ASCII presets.
 - Audio reactivity is enabled by default, starts from Mic/Input by default, and
@@ -133,10 +120,10 @@ Live behavior:
 - Audio reactivity uses bounded feature vectors, including RMS, bands,
   transient/flux, presence, brightness, density, beat pulse, and phase. Do not
   ship raw audio buffers through IPC or diagnostics.
-- Safe clamps should prevent pure black or pure white outputs from randomized or
+- Safe clamps prevent pure black or pure white outputs from randomized or
   audio-driven states.
-- The first experimental MIDI rig is the UC-33e through both DIN directions of
-  a mioXC; direct UC USB is out of scope for 0.9.6.
+- The experimental MIDI rig is the UC-33e through both DIN directions of a
+  mioXC; direct UC USB is not supported.
 - MIDI uses four channel-addressed pages, soft takeover, numeric preset slots,
   MIDI Learn overrides, and bounded full-bank SysEx capture/restore.
 - MIDI targets visual/audio/preset/WTF behavior only. Do not add source, Camera,
@@ -243,14 +230,15 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- Public 0.9.3 release CI requires Apple Developer ID notarization for macOS and
-  publishes Windows as an unsigned preview. Normal local builds use
+- Public 0.9.6 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.6 Windows artifacts are unsigned previews.
+  Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.
 - If `TAURI_SIGNING_PRIVATE_KEY` or `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is
   absent while updater artifacts are enabled, release bundling will fail at
-  updater signing. Use the local key/password above for local validation, and
-  never commit either file.
+  updater signing. The local validation paths are documented in the contributor
+  guide; never commit either file.
 
 ## Tauri and Packaging Notes
 
@@ -261,16 +249,16 @@ Expected local release-build note:
   production name, bundle identifier, and updater.
 - `src-tauri/tauri.notarized.conf.json` is for Developer ID notarized macOS
   release builds.
-- `src-tauri/tauri.windows-signed.conf.json` is retained for future signed
-  Windows release work. The active 0.9.3 Windows release path uses the default
-  unsigned config.
+- `src-tauri/tauri.windows-signed.conf.json` and its Authenticode helper exist
+  but are inactive. The current Windows release path uses the default unsigned
+  config.
 - macOS builds in iCloud Drive workspaces redirect target output to
   `/private/tmp/ascii-vj-remix-tauri-target` through the helper scripts to avoid
   iCloud extended attributes breaking codesign.
 - Release updater artifacts are signed with a minisign key. The public key is
   committed; the private key belongs in GitHub Actions secrets.
 - FFmpeg sidecars must be reviewed, local, and policy-checked. The packaged app
-  should not download FFmpeg, codecs, renderer assets, or fonts at runtime.
+  does not download FFmpeg, codecs, renderer assets, or fonts at runtime.
 
 See [Contributor Guide: Release and Updater Work](CONTRIBUTORS.md#release-and-updater-work)
 for the full release/updater procedure.
@@ -292,14 +280,14 @@ source selection
 
 Important implications:
 
-- Saved params and effective params are different. Audio reactivity should
-  modify effective params, not saved preset definitions.
-- Source identity matters. Preset transitions should not silently reset source
-  or restart media playback.
+- Saved params and effective params are different. Audio reactivity modifies
+  effective params, not saved preset definitions.
+- Source identity matters. Preset transitions do not reset source or restart
+  media playback.
 - Native output needs fresh params and frames. If Pop Out looks stale, inspect
   native output synchronization before adding another renderer.
-- Camera latency work should prefer latest-frame native capture/presentation
-  paths over buffered decode paths.
+- Camera latency work uses latest-frame native capture/presentation paths where
+  implemented instead of buffered decode paths.
 - Fallback paths matter for Windows/Linux and for environments without the best
   GPU backend.
 
@@ -310,8 +298,8 @@ See [Rendering Engine](RENDERING_ENGINE.md) for deeper architecture details.
 When behavior changes, update the closest durable doc:
 
 - User-facing feature or install behavior: [README](../README.md).
-- Current release behavior: [Changelog](../CHANGELOG.md).
-- Planned/deferred work: [Roadmap](ROADMAP.md).
+- Current and unreleased release behavior: [Changelog](../CHANGELOG.md).
+- Prospective work only: [Roadmap](ROADMAP.md).
 - Renderer architecture, media flow, native output, audio modulation, MIDI
   architecture: [Rendering Engine](RENDERING_ENGINE.md).
 - Build, test, release, FFmpeg, Podman, or contributor workflow:
@@ -327,20 +315,8 @@ When behavior changes, update the closest durable doc:
   [Internationalization](I18N.md).
 - Agent onboarding assumptions: this file.
 
-Keep docs native-app focused. Do not add browser-based build instructions to the
-README unless the product direction changes.
-
-## Known Future Work To Respect
-
-The roadmap tracks future work. At a high level:
-
-- Productize local stream mode only when the full standalone source workflow is
-  ready.
-- Extend MIDI beyond the 0.9.6 UC-33e/mioXC DIN profile only after its current
-  scope, mapping semantics, SysEx safety, and platform validation are preserved.
-- Continue improving native GPU output and platform-native capture paths.
-- Continue improving Windows SmartScreen reputation validation and real
-  install/updater-hop tests on Windows/Linux machines.
-
-Before implementing any of these, read [Roadmap](ROADMAP.md) and
-[Rendering Engine](RENDERING_ENGINE.md), then inspect the current code paths.
+Keep docs native-app focused. Current-state docs use present tense and describe
+verified behavior. Do not put proposals, future candidates, deferred work, or
+completed release plans in those documents. Put prospective work in the
+[Roadmap](ROADMAP.md), and keep release history in the
+[Changelog](../CHANGELOG.md).

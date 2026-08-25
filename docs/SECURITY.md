@@ -21,8 +21,8 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
   controller.
 - Keep release signing, updater signing, and notarization secrets out of the
   repository.
-- Preserve the bundle identifier `com.asciline.remix` unless there is a planned
-  migration for existing macOS privacy grants.
+- The production bundle identifier is `com.asciline.remix`; changing it creates
+  a macOS privacy-grant migration.
 - Keep local development on `com.asciline.remix.dev`; never sign or install an
   ad-hoc development build under the production identifier.
 
@@ -30,38 +30,38 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 
 | Surface | Current Boundary | Risk Level | Notes |
 | --- | --- | --- | --- |
-| Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly and should not grant broad filesystem access. |
+| Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly without broad filesystem access. |
 | Built-in demo media | Bundled under `media/` and copied into app assets | Low | Demo media is local and versioned. |
 | Camera input | Browser `getUserMedia`; macOS native AVFoundation path for Pop Out | Medium | Requires OS privacy permission. Frames stay local. |
-| Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features should be bounded. |
+| Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
 | Presets/settings | Local browser storage, IndexedDB, imported/exported JSON | Low to Medium | User-authored data. Validate imports before applying. |
 | Output window | Tauri output window with minimal permissions | Medium | Must not expose media selection, filesystem, updater, or broad command APIs. |
 | Tauri commands | `src-tauri/src/lib.rs` plus capability files | High | Treat every command as a security boundary. Validate inputs in Rust. |
 | Asset protocol | Empty by default, expanded only for selected media/session needs | High | Avoid persistent broad paths. |
-| FFmpeg sidecars | Bundled resources with policy checks and source/provenance metadata | Medium | No runtime downloads. Release sidecars should disable network protocols. |
+| FFmpeg sidecars | Bundled resources with policy checks and source/provenance metadata | Medium | No runtime downloads. Release sidecars disable network protocols. |
 | Updater | GitHub Releases endpoint with signed updater packages | High | Private signing key is external. Public key is committed. |
 | Crash reporter | Rust-only POST to `https://crash.dustwave.xyz/v1/reports` in production builds | High | Reports are bounded, sanitized, user-configurable, and relayed to GitHub issues by a Cloudflare Worker. |
 | Experimental MIDI and UC-33e SysEx | Main-window-only Rust commands, mioXC port allowlist, bounded queues and packet limits | Medium | Profiles stay local and cannot target sources, Camera, Pop Out, or output displays. Physical full-bank restore verification remains incomplete. |
 | Logs and smoke reports | Local developer/test artifacts | Low to Medium | Do not log private file paths, raw audio, or sensitive environment values unless needed for explicit debugging. |
 
-## Release Hardening Notes
+## Release Security Posture
 
 The current release line includes these security hardening rules:
 
 - Production CSP allows only the app origin, Tauri IPC, and the Tauri asset
   protocol needed for selected local media. Localhost HTTP/WebSocket endpoints
-  belong in development CSP only until stream mode is productized.
+  exist only in the development CSP; stream mode is not a production source.
 - Crash report submission is implemented in Rust, not webview `fetch`, so the
   production CSP does not gain arbitrary remote `connect-src` access.
 - GitHub Actions updater signing secrets are scoped to the updater-secret check
   and Tauri packaging steps. Do not place `TAURI_SIGNING_PRIVATE_KEY`,
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
-- Public 0.9.3 release CI fails closed when Apple Developer ID notarization is
-  incomplete. Windows artifacts are published as unsigned previews until
-  SignPath Foundation, Azure Artifact Signing, or another signing backend is
-  proven.
+- Public macOS release CI fails closed when Apple Developer ID signing or
+  notarization is incomplete. Public 0.9.6 macOS artifacts are signed,
+  notarized, stapled, and Gatekeeper-validated; Windows 0.9.6 artifacts are
+  unsigned previews.
 - Public macOS artifacts must retain Team ID `PWT3Q52LZ2` and the stable
   identifier/team designated requirement. CI validates both the built app and
   the extracted updater archive and rejects ad-hoc or code-hash-only identity.
@@ -71,21 +71,23 @@ The current release line includes these security hardening rules:
 - GitHub Actions macOS jobs are pinned to `macos-26` instead of
   `macos-latest`. The native `wgpu`/`apple-metal` stack needs the macOS 26
   Metal SDK, and the moving `macos-latest` alias can select an older SDK.
-- Selected local media paths should not be retained in frontend app state after
-  the app derives the playback URL it needs. Diagnostics should redact file and
-  asset URLs before writing `/tmp/asciline-media-diagnostics.log`.
-- Session-local Tauri asset grants should be revoked when a selected media
-  registration is forgotten and no other registration still uses that path.
+- Frontend app state retains the derived playback URL or media id instead of the
+  selected local path. Diagnostics redact file and asset URLs before writing
+  `/tmp/asciline-media-diagnostics.log`.
+- Tauri media registrations and asset grants are session-local. The
+  `forget_media_file` command revokes a path grant after its final registration
+  is removed; persisted custom-source metadata does not preserve path access
+  across app restarts.
 - Preset imports must be bounded, schema-checked, clamped through the shared
   control metadata, and stripped of source/media fields before they can affect
   renderer state.
-- Glyph-mode native output should treat `charset` as allowlisted data. Resolved
+- Glyph-mode native output treats `charset` as allowlisted data. Resolved
   custom catalog ramps must be bounded, space-leading, unique, and restricted
   to the fixed glyph atlas. Keep `fontFamily` out of native font-loading or
   resource-lookup paths.
-- Dependency audits should include npm and Rust. `cargo audit` warnings from
+- Dependency audits cover npm and Rust. `cargo audit` warnings from
   Tauri's current GTK/WebKit transitive stack are tracked as upstream desktop
-  framework risk; actionable direct/transitive advisories should be fixed before
+  framework risk; actionable direct/transitive advisories must be fixed before
   release when an upgrade is available.
 
 ## Tauri Runtime Policy
@@ -95,8 +97,7 @@ The production runtime is intentionally narrow:
 - `src-tauri/tauri.conf.json` keeps a restrictive production Content Security
   Policy.
 - Production CSP does not allow arbitrary localhost HTTP/WebSocket endpoints;
-  localhost stream/dev endpoints belong only in `devCsp` until stream mode is
-  productized for normal users.
+  localhost stream/dev endpoints exist only in `devCsp`.
 - `npm run check:tauri-policy` verifies the local-only runtime policy, the
   GitHub updater endpoint exception, and the Rust-only crash reporter command
   boundary.
@@ -104,7 +105,7 @@ The production runtime is intentionally narrow:
   output-window privileges.
 - The main window owns media selection, output management, audio providers, and
   updater/crash-report work.
-- The output window should only listen for render/output messages and expose
+- The output window only listens for render/output messages and exposes
   the minimum close/fullscreen behavior it needs.
 
 When adding a Tauri command:
@@ -178,17 +179,17 @@ Rules:
 - Do not send media paths to analytics or remote logs.
 - Imported preset/profile files must be parsed and validated as data, not
   executed.
-- Future preset bundles must not include private media files or absolute media
-  paths unless the user explicitly exports that information.
+- Current preset exports exclude source and media fields, including private
+  media files and absolute media paths.
 
 ## Camera, Microphone, and System Audio
 
-Camera and audio capture are sensitive local inputs. They should be started only
-from explicit app behavior that the user can understand, such as selecting
-Camera or enabling Audio Reactivity. Audio Reactivity is currently an intentional
-default product mode, so the app may request microphone/input permission during
-startup. Capture remains OS-gated and local, and the user can stop it by
-disabling Audio Reactivity or changing the audio source.
+Camera and audio capture are sensitive local inputs. Capture starts from visible
+app behavior such as selecting Camera or enabling Audio Reactivity. Audio
+Reactivity is an intentional default mode, so the app may request
+microphone/input permission during startup. Capture remains OS-gated and local,
+and the user can stop it by disabling Audio Reactivity or changing the audio
+source.
 
 Current macOS bundle identifier:
 
@@ -216,7 +217,7 @@ Development rules:
 - Prefer narrower native system-audio permissions when the platform exposes
   them.
 - Keep feature frames bounded. Do not ship raw unbounded audio buffers over
-  IPC when feature vectors are enough. Audio reactivity should use derived
+  IPC when feature vectors are enough. Audio reactivity uses derived
   features such as RMS, bands, transient/flux, presence, brightness, density,
   beat pulse, and phase.
 - Avoid capture auto-retry loops that keep prompting or capturing after the user
@@ -248,12 +249,11 @@ Security requirements:
 - Release workflows must scope updater signing secrets to signing-only steps,
   never to the whole job.
 
-Apple Developer ID signing adds more secrets. Store certificates, passwords, API
-keys, and CI keychain passwords in GitHub secrets only, and keep local test
-credentials outside the repo. Future Windows Authenticode signing must follow
-the same rule for Azure client secrets, SignPath tokens, certificates, or other
-signing credentials. Non-secret Azure IDs for Artifact Signing may live in
-GitHub repository variables if Azure Artifact Signing is enabled later.
+Apple Developer ID signing adds more secrets. Certificates, passwords, API keys,
+and CI keychain passwords live in GitHub secrets, while local test credentials
+remain outside the repo. The inactive Windows Authenticode tooling follows the
+same boundary: secret values stay in GitHub secrets and non-secret Azure ids use
+GitHub repository variables when that tooling is explicitly enabled.
 
 ## FFmpeg and Codec Sidecars
 
@@ -263,8 +263,8 @@ also an important supply-chain and licensing boundary.
 Rules:
 
 - Do not download FFmpeg, codecs, or media helper binaries at runtime.
-- Release sidecars should be built from pinned official source.
-- Network protocols should remain disabled for release FFmpeg builds unless a
+- Release sidecars are built from pinned official source.
+- Network protocols remain disabled for release FFmpeg builds unless a
   productized streaming feature explicitly requires a reviewed exception.
 - Sidecars need version, SHA-256, license, source, and NOTICE metadata.
 - Do not commit generated sidecar binaries unless the release policy changes.
@@ -277,7 +277,7 @@ npm run check:ffmpeg-resources
 npm run check:ffmpeg-release
 ```
 
-## Presets, MIDI, and Future Profiles
+## Presets and MIDI Data
 
 Presets and MIDI maps are local data, but they can still break the app if
 the import path trusts them.
@@ -296,8 +296,8 @@ Import rules:
 
 ### MIDI and SysEx Rules
 
-- The first native adapter accepts only input/output port names containing
-  `mioXC`; direct UC-33e USB is not enabled in 0.9.5.
+- The native adapter accepts only input/output port names containing `mioXC`;
+  direct UC-33e USB is not supported.
 - MIDI commands belong only to the main control window. The output window must
   never enumerate devices, read events, capture dumps, or send SysEx.
 - Event queues, event reads, mapping counts, packet counts, decoded bytes, and
@@ -349,23 +349,22 @@ npm run test:ffmpeg-policy
 npm run check:ffmpeg-resources
 ```
 
-## Known Risks and Deferred Hardening
+## Known Risks
 
 - macOS privacy prompts remain sensitive to app path, bundle identifier, and
   signing identity. Production and development identities are isolated, but a
   deliberately ad-hoc development build still receives build-specific grants.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
-- Windows 0.9.5 artifacts are unsigned previews and may trigger Unknown
-  Publisher, SmartScreen, or Defender warnings. Future public Windows releases
-  should be Authenticode signed and timestamped before being treated as normal
-  public installers.
+- Windows 0.9.6 artifacts are unsigned previews and may trigger Unknown
+  Publisher, SmartScreen, or Defender warnings.
 - Linux media/camera/audio behavior varies by distribution, WebKitGTK, drivers,
   and portal setup.
-- Stream mode exists in development paths but is hidden from the normal UI until
-  it is productized and security-reviewed.
-- MIDI mapping export/import still needs a user-shareable profile format with
-  the same validation, scopes, and rate limits as local MIDI Learn overrides.
+- Stream mode exists in development paths but is hidden from the normal UI and
+  excluded from the production CSP.
+
+Prospective security hardening, Windows signing, stream exposure, and MIDI
+profile work is tracked in the [Roadmap](ROADMAP.md).
 
 ## Reporting Security Issues
 

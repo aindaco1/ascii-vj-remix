@@ -1,6 +1,6 @@
 # Performance
 
-This guide documents the current performance model, target behaviors, and
+This guide documents the current performance model, acceptance behavior, and
 validation practices for ASCII VJ Remix.
 
 Performance work is about frame pacing, GPU
@@ -26,21 +26,22 @@ and keeping the dense control UI responsive while the renderer is under load.
 - Watch thermals and battery. This app can intentionally keep CPU, GPU, camera,
   media decode, and audio analysis active.
 
-## Practical Targets
+## Practical Acceptance Behavior
 
-These are practical targets, not hard guarantees across all hardware.
+These are regression criteria for supported hardware, not frame-rate guarantees
+across every machine.
 
 | Area | Target |
 | --- | --- |
 | Demo Image | Renderer starts automatically and remains responsive while presets/WTF/audio change params. |
 | Demo Video | Smooth playback through source switches and preset transitions without restarting video unless source changes. |
-| Main preview | Should not collapse to low single-digit FPS when Pop Out is open on supported hardware. |
-| Pop Out | Native output should approach display refresh on Demo Image and Demo Video in optimized builds. |
+| Main preview | Does not collapse to low single-digit FPS solely because Pop Out is open on supported hardware. |
+| Pop Out | Native output approaches display refresh on Demo Image and Demo Video in optimized builds. |
 | Camera Pop Out | Prefer latest-frame native capture/presentation paths to minimize visible latency. |
-| Audio reactivity | Visual response should feel immediate while preserving stable RMS/band/beat analysis. |
-| Source switching | Built-in image/video switches should be bounded and should not leave the renderer stuck. |
-| Control UI | Sliders, preset buttons, source selection, and WTF toggle should remain interactive under render load. |
-| MIDI | Continuous controls should feel frame-immediate without creating one IPC/render update per raw hardware message. |
+| Audio reactivity | Visual response remains immediate while preserving stable RMS/band/beat analysis. |
+| Source switching | Built-in image/video switches are bounded and do not leave the renderer stuck. |
+| Control UI | Sliders, preset buttons, source selection, and WTF toggle remain interactive under render load. |
+| MIDI | Continuous controls are frame-coalesced and remain responsive without one IPC/render update per raw hardware message. |
 
 ## Renderer Performance Model
 
@@ -105,8 +106,8 @@ continue throughout the tween.
 
 ### WebGPU
 
-WebGPU is the primary visual quality target. It should stay the first choice on
-capable Chromium/WebView runtimes.
+WebGPU is the primary visual quality target and the first choice on capable
+Chromium/WebView runtimes.
 
 Watch for:
 
@@ -117,8 +118,8 @@ Watch for:
 
 ### WebGL2
 
-WebGL2 is the most important embedded GPU fallback. It should visually track
-WebGPU as closely as practical.
+WebGL2 is the most important embedded GPU fallback and visually tracks WebGPU as
+closely as practical.
 
 Watch for:
 
@@ -148,7 +149,7 @@ Rules:
 - Use native `wgpu` output when available.
 - Keep output-window permissions minimal.
 - Prefer direct frame transfer or latest-frame native capture paths.
-- Keep glyph-mode resources bounded. Character-set changes should update the
+- Keep glyph-mode resources bounded. Character-set changes update the
   small glyph ramp/params, not trigger unbounded font loading or large dynamic
   atlas allocation.
 - Avoid blocking the main UI while the output window presents.
@@ -161,7 +162,7 @@ Rules:
 
 ### Static Images
 
-Static image rendering should be the cheapest path. Jitter, audio modulation,
+Static image rendering is the cheapest path. Jitter, audio modulation,
 and WTF transitions can animate the output without reloading the image.
 
 Avoid:
@@ -194,7 +195,7 @@ Rules:
 
 ### Audio Reactivity
 
-Audio analysis should be stable but not sluggish.
+Audio analysis is tuned for stable live response.
 
 Rules:
 
@@ -202,7 +203,7 @@ Rules:
 - Use feature vectors such as RMS, bass, mid, treble, flux, beat pulse, and
   phase rather than unbounded raw samples.
 - Keep dense-mix helpers derived from the same bounded analyzer buffers:
-  low-mid/high-mid bands, presence, brightness, and density should not add
+  low-mid/high-mid bands, presence, brightness, and density do not add
   unbounded history or raw-audio IPC.
 - Clamp modulation so high sensitivity cannot drive pure black or pure white
   screens.
@@ -340,13 +341,5 @@ Investigate immediately when:
 - camera output freezes or accumulates stale frames.
 - CPU/GPU usage spikes after closing Pop Out.
 
-## Future Performance Work
-
-- Repeatable optimized-build benchmark suite.
-- Synthetic timestamped camera latency tests.
-- Audio-reactivity response-time tests.
-- Golden-output or bounded visual tests for representative presets.
-- Native texture-sharing paths on Windows and Linux comparable to the macOS
-  camera/output work.
-- Performance dashboards for main preview FPS, output FPS, frame drops, and
-  param-version propagation.
+Prospective benchmark, latency-test, texture-sharing, and performance-dashboard
+work is tracked in the [Roadmap](ROADMAP.md).

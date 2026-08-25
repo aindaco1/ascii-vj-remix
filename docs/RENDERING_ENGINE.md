@@ -13,18 +13,17 @@ Related practice docs:
 - [Accessibility](ACCESSIBILITY.md) and [Internationalization](I18N.md) for
   control-surface UX rules that affect renderer-facing controls.
 
-## Goals
+## Architecture Properties
 
-- Preserve the high-quality WebGPU/WebGL output adapted from
-  `ascii-point-and-click`.
-- Keep ASCILINE's fast Canvas and adaptive stream lineage available as fallback
-  and development infrastructure.
-- Keep normal app use local-first and offline.
-- Keep all live controls routed through one canonical parameter model.
-- Allow presets, WTF mode, audio reactivity, and MIDI control to compose
-  without forking renderer state.
-- Keep Pop Out output as close to latency-free as possible, especially for live
-  camera sources.
+- WebGPU/WebGL output is the visual-quality target.
+- ASCILINE-derived Canvas and adaptive-stream paths remain available as
+  compatibility and development infrastructure.
+- Normal app use is local-first and offline.
+- All live controls route through one canonical parameter model.
+- Presets, WTF mode, audio reactivity, and MIDI control compose without forking
+  renderer state.
+- Pop Out uses latest-frame native paths where available to minimize live-camera
+  latency.
 
 ## High-Level Data Flow
 
@@ -125,7 +124,8 @@ visual frames.
 
 ### Stream Sessions
 
-Stream sessions are development/advanced infrastructure in 0.9.0.
+Stream sessions are development and advanced infrastructure. They are not a
+normal user-facing source.
 
 Legacy path:
 
@@ -149,8 +149,8 @@ registered media id
   -> StreamRuntime
 ```
 
-The normal Source UI hides stream mode until this workflow is ready for normal
-users.
+The normal Source UI hides stream mode. Prospective productization work is
+tracked in the [Roadmap](ROADMAP.md).
 
 ## Parameter Model
 
@@ -182,7 +182,7 @@ the same live video/camera source instead of destroying and reloading media when
 
 ### Shared Renderer Math
 
-Version 0.9.2 starts reducing duplicated renderer math without changing visible
+Shared helpers reduce duplicated renderer math without changing the established
 Canvas or stream output.
 
 Shared JavaScript helpers live in:
@@ -203,10 +203,9 @@ The shared module currently owns:
   adaptations.
 - compact charset and luminance-to-glyph helpers.
 
-The legacy Canvas and stream functions are intentionally named separately from
-the GPU function. Canvas/stream quantization and background-blend behavior are
-preserved in 0.9.2 so this release does not introduce visual regressions while
-the shader/math contract is being consolidated.
+The Canvas and stream functions are intentionally named separately from the GPU
+function. Their established quantization and background-blend behavior remains
+distinct while shared vectors protect compatibility.
 
 `npm run test:render-math` validates the JavaScript helpers against shared
 vectors. Rust native output tests consume the same vector file for GPU color
@@ -214,7 +213,7 @@ processing parity.
 
 ### Effective Params
 
-Some features should affect live rendering without changing saved state.
+Some features affect live rendering without changing saved state.
 
 Audio reactivity is the main example:
 
@@ -311,7 +310,7 @@ These paths are important for:
 - testing the adaptive codec output.
 - environments where GPU initialization fails.
 
-Canvas fallback should remain functional even when it is not the highest-quality
+Canvas fallback remains functional even though it is not the highest-quality
 path.
 
 ## Static Runtime
@@ -365,8 +364,8 @@ supports:
 - adaptive ZLIB.
 - adaptive DELTA.
 
-Stream mode remains hidden from the normal Source UI in 0.9.0. It is retained
-for development and future productization.
+Stream mode is hidden from the normal Source UI and retained as development
+infrastructure.
 
 ## Adaptive Codec
 
@@ -422,9 +421,9 @@ Frame preparation modes:
 - color modes 2 through 5: `[char, R, G, B]` cells with quantized color levels.
 - pixel mode: `[B, G, R]` cells.
 
-The Rust path is not intended to replace the WebGPU/WebGL static renderer. It is
-the long-term answer for packaged stream-style media preparation and broader
-native decode support.
+The Rust path complements rather than replaces the WebGPU/WebGL static renderer.
+It provides packaged stream-style media preparation and native decoder
+integration.
 
 ## Native Output Renderer
 
@@ -453,9 +452,9 @@ with the latest visual and audio-reactive params. Unversioned fallback callers
 retain unconditional uploads. Logs expose source upload and skip counters.
 
 For macOS single-camera output, AVFoundation captures latest frames directly for
-the native presenter. Live camera presets should not use browser mirror
-transport by default because canvas readback and IPC frame transfer are too
-expensive for sustained output.
+the native presenter. Live camera presets do not use browser mirror transport by
+default because canvas readback and IPC frame transfer are too expensive for
+sustained output.
 
 For Canvas2D-style glyph presets, native output consumes the same canonical
 `glyphMode` and `charset` params as the control surface. The native `wgpu`
@@ -476,8 +475,8 @@ main renderer to the native output.
 
 Native output design rules:
 
-- output window should not own broad Tauri permissions.
-- presenter should consume latest params live.
+- output window does not own broad Tauri permissions.
+- presenter consumes the latest params live.
 - latest-frame semantics are preferred over deep buffering.
 - primary renderer behavior must not regress when Pop Out is open.
 - browser fallback must remain available.
@@ -536,7 +535,7 @@ WTF mode:
 - transitions indefinitely until stopped.
 - avoids unsafe all-white/all-black states.
 
-Experimental MIDI in 0.9.5:
+Experimental MIDI:
 
 ```text
 UC-33e DIN output
@@ -576,28 +575,15 @@ Packaged assets include:
 - fonts.
 - built-in demo media.
 - Tauri native code.
-- future reviewed FFmpeg sidecars.
+- reviewed FFmpeg sidecars.
 
 Production CSP blocks arbitrary remote HTTP(S) runtime access. The asset
 protocol is scoped narrowly and session-locally for user-selected media.
 
-## Testing Strategy
+## Validation
 
-Renderer-related tests should cover:
-
-- static source startup.
-- source switching.
-- camera source and fake-device paths.
-- preset application.
-- transition smoothness.
-- WebGL2 and Canvas fallbacks.
-- output display placement.
-- native output performance and log analysis.
-- adaptive codec vectors.
-- Rust/Python frame-prep parity.
-- FFmpeg/OpenCV decode/resize bounded parity.
-
-Useful commands:
+The maintained validation matrix lives in [Testing](TESTING.md). The primary
+renderer, output, codec, and media commands are:
 
 ```bash
 npm run smoke:static
@@ -611,17 +597,5 @@ npm run check:media
 npm run test:rust
 ```
 
-## Open Engineering Work
-
-- Consolidate duplicated color math across WebGPU, WebGL2, Canvas, stream, and
-  native output.
-- Add more direct texture-sharing camera paths:
-  - AVFoundation/CVPixelBuffer/Metal on macOS.
-  - Media Foundation/D3D on Windows.
-  - PipeWire/V4L2/Vulkan or GLES on Linux.
-- Productize stream mode or keep it hidden.
-- Extend the MIDI profile system to direct UC-33e USB and additional hardware
-  after the mioXC DIN path is physically validated on more platforms.
-- Improve native system audio capture through narrower platform APIs.
-- Add performance tests that reproduce user-reported Pop Out/main-window
-  contention automatically.
+Prospective renderer, camera, stream, audio, and MIDI work is tracked only in
+the [Roadmap](ROADMAP.md).

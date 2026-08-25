@@ -1,7 +1,7 @@
 # Testing
 
 This guide documents the current automated checks, manual verification paths,
-and future test expectations for ASCII VJ Remix.
+and known coverage gaps for ASCII VJ Remix.
 
 Testing focuses on offline bundles, renderer startup, source switching,
 native output, media/camera/audio behavior, Tauri permissions, FFmpeg sidecars,
@@ -34,7 +34,7 @@ npm run check:desktop            # Main desktop validation gate
 npm run check:release            # Release-oriented gate; expects staged FFmpeg sidecar
 npm run bundle:debug             # Build and validate local debug bundle
 npm run bundle:release           # Release gate, release build, bundle check
-npm run check:windows-authenticode # Future signed Windows release signature check
+npm run check:windows-authenticode # Inactive signed-Windows path signature check
 npm run smoke:native-output      # Native output performance helper
 npm run smoke:ui-perf            # UI performance helper
 npm run smoke:release-install    # Release artifact install/updater smoke
@@ -118,8 +118,8 @@ npm run smoke:ui-perf
 ```
 
 Native log analysis reports both source upload and upload-skip rates. A healthy
-24 FPS source on a 60 Hz display should upload near source rate and skip the
-duplicate display ticks while presentation remains near refresh rate.
+A healthy 24 FPS source on a 60 Hz display uploads near source rate and skips
+the duplicate display ticks while presentation remains near refresh rate.
 For glyph-mode changes, include at least one traditional ASCII preset in manual
 Pop Out checks and confirm Character Set/Font Family changes do not hide the
 Glyph/Cell controls.
@@ -222,8 +222,8 @@ Use this after user-facing renderer, source, audio, or output changes:
 
 ## Hardware and Platform Checks
 
-The app depends on real hardware and OS media stacks. Automated tests cannot
-cover everything yet.
+The app depends on real hardware and OS media stacks. Automated tests do not
+cover every hardware and platform combination.
 
 Important manual matrices:
 
@@ -263,9 +263,9 @@ scripts/podman_codec_tests.sh
 The Podman image defaults to Node 24. Use `NODE_MAJOR=26` only when explicitly
 testing a newer Node baseline.
 
-## CI and Release Expectations
+## CI and Release Behavior
 
-Release CI should:
+Release CI:
 
 - build macOS, Windows, and Linux artifacts.
 - verify offline bundle behavior.
@@ -277,25 +277,21 @@ Release CI should:
 - upload installers, updater packages, signatures, and `latest.json`.
 - validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
   acceptance before publishing macOS artifacts.
-- publish Windows 0.9.5 artifacts as unsigned previews; future signed Windows
-  releases must validate Authenticode signer and timestamp state before
-  publishing Windows artifacts.
+- publishes Windows 0.9.6 artifacts as unsigned previews; the inactive signed
+  Windows path includes Authenticode signer and timestamp validation.
 - run install smoke checks after publishing.
 - run macOS updater identity/replacement smoke on `macos-26`.
 
-Future release hardening should add:
-
-- real Windows and Linux install smoke tests on physical or VM machines.
-- a clean-machine/manual TCC grant-retention check across a public update.
-- Windows SmartScreen reputation checks on clean machines.
-
 ## Known Gaps
 
-- No comprehensive automated accessibility suite yet.
-- No full i18n/l10n test suite yet.
-- No golden visual output suite for presets yet.
-- No automated camera latency benchmark yet.
+- No comprehensive automated accessibility suite.
+- No full i18n/l10n test suite.
+- No golden visual output suite for presets.
+- No automated camera latency benchmark.
 - Experimental MIDI parsing, mapping, fake events, and SysEx assembly are
   automated; physical control sweeps and full-bank restore still require the
   UC-33e/mioXC rig.
-- Linux native media/camera/audio coverage needs broader machine testing.
+- Linux native media/camera/audio coverage is limited outside CI.
+
+Prospective release, platform, accessibility, localization, and performance
+coverage is tracked in the [Roadmap](ROADMAP.md).

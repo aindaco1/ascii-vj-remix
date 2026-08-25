@@ -1,11 +1,11 @@
 # Accessibility
 
-This guide establishes accessibility best practices for ASCII VJ Remix and
-tracks the current baseline.
+This guide documents the current accessibility baseline and the rules applied
+to control-surface changes.
 
-The controls still need to be accessible, but the renderer output itself is
-creative media that may intentionally be high contrast, animated, jittery, and
-visually intense.
+The control UI remains subject to keyboard, labeling, contrast, and focus
+requirements. The rendered output is creative media that may intentionally be
+high contrast, animated, jittery, and visually intense.
 
 ## Current Baseline
 
@@ -22,7 +22,7 @@ Known limitations:
 
 - No comprehensive keyboard-only audit has been completed.
 - No screen-reader pass has been completed.
-- No automated axe/ARIA snapshot suite exists yet.
+- No automated axe/ARIA snapshot suite exists.
 - The dense VJ control surface has many sliders and buttons that need stronger
   focus and labeling coverage over time.
 - The visual output can include rapid motion, high contrast, jitter, and color
@@ -64,17 +64,17 @@ Use these rules for new UI work:
 
 - Buttons need accessible names that match their action.
 - Icon-only controls need a label via `aria-label` or equivalent visible text.
-- Toggle buttons should expose pressed/on state.
+- Toggle buttons must expose pressed/on state.
 - Sliders need visible labels, accessible labels, min/max/current values, and
   keyboard support.
-- Mutually exclusive choices should use radio buttons, a select, or an ARIA
+- Mutually exclusive choices use radio buttons, a select, or an ARIA
   pattern that is tested with keyboard input.
 - Checkbox groups need a group label.
-- File picker controls should announce selected filename/presence state.
+- File picker controls announce selected filename/presence state.
 - Menus and overflow controls must close with Escape and restore focus.
-- Status/error text should appear near the triggering control and use an
+- Status/error text appears near the triggering control and uses an
   appropriate status or alert region when dynamic.
-- Disabled or irrelevant controls should be hidden or disabled consistently,
+- Disabled or irrelevant controls are hidden or disabled consistently,
   matching the conditional-knob model.
 
 ## Keyboard Expectations
@@ -103,26 +103,17 @@ For MIDI Learn and mapping controls:
 
 ## Motion, Flashing, and Visual Intensity
 
-ASCII VJ Remix is designed for extreme visuals, but the control UI should still
-respect accessibility needs.
+ASCII VJ Remix is designed for extreme visuals, while the control UI remains
+readable and operable.
 
 Current rule:
 
 - The app may generate intense visuals when the user selects extreme presets or
   WTF mode, but controls must remain readable and operable.
 
-Future candidates:
-
-- A reduced-motion preference for UI transitions.
-- A photosensitivity safety option that limits extreme flicker/jitter in
-  randomized modes.
-- Clear user-facing warnings for performance sets that intentionally use rapid
-  flashes or high-contrast changes.
-- A way to exclude specific presets from WTF/randomized mode.
-
 ## Color and Contrast
 
-The current theme should keep:
+The current theme uses:
 
 - black/graphite surfaces for structure.
 - white as the primary active/focus color.
@@ -136,10 +127,9 @@ Rules:
   text.
 - Focus rings must be visible against both black and grey panels.
 - Error and warning states need text/icon/state differences, not color only.
-- The logo/light blue legacy color should not be used as the main UI accent
-  unless the theme changes intentionally.
+- The logo/light blue legacy color is not the main UI accent.
 
-## Automated Coverage Goals
+## Current Automated Coverage
 
 Current checks are indirect:
 
@@ -148,15 +138,10 @@ npm run build
 npm run smoke:static
 ```
 
-Near-term accessibility checks to add:
-
-- Playwright keyboard smoke for Source, Presets, WTF, Audio Reactivity, and Pop
-  Out controls.
-- Axe checks for the main control window.
-- ARIA snapshots for major panels.
-- Focus-order assertions for compact panels.
-- Reduced-motion behavior checks once the preference exists.
-- Hover/focus color contrast checks for the black/neon theme.
+There is no dedicated keyboard, axe, ARIA-snapshot, focus-order, reduced-motion,
+or automated contrast suite. Those gaps are also summarized in
+[Testing](TESTING.md); prospective accessibility work lives in the
+[Roadmap](ROADMAP.md).
 
 ## Manual Accessibility Checklist
 

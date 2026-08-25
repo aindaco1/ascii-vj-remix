@@ -1,6 +1,7 @@
 # Bundled FFmpeg Resources
 
-Packaged desktop builds should include reviewed FFmpeg and ffprobe binaries here so stream mode does not depend on a system install or network download.
+Packaged desktop builds include reviewed FFmpeg and ffprobe binaries here so the
+media engine does not depend on a system install or runtime download.
 
 Preferred layout:
 
@@ -24,4 +25,6 @@ npm run ffmpeg:stage -- --ffmpeg /path/to/ffmpeg --ffprobe /path/to/ffprobe --li
 npm run check:ffmpeg-resources
 ```
 
-Each staged platform directory should contain `manifest.json` and `NOTICE.md` beside the `bin/` directory. Release packaging should run `npm run check:ffmpeg-release` for the current platform before shipping stream mode as standalone.
+Each staged platform directory contains `manifest.json` and `NOTICE.md` beside
+the `bin/` directory. Release packaging runs `npm run check:ffmpeg-release` for
+the current platform before bundling the sidecars.

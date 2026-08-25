@@ -1,14 +1,13 @@
 # Experimental UC-33e and mioXC MIDI Control
 
-ASCII VJ Remix 0.9.5 added experimental native MIDI control for an
-Evolution/M-Audio UC-33e connected through an iConnectivity mioXC. The initial
+ASCII VJ Remix includes experimental native MIDI control for an
+Evolution/M-Audio UC-33e connected through an iConnectivity mioXC. The current
 reference path is DIN MIDI on macOS Apple Silicon. Direct UC-33e USB input is
-intentionally out of scope for 0.9.6. Version 0.9.6 keeps the software profile
-and safety boundary intact while physical commissioning resumes.
+not supported.
 
 The software mapping and transport layers are covered by automated tests, but
 the complete physical control sweep and end-to-end full-bank SysEx
-restore/verification procedure are not release-certified yet. Treat profile
+restore/verification procedure are not release-certified. Treat profile
 installation as experimental, keep Ensure Profile on Connection off until a
 manual restore succeeds, and retain a known-good hardware dump.
 
@@ -84,7 +83,7 @@ stop.
 
 For each fader and rotary control:
 
-1. Move the physical control. Its printed F/C number should appear as the small
+1. Move the physical control. Its printed F/C number appears as the small
    selected-controller number in the LCD.
 2. Press `ASSIGN` once.
 3. Enter the matching CC number on the numeric keypad: F1 becomes CC 01, through
@@ -104,7 +103,7 @@ Repeat this sequence for C34 through C47:
    C34. This selection method is required for the numeric keys because those
    keys enter numbers while edit mode is active.
 2. Press `ASSIGN` once, then enter `146` (extended momentary MIDI CC mode).
-3. Press `PROGRAM` twice, then enter the CC number that should be transmitted.
+3. Press `PROGRAM` twice, then enter the CC number to transmit.
    Use CC 34 for C34, CC 35 for C35, through CC 47 for C47.
 4. Press `DATA MSB` twice, then enter `127` (button press value).
 5. Press `DATA LSB` twice, then enter `000` (button release value).
@@ -339,9 +338,5 @@ Hardware checklist:
 8. Capture, restore, recall preset 1, and verify the full SysEx bank.
 9. Confirm source, Camera, Pop Out, and output display never change from MIDI.
 
-## Deferred Work
-
-- Direct UC-33e USB support.
-- Physical Windows and Linux hardware validation.
-- Automatic construction of proprietary UC-33e SysEx without first capturing
-  a verified hardware dump.
+Prospective direct-USB, cross-platform hardware, controller-profile, and SysEx
+work is tracked in the [Roadmap](ROADMAP.md).
