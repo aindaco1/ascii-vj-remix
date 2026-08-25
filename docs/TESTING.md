@@ -118,7 +118,7 @@ npm run smoke:ui-perf
 ```
 
 Native log analysis reports both source upload and upload-skip rates. A healthy
-A healthy 24 FPS source on a 60 Hz display uploads near source rate and skips
+24 FPS source on a 60 Hz display uploads near source rate and skips
 the duplicate display ticks while presentation remains near refresh rate.
 For glyph-mode changes, include at least one traditional ASCII preset in manual
 Pop Out checks and confirm Character Set/Font Family changes do not hide the

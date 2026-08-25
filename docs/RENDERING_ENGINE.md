@@ -51,9 +51,8 @@ The visible built-ins are:
 - Demo Image: `media/demo.svg`.
 - Demo Video: `media/demo-video-2.mp4`.
 
-Hidden fixtures such as `media/point-click-test.mp4` and
-`media/point-click-test-30s.mp4` remain for development, parity tests, and
-performance smoke tests.
+Additional bundled media files remain hidden development fixtures for parity
+tests and performance smoke tests.
 
 ### Custom Files
 

@@ -292,9 +292,9 @@ ASCILINE_FFPROBE=/path/to/ffprobe
 Preview the media pipeline:
 
 ```bash
-npm run media:decode-preview -- media/point-click-test.mp4 96 54 2
-npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 false
-npm run media:native-session-preview -- media/point-click-test.mp4 96 54 12 5 true 4
+npm run media:decode-preview -- media/demo-video-2.mp4 96 54 2
+npm run media:pipeline-preview -- media/demo-video-2.mp4 96 54 12 5 false
+npm run media:native-session-preview -- media/demo-video-2.mp4 96 54 12 5 true 4
 ```
 
 Run parity checks:
