@@ -16,7 +16,8 @@ desktop-only feature is added.
 | `renderers/gpu/` | GPU renderer, media source abstraction, WebGPU/WebGL2 backends, and renderer assets. |
 | `renderers/desktop/` | Tauri adapter and output-display helpers. |
 | `renderers/shared/midi-mapping.js` | UC-33e profile, mapping validation, scaling, soft takeover, and event coalescing. |
-| `src-tauri/` | Tauri v2 desktop shell, native output window, media registry, audio providers, FFmpeg media engine, capabilities, icons, and packaging config. |
+| `assets/branding/` | Canonical app artwork used to generate platform icons. |
+| `src-tauri/` | Tauri v2 desktop shell, native output window, media registry, audio providers, FFmpeg media engine, capabilities, generated icons, and packaging config. |
 | `media/` | Built-in demo image/video and hidden development fixtures. |
 | `experiments/` | Legacy/adaptive codec vector and stream experiments. |
 | `scripts/` | Build checks, Podman setup, release helpers, updater helpers, FFmpeg staging/build scripts, and smoke tests. |
@@ -101,6 +102,8 @@ attributes do not break app signing. You can override the build directory with
 | `npm run smoke:static` | Browser smoke test for source UI, renderer startup, output fallback, and audio fake devices. |
 | `npm run tauri:dev` | Tauri desktop dev mode. |
 | `npm run check:desktop` | Offline build, Tauri policy, output-display simulation, updater manifest, FFmpeg resource policy, Rust tests, and debug no-bundle build. |
+| `npm run icons:generate` | Regenerate every Tauri platform icon from the canonical 1024px source. |
+| `npm run check:icons` | Regenerate icons in isolation and verify the committed set matches. |
 | `npm run bundle:debug` | Build a local debug desktop bundle and validate it. |
 | `npm run bundle:release` | Run release gates, build release bundle, and validate it. |
 | `npm run test:rust` | Run Rust tests. |
@@ -235,6 +238,15 @@ path, update the policy deliberately and run:
 
 ```bash
 npm run check:tauri-policy
+```
+
+The app icon has one source of truth:
+`assets/branding/ascii-vj-remix-app-icon-1024.png`. Do not hand-edit the
+platform files under `src-tauri/icons/`. Regenerate and verify them with:
+
+```bash
+npm run icons:generate
+npm run check:icons
 ```
 
 ## macOS Permissions During Development
@@ -440,7 +452,7 @@ The repository contains an inactive Azure Artifact Signing path in
 `src-tauri/windows-artifact-sign.cmd`; that wrapper calls
 `scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
 creates updater signatures. The current Windows release path does not use this
-config and publishes unsigned 0.9.9 preview artifacts. Configure the Azure
+config and publishes unsigned 0.9.10 preview artifacts. Configure the Azure
 values only after Windows signing is enabled as a release policy:
 
 ```bash

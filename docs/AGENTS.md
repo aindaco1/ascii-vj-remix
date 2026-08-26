@@ -80,7 +80,7 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current packaged version and latest public release are 0.9.9. The Changelog
+The current packaged version and latest public release are 0.9.10. The Changelog
 is the only current-state document that includes unreleased changes.
 
 Sources:
@@ -236,8 +236,8 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- Public 0.9.9 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.9 Windows artifacts are unsigned previews.
+- Public 0.9.10 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.10 Windows artifacts are unsigned previews.
   Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.
@@ -258,6 +258,10 @@ Expected local release-build note:
   production name, bundle identifier, and updater.
 - `src-tauri/tauri.notarized.conf.json` is for Developer ID notarized macOS
   release builds.
+- `assets/branding/ascii-vj-remix-app-icon-1024.png` is the canonical app icon.
+  Run `npm run icons:generate` instead of editing platform files under
+  `src-tauri/icons/` independently; `npm run check:icons` verifies the complete
+  generated set.
 - `src-tauri/tauri.windows-signed.conf.json` and its Authenticode helper exist
   but are inactive. The current Windows release path uses the default unsigned
   config.

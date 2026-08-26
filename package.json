@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -16,12 +16,13 @@
     "preview": "vite preview --host 127.0.0.1 --port 8010",
     "check": "npm run check:offline",
     "check:offline": "npm run build && node scripts/check_offline_bundle.mjs",
-    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
-    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
+    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run check:icons && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
+    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run check:icons && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
     "check:bundle": "node scripts/check_tauri_bundle.mjs",
     "check:bundle:debug": "node scripts/check_tauri_bundle.mjs --profile debug --expected-bundle-id com.asciline.remix.dev",
     "check:bundle:release": "node scripts/check_tauri_bundle.mjs --profile release --expected-bundle-id com.asciline.remix",
     "check:ffmpeg-resources": "node scripts/check_ffmpeg_resources.mjs",
+    "check:icons": "node scripts/check_app_icons.mjs",
     "check:ffmpeg-release": "node scripts/check_ffmpeg_resources.mjs --require-current-platform",
     "check:release-runtime": "npm run test:ffmpeg-source-build && npm run check:ffmpeg-release",
     "check:macos-notarization": "node scripts/check_macos_notarization.mjs --profile release",
@@ -37,6 +38,7 @@
     "ffmpeg:stage": "node scripts/stage_ffmpeg_sidecars.mjs",
     "ffmpeg:build-sidecar": "bash scripts/build_ffmpeg_sidecar.sh",
     "ffmpeg:sign:macos": "node scripts/sign_macos_ffmpeg_sidecars.mjs",
+    "icons:generate": "node scripts/tauri_env.mjs icon assets/branding/ascii-vj-remix-app-icon-1024.png --output src-tauri/icons",
     "macos:notarize-dmg": "node scripts/notarize_macos_dmg.mjs",
     "release:version:check": "node scripts/check_release_version.mjs",
     "release:secrets:check": "node scripts/check_github_release_secrets.mjs",

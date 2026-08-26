@@ -14,6 +14,7 @@ npm run build                    # Vite production build plus local asset copy
 npm run check:offline            # Build and verify bundled/offline assets
 npm run smoke:static             # Static UI/renderer smoke harness
 npm run check:tauri-policy       # Production CSP and local-only runtime policy
+npm run check:icons              # Canonical source and generated platform icons
 npm run test:output-display      # Secondary-display placement simulation
 npm run test:desktop-updater     # Once-per-launch and manual updater orchestration
 npm run test:updater-manifest    # Tauri latest.json/updater manifest tests
@@ -55,6 +56,7 @@ git diff --check
 | Offline runtime | `npm run check:offline`, `scripts/check_offline_bundle.mjs` |
 | Static UI harness | `npm run smoke:static` |
 | Tauri policy | `npm run check:tauri-policy` |
+| App icons | `npm run check:icons` |
 | Output display logic | `npm run test:output-display` |
 | Desktop updater behavior | `npm run test:desktop-updater` |
 | Updater manifests | `npm run test:updater-manifest` |
@@ -212,10 +214,11 @@ used by the updater availability gate, so their Update control can flash and
 then disappear. Install 0.9.8 manually from the notarized DMG. Relaunch 0.9.8
 and confirm the current-version launch check stays silent while the Update
 control remains visible, then use the control and confirm it reports `Up to
-date`. For the 0.9.9 release, launch the installed 0.9.8 app and confirm its
-background check surfaces 0.9.9 without downloading it automatically. After the
-user-approved install, confirm Reports remains visible with an empty queue and
-the right-side backend readout is absent.
+date`. For the 0.9.10 release, launch the installed 0.9.9 app and confirm its
+background check surfaces 0.9.10 without downloading it automatically. After
+the user-approved install, confirm the new app icon is present, Reports remains
+visible in either its empty or pending-count state, and the right-side backend
+readout is absent.
 
 On macOS, release smoke extracts the current and previous `.app.tar.gz`
 payloads, requires `com.asciline.remix`, Team ID `PWT3Q52LZ2`, hardened runtime,
@@ -306,7 +309,7 @@ Release CI:
 - upload installers, updater packages, signatures, and `latest.json`.
 - validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
   acceptance before publishing macOS artifacts.
-- publishes Windows 0.9.9 artifacts as unsigned previews; the inactive signed
+- publishes Windows 0.9.10 artifacts as unsigned previews; the inactive signed
   Windows path includes Authenticode signer and timestamp validation.
 - run install and visible-updater-UI smoke checks after publishing.
 - run macOS updater identity/replacement smoke on `macos-26`.
