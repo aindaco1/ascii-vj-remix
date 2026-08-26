@@ -287,6 +287,13 @@ async function compareGeneratedIcons(generated) {
       comparison = compareIcns(actual, expected);
     } else if (relative === 'icon.ico') {
       comparison = compareIco(actual, expected);
+    } else if (relative.endsWith('.xml')) {
+      const actualText = actual.toString('utf8').replaceAll('\r\n', '\n');
+      const expectedText = expected.toString('utf8').replaceAll('\r\n', '\n');
+      comparison = {
+        agrees: actualText === expectedText,
+        detail: actualText === expectedText ? 'exact normalized text' : 'XML content differs'
+      };
     } else {
       comparison = {
         agrees: actual.equals(expected),
