@@ -13,6 +13,7 @@ const entitlementsPath = path.join(root, 'src-tauri', 'Entitlements.plist');
 const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-desktop.yml');
 const desktopWorkflowPath = path.join(root, '.github', 'workflows', 'desktop.yml');
 const releaseSmokePath = path.join(root, 'scripts', 'smoke_tauri_release_install.mjs');
+const appPath = path.join(root, 'app.js');
 const packagePath = path.join(root, 'package.json');
 const localRunnerPath = path.join(root, 'scripts', 'run_local_desktop_app.sh');
 const tauriRoot = path.join(root, 'src-tauri');
@@ -390,6 +391,19 @@ for (const key of [
 const releaseWorkflow = await readFile(releaseWorkflowPath, 'utf8');
 const desktopWorkflow = await readFile(desktopWorkflowPath, 'utf8');
 const releaseSmoke = await readFile(releaseSmokePath, 'utf8');
+const appSource = await readFile(appPath, 'utf8');
+const smokeBindingIndex = appSource.indexOf('await this._bindTauriSmokeEvents();');
+const updaterAvailabilityIndex = appSource.indexOf('await isTauriUpdaterAvailable()');
+const midiInitIndex = appSource.indexOf('await this.midiRuntime.init()');
+if (
+  smokeBindingIndex < 0 ||
+  updaterAvailabilityIndex < 0 ||
+  midiInitIndex < 0 ||
+  smokeBindingIndex > updaterAvailabilityIndex ||
+  smokeBindingIndex > midiInitIndex
+) {
+  issues.push('Tauri smoke listeners must bind before updater, backend, and device initialization can block release UI validation');
+}
 const bundleJobStart = releaseWorkflow.indexOf('\n  bundle:');
 const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJobStart);
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart

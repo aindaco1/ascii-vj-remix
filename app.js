@@ -5208,6 +5208,7 @@ class RendererLabApp {
 
     async init() {
         this._startWebViewKeepalive();
+        await this._bindTauriSmokeEvents();
         this.desktopUpdater.setAvailable(await isTauriUpdaterAvailable());
         void this.desktopUpdater.checkOnLaunch();
         await this._initCrashReporter();
@@ -5217,7 +5218,6 @@ class RendererLabApp {
         this._buildAudioReactiveControls();
         this._bindEvents();
         await this.midiRuntime.init();
-        await this._bindTauriSmokeEvents();
         await this._refreshOutputDisplays();
         await this._refreshCameraDevices();
         await this._refreshAudioInputDevices();
