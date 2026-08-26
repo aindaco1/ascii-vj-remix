@@ -268,8 +268,16 @@ async function runUpdaterUiSmoke(exe, prefix, expectedVersion) {
   if (value.package_version !== expectedVersion) {
     throw new Error(`updater UI package version ${value.package_version} does not match ${expectedVersion}`);
   }
-  if (!value.update_control_present || !value.update_control_visible || !value.update_status_present) {
-    throw new Error(`updater UI is incomplete after launch: ${JSON.stringify(value)}`);
+  if (
+    !value.update_control_present ||
+    !value.update_control_visible ||
+    !value.update_status_present ||
+    !value.reports_control_present ||
+    !value.reports_control_visible ||
+    value.reports_control_label !== 'Reports' ||
+    !value.backend_status_absent
+  ) {
+    throw new Error(`top-bar updater/reports UI is incomplete after launch: ${JSON.stringify(value)}`);
   }
 }
 

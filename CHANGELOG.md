@@ -1,10 +1,12 @@
 # Changelog
 
-Version 0.9.8 restores the production Update control and launch check, adds a
-packaged UI regression smoke, and shortens release builds by compiling the app
-and FFmpeg runtime concurrently before verified artifact reuse. Version 0.9.7
-adds the silent launch-check controller while retaining user-approved
-installation and strengthens release transport resilience.
+Version 0.9.9 keeps crash-report preferences reachable with an empty queue,
+removes the duplicate top-bar backend readout, and extends packaged UI smoke to
+cover both controls. Version 0.9.8 restores the production Update control and
+launch check, adds a packaged UI regression smoke, and shortens release builds
+by compiling the app and FFmpeg runtime concurrently before verified artifact
+reuse. Version 0.9.7 adds the silent launch-check controller while retaining
+user-approved installation and strengthens release transport resilience.
 Version 0.9.6 continues the experimental MIDI commissioning work, removes
 measured renderer/output hot-path overhead without changing visual math or
 quality, and hardens the macOS drag-to-Applications release path. Version 0.9.5
@@ -17,6 +19,36 @@ distribution, publishes Windows as an unsigned preview while signing is
 deferred, and expands audio reactivity with dense-mix controls that reduce
 overreaction on busy music. Version 0.9.0 remains the first documentation
 baseline for the current ASCII VJ Remix feature set.
+
+## [0.9.9] - 2026-08-26
+
+### Fixed
+
+- The top-bar Reports control now remains visible in Tauri builds when the
+  crash queue is empty, so users can review the existing `ask`, `always`, and
+  `off` preference without waiting for an error. Pending reports still add a
+  count and warning state; Send and Discard remain disabled with an empty queue.
+- Removed the duplicate right-side backend readout from the top bar. The center
+  Backend selector remains the canonical control, while the user-owned Stats
+  Overlay continues to report the resolved runtime backend.
+- Packaged updater UI smoke listeners now bind before device initialization, so
+  early smoke requests cannot race camera or audio startup.
+
+### Security
+
+- Reports continue to contain only bounded, sanitized crash data. Local media
+  diagnostics and arbitrary logs are not attached or submitted.
+- Added an opt-in production crash-relay acceptance canary that refuses to run
+  when any user report is already pending and submits only a hard-coded
+  synthetic payload.
+
+### Validation
+
+- Added deterministic crash-report UI state tests for browser, empty, pending,
+  disabled, and busy states.
+- Static and packaged release smoke now require the duplicate backend status to
+  be absent. Packaged macOS, Windows, and Linux smoke also requires the Reports
+  control to remain visible with an empty queue.
 
 ## [0.9.8] - 2026-08-26
 

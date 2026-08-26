@@ -145,11 +145,11 @@ async function runSmoke() {
       { timeout: 15000 }
     );
     const main = await page.evaluate(() => ({
-      status: document.querySelector('#backend-status')?.textContent,
       sourceModeHidden: Boolean(document.querySelector('.source-mode-field')?.hidden),
       bufferHidden: Boolean(document.querySelector('#buffer-meter')?.hidden),
       connectionHidden: Boolean(document.querySelector('#connection-status')?.hidden),
       midiPanelHidden: Boolean(document.querySelector('#midi-panel')?.hidden),
+      backendStatusAbsent: !document.querySelector('#backend-status'),
       defaultSource: {
         mediaUrl: window.ascilineRemix?.params?.mediaUrl || '',
         mediaType: window.ascilineRemix?.params?.mediaType || '',
@@ -191,6 +191,9 @@ async function runSmoke() {
         connectionHidden: main.connectionHidden,
         midiPanelHidden: main.midiPanelHidden
       })}`);
+    }
+    if (!main.backendStatusAbsent) {
+      throw new Error('The duplicate top-bar backend status should be absent.');
     }
     if (
       main.defaultSource.mediaUrl !== 'media/demo.svg' ||

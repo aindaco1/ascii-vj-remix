@@ -195,8 +195,8 @@ button:disabled {
 .crash-report-button {
     min-height: 24px;
     padding: 0 8px;
-    border-color: var(--red);
-    color: var(--red);
+    border-color: var(--border);
+    color: var(--muted);
     font-size: 11px;
     line-height: 1;
 }
