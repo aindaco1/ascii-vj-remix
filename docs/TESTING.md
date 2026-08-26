@@ -194,6 +194,11 @@ top-bar backend readout. On
 macOS it verifies the downloaded DMG, mounts it read-only in a private temporary
 root, validates the exact app-to-Applications layout, and inspects the mounted
 app before the updater hop.
+
+If artifact publication succeeds but a post-publication runner exposes an
+acceptance-tooling defect, run the `Release Acceptance` workflow against the
+existing immutable tag after correcting the tooling. It reuses the published
+bytes and does not rebuild or replace release assets.
 Updater-hop smoke uses `0.9.0` as the default minimum previous version because
 older `0.1.x` releases were signed with a different updater key.
 

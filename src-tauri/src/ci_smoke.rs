@@ -296,7 +296,14 @@ fn spawn_updater_ui_smoke(app: &App) {
                         value["backendStatusAbsent"].as_bool().unwrap_or(false),
                     );
                 }
-                if last.0 && last.1 && last.2 && last.3 && last.4 && last.5 == "Reports" && last.6 {
+                if last.0
+                    && last.1
+                    && last.2
+                    && last.3
+                    && last.4
+                    && (last.5 == "Reports" || last.5.starts_with("Reports "))
+                    && last.6
+                {
                     handle.unlisten(listener_id);
                     finish(
                         UpdaterUiSmokeReport {

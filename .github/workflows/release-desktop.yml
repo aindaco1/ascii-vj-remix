@@ -567,6 +567,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
+      - name: Checkout current release acceptance tooling
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+          path: .release-tooling
+
       - name: Install Node
         uses: actions/setup-node@v6
         with:
@@ -590,4 +597,8 @@ jobs:
       - name: Install release and verify updater hop
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/smoke_tauri_release_install.mjs --assets-dir release-smoke --release-tag "${{ env.RELEASE_TAG }}"
+        shell: bash
+        run: >-
+          node .release-tooling/scripts/smoke_tauri_release_install.mjs
+          --assets-dir release-smoke
+          --release-tag "${{ env.RELEASE_TAG }}"

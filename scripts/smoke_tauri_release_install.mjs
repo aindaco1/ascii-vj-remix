@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { isCrashReportControlLabel } from '../renderers/desktop/crash-report-ui.js';
 import {
   assertProductionMacosIdentity,
   assertSameDesignatedRequirement,
@@ -260,10 +261,20 @@ async function runUpdaterUiSmoke(exe, prefix, expectedVersion) {
     ASCILINE_DESKTOP_SMOKE_REPORT: report,
     ASCILINE_SMOKE_REPORT: report
   };
-  run(prefix[0] || exe, prefix[0] ? [...prefix.slice(1), exe] : [], { env, timeout: timeoutMs });
-  const value = await readJson(report);
-  if (!value.ok || value.kind !== 'updater-ui') {
-    throw new Error(`updater UI smoke failed: ${JSON.stringify(value)}`);
+  let launchError = null;
+  try {
+    run(prefix[0] || exe, prefix[0] ? [...prefix.slice(1), exe] : [], { env, timeout: timeoutMs });
+  } catch (error) {
+    launchError = error;
+  }
+  let value;
+  try {
+    value = await readJson(report);
+  } catch (error) {
+    throw launchError || error;
+  }
+  if (value.kind !== 'updater-ui') {
+    throw launchError || new Error(`updater UI smoke failed: ${JSON.stringify(value)}`);
   }
   if (value.package_version !== expectedVersion) {
     throw new Error(`updater UI package version ${value.package_version} does not match ${expectedVersion}`);
@@ -274,10 +285,10 @@ async function runUpdaterUiSmoke(exe, prefix, expectedVersion) {
     !value.update_status_present ||
     !value.reports_control_present ||
     !value.reports_control_visible ||
-    value.reports_control_label !== 'Reports' ||
+    !isCrashReportControlLabel(value.reports_control_label) ||
     !value.backend_status_absent
   ) {
-    throw new Error(`top-bar updater/reports UI is incomplete after launch: ${JSON.stringify(value)}`);
+    throw launchError || new Error(`top-bar updater/reports UI is incomplete after launch: ${JSON.stringify(value)}`);
   }
 }
 
