@@ -40,7 +40,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | Tauri commands | `src-tauri/src/lib.rs` plus capability files | High | Treat every command as a security boundary. Validate inputs in Rust. |
 | Asset protocol | Empty by default, expanded only for selected media/session needs | High | Avoid persistent broad paths. |
 | FFmpeg sidecars | Bundled resources with policy checks and source/provenance metadata | Medium | No runtime downloads. Release sidecars disable network protocols. |
-| Updater | GitHub Releases endpoint with signed updater packages | High | Private signing key is external. Public key is committed. |
+| Updater | One production launch check plus explicit manual/download/install actions against the GitHub Releases endpoint with signed packages | High | Launch checks send no product data. Private signing key is external; public key is committed. |
 | Crash reporter | Rust-only POST to `https://crash.dustwave.xyz/v1/reports` in production builds | High | Reports are bounded, sanitized, user-configurable, and relayed to GitHub issues by a Cloudflare Worker. |
 | Experimental MIDI and UC-33e SysEx | Main-window-only Rust commands, mioXC port allowlist, bounded queues and packet limits | Medium | Profiles stay local and cannot target sources, Camera, Pop Out, or output displays. Physical full-bank restore verification remains incomplete. |
 | Logs and smoke reports | Local developer/test artifacts | Low to Medium | Do not log private file paths, raw audio, or sensitive environment values unless needed for explicit debugging. |
@@ -231,6 +231,15 @@ The updater is the intentional online path. It reads:
 https://github.com/aindaco1/ascii-vj-remix/releases/latest/download/latest.json
 ```
 
+The production app checks that metadata once per launch without blocking
+renderer startup. Current-version and network-failure results remain silent;
+when a newer signed release exists, the existing Update control surfaces it.
+Downloading, installation, and relaunch require an explicit user action. The
+request contains no media, frames, camera or audio data, presets, MIDI state,
+crash reports, local paths, credentials, or analytics identifiers. Development
+builds do not receive the production endpoint. The launch request necessarily
+exposes ordinary connection metadata to GitHub and the surrounding network.
+
 Security requirements:
 
 - Updater packages must be signed.
@@ -338,6 +347,7 @@ npm run release:secrets:check
 Updater:
 
 ```bash
+npm run test:desktop-updater
 npm run test:updater-manifest
 npm run updater:secret:check
 ```

@@ -45,7 +45,7 @@
             <div class="topbar-status">
                 <button id="check-update" class="update-status-button" type="button" hidden>Update</button>
                 <button id="crash-report-status" class="crash-report-button" type="button" hidden>Crash</button>
-                <span id="update-status" class="update-status-text" hidden></span>
+                <span id="update-status" class="update-status-text" role="status" aria-live="polite" aria-atomic="true" hidden></span>
                 <span id="backend-status">Backend: idle</span>
                 <span id="connection-status" hidden>Disconnected</span>
             </div>
@@ -233,7 +233,7 @@
     </div>
 
     <script type="module" src="codec.js?v=20260617-live-renderer-crossfade"></script>
-    <script type="module" src="app.js?v=20260711-midi-control"></script>
+    <script type="module" src="app.js?v=20260826-launch-update"></script>
 </body>
 
 </html>

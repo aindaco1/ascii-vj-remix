@@ -58,8 +58,10 @@ ASCII/cell visuals.
 - Runtime must be local-first and offline by default.
 - Do not add CDN, hosted font, hosted decoder, telemetry, or online runtime
   dependencies.
-- Intentional online runtime paths are limited to the GitHub Releases updater and
-  production-only reviewed/sanitized crash report submission.
+- Intentional online runtime paths are limited to the production app's bounded
+  release-metadata check for signed updater artifacts at launch, explicit
+  updater download/install actions, and production-only reviewed/sanitized
+  crash report submission.
 - Preserve the app name: ASCII VJ Remix.
 - Preserve the native app direction for macOS, Windows, and Linux.
 - Do not reframe browser mode as the product. Browser/Vite paths are useful for
@@ -243,6 +245,9 @@ Expected local release-build note:
 ## Tauri and Packaging Notes
 
 - Tauri v2 is the desktop shell.
+- Production builds perform one non-blocking updater check per launch. A
+  current or failed background check stays silent; download/install remains an
+  explicit user action through the existing Update control.
 - `src-tauri/tauri.conf.json` is the cross-platform production base config; its
   macOS ad-hoc identity is used only by explicit non-notarized packaging paths.
 - `src-tauri/tauri.dev.conf.json` isolates normal local commands from the

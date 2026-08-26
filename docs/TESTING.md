@@ -15,6 +15,7 @@ npm run check:offline            # Build and verify bundled/offline assets
 npm run smoke:static             # Static UI/renderer smoke harness
 npm run check:tauri-policy       # Production CSP and local-only runtime policy
 npm run test:output-display      # Secondary-display placement simulation
+npm run test:desktop-updater     # Once-per-launch and manual updater orchestration
 npm run test:updater-manifest    # Tauri latest.json/updater manifest tests
 npm run test:macos-identity      # macOS bundle/team/designated-requirement tests
 npm run test:macos-secret-args   # macOS notarization secret argument safety
@@ -54,6 +55,7 @@ git diff --check
 | Static UI harness | `npm run smoke:static` |
 | Tauri policy | `npm run check:tauri-policy` |
 | Output display logic | `npm run test:output-display` |
+| Desktop updater behavior | `npm run test:desktop-updater` |
 | Updater manifests | `npm run test:updater-manifest` |
 | macOS app identity | `npm run test:macos-identity`, release artifact inspection on macOS |
 | macOS secret handling | `npm run test:macos-secret-args` |
@@ -173,6 +175,7 @@ npm run check:ffmpeg-release
 ### Release and Updater
 
 ```bash
+npm run test:desktop-updater
 npm run check:release
 npm run bundle:release
 npm run smoke:release-install
@@ -189,6 +192,18 @@ root, validates the exact app-to-Applications layout, and inspects the mounted
 app before the updater hop.
 Updater-hop smoke uses `0.9.0` as the default minimum previous version because
 older `0.1.x` releases were signed with a different updater key.
+
+The controller test verifies that production availability permits exactly one
+silent check per launch, current/offline results do not announce status, an
+available update is not installed automatically, and the existing manual path
+still performs rechecks and user-triggered installation.
+
+After 0.9.7 is published, use the installed 0.9.6 app's manual Update control to
+discover and install it; automatic checks do not exist in 0.9.6. Relaunch 0.9.7
+and confirm the current-version launch check stays silent, then exercise the
+manual Update control separately and confirm it reports `Up to date`. At the
+next release, launch the installed 0.9.7 app and confirm its background check
+surfaces the newer version without downloading it automatically.
 
 On macOS, release smoke extracts the current and previous `.app.tar.gz`
 payloads, requires `com.asciline.remix`, Team ID `PWT3Q52LZ2`, hardened runtime,

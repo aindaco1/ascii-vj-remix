@@ -75,6 +75,7 @@ import {
     connectTauriMidi,
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
+import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
     selectBrowserScreen
@@ -5194,10 +5195,11 @@ class RendererLabApp {
         this.cameraError = '';
         this.wtfActive = false;
         this.wtfToken = 0;
-        this.desktopUpdate = null;
-        this.desktopUpdateBusy = false;
-        this.desktopUpdateStatus = '';
-        this.desktopUpdaterAvailable = false;
+        this.desktopUpdater = new DesktopUpdateController({
+            checkForUpdate: checkTauriUpdate,
+            installUpdate: installTauriUpdate,
+            onStateChange: () => this._syncDesktopUpdateUi()
+        });
         this.crashReportState = null;
         this.crashReportBusy = false;
         this.warmMediaElements = [];
@@ -5205,7 +5207,8 @@ class RendererLabApp {
 
     async init() {
         this._startWebViewKeepalive();
-        this.desktopUpdaterAvailable = await isTauriUpdaterAvailable();
+        this.desktopUpdater.setAvailable(await isTauriUpdaterAvailable());
+        void this.desktopUpdater.checkOnLaunch();
         await this._initCrashReporter();
         await this._detectBackends();
         await this._restoreCustomSource();
@@ -6143,7 +6146,9 @@ class RendererLabApp {
         els.addCustomFile.addEventListener('click', () => this._openCustomFilePicker());
         els.localMediaFile.addEventListener('change', () => this._selectLocalMediaFile());
         els.togglePlay.addEventListener('click', () => this.toggle());
-        els.checkUpdate?.addEventListener('click', () => this._checkOrInstallDesktopUpdate());
+        els.checkUpdate?.addEventListener('click', () => {
+            this.desktopUpdater.activate().catch((error) => console.warn('[Updater] Action failed:', error));
+        });
         els.crashReportStatus?.addEventListener('click', () => this._openCrashReportDialog());
         els.crashReportClose?.addEventListener('click', () => this._closeCrashReportDialog());
         els.crashReportSend?.addEventListener('click', () => this._sendCrashReports());
@@ -7927,88 +7932,17 @@ button:hover{background:#202a35}
     _syncDesktopUpdateUi() {
         if (!els.checkUpdate) return;
 
-        const available = this.desktopUpdaterAvailable;
+        const { available, busy, silent, status, update } = this.desktopUpdater.snapshot();
         els.checkUpdate.hidden = !available;
         if (els.updateStatus) {
-            els.updateStatus.hidden = !available || !this.desktopUpdateStatus;
-            els.updateStatus.textContent = available ? this.desktopUpdateStatus : '';
+            els.updateStatus.hidden = !available || !status;
+            els.updateStatus.textContent = available ? status : '';
         }
         if (!available) return;
 
-        els.checkUpdate.disabled = this.desktopUpdateBusy;
-        if (this.desktopUpdateBusy) {
-            els.checkUpdate.textContent = this.desktopUpdate ? 'Install' : 'Check';
-        } else {
-            els.checkUpdate.textContent = this.desktopUpdate ? 'Install' : 'Update';
-        }
-        els.checkUpdate.classList.toggle('active', Boolean(this.desktopUpdate));
-    }
-
-    async _checkOrInstallDesktopUpdate() {
-        if (!this.desktopUpdaterAvailable || this.desktopUpdateBusy) return;
-        if (this.desktopUpdate) {
-            await this._installDesktopUpdate();
-            return;
-        }
-        await this._checkDesktopUpdate();
-    }
-
-    async _checkDesktopUpdate() {
-        this.desktopUpdateBusy = true;
-        this.desktopUpdateStatus = 'Checking...';
-        this._syncDesktopUpdateUi();
-
-        try {
-            const update = await checkTauriUpdate({ timeout: 15000 });
-            this.desktopUpdate = update;
-            this.desktopUpdateStatus = update ? `v${update.version} available` : 'Up to date';
-        } catch (error) {
-            console.warn('[Updater] Update check failed:', error);
-            this.desktopUpdate = null;
-            this.desktopUpdateStatus = 'Check failed';
-        } finally {
-            this.desktopUpdateBusy = false;
-            this._syncDesktopUpdateUi();
-        }
-    }
-
-    async _installDesktopUpdate() {
-        if (!this.desktopUpdate || this.desktopUpdateBusy) return;
-
-        this.desktopUpdateBusy = true;
-        this.desktopUpdateStatus = 'Downloading...';
-        this._syncDesktopUpdateUi();
-
-        let received = 0;
-        let total = 0;
-        const updateProgress = (event) => {
-            if (!event) return;
-            if (event.event === 'Started') {
-                received = 0;
-                total = Number(event.data?.contentLength || 0);
-                this.desktopUpdateStatus = total > 0 ? 'Downloading 0%' : 'Downloading...';
-            } else if (event.event === 'Progress') {
-                received += Number(event.data?.chunkLength || 0);
-                if (total > 0) {
-                    const percent = Math.min(100, Math.floor((received / total) * 100));
-                    this.desktopUpdateStatus = `Downloading ${percent}%`;
-                }
-            } else if (event.event === 'Finished') {
-                this.desktopUpdateStatus = 'Installing...';
-            }
-            this._syncDesktopUpdateUi();
-        };
-
-        try {
-            await installTauriUpdate(this.desktopUpdate, updateProgress, { timeout: 300000 });
-            this.desktopUpdateStatus = 'Relaunching...';
-        } catch (error) {
-            console.warn('[Updater] Update install failed:', error);
-            this.desktopUpdateStatus = 'Install failed';
-            this.desktopUpdateBusy = false;
-        } finally {
-            this._syncDesktopUpdateUi();
-        }
+        els.checkUpdate.disabled = busy;
+        els.checkUpdate.textContent = busy && !silent && !update ? 'Check' : (update ? 'Install' : 'Update');
+        els.checkUpdate.classList.toggle('active', Boolean(update));
     }
 
     _syncSourceControls() {

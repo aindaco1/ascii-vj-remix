@@ -106,6 +106,7 @@ attributes do not break app signing. You can override the build directory with
 | `npm run test:rust` | Run Rust tests. |
 | `npm run check:media` | Run frame prep, decode/resize, and native session media checks. |
 | `npm run test:output-display` | Deterministic secondary-display placement simulation. |
+| `npm run test:desktop-updater` | Launch/manual updater orchestration, silent-check, install, and progress tests. |
 | `npm run smoke:native-output` | Native output performance smoke helper. |
 | `npm run smoke:ui-perf` | UI performance smoke helper. |
 | `npm run test:midi` | MIDI map, scaling, soft-takeover, action, and scope tests. |
@@ -319,9 +320,11 @@ Do not commit generated sidecar binaries or private release keys.
 
 ## Release and Updater Work
 
-ASCII VJ Remix desktop builds must remain standalone at runtime. The only
-intentional online path is the Tauri updater, which checks GitHub release
-metadata when the app invokes the updater plugin.
+ASCII VJ Remix desktop builds must remain standalone at runtime. The Tauri
+updater is an intentional online path: the production app invokes it once in
+the background at launch and when the user requests a manual recheck. A current
+or failed launch check stays silent. Downloading, installation, and relaunch
+remain explicit user actions through the existing Update control.
 
 Releases are published by `.github/workflows/release-desktop.yml`. The release
 matrix builds macOS, Windows, and Linux artifacts, verifies them, writes updater
@@ -461,6 +464,7 @@ Use these checks before publishing release changes:
 
 ```bash
 npm run check:desktop
+npm run test:desktop-updater
 npm run test:updater-manifest
 npm run check:bundle:debug
 ```

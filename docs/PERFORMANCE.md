@@ -20,6 +20,8 @@ and keeping the dense control UI responsive while the renderer is under load.
   live-control path.
 - Keep all runtime assets local so performance does not depend on network
   availability.
+- Start the production launch update check asynchronously. A slow or unavailable
+  release endpoint must not delay renderer, source, audio, or control startup.
 - Keep crash reporting off the render path. Capture, queueing, sanitization, and
   submission must be bounded and must not block frame presentation or live
   controls.
@@ -290,6 +292,7 @@ and 36 skips per second while presentation remains near 60 FPS.
 Desktop and release gates:
 
 ```bash
+npm run test:desktop-updater
 npm run check:desktop
 npm run check:release
 ```
