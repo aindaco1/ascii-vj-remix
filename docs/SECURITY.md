@@ -59,8 +59,8 @@ The current release line includes these security hardening rules:
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
 - Public macOS release CI fails closed when Apple Developer ID signing or
-  notarization is incomplete. Public 0.9.9 macOS artifacts are signed,
-  notarized, stapled, and Gatekeeper-validated; Windows 0.9.9 artifacts are
+  notarization is incomplete. Public 0.9.10 macOS artifacts are signed,
+  notarized, stapled, and Gatekeeper-validated; Windows 0.9.10 artifacts are
   unsigned previews.
 - Public macOS artifacts must retain Team ID `PWT3Q52LZ2` and the stable
   identifier/team designated requirement. CI validates both the built app and
@@ -373,7 +373,7 @@ npm run check:ffmpeg-resources
   deliberately ad-hoc development build still receives build-specific grants.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
-- Windows 0.9.9 artifacts are unsigned previews and may trigger Unknown
+- Windows 0.9.10 artifacts are unsigned previews and may trigger Unknown
   Publisher, SmartScreen, or Defender warnings.
 - Linux media/camera/audio behavior varies by distribution, WebKitGTK, drivers,
   and portal setup.
