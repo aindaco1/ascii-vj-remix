@@ -11,6 +11,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const source = path.join(root, 'assets', 'branding', 'ascii-vj-remix-app-icon-1024.png');
 const committed = path.join(root, 'src-tauri', 'icons');
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const maxChannelDelta = 3;
+const maxMeanChannelDelta = 0.1;
 
 function hash(data) {
   return createHash('sha256').update(data).digest('hex');
@@ -25,7 +27,7 @@ function paeth(left, above, upperLeft) {
   return aboveDistance <= upperLeftDistance ? above : upperLeft;
 }
 
-function pngManifest(data) {
+function decodePng(data) {
   if (!data.subarray(0, pngSignature.length).equals(pngSignature)) {
     throw new Error('generated icon payload is not a PNG');
   }
@@ -105,13 +107,49 @@ function pngManifest(data) {
     visiblePixels[offset + 3] = alpha;
   }
 
-  return `${header.width}x${header.height}:rgba8-premultiplied:${hash(visiblePixels)}`;
+  return {
+    format: `${header.width}x${header.height}:rgba8-premultiplied`,
+    pixels: visiblePixels
+  };
 }
 
-function iconPayloadManifest(data) {
-  return data.subarray(0, pngSignature.length).equals(pngSignature)
-    ? pngManifest(data)
-    : `binary:${data.length}:${hash(data)}`;
+function comparePng(actualData, expectedData) {
+  const actual = decodePng(actualData);
+  const expected = decodePng(expectedData);
+  if (actual.format !== expected.format || actual.pixels.length !== expected.pixels.length) {
+    return { agrees: false, detail: `PNG format differs (${actual.format} versus ${expected.format})` };
+  }
+  if (actual.pixels.equals(expected.pixels)) return { agrees: true, detail: 'exact visible pixels' };
+
+  let maximum = 0;
+  let total = 0;
+  let changed = 0;
+  for (let index = 0; index < actual.pixels.length; index += 1) {
+    const delta = Math.abs(actual.pixels[index] - expected.pixels[index]);
+    if (delta > 0) changed += 1;
+    if (delta > maximum) maximum = delta;
+    total += delta;
+  }
+  const mean = total / actual.pixels.length;
+  return {
+    agrees: maximum <= maxChannelDelta && mean <= maxMeanChannelDelta,
+    detail: `visible pixel delta max=${maximum}, mean=${mean.toFixed(4)}, changed=${changed}/${actual.pixels.length}`
+  };
+}
+
+function compareIconPayload(actual, expected) {
+  const actualIsPng = actual.subarray(0, pngSignature.length).equals(pngSignature);
+  const expectedIsPng = expected.subarray(0, pngSignature.length).equals(pngSignature);
+  if (actualIsPng || expectedIsPng) {
+    if (!actualIsPng || !expectedIsPng) return { agrees: false, detail: 'icon payload format differs' };
+    return comparePng(actual, expected);
+  }
+  return {
+    agrees: actual.equals(expected),
+    detail: actual.equals(expected)
+      ? 'exact binary payload'
+      : `binary payload differs (${actual.length}:${hash(actual)} versus ${expected.length}:${hash(expected)})`
+  };
 }
 
 async function validateSource() {
@@ -148,7 +186,7 @@ async function filesUnder(directory, relative = '') {
   return files.sort();
 }
 
-function icnsManifest(data) {
+function icnsEntries(data) {
   if (data.subarray(0, 4).toString('ascii') !== 'icns' || data.readUInt32BE(4) !== data.length) {
     throw new Error('generated macOS icon is not a valid ICNS container');
   }
@@ -162,14 +200,32 @@ function icnsManifest(data) {
     }
     if (type !== 'TOC ') {
       const payload = data.subarray(offset + 8, offset + length);
-      chunks.push(`${type}:${iconPayloadManifest(payload)}`);
+      chunks.push({ type, payload });
     }
     offset += length;
   }
-  return chunks.sort();
+  return chunks.sort((left, right) => left.type.localeCompare(right.type));
 }
 
-function icoManifest(data) {
+function compareIcns(actualData, expectedData) {
+  const actual = icnsEntries(actualData);
+  const expected = icnsEntries(expectedData);
+  if (actual.length !== expected.length) {
+    return { agrees: false, detail: `ICNS chunk count differs (${actual.length} versus ${expected.length})` };
+  }
+  for (let index = 0; index < actual.length; index += 1) {
+    if (actual[index].type !== expected[index].type) {
+      return { agrees: false, detail: `ICNS chunk type differs (${actual[index].type} versus ${expected[index].type})` };
+    }
+    const comparison = compareIconPayload(actual[index].payload, expected[index].payload);
+    if (!comparison.agrees) {
+      return { agrees: false, detail: `ICNS ${actual[index].type}: ${comparison.detail}` };
+    }
+  }
+  return { agrees: true, detail: 'ICNS image chunks agree' };
+}
+
+function icoEntries(data) {
   if (data.length < 6 || data.readUInt16LE(0) !== 0 || data.readUInt16LE(2) !== 1) {
     throw new Error('generated Windows icon is not a valid ICO container');
   }
@@ -187,9 +243,27 @@ function icoManifest(data) {
     const imageOffset = data.readUInt32LE(offset + 12);
     if (imageOffset + length > data.length) throw new Error('generated Windows icon has a truncated image');
     const payload = data.subarray(imageOffset, imageOffset + length);
-    images.push(`${width}x${height}:${colorCount}:${planes}:${bitCount}:${iconPayloadManifest(payload)}`);
+    images.push({ key: `${width}x${height}:${colorCount}:${planes}:${bitCount}`, payload });
   }
-  return images.sort();
+  return images.sort((left, right) => left.key.localeCompare(right.key));
+}
+
+function compareIco(actualData, expectedData) {
+  const actual = icoEntries(actualData);
+  const expected = icoEntries(expectedData);
+  if (actual.length !== expected.length) {
+    return { agrees: false, detail: `ICO image count differs (${actual.length} versus ${expected.length})` };
+  }
+  for (let index = 0; index < actual.length; index += 1) {
+    if (actual[index].key !== expected[index].key) {
+      return { agrees: false, detail: `ICO entry differs (${actual[index].key} versus ${expected[index].key})` };
+    }
+    const comparison = compareIconPayload(actual[index].payload, expected[index].payload);
+    if (!comparison.agrees) {
+      return { agrees: false, detail: `ICO ${actual[index].key}: ${comparison.detail}` };
+    }
+  }
+  return { agrees: true, detail: 'ICO images agree' };
 }
 
 async function compareGeneratedIcons(generated) {
@@ -206,18 +280,23 @@ async function compareGeneratedIcons(generated) {
       readFile(path.join(generated, relative)),
       readFile(path.join(committed, relative))
     ]);
-    let agrees;
+    let comparison;
     if (relative.endsWith('.png')) {
-      agrees = pngManifest(actual) === pngManifest(expected);
+      comparison = comparePng(actual, expected);
     } else if (relative === 'icon.icns') {
-      agrees = JSON.stringify(icnsManifest(actual)) === JSON.stringify(icnsManifest(expected));
+      comparison = compareIcns(actual, expected);
     } else if (relative === 'icon.ico') {
-      agrees = JSON.stringify(icoManifest(actual)) === JSON.stringify(icoManifest(expected));
+      comparison = compareIco(actual, expected);
     } else {
-      agrees = actual.equals(expected);
+      comparison = {
+        agrees: actual.equals(expected),
+        detail: actual.equals(expected) ? 'exact bytes' : 'file bytes differ'
+      };
     }
-    if (!agrees) {
-      throw new Error(`committed icon differs from canonical Tauri output: src-tauri/icons/${relative}`);
+    if (!comparison.agrees) {
+      throw new Error(
+        `committed icon differs from canonical Tauri output: src-tauri/icons/${relative} (${comparison.detail})`
+      );
     }
   }
 }

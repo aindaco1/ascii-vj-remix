@@ -46,7 +46,8 @@ baseline for the current ASCII VJ Remix feature set.
   the canonical source and compares their decoded, alpha-composited image
   content. PNG payloads inside ICO and ICNS containers are normalized so
   platform-specific compression, transparent RGB data, and container ordering
-  do not mask or falsely report artwork changes.
+  do not mask artwork changes. A tightly bounded pixel tolerance covers minor
+  cross-platform resampling differences while rejecting visible drift.
 - Desktop and release gates now run the icon consistency check before compiling
   or packaging the app.
 
