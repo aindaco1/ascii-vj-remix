@@ -43,9 +43,10 @@ baseline for the current ASCII VJ Remix feature set.
 ### Validation
 
 - Added a cross-platform icon check that regenerates all Tauri icon assets from
-  the canonical source and compares their decoded image content. PNG payloads
-  inside ICO and ICNS containers are normalized so platform-specific compression
-  and container ordering do not mask or falsely report artwork changes.
+  the canonical source and compares their decoded, alpha-composited image
+  content. PNG payloads inside ICO and ICNS containers are normalized so
+  platform-specific compression, transparent RGB data, and container ordering
+  do not mask or falsely report artwork changes.
 - Desktop and release gates now run the icon consistency check before compiling
   or packaging the app.
 

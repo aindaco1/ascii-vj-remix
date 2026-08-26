@@ -93,7 +93,19 @@ function pngManifest(data) {
     }
   }
 
-  return `${header.width}x${header.height}:rgba8:${hash(pixels)}`;
+  // RGB values beneath transparent pixels are not rendered and can vary across
+  // platform encoders. Compare premultiplied pixels so the check reflects the
+  // visible icon while still requiring exact alpha and composited color data.
+  const visiblePixels = Buffer.alloc(pixels.length);
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    const alpha = pixels[offset + 3];
+    visiblePixels[offset] = Math.round((pixels[offset] * alpha) / 255);
+    visiblePixels[offset + 1] = Math.round((pixels[offset + 1] * alpha) / 255);
+    visiblePixels[offset + 2] = Math.round((pixels[offset + 2] * alpha) / 255);
+    visiblePixels[offset + 3] = alpha;
+  }
+
+  return `${header.width}x${header.height}:rgba8-premultiplied:${hash(visiblePixels)}`;
 }
 
 function iconPayloadManifest(data) {
