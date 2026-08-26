@@ -165,7 +165,12 @@ and requires a manually captured and verified hardware profile.
 - The app uses narrow Tauri capabilities split by window:
   - The main control window can open selected media and manage output.
   - The output window has a minimal command surface.
-- GitHub Releases updater infrastructure is configured.
+- Version 0.9.7 checks GitHub Releases metadata for signed updater packages once
+  in the background whenever the production app opens. A current or offline
+  check is silent; when a newer release exists, the top-bar Update control shows
+  it. Version 0.9.6 still needs a manual check to discover 0.9.7.
+- The same Update control remains available for a manual recheck. Downloading,
+  installation, and relaunch remain explicitly user initiated.
 - Public 0.9.6 macOS artifacts are Developer ID signed, notarized, stapled, and
   Gatekeeper-validated. Public 0.9.6 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
@@ -408,6 +413,11 @@ ASCII VJ Remix is designed to be local-first.
 - Local media files stay on your machine.
 - Camera frames stay local.
 - Audio analysis is local.
+- The production app performs one bounded release-metadata check for signed
+  updater packages at launch. That request contains no media, camera, audio,
+  preset, MIDI, crash-report, or local-path data, and a network failure does not
+  block app startup. As with any request to GitHub, ordinary connection metadata
+  is visible to the network service.
 - The packaged app does not download renderer assets, fonts, codecs, models, or
   media providers at runtime.
 - Intentional online paths are limited to the Tauri updater and production-only

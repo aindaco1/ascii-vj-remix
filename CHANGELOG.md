@@ -1,7 +1,8 @@
 # Changelog
 
-Version 0.9.7 development begins with release transport resilience. Version
-0.9.6 continues the experimental MIDI commissioning work, removes
+Version 0.9.7 adds a silent automatic update check at launch while retaining
+user-approved installation and strengthens release transport resilience.
+Version 0.9.6 continues the experimental MIDI commissioning work, removes
 measured renderer/output hot-path overhead without changing visual math or
 quality, and hardens the macOS drag-to-Applications release path. Version 0.9.5
 adds 23 credited ascii.today-inspired character presets and
@@ -16,12 +17,35 @@ baseline for the current ASCII VJ Remix feature set.
 
 ## [0.9.7] - Unreleased
 
+### Added
+
+- The production desktop app now performs one non-blocking release-metadata
+  check for signed updater packages whenever it opens. Current-version and
+  offline launch checks stay silent; a newer version is surfaced through the
+  existing top-bar Update control. Version 0.9.6 still requires a manual check
+  to discover 0.9.7; automatic launch checks begin after 0.9.7 is installed.
+- The manual Update control remains available for an immediate recheck, and
+  downloading, installation, and relaunch remain explicitly user initiated.
+
 ### Fixed
 
 - Release source downloads now retry bounded transient transport failures and
   promote only completed FFmpeg tarballs before the pinned SHA-256 check.
 - Automatic desktop-release dispatch now retries transient GitHub API failures
   with bounded backoff.
+
+### Security
+
+- Automatic checks reuse the existing Tauri updater endpoint and signed
+  artifacts. They send no media, camera, audio, preset, MIDI, crash-report, or
+  local-path data, and development builds continue to disable production
+  updater endpoints.
+
+### Validation
+
+- Added deterministic updater-controller coverage for one check per launch,
+  silent current/offline results, update discovery without automatic install,
+  the manual fallback, download progress, and relaunch handoff.
 
 ## [0.9.6] - 2026-08-17
 

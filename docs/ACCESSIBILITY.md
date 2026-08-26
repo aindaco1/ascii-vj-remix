@@ -16,6 +16,8 @@ Accessibility is early for this project. The current app benefits from:
   picker flows.
 - compact but visible control grouping.
 - persistent Stats Overlay for renderer state.
+- polite live status for user-triggered updater checks and available releases;
+  silent launch checks do not announce current/offline results.
 - platform-native permission prompts for camera, microphone, and system audio.
 
 Known limitations:
