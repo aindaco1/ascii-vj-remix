@@ -2,10 +2,12 @@ use crate::native_output::NativeOutputState;
 use serde::Serialize;
 use serde_json::json;
 use std::{
-    env, fs, process, thread,
+    env, fs, process,
+    sync::mpsc,
+    thread,
     time::{Duration, Instant},
 };
-use tauri::{App, Emitter, Manager};
+use tauri::{App, Emitter, Listener, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Serialize)]
@@ -27,6 +29,18 @@ struct SmokeReport {
     forced_from_version: Option<String>,
     backend: Option<String>,
     media_url: Option<String>,
+    elapsed_ms: u128,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct UpdaterUiSmokeReport {
+    ok: bool,
+    kind: String,
+    package_version: String,
+    update_control_present: bool,
+    update_control_visible: bool,
+    update_status_present: bool,
     elapsed_ms: u128,
     error: Option<String>,
 }
@@ -64,9 +78,94 @@ pub fn maybe_spawn(app: &App) {
         spawn_ui_perf_smoke(app);
     } else if env::var_os("ASCILINE_NATIVE_OUTPUT_SMOKE").is_some() {
         spawn_native_output_smoke(app);
+    } else if matches!(
+        env::var("ASCILINE_DESKTOP_SMOKE").as_deref(),
+        Ok("updater-ui")
+    ) {
+        spawn_updater_ui_smoke(app);
     } else if matches!(env::var("ASCILINE_DESKTOP_SMOKE").as_deref(), Ok("launch")) {
         spawn_launch_smoke(app);
     }
+}
+
+fn spawn_updater_ui_smoke(app: &App) {
+    let handle = app.handle().clone();
+    let package_version = app.package_info().version.to_string();
+    let delay_ms = env::var("ASCILINE_DESKTOP_SMOKE_DELAY_MS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(1200);
+    let (sender, receiver) = mpsc::channel();
+    let listener_id = handle.listen("asciline-updater-ui-smoke-result", move |event| {
+        let _ = sender.send(event.payload().to_string());
+    });
+
+    thread::spawn(move || {
+        let start = Instant::now();
+        thread::sleep(Duration::from_millis(delay_ms));
+        if handle.get_webview_window("main").is_none() {
+            finish(
+                UpdaterUiSmokeReport {
+                    ok: false,
+                    kind: "updater-ui".to_string(),
+                    package_version,
+                    update_control_present: false,
+                    update_control_visible: false,
+                    update_status_present: false,
+                    elapsed_ms: start.elapsed().as_millis(),
+                    error: Some("main webview window was unavailable".to_string()),
+                },
+                1,
+            );
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(12);
+        let mut last = (false, false, false);
+
+        while Instant::now() < deadline {
+            let _ = handle.emit_to("main", "asciline-updater-ui-smoke", ());
+            if let Ok(payload) = receiver.recv_timeout(Duration::from_millis(150)) {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
+                    last = (
+                        value["updateControlPresent"].as_bool().unwrap_or(false),
+                        value["updateControlVisible"].as_bool().unwrap_or(false),
+                        value["updateStatusPresent"].as_bool().unwrap_or(false),
+                    );
+                }
+                if last.0 && last.1 && last.2 {
+                    handle.unlisten(listener_id);
+                    finish(
+                        UpdaterUiSmokeReport {
+                            ok: true,
+                            kind: "updater-ui".to_string(),
+                            package_version,
+                            update_control_present: true,
+                            update_control_visible: true,
+                            update_status_present: true,
+                            elapsed_ms: start.elapsed().as_millis(),
+                            error: None,
+                        },
+                        0,
+                    );
+                }
+            }
+        }
+
+        handle.unlisten(listener_id);
+        finish(
+            UpdaterUiSmokeReport {
+                ok: false,
+                kind: "updater-ui".to_string(),
+                package_version,
+                update_control_present: last.0,
+                update_control_visible: last.1,
+                update_status_present: last.2,
+                elapsed_ms: start.elapsed().as_millis(),
+                error: Some("Update control did not remain visible after launch".to_string()),
+            },
+            1,
+        );
+    });
 }
 
 fn spawn_launch_smoke(app: &App) {
@@ -429,7 +528,7 @@ fn spawn_ui_perf_smoke(app: &App) {
     });
 }
 
-fn emit_report(report: &SmokeReport, code: i32) {
+fn emit_report<T: Serialize>(report: &T, code: i32) {
     let payload = serde_json::to_string_pretty(&report)
         .unwrap_or_else(|error| format!("{{\"ok\":false,\"error\":\"{}\"}}", error));
 
@@ -450,7 +549,7 @@ fn emit_report(report: &SmokeReport, code: i32) {
     }
 }
 
-fn finish(report: SmokeReport, code: i32) -> ! {
+fn finish<T: Serialize>(report: T, code: i32) -> ! {
     emit_report(&report, code);
     process::exit(code);
 }

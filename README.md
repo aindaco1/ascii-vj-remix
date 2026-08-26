@@ -8,7 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current packaged version and latest public release are 0.9.6. Unreleased
+The current packaged version and latest public release are 0.9.8. Unreleased
 changes are recorded in the [Changelog](CHANGELOG.md); prospective work belongs
 in the [Roadmap](docs/ROADMAP.md).
 
@@ -165,14 +165,15 @@ and requires a manually captured and verified hardware profile.
 - The app uses narrow Tauri capabilities split by window:
   - The main control window can open selected media and manage output.
   - The output window has a minimal command surface.
-- Version 0.9.7 checks GitHub Releases metadata for signed updater packages once
+- Version 0.9.8 checks GitHub Releases metadata for signed updater packages once
   in the background whenever the production app opens. A current or offline
   check is silent; when a newer release exists, the top-bar Update control shows
-  it. Version 0.9.6 still needs a manual check to discover 0.9.7.
+  it. Versions 0.9.6 and 0.9.7 require a manual DMG upgrade to 0.9.8 because a
+  missing production capability hid their Update control.
 - The same Update control remains available for a manual recheck. Downloading,
   installation, and relaunch remain explicitly user initiated.
-- Public 0.9.6 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.6 Windows artifacts are unsigned previews.
+- Public 0.9.8 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.8 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
   app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
   replace or inherit privacy grants from the production app.
@@ -210,7 +211,7 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Public 0.9.6 release builds are Developer ID signed, notarized, stapled, and
+- Public 0.9.8 release builds are Developer ID signed, notarized, stapled, and
   accepted by Gatekeeper. Local or test builds may require the normal macOS
   right-click Open or Open Anyway flow.
 
@@ -277,7 +278,7 @@ Download the latest desktop build from:
 
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
-The 0.9.6 release contains a notarized Apple Silicon macOS DMG, Windows
+The 0.9.8 release contains a notarized Apple Silicon macOS DMG, Windows
 EXE/MSI installers, Linux AppImage/deb/rpm packages, and signed updater
 metadata. The Windows installers are unsigned previews.
 
@@ -287,7 +288,7 @@ metadata. The Windows installers are unsigned previews.
    artifact, not the primary manual installer.
 2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
 3. Eject the DMG, then open the installed app from `/Applications` in Finder.
-4. The public 0.9.6 macOS release is Developer ID signed, notarized, stapled,
+4. The public 0.9.8 macOS release is Developer ID signed, notarized, stapled,
    and accepted by Gatekeeper. Local or test builds may still require the
    normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
@@ -297,7 +298,7 @@ metadata. The Windows installers are unsigned previews.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 0.9.6 artifacts are unsigned previews. Windows may show Unknown
+3. Windows 0.9.8 artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.

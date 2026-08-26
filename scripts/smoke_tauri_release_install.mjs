@@ -84,6 +84,7 @@ async function smokeMacos(current, previous) {
     if (currentIdentity.version !== current.version) {
       throw new Error(`macOS updater archive version ${currentIdentity.version} does not match ${current.version}`);
     }
+    await runUpdaterUiSmoke(macosExecutable(currentExtracted.appPath), [], current.version);
 
     if (!previous) {
       console.log(`macOS release identity smoke passed for ${current.version}: ${currentExtracted.appPath}`);
@@ -130,6 +131,7 @@ async function smokeWindows(current, previous) {
       await runLaunchSmoke(exe, [], current.version);
       await runUpdaterDownloadSmoke(exe, [], current);
     }
+    await runUpdaterUiSmoke(exe, [], current.version);
 
     console.log(`Windows release install smoke passed for ${current.version}: ${exe}`);
   }
@@ -146,6 +148,7 @@ async function smokeWindowsUpdaterHop(current, previous) {
   exe = await waitForWindowsLaunchVersion(current.version);
   await verifyWindowsInstall(exe, current.version);
   await runUpdaterDownloadSmoke(exe, [], current);
+  await runUpdaterUiSmoke(exe, [], current.version);
 
   console.log(`Windows updater hop smoke passed: ${previous.version} -> ${current.version}`);
 }
@@ -165,6 +168,7 @@ async function smokeLinux(current, previous) {
       await runLaunchSmoke(exe, linuxAppPrefix(), current.version);
       await runUpdaterDownloadSmoke(exe, linuxAppPrefix(), current);
     }
+    await runUpdaterUiSmoke(exe, linuxAppPrefix(), current.version);
 
     console.log(`Linux release install smoke passed for ${current.version}: ${exe}`);
   }
@@ -180,6 +184,7 @@ async function smokeLinuxUpdaterHop(current, previous) {
   exe = await waitForLinuxPackageVersion(previousPackageName, current.version);
   await runLaunchSmoke(exe, linuxAppPrefix(), current.version);
   await runUpdaterDownloadSmoke(exe, linuxAppPrefix(), current);
+  await runUpdaterUiSmoke(exe, linuxAppPrefix(), current.version);
 
   console.log(`Linux updater hop smoke passed: ${previous.version} -> ${current.version}`);
 }
@@ -243,6 +248,28 @@ async function runLaunchSmoke(exe, prefix, expectedVersion) {
   }
   if (value.package_version !== expectedVersion) {
     throw new Error(`launch smoke package version ${value.package_version} does not match ${expectedVersion}`);
+  }
+}
+
+async function runUpdaterUiSmoke(exe, prefix, expectedVersion) {
+  const report = path.join(await mkdtemp(path.join(os.tmpdir(), 'asciline-updater-ui-smoke-')), 'report.json');
+  const env = {
+    ...process.env,
+    ASCILINE_DESKTOP_SMOKE: 'updater-ui',
+    ASCILINE_DESKTOP_SMOKE_DELAY_MS: '1200',
+    ASCILINE_DESKTOP_SMOKE_REPORT: report,
+    ASCILINE_SMOKE_REPORT: report
+  };
+  run(prefix[0] || exe, prefix[0] ? [...prefix.slice(1), exe] : [], { env, timeout: timeoutMs });
+  const value = await readJson(report);
+  if (!value.ok || value.kind !== 'updater-ui') {
+    throw new Error(`updater UI smoke failed: ${JSON.stringify(value)}`);
+  }
+  if (value.package_version !== expectedVersion) {
+    throw new Error(`updater UI package version ${value.package_version} does not match ${expectedVersion}`);
+  }
+  if (!value.update_control_present || !value.update_control_visible || !value.update_status_present) {
+    throw new Error(`updater UI is incomplete after launch: ${JSON.stringify(value)}`);
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -16,13 +16,14 @@
     "preview": "vite preview --host 127.0.0.1 --port 8010",
     "check": "npm run check:offline",
     "check:offline": "npm run build && node scripts/check_offline_bundle.mjs",
-    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
-    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run test:ffmpeg-source-build && npm run check:ffmpeg-release && npm run test:rust",
+    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
+    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
     "check:bundle": "node scripts/check_tauri_bundle.mjs",
     "check:bundle:debug": "node scripts/check_tauri_bundle.mjs --profile debug --expected-bundle-id com.asciline.remix.dev",
     "check:bundle:release": "node scripts/check_tauri_bundle.mjs --profile release --expected-bundle-id com.asciline.remix",
     "check:ffmpeg-resources": "node scripts/check_ffmpeg_resources.mjs",
     "check:ffmpeg-release": "node scripts/check_ffmpeg_resources.mjs --require-current-platform",
+    "check:release-runtime": "npm run test:ffmpeg-source-build && npm run check:ffmpeg-release",
     "check:macos-notarization": "node scripts/check_macos_notarization.mjs --profile release",
     "check:windows-authenticode": "node scripts/check_windows_authenticode.mjs --profile release",
     "check:media": "npm run test:frame-prep && npm run test:decode-resize && npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 false && npm run media:pipeline-preview -- media/point-click-test.mp4 96 54 12 5 true && npm run media:native-session-preview -- media/point-click-test.mp4 96 54 12 5 false 4 && npm run media:native-session-preview -- media/point-click-test.mp4 96 54 12 5 true 4",
@@ -69,6 +70,7 @@
     "test:midi": "node scripts/test_midi_mapping.mjs",
     "test:native-output-log": "node scripts/analyze_native_output_log.mjs",
     "test:render-math": "node scripts/test_render_math.mjs",
+    "test:release-build-reuse": "node scripts/test_release_build_reuse.mjs",
     "test:crash-relay": "npm --prefix crash-relay test",
     "test:vectors": "node scripts/test_vectors.mjs",
     "test:rust": "node scripts/cargo_env.mjs test --manifest-path src-tauri/Cargo.toml",

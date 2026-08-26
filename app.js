@@ -39,6 +39,7 @@ import {
     checkTauriUpdate,
     discardTauriCrashReports,
     disconnectTauriMidi,
+    emitTauriEventToApp,
     finishTauriMidiSysexCapture,
     getTauriCrashReportState,
     installTauriUpdate,
@@ -6252,14 +6253,47 @@ class RendererLabApp {
 
     async _bindTauriSmokeEvents() {
         if (!isTauriRuntime()) return;
-        try {
-            await listenTauriEvent('asciline-ui-perf-smoke', (event) => {
-                this._runUiPerfSmoke(event?.payload || {})
-                    .catch((error) => logMediaDiagnostic(`[ASCILINE_UI_PERF_ERROR] ${diagnosticErrorLabel(error)}`));
-            });
-        } catch (error) {
-            console.warn('[Smoke] UI perf smoke listener failed:', error);
+        const bindings = [
+            {
+                event: 'asciline-ui-perf-smoke',
+                label: 'UI perf',
+                handler: (event) => {
+                    this._runUiPerfSmoke(event?.payload || {})
+                        .catch((error) => logMediaDiagnostic(`[ASCILINE_UI_PERF_ERROR] ${diagnosticErrorLabel(error)}`));
+                }
+            },
+            {
+                event: 'asciline-updater-ui-smoke',
+                label: 'Updater UI',
+                handler: () => {
+                    this._reportUpdaterUiSmoke()
+                        .catch((error) => console.warn('[Smoke] Updater UI report failed:', error));
+                }
+            }
+        ];
+        for (const binding of bindings) {
+            try {
+                await listenTauriEvent(binding.event, binding.handler);
+            } catch (error) {
+                console.warn(`[Smoke] ${binding.label} smoke listener failed:`, error);
+            }
         }
+    }
+
+    async _reportUpdaterUiSmoke() {
+        const control = els.checkUpdate;
+        const status = els.updateStatus;
+        const visible = Boolean(
+            control &&
+            !control.hidden &&
+            window.getComputedStyle(control).display !== 'none' &&
+            control.getClientRects().length > 0
+        );
+        await emitTauriEventToApp('asciline-updater-ui-smoke-result', {
+            updateControlPresent: Boolean(control),
+            updateControlVisible: visible,
+            updateStatusPresent: Boolean(status)
+        });
     }
 
     async _runUiPerfSmoke(payload = {}) {

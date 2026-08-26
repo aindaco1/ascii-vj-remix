@@ -43,7 +43,8 @@ async function isTauriUpdaterAvailable() {
     if (!isTauriRuntime()) return false;
     try {
         return await getName() === PRODUCTION_APP_NAME;
-    } catch {
+    } catch (error) {
+        console.warn('[Updater] Could not verify the production app identity:', error);
         return false;
     }
 }
@@ -351,6 +352,12 @@ async function listenTauriEvent(eventName, handler) {
     return listen(eventName, handler);
 }
 
+async function emitTauriEventToApp(eventName, payload) {
+    if (!isTauriRuntime()) return false;
+    await emitTo({ kind: 'App' }, eventName, payload);
+    return true;
+}
+
 async function listTauriOutputDisplays() {
     if (!isTauriRuntime()) return [];
     const monitors = await availableMonitors();
@@ -573,6 +580,7 @@ export {
     checkTauriUpdate,
     discardTauriCrashReports,
     disconnectTauriMidi,
+    emitTauriEventToApp,
     finishTauriMidiSysexCapture,
     getTauriCrashReportState,
     getTauriMidiState,
