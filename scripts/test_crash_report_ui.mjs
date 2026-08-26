@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { crashReportUiState, pendingCrashReportCount } from '../renderers/desktop/crash-report-ui.js';
+import {
+  crashReportUiState,
+  isCrashReportControlLabel,
+  pendingCrashReportCount
+} from '../renderers/desktop/crash-report-ui.js';
 
 assert.equal(pendingCrashReportCount({ pendingCount: -2 }), 0);
 assert.equal(pendingCrashReportCount({ pendingCount: 2.9 }), 2);
 assert.equal(pendingCrashReportCount({ pendingCount: 'bad' }), 0);
+assert.equal(isCrashReportControlLabel('Reports'), true);
+assert.equal(isCrashReportControlLabel('Reports 2'), true);
+assert.equal(isCrashReportControlLabel('Reports 0'), false);
+assert.equal(isCrashReportControlLabel('Crash 2'), false);
 
 assert.deepEqual(
   crashReportUiState({ tauri: false, state: { available: true, pendingCount: 0, preference: 'ask' } }),

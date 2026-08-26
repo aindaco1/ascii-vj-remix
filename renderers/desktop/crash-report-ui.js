@@ -3,6 +3,10 @@ function pendingCrashReportCount(state) {
     return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
 }
 
+function isCrashReportControlLabel(value) {
+    return /^Reports(?: [1-9]\d*)?$/.test(String(value || ''));
+}
+
 function crashReportUiState({ tauri = false, state = null, busy = false } = {}) {
     const available = Boolean(tauri && state?.available);
     const pendingCount = pendingCrashReportCount(state);
@@ -21,4 +25,4 @@ function crashReportUiState({ tauri = false, state = null, busy = false } = {}) 
     };
 }
 
-export { crashReportUiState, pendingCrashReportCount };
+export { crashReportUiState, isCrashReportControlLabel, pendingCrashReportCount };

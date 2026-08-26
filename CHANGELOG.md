@@ -48,7 +48,7 @@ baseline for the current ASCII VJ Remix feature set.
   disabled, and busy states.
 - Static and packaged release smoke now require the duplicate backend status to
   be absent. Packaged macOS, Windows, and Linux smoke also requires the Reports
-  control to remain visible with an empty queue.
+  control to remain visible in either its empty or pending-count state.
 
 ## [0.9.8] - 2026-08-26
 
