@@ -440,7 +440,7 @@ The repository contains an inactive Azure Artifact Signing path in
 `src-tauri/windows-artifact-sign.cmd`; that wrapper calls
 `scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
 creates updater signatures. The current Windows release path does not use this
-config and publishes unsigned 0.9.8 preview artifacts. Configure the Azure
+config and publishes unsigned 0.9.9 preview artifacts. Configure the Azure
 values only after Windows signing is enabled as a release policy:
 
 ```bash
@@ -508,7 +508,12 @@ baseline for the current app line.
 
 - `ASCILINE_DESKTOP_SMOKE=launch`: bounded launch smoke with a report.
 - `ASCILINE_DESKTOP_SMOKE=updater-ui`: requires the packaged production Update
-  control to remain visible after its app-identity permission check.
+  and Reports controls to remain visible after initialization and requires the
+  duplicate top-bar backend readout to be absent.
+- `ASCILINE_CRASH_REPORT_SMOKE=submit`: production-only acceptance canary. It
+  refuses to run with an existing pending report or an `off` preference,
+  captures one hard-coded sanitized report, submits it through the Rust relay
+  path, and requires the queue to return to empty.
 - `ASCILINE_UPDATER_SMOKE=download`: checks `latest.json`, downloads the signed
   updater package, verifies its signature, writes a report, and exits.
 - `ASCILINE_UPDATER_SMOKE=install`: downloads and verifies the updater package,

@@ -1,5 +1,5 @@
 import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
-import { createRenderer, detectCapabilities } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
+import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
     glyphForLuma,
     processCanvasColorLegacy as processColor,
@@ -76,6 +76,7 @@ import {
     connectTauriMidi,
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
+import { crashReportUiState } from './renderers/desktop/crash-report-ui.js?v=20260826-reports';
 import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
@@ -96,7 +97,6 @@ const els = {
     sourceMode: $('source-mode'),
     backend: $('backend'),
     togglePlay: $('toggle-play'),
-    backendStatus: $('backend-status'),
     connectionStatus: $('connection-status'),
     checkUpdate: $('check-update'),
     crashReportStatus: $('crash-report-status'),
@@ -5212,7 +5212,6 @@ class RendererLabApp {
         this.desktopUpdater.setAvailable(await isTauriUpdaterAvailable());
         void this.desktopUpdater.checkOnLaunch();
         await this._initCrashReporter();
-        await this._detectBackends();
         await this._restoreCustomSource();
         this._buildControls();
         this._buildAudioReactiveControls();
@@ -5317,12 +5316,16 @@ class RendererLabApp {
     }
 
     _syncCrashReportUi() {
-        const pendingCount = Number(this.crashReportState?.pendingCount || 0);
+        const ui = crashReportUiState({
+            tauri: isTauriRuntime(),
+            state: this.crashReportState,
+            busy: this.crashReportBusy
+        });
         if (els.crashReportStatus) {
-            els.crashReportStatus.hidden = !isTauriRuntime() || pendingCount <= 0;
-            els.crashReportStatus.classList.toggle('pending', pendingCount > 0);
-            els.crashReportStatus.textContent = pendingCount > 1 ? `Crash ${pendingCount}` : 'Crash';
-            els.crashReportStatus.title = pendingCount > 0 ? `${pendingCount} pending crash report${pendingCount === 1 ? '' : 's'}` : '';
+            els.crashReportStatus.hidden = ui.hidden;
+            els.crashReportStatus.classList.toggle('pending', ui.pending);
+            els.crashReportStatus.textContent = ui.label;
+            els.crashReportStatus.title = ui.title;
         }
         if (els.crashReportPreference && this.crashReportState?.preference) {
             els.crashReportPreference.value = this.crashReportState.preference;
@@ -5331,10 +5334,10 @@ class RendererLabApp {
             els.crashReportPreview.value = crashReportPreview(this.crashReportState);
         }
         if (els.crashReportSend) {
-            els.crashReportSend.disabled = this.crashReportBusy || pendingCount <= 0 || this.crashReportState?.preference === 'off';
+            els.crashReportSend.disabled = ui.sendDisabled;
         }
         if (els.crashReportDiscard) {
-            els.crashReportDiscard.disabled = this.crashReportBusy || pendingCount <= 0;
+            els.crashReportDiscard.disabled = ui.discardDisabled;
         }
     }
 
@@ -5342,12 +5345,16 @@ class RendererLabApp {
         if (!els.crashReportDialog) return;
         els.crashReportPreview.value = crashReportPreview(this.crashReportState);
         els.crashReportDialog.hidden = false;
+        els.crashReportStatus?.setAttribute('aria-expanded', 'true');
         els.crashReportClose?.focus();
         this._syncCrashReportUi();
     }
 
     _closeCrashReportDialog() {
-        if (els.crashReportDialog) els.crashReportDialog.hidden = true;
+        if (!els.crashReportDialog || els.crashReportDialog.hidden) return;
+        els.crashReportDialog.hidden = true;
+        els.crashReportStatus?.setAttribute('aria-expanded', 'false');
+        els.crashReportStatus?.focus();
     }
 
     async _setCrashReportPreference(value) {
@@ -5395,15 +5402,6 @@ class RendererLabApp {
             this.crashReportBusy = false;
             this._syncCrashReportUi();
         }
-    }
-
-    async _detectBackends() {
-        const caps = await detectCapabilities().catch(() => null);
-        const parts = [];
-        if (caps?.webgpu) parts.push('WebGPU');
-        if (caps?.webgl2) parts.push('WebGL2');
-        parts.push('Canvas');
-        els.backendStatus.textContent = `Backend: ${parts.join(' / ')}`;
     }
 
     async _refreshOutputDisplays() {
@@ -6281,18 +6279,23 @@ class RendererLabApp {
     }
 
     async _reportUpdaterUiSmoke() {
-        const control = els.checkUpdate;
-        const status = els.updateStatus;
-        const visible = Boolean(
+        const updateControl = els.checkUpdate;
+        const updateStatus = els.updateStatus;
+        const reportsControl = els.crashReportStatus;
+        const controlVisible = (control) => Boolean(
             control &&
             !control.hidden &&
             window.getComputedStyle(control).display !== 'none' &&
             control.getClientRects().length > 0
         );
         await emitTauriEventToApp('asciline-updater-ui-smoke-result', {
-            updateControlPresent: Boolean(control),
-            updateControlVisible: visible,
-            updateStatusPresent: Boolean(status)
+            updateControlPresent: Boolean(updateControl),
+            updateControlVisible: controlVisible(updateControl),
+            updateStatusPresent: Boolean(updateStatus),
+            reportsControlPresent: Boolean(reportsControl),
+            reportsControlVisible: controlVisible(reportsControl),
+            reportsControlLabel: reportsControl?.textContent?.trim() || '',
+            backendStatusAbsent: !document.getElementById('backend-status')
         });
     }
 
@@ -7112,19 +7115,16 @@ class RendererLabApp {
         els.togglePlay.textContent = 'Stop';
         try {
             if (this.params.sourceMode === 'static') {
-                const stats = await this.staticRuntime.start(this.params, options);
+                await this.staticRuntime.start(this.params, options);
                 if (token !== this.startToken) return;
                 this.running = true;
                 await this._ensureStaticVideoPlayback();
                 this.setConnection(this._staticConnectionLabel());
-                this.setBackend(stats?.backend || 'static');
             } else {
                 this.staticRuntime.destroy();
                 await this.streamRuntime.start(this.params, options);
                 if (token !== this.startToken) return;
                 this.running = true;
-                const stats = this.streamRuntime.getStats();
-                this.setBackend(stats?.backend || (this.params.backend === 'auto' ? 'stream canvas' : this.params.backend));
             }
             this._applyEffectiveRendererParams(this.renderParams());
         } catch (error) {
@@ -7164,10 +7164,9 @@ class RendererLabApp {
             this.staticRuntime.canReuseSource(this.params);
 
         if (canReuseStaticSource) {
-            const stats = await this.staticRuntime.rebuildRenderer(this.params);
+            await this.staticRuntime.rebuildRenderer(this.params);
             await this._ensureStaticVideoPlayback();
             this.setConnection(this._staticConnectionLabel());
-            this.setBackend(stats?.backend || 'static');
             this._applyEffectiveRendererParams(this.renderParams());
             this.updateMeters();
             if (this.popout && !this.popout.closed) {
@@ -7195,14 +7194,13 @@ class RendererLabApp {
 
         const nextRuntime = new StaticRuntime(this);
         try {
-            const stats = await nextRuntime.start(this.params, { ...options, preserveStage: true });
+            await nextRuntime.start(this.params, { ...options, preserveStage: true });
             this.staticRuntime = nextRuntime;
             previousRuntime.destroy({ clearStage: false });
             const nextLayer = nextRuntime.renderer?.canvas?.parentElement || null;
             if (nextLayer) nextLayer.style.zIndex = '';
             await this._ensureStaticVideoPlayback();
             this.setConnection(this._staticConnectionLabel());
-            this.setBackend(stats?.backend || 'static');
             this._applyEffectiveRendererParams(this.renderParams());
             this.updateMeters();
             if (this.popout && !this.popout.closed) {
@@ -7957,10 +7955,6 @@ button:hover{background:#202a35}
 
     setConnection(text) {
         els.connectionStatus.textContent = text;
-    }
-
-    setBackend(text) {
-        els.backendStatus.textContent = `Backend: ${text}`;
     }
 
     _syncDesktopUpdateUi() {
@@ -8759,7 +8753,6 @@ button:hover{background:#202a35}
 
                 await this._ensureStaticVideoPlayback();
                 this.setConnection(this._staticConnectionLabel());
-                this.setBackend(prepared.stats?.backend || 'static');
                 this._applyEffectiveRendererParams(this.renderParams(), 'transition');
                 this.updateMeters();
                 if (this.popout && !this.popout.closed) {

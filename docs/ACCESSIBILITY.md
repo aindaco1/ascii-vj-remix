@@ -18,6 +18,8 @@ Accessibility is early for this project. The current app benefits from:
 - persistent Stats Overlay for renderer state.
 - polite live status for user-triggered updater checks and available releases;
   silent launch checks do not announce current/offline results.
+- a persistent Reports control that keeps crash-report preferences reachable
+  before any report is pending.
 - platform-native permission prompts for camera, microphone, and system audio.
 
 Known limitations:
@@ -59,6 +61,7 @@ The highest-risk accessibility surfaces are:
 8. Stats Overlay content.
 9. Permission recovery and error messaging.
 10. MIDI device status, soft-takeover state, SysEx actions, and MIDI Learn.
+11. Reports dialog preference, pending count, Send, and Discard actions.
 
 ## UI Control Rules
 
@@ -76,6 +79,7 @@ Use these rules for new UI work:
 - Menus and overflow controls must close with Escape and restore focus.
 - Status/error text appears near the triggering control and uses an
   appropriate status or alert region when dynamic.
+- Dialogs close with Escape and restore focus to their triggering control.
 - Disabled or irrelevant controls are hidden or disabled consistently,
   matching the conditional-knob model.
 

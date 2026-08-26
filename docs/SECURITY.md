@@ -59,8 +59,8 @@ The current release line includes these security hardening rules:
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
 - Public macOS release CI fails closed when Apple Developer ID signing or
-  notarization is incomplete. Public 0.9.8 macOS artifacts are signed,
-  notarized, stapled, and Gatekeeper-validated; Windows 0.9.8 artifacts are
+  notarization is incomplete. Public 0.9.9 macOS artifacts are signed,
+  notarized, stapled, and Gatekeeper-validated; Windows 0.9.9 artifacts are
   unsigned previews.
 - Public macOS artifacts must retain Team ID `PWT3Q52LZ2` and the stable
   identifier/team designated requirement. CI validates both the built app and
@@ -140,6 +140,9 @@ Security requirements:
   audio, local storage dumps, environment dumps, or arbitrary logs.
 - The app stores at most a small local queue and lets the user choose `ask`,
   `always`, or `off`.
+- The Reports control remains reachable with an empty queue so the preference
+  can be reviewed before an error occurs. Empty state does not create or submit
+  a report.
 - Submission uses the Rust command surface only. The output window must not have
   crash-report permissions.
 - GitHub credentials must not be present in the desktop app, repository config,
@@ -164,6 +167,10 @@ kind, surface, platform, command/backend/source mode, native-output state, and
 explicit error-code fields; normalized stack frame or message are fallbacks.
 Issue bodies keep bounded aggregate state rather than concatenating every
 report.
+
+The opt-in production acceptance canary is hard-coded and refuses to run when a
+user report is already pending or the preference is `off`. It must never be
+expanded into a general log-upload path.
 
 ## Local Media and File Access
 
@@ -366,7 +373,7 @@ npm run check:ffmpeg-resources
   deliberately ad-hoc development build still receives build-specific grants.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
-- Windows 0.9.8 artifacts are unsigned previews and may trigger Unknown
+- Windows 0.9.9 artifacts are unsigned previews and may trigger Unknown
   Publisher, SmartScreen, or Defender warnings.
 - Linux media/camera/audio behavior varies by distribution, WebKitGTK, drivers,
   and portal setup.

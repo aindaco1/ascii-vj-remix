@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -16,8 +16,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 8010",
     "check": "npm run check:offline",
     "check:offline": "npm run build && node scripts/check_offline_bundle.mjs",
-    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
-    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
+    "check:desktop": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
+    "check:release": "npm run check:offline && npm run check:tauri-policy && npm run test:release-build-reuse && npm run test:render-math && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
     "check:bundle": "node scripts/check_tauri_bundle.mjs",
     "check:bundle:debug": "node scripts/check_tauri_bundle.mjs --profile debug --expected-bundle-id com.asciline.remix.dev",
     "check:bundle:release": "node scripts/check_tauri_bundle.mjs --profile release --expected-bundle-id com.asciline.remix",
@@ -71,6 +71,7 @@
     "test:native-output-log": "node scripts/analyze_native_output_log.mjs",
     "test:render-math": "node scripts/test_render_math.mjs",
     "test:release-build-reuse": "node scripts/test_release_build_reuse.mjs",
+    "test:crash-report-ui": "node scripts/test_crash_report_ui.mjs",
     "test:crash-relay": "npm --prefix crash-relay test",
     "test:vectors": "node scripts/test_vectors.mjs",
     "test:rust": "node scripts/cargo_env.mjs test --manifest-path src-tauri/Cargo.toml",

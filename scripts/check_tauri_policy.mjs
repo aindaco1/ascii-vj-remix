@@ -425,7 +425,11 @@ for (const required of [
   "ASCILINE_DESKTOP_SMOKE: 'updater-ui'",
   'update_control_present',
   'update_control_visible',
-  'update_status_present'
+  'update_status_present',
+  'reports_control_present',
+  'reports_control_visible',
+  'reports_control_label',
+  'backend_status_absent'
 ]) {
   if (!releaseSmoke.includes(required)) {
     issues.push(`release install/updater smoke must verify packaged updater UI contract: ${required}`);

@@ -80,7 +80,7 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current packaged version and latest public release are 0.9.8. The Changelog
+The current packaged version and latest public release are 0.9.9. The Changelog
 is the only current-state document that includes unreleased changes.
 
 Sources:
@@ -139,6 +139,10 @@ UI:
 - The layout is intentionally dense.
 - Do not reduce control density when changing visual styling.
 - Avoid adding explanatory marketing text inside the app UI.
+- Keep the top-bar Reports control reachable with an empty queue; pending state
+  is additive. Do not attach local media diagnostics or arbitrary logs.
+- Keep backend selection in the center control. Resolved-backend diagnostics
+  belong in the user-owned Stats Overlay, not a duplicate top-bar readout.
 
 ## Repository Ownership Map
 
@@ -232,8 +236,8 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- Public 0.9.8 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.8 Windows artifacts are unsigned previews.
+- Public 0.9.9 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.9 Windows artifacts are unsigned previews.
   Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.

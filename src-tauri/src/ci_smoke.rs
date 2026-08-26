@@ -1,4 +1,10 @@
-use crate::native_output::NativeOutputState;
+use crate::{
+    crash_reporter::{
+        capture_crash_report, discard_crash_reports, get_crash_report_state, submit_crash_reports,
+        CrashReportInput,
+    },
+    native_output::NativeOutputState,
+};
 use serde::Serialize;
 use serde_json::json;
 use std::{
@@ -41,6 +47,27 @@ struct UpdaterUiSmokeReport {
     update_control_present: bool,
     update_control_visible: bool,
     update_status_present: bool,
+    reports_control_present: bool,
+    reports_control_visible: bool,
+    reports_control_label: String,
+    backend_status_absent: bool,
+    elapsed_ms: u128,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CrashRelaySmokeReport {
+    ok: bool,
+    kind: String,
+    mode: String,
+    package_version: String,
+    pending_before: usize,
+    pending_after_capture: usize,
+    pending_after_submit: usize,
+    attempted: usize,
+    submitted: usize,
+    failed: usize,
+    relay_result: Option<serde_json::Value>,
     elapsed_ms: u128,
     error: Option<String>,
 }
@@ -72,7 +99,9 @@ impl SmokeReport {
 }
 
 pub fn maybe_spawn(app: &App) {
-    if env::var_os("ASCILINE_UPDATER_SMOKE").is_some() {
+    if env::var_os("ASCILINE_CRASH_REPORT_SMOKE").is_some() {
+        spawn_crash_relay_smoke(app);
+    } else if env::var_os("ASCILINE_UPDATER_SMOKE").is_some() {
         spawn_updater_smoke(app);
     } else if env::var_os("ASCILINE_UI_PERF_SMOKE").is_some() {
         spawn_ui_perf_smoke(app);
@@ -86,6 +115,130 @@ pub fn maybe_spawn(app: &App) {
     } else if matches!(env::var("ASCILINE_DESKTOP_SMOKE").as_deref(), Ok("launch")) {
         spawn_launch_smoke(app);
     }
+}
+
+fn spawn_crash_relay_smoke(app: &App) {
+    let handle = app.handle().clone();
+    let package_version = app.package_info().version.to_string();
+    let mode = env::var("ASCILINE_CRASH_REPORT_SMOKE").unwrap_or_default();
+
+    tauri::async_runtime::spawn(async move {
+        let start = Instant::now();
+        let result = run_crash_relay_smoke(handle, package_version.clone(), mode.clone()).await;
+        match result {
+            Ok(mut report) => {
+                report.elapsed_ms = start.elapsed().as_millis();
+                finish(report, 0);
+            }
+            Err(error) => finish(
+                CrashRelaySmokeReport {
+                    ok: false,
+                    kind: "crash-relay".to_string(),
+                    mode,
+                    package_version,
+                    pending_before: 0,
+                    pending_after_capture: 0,
+                    pending_after_submit: 0,
+                    attempted: 0,
+                    submitted: 0,
+                    failed: 0,
+                    relay_result: None,
+                    elapsed_ms: start.elapsed().as_millis(),
+                    error: Some(error),
+                },
+                1,
+            ),
+        }
+    });
+}
+
+async fn run_crash_relay_smoke(
+    handle: tauri::AppHandle,
+    package_version: String,
+    mode: String,
+) -> Result<CrashRelaySmokeReport, String> {
+    if mode != "submit" {
+        return Err("ASCILINE_CRASH_REPORT_SMOKE must be set to submit".to_string());
+    }
+
+    let before = get_crash_report_state(handle.clone())?;
+    if !before.production {
+        return Err("Crash relay submission smoke requires a production build".to_string());
+    }
+    if before.preference == "off" {
+        return Err("Crash reporting preference is off".to_string());
+    }
+    if before.pending_count != 0 {
+        return Err(format!(
+            "Crash relay submission smoke refuses to run with {} existing pending report(s)",
+            before.pending_count
+        ));
+    }
+
+    let captured = capture_crash_report(
+        handle.clone(),
+        CrashReportInput {
+            kind: Some("frontend-error".to_string()),
+            surface: Some("startup".to_string()),
+            message: Some("ASCII VJ Remix production crash relay acceptance canary".to_string()),
+            stack: Some("synthetic acceptance canary".to_string()),
+            context: Some(json!({
+                "errorCode": "ASCILINE_CRASH_CANARY",
+                "sourceMode": "synthetic",
+                "backend": "canary",
+                "nativeOutputActive": false
+            })),
+        },
+    )?;
+    if captured.pending_count != 1 {
+        let _ = discard_crash_reports(handle.clone());
+        return Err(format!(
+            "Crash relay canary capture produced {} pending reports instead of one",
+            captured.pending_count
+        ));
+    }
+
+    let submitted_state = match submit_crash_reports(handle.clone()).await {
+        Ok(state) => state,
+        Err(error) => {
+            let _ = discard_crash_reports(handle);
+            return Err(error);
+        }
+    };
+    let summary = submitted_state
+        .last_result
+        .as_ref()
+        .ok_or_else(|| "Crash relay submission returned no summary".to_string())?;
+    if summary.attempted != 1 || summary.submitted != 1 || summary.failed != 0 {
+        let _ = discard_crash_reports(handle);
+        return Err(format!(
+            "Crash relay canary submission was incomplete: attempted={}, submitted={}, failed={}",
+            summary.attempted, summary.submitted, summary.failed
+        ));
+    }
+    if submitted_state.pending_count != 0 {
+        let _ = discard_crash_reports(handle);
+        return Err(format!(
+            "Crash relay canary left {} pending reports",
+            submitted_state.pending_count
+        ));
+    }
+
+    Ok(CrashRelaySmokeReport {
+        ok: true,
+        kind: "crash-relay".to_string(),
+        mode,
+        package_version,
+        pending_before: before.pending_count,
+        pending_after_capture: captured.pending_count,
+        pending_after_submit: submitted_state.pending_count,
+        attempted: summary.attempted,
+        submitted: summary.submitted,
+        failed: summary.failed,
+        relay_result: summary.results.first().cloned(),
+        elapsed_ms: 0,
+        error: None,
+    })
 }
 
 fn spawn_updater_ui_smoke(app: &App) {
@@ -112,6 +265,10 @@ fn spawn_updater_ui_smoke(app: &App) {
                     update_control_present: false,
                     update_control_visible: false,
                     update_status_present: false,
+                    reports_control_present: false,
+                    reports_control_visible: false,
+                    reports_control_label: String::new(),
+                    backend_status_absent: false,
                     elapsed_ms: start.elapsed().as_millis(),
                     error: Some("main webview window was unavailable".to_string()),
                 },
@@ -120,7 +277,7 @@ fn spawn_updater_ui_smoke(app: &App) {
         }
 
         let deadline = Instant::now() + Duration::from_secs(12);
-        let mut last = (false, false, false);
+        let mut last = (false, false, false, false, false, String::new(), false);
 
         while Instant::now() < deadline {
             let _ = handle.emit_to("main", "asciline-updater-ui-smoke", ());
@@ -130,9 +287,16 @@ fn spawn_updater_ui_smoke(app: &App) {
                         value["updateControlPresent"].as_bool().unwrap_or(false),
                         value["updateControlVisible"].as_bool().unwrap_or(false),
                         value["updateStatusPresent"].as_bool().unwrap_or(false),
+                        value["reportsControlPresent"].as_bool().unwrap_or(false),
+                        value["reportsControlVisible"].as_bool().unwrap_or(false),
+                        value["reportsControlLabel"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_string(),
+                        value["backendStatusAbsent"].as_bool().unwrap_or(false),
                     );
                 }
-                if last.0 && last.1 && last.2 {
+                if last.0 && last.1 && last.2 && last.3 && last.4 && last.5 == "Reports" && last.6 {
                     handle.unlisten(listener_id);
                     finish(
                         UpdaterUiSmokeReport {
@@ -142,6 +306,10 @@ fn spawn_updater_ui_smoke(app: &App) {
                             update_control_present: true,
                             update_control_visible: true,
                             update_status_present: true,
+                            reports_control_present: true,
+                            reports_control_visible: true,
+                            reports_control_label: last.5,
+                            backend_status_absent: true,
                             elapsed_ms: start.elapsed().as_millis(),
                             error: None,
                         },
@@ -160,8 +328,14 @@ fn spawn_updater_ui_smoke(app: &App) {
                 update_control_present: last.0,
                 update_control_visible: last.1,
                 update_status_present: last.2,
+                reports_control_present: last.3,
+                reports_control_visible: last.4,
+                reports_control_label: last.5,
+                backend_status_absent: last.6,
                 elapsed_ms: start.elapsed().as_millis(),
-                error: Some("Update control did not remain visible after launch".to_string()),
+                error: Some(
+                    "Top-bar updater/reports contract was incomplete after launch".to_string(),
+                ),
             },
             1,
         );
