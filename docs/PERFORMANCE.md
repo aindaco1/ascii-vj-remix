@@ -104,6 +104,27 @@ requires source-control synchronization to remain at no more than two calls and
 camera/full-visual synchronization at no more than one call while value updates
 continue throughout the tween.
 
+## 0.9.8 Release Build Optimization
+
+The 0.9.7 release's slowest Windows packaging job took about 31 minutes. Its
+FFmpeg source build took about 12.5 minutes, repeated release verification about
+5.5 minutes, and app compilation plus packaging about 10 minutes; those
+independent stages were mostly serialized.
+
+Version 0.9.8 adapts the verified-build reuse pattern used by MKV Magic. Release
+CI resolves one immutable tag commit and runs the FFmpeg source build and Tauri
+`--no-bundle` app compilation concurrently. It also waits for the exact
+commit's normal `Desktop` CI instead of repeating that suite inside every
+packaging job. Bundle jobs accept only the matching short-lived workflow
+artifacts, recheck FFmpeg resources, and verify the app binary's commit,
+platform, version, size, and SHA-256 before `tauri bundle` packages it without a
+second compile. Signing, updater signatures, notarization, bundle inspection,
+published-asset checks, and real install/update smokes remain release gates.
+
+This changes the critical path from the sum of FFmpeg plus app compilation to
+approximately the slower of the two, without changing renderer code, shipped
+resources, target platforms, signing policy, or output formats.
+
 ## Backend Notes
 
 ### WebGPU

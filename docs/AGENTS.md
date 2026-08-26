@@ -80,7 +80,7 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current packaged version and latest public release are 0.9.6. The Changelog
+The current packaged version and latest public release are 0.9.8. The Changelog
 is the only current-state document that includes unreleased changes.
 
 Sources:
@@ -232,8 +232,8 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- Public 0.9.6 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.6 Windows artifacts are unsigned previews.
+- Public 0.9.8 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.9.8 Windows artifacts are unsigned previews.
   Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.

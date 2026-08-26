@@ -12,6 +12,7 @@ const infoPlistPath = path.join(root, 'src-tauri', 'Info.plist');
 const entitlementsPath = path.join(root, 'src-tauri', 'Entitlements.plist');
 const releaseWorkflowPath = path.join(root, '.github', 'workflows', 'release-desktop.yml');
 const desktopWorkflowPath = path.join(root, '.github', 'workflows', 'desktop.yml');
+const releaseSmokePath = path.join(root, 'scripts', 'smoke_tauri_release_install.mjs');
 const packagePath = path.join(root, 'package.json');
 const localRunnerPath = path.join(root, 'scripts', 'run_local_desktop_app.sh');
 const tauriRoot = path.join(root, 'src-tauri');
@@ -272,6 +273,7 @@ if (!mainCapability) {
   }
   const permissions = new Set(mainCapability.permissions || []);
   const requiredMainPermissions = [
+    'core:app:allow-name',
     'dialog:allow-open',
     'core:event:allow-unlisten',
     'core:webview:allow-clear-all-browsing-data',
@@ -340,6 +342,7 @@ if (!outputCapability) {
     }
   }
   for (const forbidden of [
+    'core:app:allow-name',
     'dialog:allow-open',
     'core:event:allow-emit-to',
     'core:event:allow-unlisten',
@@ -351,6 +354,7 @@ if (!outputCapability) {
     'core:window:allow-set-size',
     'core:window:allow-show',
     'process:allow-restart',
+    'updater:default',
     'allow-get-crash-report-state',
     'allow-set-crash-report-preference',
     'allow-capture-crash-report',
@@ -385,10 +389,15 @@ for (const key of [
 
 const releaseWorkflow = await readFile(releaseWorkflowPath, 'utf8');
 const desktopWorkflow = await readFile(desktopWorkflowPath, 'utf8');
+const releaseSmoke = await readFile(releaseSmokePath, 'utf8');
 const bundleJobStart = releaseWorkflow.indexOf('\n  bundle:');
 const bundleStrategyStart = releaseWorkflow.indexOf('\n    strategy:', bundleJobStart);
 const bundleJobHeader = bundleJobStart >= 0 && bundleStrategyStart > bundleJobStart
   ? releaseWorkflow.slice(bundleJobStart, bundleStrategyStart)
+  : '';
+const publishJobStart = releaseWorkflow.indexOf('\n  publish-github-release:');
+const bundleJob = bundleJobStart >= 0 && publishJobStart > bundleJobStart
+  ? releaseWorkflow.slice(bundleJobStart, publishJobStart)
   : '';
 const installSmokeStart = releaseWorkflow.indexOf('\n  install-and-updater-smoke:');
 const installSmokeJob = installSmokeStart >= 0 ? releaseWorkflow.slice(installSmokeStart) : '';
@@ -398,6 +407,36 @@ if (!installSmokeJob.includes('macos-26')) {
 if (!installSmokeJob.includes('smoke_tauri_release_install.mjs')) {
   issues.push('release install/updater smoke must run smoke_tauri_release_install.mjs');
 }
+for (const required of [
+  "ASCILINE_DESKTOP_SMOKE: 'updater-ui'",
+  'update_control_present',
+  'update_control_visible',
+  'update_status_present'
+]) {
+  if (!releaseSmoke.includes(required)) {
+    issues.push(`release install/updater smoke must verify packaged updater UI contract: ${required}`);
+  }
+}
+for (const required of [
+  'source-acceptance:',
+  'require_github_workflow_success.mjs',
+  'build-runtime:',
+  'build-binary:',
+  'tauri_release_binary.mjs pack',
+  'tauri_release_binary.mjs restore',
+  'npm run tauri:build -- --no-bundle --ci',
+  'pattern: ascii-vj-remix-*'
+]) {
+  if (!releaseWorkflow.includes(required)) {
+    issues.push(`release workflow must preserve verified parallel build reuse: ${required}`);
+  }
+}
+if (!bundleJob.includes('npm run tauri -- bundle')) {
+  issues.push('release bundle job must package the restored binary with the Tauri bundle command');
+}
+if (bundleJob.includes('npm run tauri:build')) {
+  issues.push('release bundle job must not rebuild the already-verified app binary');
+}
 for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'AZURE_', 'KEYCHAIN_PASSWORD', 'TAURI_SIGNING_PRIVATE_KEY']) {
   const pattern = new RegExp(`^      ${forbiddenJobEnvPrefix}`, 'm');
   if (pattern.test(bundleJobHeader)) {
@@ -406,7 +445,7 @@ for (const forbiddenJobEnvPrefix of ['ASCILINE_APPLE_', 'APPLE_', 'AZURE_', 'KEY
 }
 
 if (!releaseWorkflow.includes('windows-latest')) {
-  issues.push('release workflow must publish Windows preview artifacts in the 0.9.3 matrix');
+  issues.push('release workflow must publish unsigned Windows preview artifacts');
 }
 if (releaseWorkflow.includes('tauri.windows-signed.conf.json')) {
   issues.push('release workflow must not use tauri.windows-signed.conf.json until a Windows signing backend is configured and proven');

@@ -186,7 +186,8 @@ Run `npm run ffmpeg:build-sidecar` before `npm run check:release` on a clean
 clone. `npm run bundle:release` runs the sidecar build step automatically.
 
 The release smoke downloads artifacts from GitHub Releases and checks installer
-layout, bundled assets, signed updater packages, and `latest.json` behavior. On
+layout, bundled assets, signed updater packages, `latest.json` behavior, and the
+visible packaged Update control. On
 macOS it verifies the downloaded DMG, mounts it read-only in a private temporary
 root, validates the exact app-to-Applications layout, and inspects the mounted
 app before the updater hop.
@@ -198,12 +199,14 @@ silent check per launch, current/offline results do not announce status, an
 available update is not installed automatically, and the existing manual path
 still performs rechecks and user-triggered installation.
 
-After 0.9.7 is published, use the installed 0.9.6 app's manual Update control to
-discover and install it; automatic checks do not exist in 0.9.6. Relaunch 0.9.7
-and confirm the current-version launch check stays silent, then exercise the
-manual Update control separately and confirm it reports `Up to date`. At the
-next release, launch the installed 0.9.7 app and confirm its background check
-surfaces the newer version without downloading it automatically.
+Versions 0.9.6 and 0.9.7 shipped without the main-window app-name capability
+used by the updater availability gate, so their Update control can flash and
+then disappear. Install 0.9.8 manually from the notarized DMG. Relaunch 0.9.8
+and confirm the current-version launch check stays silent while the Update
+control remains visible, then use the control and confirm it reports `Up to
+date`. At the next release, launch the installed 0.9.8 app and confirm its
+background check surfaces the newer version without downloading it
+automatically.
 
 On macOS, release smoke extracts the current and previous `.app.tar.gz`
 payloads, requires `com.asciline.remix`, Team ID `PWT3Q52LZ2`, hardened runtime,
@@ -282,7 +285,9 @@ testing a newer Node baseline.
 
 Release CI:
 
-- build macOS, Windows, and Linux artifacts.
+- require a successful `Desktop` main-push run for the exact release commit.
+- compile the app and build FFmpeg concurrently on macOS, Windows, and Linux,
+  then verify and reuse those exact inputs for bundle-only packaging.
 - verify offline bundle behavior.
 - verify Tauri policy.
 - build/check FFmpeg sidecars.
@@ -292,9 +297,9 @@ Release CI:
 - upload installers, updater packages, signatures, and `latest.json`.
 - validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
   acceptance before publishing macOS artifacts.
-- publishes Windows 0.9.6 artifacts as unsigned previews; the inactive signed
+- publishes Windows 0.9.8 artifacts as unsigned previews; the inactive signed
   Windows path includes Authenticode signer and timestamp validation.
-- run install smoke checks after publishing.
+- run install and visible-updater-UI smoke checks after publishing.
 - run macOS updater identity/replacement smoke on `macos-26`.
 
 ## Known Gaps

@@ -440,7 +440,7 @@ The repository contains an inactive Azure Artifact Signing path in
 `src-tauri/windows-artifact-sign.cmd`; that wrapper calls
 `scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
 creates updater signatures. The current Windows release path does not use this
-config and publishes unsigned 0.9.6 preview artifacts. Configure the Azure
+config and publishes unsigned 0.9.8 preview artifacts. Configure the Azure
 values only after Windows signing is enabled as a release policy:
 
 ```bash
@@ -475,22 +475,26 @@ breaking `codesign`. Normal CI and non-iCloud workspaces continue to use
 `src-tauri/target`. Override with `ASCILINE_TAURI_TARGET_DIR` or
 `CARGO_TARGET_DIR` when needed.
 
-Release builds run `npm run ffmpeg:build-sidecar` before
-`npm run check:release`. That builds from the pinned official FFmpeg 8.1.2
-source tarball, retries bounded transient transport failures, promotes only a
-completed download, verifies the source SHA-256, disables FFmpeg network
-protocols, and stages LGPL-compatible FFmpeg/ffprobe binaries as local Tauri
-resources. Runtime builds remain offline; CI may download official source during
-release builds, but the packaged app never downloads FFmpeg, codecs, or renderer
-assets at runtime.
+Local release builds run `npm run ffmpeg:build-sidecar` before
+`npm run check:release`. Public release CI keeps the same pinned official FFmpeg
+8.1.2 source, completed-download promotion, source SHA-256, disabled network
+protocols, and LGPL-compatible resource checks, but builds that runtime in
+parallel with `tauri build --no-bundle`. It requires the exact commit's
+successful main-push `Desktop` workflow, then hands both outputs to the bundle
+jobs as immutable one-day workflow artifacts. The restored app binary is
+verified against its commit, platform, version, byte size, and SHA-256 before
+`tauri bundle` packages it without recompiling. Runtime builds remain offline;
+CI may download official source during release builds, but the packaged app
+never downloads FFmpeg, codecs, or renderer assets at runtime.
 
 The release workflow also runs `scripts/smoke_tauri_release_install.mjs` on
 macOS, Windows, and Linux after publishing. It downloads artifacts from GitHub
 Releases instead of reusing local build directories, catching missing assets,
-bad `latest.json` URLs, installer layout issues, and broken signed updater
-downloads. macOS additionally extracts consecutive updater archives, requires
-the DMG to contain the real app, exact `/Applications` link, and reviewed Tauri
-Finder metadata; validates the downloaded DMG and mounted app; extracts
+bad `latest.json` URLs, installer layout issues, a hidden Update control, and
+broken signed updater downloads. macOS additionally extracts consecutive
+updater archives, requires the DMG to contain the real app, exact
+`/Applications` link, and reviewed Tauri Finder metadata; validates the
+downloaded DMG and mounted app; extracts
 consecutive updater archives; requires the stable production designated
 requirement; performs a true updater self-replacement; and validates the
 resulting app identity. Release upload does not replace already-published
@@ -503,6 +507,8 @@ kept as historical releases but cannot be used as a cryptographic updater-hop
 baseline for the current app line.
 
 - `ASCILINE_DESKTOP_SMOKE=launch`: bounded launch smoke with a report.
+- `ASCILINE_DESKTOP_SMOKE=updater-ui`: requires the packaged production Update
+  control to remain visible after its app-identity permission check.
 - `ASCILINE_UPDATER_SMOKE=download`: checks `latest.json`, downloads the signed
   updater package, verifies its signature, writes a report, and exits.
 - `ASCILINE_UPDATER_SMOKE=install`: downloads and verifies the updater package,

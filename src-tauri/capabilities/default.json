@@ -4,6 +4,7 @@
   "description": "Capability set for the main renderer lab control window.",
   "windows": ["main"],
   "permissions": [
+    "core:app:allow-name",
     "core:event:allow-emit-to",
     "core:event:allow-listen",
     "core:event:allow-unlisten",

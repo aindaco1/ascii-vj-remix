@@ -12,43 +12,93 @@ on:
       - 'v*'
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
-  bundle:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  release-context:
+    name: Resolve immutable release context
+    runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      # GitHub-hosted macOS 26 images can include unrelated untrusted taps.
-      # Keep this CI-scoped instead of untapping or trusting runner-managed taps.
-      HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
-      CARGO_NET_RETRY: '10'
-      CARGO_HTTP_MULTIPLEXING: 'false'
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          # `apple-metal` in the native wgpu stack needs the macOS 26 Metal SDK.
-          - macos-26
-          - windows-latest
-          - ubuntu-latest
-
+    outputs:
+      matrix: ${{ steps.context.outputs.matrix }}
+      release_sha: ${{ steps.context.outputs.release_sha }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Checkout release tooling
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Read and validate release version
+        id: version
+        run: node scripts/check_release_version.mjs --github-output
+
+      - name: Pin release commit and platform matrix
+        id: context
+        shell: bash
+        run: |
+          if [ "$RELEASE_TAG" != "${{ steps.version.outputs.tag }}" ]; then
+            echo "Release tag $RELEASE_TAG does not match version tag ${{ steps.version.outputs.tag }}."
+            exit 1
+          fi
+          echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo 'matrix={"include":[{"os":"macos-26","platform":"macos-aarch64","binary":"ascii-vj-remix"},{"os":"windows-latest","platform":"windows-x86_64","binary":"ascii-vj-remix.exe"},{"os":"ubuntu-latest","platform":"linux-x86_64","binary":"ascii-vj-remix"}]}' >> "$GITHUB_OUTPUT"
+
+  source-acceptance:
+    name: Require exact Desktop CI success
+    needs: release-context
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout release source
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
-          ref: ${{ github.sha }}
-          path: .release-tooling
+          ref: ${{ env.RELEASE_TAG }}
 
-      - name: Install Linux Tauri prerequisites
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Accept exact main-push Desktop CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/require_github_workflow_success.mjs
+          --repository "${{ github.repository }}"
+          --workflow desktop.yml
+          --commit "${{ needs.release-context.outputs.release_sha }}"
+          --branch main
+          --event push
+
+  build-runtime:
+    name: Build ${{ matrix.platform }} FFmpeg runtime
+    needs: release-context
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.release-context.outputs.matrix) }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Install Linux FFmpeg build prerequisites
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -56,21 +106,13 @@ jobs:
             build-essential \
             ca-certificates \
             curl \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            libasound2-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libfuse2 \
             nasm \
             xz-utils \
             yasm
 
       - name: Install macOS FFmpeg build prerequisites
         if: runner.os == 'macOS'
-        run: |
-          brew list --formula nasm >/dev/null 2>&1 || brew install --formula nasm
+        run: brew list --formula nasm >/dev/null 2>&1 || brew install --formula nasm
 
       - name: Install Windows FFmpeg build prerequisites
         if: runner.os == 'Windows'
@@ -90,17 +132,10 @@ jobs:
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-yasm
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Install Node
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: npm
-
-      - name: Install npm dependencies
-        run: npm ci
 
       - name: Build FFmpeg sidecar
         if: runner.os != 'Windows'
@@ -114,8 +149,165 @@ jobs:
           ASCILINE_FFMPEG_BUILD_DIR: /tmp/asciline-ffmpeg
         run: npm run ffmpeg:build-sidecar
 
-      - name: Verify release gates
-        run: npm run check:release
+      - name: Verify FFmpeg release runtime
+        run: npm run check:release-runtime
+
+      - name: Upload verified FFmpeg runtime
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-runtime-${{ matrix.platform }}-${{ needs.release-context.outputs.release_sha }}
+          path: src-tauri/resources/ffmpeg/${{ matrix.platform }}
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  build-binary:
+    name: Build ${{ matrix.platform }} app binary
+    needs: release-context
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      CARGO_NET_RETRY: '10'
+      CARGO_HTTP_MULTIPLEXING: 'false'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.release-context.outputs.matrix) }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Install Linux Tauri build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            libasound2-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Compile release app without bundling
+        run: npm run tauri:build -- --no-bundle --ci
+
+      - name: Pack verified release binary
+        shell: bash
+        run: >-
+          node scripts/tauri_release_binary.mjs pack
+          --binary "src-tauri/target/release/${{ matrix.binary }}"
+          --output-dir "$RUNNER_TEMP/tauri-release-binary"
+          --commit "${{ needs.release-context.outputs.release_sha }}"
+          --platform "${{ matrix.platform }}"
+          --version "${{ needs.release-context.outputs.version }}"
+
+      - name: Upload verified release binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-binary-${{ matrix.platform }}-${{ needs.release-context.outputs.release_sha }}
+          path: ${{ runner.temp }}/tauri-release-binary
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  bundle:
+    name: Bundle ${{ matrix.platform }}
+    needs:
+      - release-context
+      - source-acceptance
+      - build-runtime
+      - build-binary
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      HOMEBREW_NO_REQUIRE_TAP_TRUST: '1'
+      CARGO_NET_RETRY: '10'
+      CARGO_HTTP_MULTIPLEXING: 'false'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.release-context.outputs.matrix) }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Checkout release tooling
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+          path: .release-tooling
+
+      - name: Install Linux Tauri bundling prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            libasound2-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libfuse2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Download verified FFmpeg runtime
+        uses: actions/download-artifact@v8
+        with:
+          name: release-runtime-${{ matrix.platform }}-${{ needs.release-context.outputs.release_sha }}
+          path: src-tauri/resources/ffmpeg/${{ matrix.platform }}
+
+      - name: Download verified release binary
+        uses: actions/download-artifact@v8
+        with:
+          name: release-binary-${{ matrix.platform }}-${{ needs.release-context.outputs.release_sha }}
+          path: ${{ runner.temp }}/tauri-release-binary
+
+      - name: Restore exact release binary
+        shell: bash
+        run: >-
+          node scripts/tauri_release_binary.mjs restore
+          --input-dir "$RUNNER_TEMP/tauri-release-binary"
+          --output "src-tauri/target/release/${{ matrix.binary }}"
+          --commit "${{ needs.release-context.outputs.release_sha }}"
+          --platform "${{ matrix.platform }}"
+          --version "${{ needs.release-context.outputs.version }}"
+
+      - name: Verify release package inputs
+        run: |
+          npm run release:version:check
+          npm run check:release-runtime
 
       - name: Verify updater signing secret
         env:
@@ -247,12 +439,12 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run check:ffmpeg-release
 
-      - name: Build notarized macOS bundle
+      - name: Bundle notarized macOS app
         if: runner.os == 'macOS'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri:build -- --config src-tauri/tauri.notarized.conf.json
+        run: npm run tauri -- bundle --config src-tauri/tauri.notarized.conf.json --ci
 
       - name: Notarize macOS DMG
         if: runner.os == 'macOS'
@@ -264,19 +456,19 @@ jobs:
           fi
           node "$tooling_script" --profile release
 
-      - name: Build Linux desktop bundle
+      - name: Bundle Linux desktop app
         if: runner.os == 'Linux'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri:build
+        run: npm run tauri -- bundle --ci
 
-      - name: Build unsigned Windows preview bundle
+      - name: Bundle unsigned Windows preview app
         if: runner.os == 'Windows'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri:build
+        run: npm run tauri -- bundle --ci
 
       - name: Verify desktop bundle contents
         run: npm run check:bundle:release
@@ -327,6 +519,7 @@ jobs:
       - name: Download platform assets
         uses: actions/download-artifact@v8
         with:
+          pattern: ascii-vj-remix-*
           path: release-artifacts
 
       - name: Merge updater metadata
