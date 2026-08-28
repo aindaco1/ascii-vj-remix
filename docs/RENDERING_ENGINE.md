@@ -255,6 +255,15 @@ Typical browser priority:
 The user can override the backend manually. Controls that do not apply to the
 active backend are hidden or disabled.
 
+Backend choice is resolved once per renderer construction in
+`renderers/gpu/ascii/renderer/backend-policy.js`; it is not evaluated in the
+frame loop. Apple WebKit glyph mode uses WebGL2 even when WebGPU is available
+or manually requested because the WebKit WebGPU atlas path can expose a live
+renderer while presenting an empty canvas. Solid-cell mode can still use
+WebGPU, and glyph mode retains WebGPU on compatible runtimes. If WebGL2 is not
+available, WebGPU remains the last accelerated option rather than falling
+straight to an unavailable CPU renderer.
+
 ## WebGPU Renderer
 
 The WebGPU renderer is the primary quality target.
@@ -318,7 +327,8 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
   queried again during each frame.
 
 WebGL2 is the most important browser fallback because it is widely available on
-machines that do not expose WebGPU.
+machines that do not expose WebGPU and is the accelerated glyph path in the
+macOS Apple WebKit webview.
 
 ## Canvas Renderers
 

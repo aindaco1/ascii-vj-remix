@@ -120,8 +120,9 @@ npm run test:rust
 
 Use an optimized app build before making performance conclusions.
 The UI performance smoke starts from canonical visual defaults, uses fixed
-non-structural numeric transitions, and records each backend visited so repeat
-runs are comparable. Select an exact bundle and a longer sample with:
+non-structural numeric transitions, records each backend visited, and rejects a
+primary canvas with no visible pixel signal even when its FPS counter advances.
+Select an exact bundle and a longer sample with:
 
 ```bash
 ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix.app" \

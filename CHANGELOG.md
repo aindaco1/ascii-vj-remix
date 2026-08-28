@@ -11,6 +11,11 @@
   resolving static row counts from the actual cell width and height.
 - Added an all-preset primary-view smoke matrix covering activation, visible
   output, WebGL errors, lazy glyph-page completion, and canvas aspect.
+- Prevented blank glyph canvases in the macOS Apple WebKit runtime by selecting
+  the accelerated WebGL2 glyph path there, while retaining WebGPU for solid
+  cells and compatible runtimes.
+- Made the packaged desktop performance smoke reject an advancing renderer
+  whose primary canvas has no visible pixel signal.
 
 Version 0.9.11 adds performance-budgeted project palettes, ordered dithering,
 multilingual glyph controls, custom Unicode ramps, density guardrails, and

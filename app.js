@@ -6635,6 +6635,7 @@ class RendererLabApp {
             rendererChanges: 0,
             frameResetCount: 0,
             finalFrameCount: 0,
+            hasVisibleSignal: false,
             error: null
         };
 
@@ -6844,11 +6845,16 @@ class RendererLabApp {
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
+            for (let attempt = 0; attempt < 3 && !report.hasVisibleSignal; attempt++) {
+                report.hasVisibleSignal = canvasHasVisibleSignal(this.staticRuntime.renderer?.canvas);
+                if (!report.hasVisibleSignal) await wait(100);
+            }
             report.ok = soak
                 ? (
                     report.phases.soak.mainAvgFps >= 30 &&
                     report.phases.soak.mainP95FrameMs <= 33.3 &&
                     report.phases.soak.nativeOkHz >= 30 &&
+                    report.hasVisibleSignal &&
                     report.nativeFailed === 0
                 )
                 : (
@@ -6856,6 +6862,7 @@ class RendererLabApp {
                     report.phases.popout.mainAvgFps >= 24 &&
                     report.phases.transition.mainAvgFps >= 24 &&
                     (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
+                    report.hasVisibleSignal &&
                     report.nativeFailed === 0
                 );
         } catch (error) {
@@ -6892,6 +6899,7 @@ class RendererLabApp {
                 rendererChanges: report.rendererChanges,
                 frameResetCount: report.frameResetCount,
                 finalFrameCount: report.finalFrameCount,
+                hasVisibleSignal: report.hasVisibleSignal,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (

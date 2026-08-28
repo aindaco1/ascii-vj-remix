@@ -102,6 +102,7 @@ console.log([
   `nativeOk=${Number(report.nativeOkHz || 0).toFixed(1)}hz`,
   `nativeFailed=${report.nativeFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
+  `visible=${report.hasVisibleSignal ? 'yes' : 'no'}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
   `palette=${report.paletteId || 'none'}`,
   `dither=${report.ditherMode || 'none'}`,

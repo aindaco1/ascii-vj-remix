@@ -366,8 +366,10 @@ npm run bench:density
 `smoke:ui-perf` starts from canonical defaults and uses two fixed,
 non-structural numeric transition targets. It records average, P10, P50, and
 minimum preview FPS plus native output rates and the renderer backends actually
-visited, requested palette/dither/charset, renderer replacements, and frame
-resets. To compare an exact installed or archived application bundle:
+visited, requested palette/dither/charset, renderer replacements, frame resets,
+and a post-run primary-canvas pixel signal. A renderer with advancing frames
+but an empty canvas fails the smoke. To compare an exact installed or archived
+application bundle:
 
 ```bash
 ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix Dev.app" \
