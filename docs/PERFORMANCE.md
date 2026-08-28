@@ -20,6 +20,10 @@ and keeping the dense control UI responsive while the renderer is under load.
   live-control path.
 - Keep all runtime assets local so performance does not depend on network
   availability.
+- Resolve density through the shared column/total-cell policy. Advanced Density
+  is an explicit global preference, not a visual-preset escape hatch.
+- Rebuild palette lookup tables and glyph ramps/pages only when their discrete
+  inputs change; audio and transition frames must remain uniform/param updates.
 - Start the production launch update check asynchronously. A slow or unavailable
   release endpoint must not delay renderer, source, audio, or control startup.
 - Keep crash reporting off the render path. Capture, queueing, sanitization, and
@@ -124,6 +128,48 @@ published-asset checks, and real install/update smokes remain release gates.
 This changes the critical path from the sum of FFmpeg plus app compilation to
 approximately the slower of the two, without changing renderer code, shipped
 resources, target platforms, signing policy, or output formats.
+
+## 0.9.11 Palette, Dither, Unicode, and Density Pass
+
+The 0.9.11 reference floor is Apple M1/16 GB or a comparable Windows x64
+integrated-GPU machine. Intel macOS is not a release target. The optimized
+primary workload is local 1080p video with Audio Reactivity and a visible
+native output window; the release target is 30 FPS with P95 frame time at or
+below 33.3 ms on the reference floor.
+
+Shared density limits are:
+
+| Mode | Columns | Total cells | Promise |
+| --- | ---: | ---: | --- |
+| Accelerated normal | 640 | 160,000 | Performance-guarded range; presets stay here. |
+| Software normal | 120 | 6,000 | Lower Canvas/CPU guardrail. |
+| Advanced Density | 900 | 500,000 | Explicit global preference; no 30 FPS guarantee. |
+
+The M1 Max/64 GB development host is faster than the reference floor, so its
+results are local regression evidence rather than floor acceptance. At 640
+columns, feature-off WebGL2 measured 39.1 FPS main, 39.9 FPS with native output,
+and 35.4 FPS during transition churn; peak RSS was about 444 MB. Signal Court +
+Bayer 4 + the CJK Unified ramp measured 37.9, 40.1, and 37.0 FPS with about
+446 MB peak RSS. Main/Pop Out/transition P95 values were 29.6/29.4/31.6 ms,
+within ten percent of the matched feature-off phases. Native output remained
+near 60 FPS with no GPU failures.
+
+Machine-readable evidence:
+
+- `docs/performance/0.9.10-phase-zero-baseline.md`
+- `docs/performance/0.9.11-density-feature-off-m1-max-webgl2.json`
+- `docs/performance/0.9.11-density-feature-on-m1-max-webgl2.json`
+
+The Unicode atlas retains a fixed 16 MB R8 GPU allocation but is divided into
+sixteen 1024px pages. Only pages required by the active maximum-96-scalar ramp
+are decoded/uploaded, and the shared decoded browser cache retains at most four
+pages. This avoids the multi-second CJK page stalls observed with four 2048px
+pages while keeping package bytes and GPU allocation bounded.
+
+The local macOS webview did not expose a usable WebGPU renderer during final
+performance sampling and selected WebGL2. WebGPU parity remains covered by
+shared vectors, shader/static checks, builds, and cross-platform automation;
+these local numbers are not WebGPU performance evidence.
 
 ## Backend Notes
 
@@ -293,17 +339,30 @@ Native output and UI performance helpers:
 npm run smoke:native-output
 npm run smoke:ui-perf
 npm run test:native-output-log
+npm run bench:density
 ```
 
 `smoke:ui-perf` starts from canonical defaults and uses two fixed,
 non-structural numeric transition targets. It records average, P10, P50, and
 minimum preview FPS plus native output rates and the renderer backends actually
-visited. To compare an exact installed or archived application bundle:
+visited, requested palette/dither/charset, renderer replacements, and frame
+resets. To compare an exact installed or archived application bundle:
 
 ```bash
 ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix Dev.app" \
 ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
 npm run smoke:ui-perf
+```
+
+Feature-on comparison example:
+
+```bash
+ASCILINE_UI_PERF_SMOKE_BACKEND=webgl2 \
+ASCILINE_UI_PERF_SMOKE_PALETTE=signal-court \
+ASCILINE_UI_PERF_SMOKE_DITHER=bayer4 \
+ASCILINE_UI_PERF_SMOKE_CHARSET=cjk-basic \
+ASCILINE_DENSITY_BENCH_COLUMNS=640 \
+npm run bench:density
 ```
 
 Native display-link logs include `sourceUploads` and `sourceUploadSkips`. For a

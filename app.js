@@ -6571,6 +6571,7 @@ class RendererLabApp {
         const paletteId = String(payload.paletteId || DEFAULT_PARAMS.paletteId);
         const ditherMode = String(payload.ditherMode || DEFAULT_PARAMS.ditherMode);
         const charset = String(payload.charset || DEFAULT_PARAMS.charset);
+        const soak = payload.soak === true;
         const sourceName = sourceNameFromUrl(mediaUrl) || 'UI Perf Demo';
         const startedAt = performance.now();
         const syncStart = {
@@ -6619,6 +6620,7 @@ class RendererLabApp {
             paletteId,
             ditherMode,
             charset,
+            soak,
             samples: [],
             phases: {},
             mainAvgFps: 0,
@@ -6772,13 +6774,6 @@ class RendererLabApp {
                 syntheticAudioTimer = window.setInterval(applySyntheticAudio, AUDIO_REACTIVE_FRAME_MS);
             }
 
-            const phaseDurationMs = Math.max(1500, Math.floor(durationMs / 3));
-            await collectPhase('main', phaseDurationMs);
-
-            await this.openPopout();
-            await wait(1000);
-            await collectPhase('popout', phaseDurationMs);
-
             const transitionTargets = [
                 {
                     brightness: 0.76,
@@ -6803,23 +6798,37 @@ class RendererLabApp {
                     sampleY: 0.38
                 }
             ];
-            const transitionDeadline = performance.now() + phaseDurationMs;
-            const transitionChurn = (async () => {
-                let targetIndex = 0;
-                while (performance.now() < transitionDeadline) {
-                    const target = normalizeParams({
-                        ...this.params,
-                        ...transitionTargets[targetIndex % transitionTargets.length]
-                    }, { preserveBlob: true });
-                    await this._transitionTo(target, 0.55);
-                    targetIndex += 1;
-                }
-            })();
-            await collectPhase('transition', phaseDurationMs);
-            await transitionChurn;
+            if (soak) {
+                await this.openPopout();
+                await wait(1000);
+                await collectPhase('soak', durationMs);
+            } else {
+                const phaseDurationMs = Math.max(1500, Math.floor(durationMs / 3));
+                await collectPhase('main', phaseDurationMs);
+
+                await this.openPopout();
+                await wait(1000);
+                await collectPhase('popout', phaseDurationMs);
+
+                const transitionDeadline = performance.now() + phaseDurationMs;
+                const transitionChurn = (async () => {
+                    let targetIndex = 0;
+                    while (performance.now() < transitionDeadline) {
+                        const target = normalizeParams({
+                            ...this.params,
+                            ...transitionTargets[targetIndex % transitionTargets.length]
+                        }, { preserveBlob: true });
+                        await this._transitionTo(target, 0.55);
+                        targetIndex += 1;
+                    }
+                })();
+                await collectPhase('transition', phaseDurationMs);
+                await transitionChurn;
+            }
 
             const usable = report.samples.filter((item) => item.t > 1500);
-            report.phases = ['main', 'popout', 'transition'].reduce((phases, phase) => {
+            const phaseNames = soak ? ['soak'] : ['main', 'popout', 'transition'];
+            report.phases = phaseNames.reduce((phases, phase) => {
                 phases[phase] = summarizeSamples(usable.filter((item) => item.phase === phase));
                 return phases;
             }, {});
@@ -6837,13 +6846,20 @@ class RendererLabApp {
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
-            report.ok = (
-                report.phases.main.mainAvgFps >= 30 &&
-                report.phases.popout.mainAvgFps >= 24 &&
-                report.phases.transition.mainAvgFps >= 24 &&
-                (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
-                report.nativeFailed === 0
-            );
+            report.ok = soak
+                ? (
+                    report.phases.soak.mainAvgFps >= 30 &&
+                    report.phases.soak.mainP95FrameMs <= 33.3 &&
+                    report.phases.soak.nativeOkHz >= 30 &&
+                    report.nativeFailed === 0
+                )
+                : (
+                    report.phases.main.mainAvgFps >= 30 &&
+                    report.phases.popout.mainAvgFps >= 24 &&
+                    report.phases.transition.mainAvgFps >= 24 &&
+                    (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
+                    report.nativeFailed === 0
+                );
         } catch (error) {
             report.error = diagnosticErrorLabel(error);
         } finally {
@@ -6870,6 +6886,7 @@ class RendererLabApp {
                 paletteId: report.paletteId,
                 ditherMode: report.ditherMode,
                 charset: report.charset,
+                soak: report.soak,
                 phases: compactPhases,
                 actualBackends: report.actualBackends,
                 nativeFailed: report.nativeFailed,

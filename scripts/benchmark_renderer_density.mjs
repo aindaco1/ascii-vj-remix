@@ -108,12 +108,22 @@ async function runDensity(columnCount, tempDir) {
     return { columns: columnCount, exitCode, error: 'missing report', stdout, stderr };
   }
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  const steadySamplesKb = rssSamplesKb.slice(Math.floor(rssSamplesKb.length * 0.2));
+  const averageMb = (values) => values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length / 1024
+    : 0;
+  const edgeCount = Math.min(10, Math.max(1, Math.floor(steadySamplesKb.length / 4)));
+  const steadyStartMb = averageMb(steadySamplesKb.slice(0, edgeCount));
+  const steadyEndMb = averageMb(steadySamplesKb.slice(-edgeCount));
   return {
     ...report,
     exitCode,
     rssSampleCount: rssSamplesKb.length,
     rssPeakMb: rssSamplesKb.length ? Math.max(...rssSamplesKb) / 1024 : 0,
-    rssMinMb: rssSamplesKb.length ? Math.min(...rssSamplesKb) / 1024 : 0
+    rssMinMb: rssSamplesKb.length ? Math.min(...rssSamplesKb) / 1024 : 0,
+    rssSteadyStartMb: steadyStartMb,
+    rssSteadyEndMb: steadyEndMb,
+    rssSteadyDriftMb: steadyEndMb - steadyStartMb
   };
 }
 

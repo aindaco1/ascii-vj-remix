@@ -80,8 +80,9 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current packaged version and latest public release are 0.9.10. The Changelog
-is the only current-state document that includes unreleased changes.
+The current source/package version is 0.9.11. The latest verified public
+release remains 0.9.10 until publication acceptance completes. The Changelog
+owns release history; the Roadmap is prospective only.
 
 Sources:
 
@@ -103,9 +104,17 @@ Rendering:
 - The active renderer is controlled by one canonical parameter model.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets.
+- Sixteen project-native palettes, nearest/luminance mapping, and Bayer
+  2x2/4x4/8x8 dithering use the shared palette catalog and cached 32x32x32 LUT.
+- The neutral generated Unicode atlas covers the approved common BMP blocks in
+  sixteen 1024px pages. Browser decoded-page cache is capped at four; native
+  and browser GPU output use Unicode scalar ids and a maximum 96-id ramp.
+- Normal density is capped by shared accelerated/software column and total-cell
+  limits. Advanced Density is global, allows up to 900 columns without a 30 FPS
+  guarantee, and must never be stored in visual presets.
 - The shared character-set catalog includes 23 credited ascii.today-derived
   luminance ramps and matching read-only presets.
-- Native glyph output uses bounded fixed atlas/ramp resources;
+- Native glyph output uses bounded paged atlas/ramp resources;
   `fontFamily` is UI/preview metadata, not a native font-loading sink.
 - Reuse stable WebGPU/WebGL resources, keep native source uploads keyed to
   source-frame versions, and do not trade quality/resolution for performance.
@@ -237,7 +246,9 @@ npm run bundle:release
 Expected local release-build note:
 
 - Public 0.9.10 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.10 Windows artifacts are unsigned previews.
+  Gatekeeper-validated. Public 0.9.10 Windows artifacts are unsigned previews;
+  do not transfer those publication claims to 0.9.11 until its exact artifacts
+  pass the same release gates.
   Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.

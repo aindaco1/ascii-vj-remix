@@ -32,6 +32,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | --- | --- | --- | --- |
 | Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly without broad filesystem access. |
 | Built-in demo media | Bundled under `media/` and copied into app assets | Low | Demo media is local and versioned. |
+| Built-in palettes/glyph atlas | Project-owned palette catalog plus pinned, generated, locally bundled glyph pages | Low | No runtime palette pack, font, CDN, or language-resource import/download. |
 | Camera input | Browser `getUserMedia`; macOS native AVFoundation path for Pop Out | Medium | Requires OS privacy permission. Frames stay local. |
 | Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
@@ -81,10 +82,13 @@ The current release line includes these security hardening rules:
 - Preset imports must be bounded, schema-checked, clamped through the shared
   control metadata, and stripped of source/media fields before they can affect
   renderer state.
-- Glyph-mode native output treats `charset` as allowlisted data. Resolved
-  custom catalog ramps must be bounded, space-leading, unique, and restricted
-  to the fixed glyph atlas. Keep `fontFamily` out of native font-loading or
-  resource-lookup paths.
+- Glyph-mode native output treats `charset` and custom ramps as untrusted data.
+  Resolved ramps are restricted to supported BMP coverage, sanitized as Unicode
+  scalars, and capped at 96 ids before reaching renderer buffers. Keep
+  `fontFamily` out of native font-loading or resource-lookup paths.
+- The neutral glyph atlas is generated offline from a pinned, checksummed source
+  retained with its license files. Runtime code may load only the 16 bundled
+  atlas pages; it never resolves system fonts or remote font resources.
 - Dependency audits cover npm and Rust. `cargo audit` warnings from
   Tauri's current GTK/WebKit transitive stack are tracked as upstream desktop
   framework risk; actionable direct/transitive advisories must be fixed before
@@ -304,7 +308,8 @@ Import rules:
 - Validate schema version and supported fields.
 - Clamp numeric values through the same live-control metadata used by the UI.
 - Keep character-set ids allowlisted. Any resolved ramp sent to native output
-  must be bounded and restricted to the fixed bundled glyph atlas.
+  must be bounded to 96 supported scalars and restricted to bundled atlas
+  coverage.
 - Reject unknown structural fields instead of silently applying them.
 - Do not let imported presets disable Stats Overlay unless the user imported
   that choice intentionally and the UI makes it clear.

@@ -78,11 +78,21 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 - Add synthetic timestamped camera-latency and audio-response tests.
 - Track frame rate, frame drops, upload/skip counts, and parameter propagation
   with comparable benchmark output.
+- Repeat the 0.9.11 1080p/audio/native-output workload on the Apple M1/16 GB
+  reference floor and a comparable physical Windows integrated-GPU machine;
+  retain automated Windows/Linux build and renderer smokes between physical
+  checks.
 - After the first neutral bundled Unicode atlas style ships, add optional
   project-owned atlas styles without changing glyph-set ids, Unicode coverage,
   custom-ramp semantics, or renderer bindings. Keep styles build-time generated,
   locally bundled, lazily loaded, and subject to explicit package/GPU-memory
   budgets rather than introducing runtime system-font lookup.
+- Evaluate CJK Extension A and supplementary-plane atlas support only with an
+  explicit package/GPU/cache budget. The current direct BMP scalar id contract
+  must be versioned rather than silently stretched.
+- Evaluate grapheme clusters, script shaping, bidirectional layout, and emoji
+  sequences separately from single-scalar visual ramps. None should enter the
+  cell hot path without measured performance and clear creative behavior.
 
 ## Presets and User Profiles
 
