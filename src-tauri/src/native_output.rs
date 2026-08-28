@@ -7,6 +7,8 @@ use crate::media_engine::ffmpeg::{
 #[cfg(target_os = "macos")]
 use crate::system_audio::{InputAudioCaptureState, SystemAudioCaptureState, SystemAudioFeatures};
 use base64::{engine::general_purpose, Engine as _};
+#[cfg(target_os = "macos")]
+use objc2::rc::autoreleasepool;
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
@@ -2466,7 +2468,11 @@ unsafe extern "C" fn native_display_link_callback(
     let context = unsafe { Arc::from_raw(context as *const NativeMacDisplayLinkContext) };
     let tick_context = context.clone();
     std::mem::forget(context);
-    tick_context.request_tick();
+    // CVDisplayLink owns a long-lived worker thread rather than entering through
+    // the AppKit run loop. Give every Metal-backed tick the same autorelease
+    // boundary AppKit would normally provide so Objective-C temporaries cannot
+    // accumulate for the lifetime of the display-link thread.
+    autoreleasepool(|_| tick_context.request_tick());
     0
 }
 

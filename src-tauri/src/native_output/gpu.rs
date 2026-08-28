@@ -562,6 +562,26 @@ impl NativeGpuPresenter {
         }
         self.configure_surface(width, height);
 
+        // Acquire before scheduling queue writes. When the output is occluded,
+        // wgpu has no render submission to retire write_texture staging buffers;
+        // uploading first would therefore retain one decoded frame per source
+        // tick for as long as the window stayed hidden.
+        let acquire_started_at = Instant::now();
+        let (output, surface_status) = self.current_surface_texture()?;
+        let acquire_ns = duration_ns_u64(acquire_started_at.elapsed());
+        let Some(output) = output else {
+            return Ok(NativeGpuFrameOutcome {
+                surface_status,
+                presented: false,
+                source_uploaded: false,
+                timing: NativeGpuFrameTiming {
+                    acquire_ns,
+                    total_ns: duration_ns_u64(total_started_at.elapsed()),
+                    ..Default::default()
+                },
+            });
+        };
+
         let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
         let source_uploaded = self.ensure_source_texture(frame, source_frame_version)?;
         self.ensure_cell_texture(cols, rows);
@@ -650,22 +670,6 @@ impl NativeGpuPresenter {
         );
         let prep_ns = duration_ns_u64(prep_started_at.elapsed());
 
-        let acquire_started_at = Instant::now();
-        let (output, surface_status) = self.current_surface_texture()?;
-        let acquire_ns = duration_ns_u64(acquire_started_at.elapsed());
-        let Some(output) = output else {
-            return Ok(NativeGpuFrameOutcome {
-                surface_status,
-                presented: false,
-                source_uploaded,
-                timing: NativeGpuFrameTiming {
-                    prep_ns,
-                    acquire_ns,
-                    total_ns: duration_ns_u64(total_started_at.elapsed()),
-                    ..Default::default()
-                },
-            });
-        };
         let encode_started_at = Instant::now();
         let output_view = output
             .texture
@@ -719,6 +723,10 @@ impl NativeGpuPresenter {
         let present_started_at = Instant::now();
         output.present();
         let present_ns = duration_ns_u64(present_started_at.elapsed());
+        // Reclaim completed queue-write staging resources without blocking the
+        // display-link callback. Native wgpu devices are not driven by a browser
+        // event loop, so regular polling is part of their steady-state upkeep.
+        let _ = self.device.poll(wgpu::PollType::Poll);
         Ok(NativeGpuFrameOutcome {
             surface_status,
             presented: true,
