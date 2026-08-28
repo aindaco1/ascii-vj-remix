@@ -665,6 +665,14 @@ fn spawn_ui_perf_smoke(app: &App) {
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(500);
+    let columns = env::var("ASCILINE_UI_PERF_SMOKE_COLUMNS")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .map(|value| value.clamp(80, 900))
+        .unwrap_or(480);
+    let synthetic_audio = env::var("ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
     thread::spawn(move || {
         let start = Instant::now();
@@ -673,7 +681,9 @@ fn spawn_ui_perf_smoke(app: &App) {
             "mediaUrl": media_url,
             "backend": backend,
             "durationMs": duration_ms,
-            "sampleMs": sample_ms
+            "sampleMs": sample_ms,
+            "columns": columns,
+            "syntheticAudio": synthetic_audio
         });
         for _ in 0..12 {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());

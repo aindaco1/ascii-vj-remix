@@ -6305,6 +6305,8 @@ class RendererLabApp {
         const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
         const durationMs = Math.max(3000, Number(payload.durationMs) || 9000);
         const sampleMs = Math.max(120, Number(payload.sampleMs) || 500);
+        const columns = clamp(Math.round(Number(payload.columns) || DEFAULT_PARAMS.cols), 80, 900);
+        const syntheticAudio = payload.syntheticAudio === true;
         const mediaUrl = String(payload.mediaUrl || DEFAULT_PARAMS.mediaUrl);
         const backend = STATIC_GPU_BACKENDS.has(payload.backend) || STATIC_CANVAS_BACKENDS.has(payload.backend)
             ? payload.backend
@@ -6331,6 +6333,8 @@ class RendererLabApp {
                 rendererAnimationId: Number(renderer?.animationId || renderer?.raf || 0),
                 videoReadyState: Number(this.staticRuntime.source?.element?.readyState ?? -1),
                 videoPaused: Boolean(this.staticRuntime.source?.element?.paused),
+                cols: Number(stats?.cols || this.params.cols || 0),
+                rows: Number(stats?.rows || computeRows(this.params) || 0),
                 nativeAttempts: this.nativeOutputSyncAttemptCount - syncStart.attempts,
                 nativeOk: this.nativeOutputSyncOkCount - syncStart.ok,
                 nativeFailed: this.nativeOutputSyncFailedCount - syncStart.failed,
@@ -6343,6 +6347,8 @@ class RendererLabApp {
             mediaUrl,
             durationMs,
             sampleMs,
+            columns,
+            syntheticAudio,
             backend,
             samples: [],
             phases: {},
@@ -6350,6 +6356,8 @@ class RendererLabApp {
             mainP10Fps: 0,
             mainP50Fps: 0,
             mainMinFps: 0,
+            mainP95FrameMs: 0,
+            mainP99FrameMs: 0,
             actualBackends: [],
             nativeSyncHz: 0,
             nativeOkHz: 0,
@@ -6383,6 +6391,9 @@ class RendererLabApp {
 
         const summarizeSamples = (samples) => {
             const fpsValues = samples.map((item) => item.measuredFps).filter(Number.isFinite);
+            const frameMsValues = fpsValues
+                .filter((value) => value > 0)
+                .map((value) => 1000 / value);
             const syncValues = samples.map((item) => item.nativeSyncHz).filter(Number.isFinite);
             const okValues = samples.map((item) => item.nativeOkHz).filter(Number.isFinite);
             const percentile = (values, fraction) => {
@@ -6400,9 +6411,40 @@ class RendererLabApp {
                 mainP10Fps: percentile(fpsValues, 0.1),
                 mainP50Fps: percentile(fpsValues, 0.5),
                 mainMinFps: fpsValues.length ? Math.min(...fpsValues) : 0,
+                mainP50FrameMs: percentile(frameMsValues, 0.5),
+                mainP95FrameMs: percentile(frameMsValues, 0.95),
+                mainP99FrameMs: percentile(frameMsValues, 0.99),
                 nativeSyncHz: syncValues.length ? syncValues.reduce((sum, value) => sum + value, 0) / syncValues.length : 0,
                 nativeOkHz: okValues.length ? okValues.reduce((sum, value) => sum + value, 0) / okValues.length : 0
             };
+        };
+
+        let syntheticAudioTimer = null;
+        const applySyntheticAudio = () => {
+            const seconds = (performance.now() - startedAt) / 1000;
+            const pulse = (Math.sin(seconds * Math.PI * 2 * 1.7) + 1) * 0.5;
+            const sway = (Math.sin(seconds * Math.PI * 2 * 0.37) + 1) * 0.5;
+            const features = {
+                rms: 0.28 + pulse * 0.32,
+                bass: 0.2 + pulse * 0.66,
+                lowMid: 0.24 + sway * 0.42,
+                mid: 0.22 + (1 - pulse) * 0.38,
+                highMid: 0.2 + sway * 0.5,
+                treble: 0.18 + (1 - sway) * 0.56,
+                presence: 0.25 + pulse * 0.4,
+                brightness: 0.22 + sway * 0.5,
+                flux: 0.15 + pulse * 0.72,
+                density: 0.35 + sway * 0.38,
+                beatPulse: pulse,
+                phase: seconds
+            };
+            const effectiveParams = applyAudioReactiveModulation(
+                this.params,
+                features,
+                this.audioReactive,
+                { clampParamValue }
+            );
+            this.applyAudioReactiveFrame(effectiveParams, features);
         };
 
         try {
@@ -6421,6 +6463,7 @@ class RendererLabApp {
                 loop: true,
                 muted: true,
                 fps: DEFAULT_PARAMS.fps,
+                cols: columns,
                 statsOverlay: true
             }, { preserveBlob: true });
             this._syncInputs();
@@ -6442,6 +6485,17 @@ class RendererLabApp {
                 await wait(120);
             }
             await wait(500);
+
+            if (syntheticAudio) {
+                this.audioReactiveRuntime.stop({ keepStatus: true });
+                this.audioReactive = sanitizeAudioReactiveSettings({
+                    ...this.audioReactive,
+                    enabled: true,
+                    preset: 'pulse-reactor'
+                });
+                applySyntheticAudio();
+                syntheticAudioTimer = window.setInterval(applySyntheticAudio, AUDIO_REACTIVE_FRAME_MS);
+            }
 
             const phaseDurationMs = Math.max(1500, Math.floor(durationMs / 3));
             await collectPhase('main', phaseDurationMs);
@@ -6499,6 +6553,8 @@ class RendererLabApp {
             report.mainP10Fps = overall.mainP10Fps;
             report.mainP50Fps = overall.mainP50Fps;
             report.mainMinFps = overall.mainMinFps;
+            report.mainP95FrameMs = overall.mainP95FrameMs;
+            report.mainP99FrameMs = overall.mainP99FrameMs;
             report.actualBackends = [...new Set(usable.map((item) => item.backend).filter(Boolean))];
             report.nativeSyncHz = overall.nativeSyncHz;
             report.nativeOkHz = overall.nativeOkHz;
@@ -6513,12 +6569,32 @@ class RendererLabApp {
         } catch (error) {
             report.error = diagnosticErrorLabel(error);
         } finally {
+            if (syntheticAudioTimer) window.clearInterval(syntheticAudioTimer);
+            if (syntheticAudio) this.clearAudioReactiveFrame();
             this._stopWtf();
             this.uiPerfSmokeActive = false;
-            const { samples, ...summary } = report;
+            const compactPhases = Object.fromEntries(Object.entries(report.phases).map(([phase, stats]) => [
+                phase,
+                {
+                    mainAvgFps: stats.mainAvgFps,
+                    mainMinFps: stats.mainMinFps,
+                    mainP95FrameMs: stats.mainP95FrameMs,
+                    mainP99FrameMs: stats.mainP99FrameMs,
+                    nativeOkHz: stats.nativeOkHz
+                }
+            ]));
             const compactSummary = JSON.parse(JSON.stringify({
-                ...summary,
-                sampleCount: samples.length
+                ok: report.ok,
+                mediaUrl: report.mediaUrl,
+                columns: report.columns,
+                syntheticAudio: report.syntheticAudio,
+                backend: report.backend,
+                phases: compactPhases,
+                actualBackends: report.actualBackends,
+                nativeFailed: report.nativeFailed,
+                outputDisplayCount: report.outputDisplayCount,
+                error: report.error,
+                sampleCount: report.samples.length
             }, (_key, value) => (
                 typeof value === 'number' && !Number.isInteger(value)
                     ? Math.round(value * 1000) / 1000

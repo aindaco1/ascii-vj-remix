@@ -55,6 +55,7 @@
     "smoke:static": "npm run build && node scripts/smoke_static_pages.mjs",
     "smoke:native-output": "node scripts/smoke_native_output_perf.mjs",
     "smoke:ui-perf": "node scripts/smoke_ui_perf.mjs",
+    "bench:density": "node scripts/benchmark_renderer_density.mjs",
     "smoke:release-install": "node scripts/smoke_tauri_release_install.mjs",
     "test:decode-resize": "node scripts/check_decode_resize_parity.mjs",
     "test:desktop-updater": "node scripts/test_desktop_updater.mjs",

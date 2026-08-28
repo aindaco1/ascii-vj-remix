@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-08-28T08:39:29.328Z",
+  "sourceApp": "/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app",
+  "durationMs": 9000,
+  "sampleMs": 250,
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "MacBookPro18,2",
+    "chip": "Apple M1 Max",
+    "memory": "64 GB"
+  },
+  "runs": [
+    {
+      "ok": true,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 120,
+      "syntheticAudio": true,
+      "backend": "pixel-canvas",
+      "phases": {
+        "main": {
+          "mainAvgFps": 30.017,
+          "mainMinFps": 29.52,
+          "mainP95FrameMs": 33.875,
+          "mainP99FrameMs": 33.875,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 29.991,
+          "mainMinFps": 29.74,
+          "mainP95FrameMs": 33.556,
+          "mainP99FrameMs": 33.611,
+          "nativeOkHz": 28.426
+        },
+        "transition": {
+          "mainAvgFps": 29.99,
+          "mainMinFps": 29.52,
+          "mainP95FrameMs": 33.75,
+          "mainP99FrameMs": 33.85,
+          "nativeOkHz": 30.019
+        }
+      },
+      "actualBackends": [
+        "pixel-canvas"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "error": null,
+      "sampleCount": 35,
+      "mainAvgFps": 29.99933333333333,
+      "mainMinFps": 29.52,
+      "mainP95FrameMs": 33.875,
+      "mainP99FrameMs": 33.875,
+      "exitCode": 1,
+      "rssSampleCount": 29,
+      "rssPeakMb": 438.15625,
+      "rssMinMb": 0.03125
+    },
+    {
+      "ok": true,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 160,
+      "syntheticAudio": true,
+      "backend": "pixel-canvas",
+      "phases": {
+        "main": {
+          "mainAvgFps": 30.003,
+          "mainMinFps": 29.63,
+          "mainP95FrameMs": 33.75,
+          "mainP99FrameMs": 33.75,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 30.001,
+          "mainMinFps": 29.63,
+          "mainP95FrameMs": 33.613,
+          "mainP99FrameMs": 33.722,
+          "nativeOkHz": 26.565
+        },
+        "transition": {
+          "mainAvgFps": 30.021,
+          "mainMinFps": 29.63,
+          "mainP95FrameMs": 33.688,
+          "mainP99FrameMs": 33.738,
+          "nativeOkHz": 30.052
+        }
+      },
+      "actualBackends": [
+        "pixel-canvas"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "error": null,
+      "sampleCount": 34,
+      "mainAvgFps": 30.008333333333336,
+      "mainMinFps": 29.63,
+      "mainP95FrameMs": 33.75,
+      "mainP99FrameMs": 33.75,
+      "exitCode": 1,
+      "rssSampleCount": 26,
+      "rssPeakMb": 494.21875,
+      "rssMinMb": 0.140625
+    },
+    {
+      "ok": false,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 240,
+      "syntheticAudio": true,
+      "backend": "pixel-canvas",
+      "phases": {
+        "main": {
+          "mainAvgFps": 23.05,
+          "mainMinFps": 22.14,
+          "mainP95FrameMs": 45.017,
+          "mainP99FrameMs": 45.137,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 21.128,
+          "mainMinFps": 19.38,
+          "mainP95FrameMs": 49.633,
+          "mainP99FrameMs": 51.207,
+          "nativeOkHz": 20.804
+        },
+        "transition": {
+          "mainAvgFps": 20.757,
+          "mainMinFps": 20.408,
+          "mainP95FrameMs": 48.75,
+          "mainP99FrameMs": 48.95,
+          "nativeOkHz": 20.757
+        }
+      },
+      "actualBackends": [
+        "pixel-canvas"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "error": null,
+      "sampleCount": 33,
+      "mainAvgFps": 21.645,
+      "mainMinFps": 19.38,
+      "mainP95FrameMs": 49.633,
+      "mainP99FrameMs": 51.207,
+      "exitCode": 1,
+      "rssSampleCount": 26,
+      "rssPeakMb": 488.203125,
+      "rssMinMb": 0.03125
+    },
+    {
+      "ok": false,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 480,
+      "syntheticAudio": true,
+      "backend": "pixel-canvas",
+      "phases": {
+        "main": {
+          "mainAvgFps": 8.782,
+          "mainMinFps": 7.394,
+          "mainP95FrameMs": 131.375,
+          "mainP99FrameMs": 134.475,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 7.017,
+          "mainMinFps": 6.803,
+          "mainP95FrameMs": 146.438,
+          "mainP99FrameMs": 146.888,
+          "nativeOkHz": 3.508
+        },
+        "transition": {
+          "mainAvgFps": 7.016,
+          "mainMinFps": 6.897,
+          "mainP95FrameMs": 144.75,
+          "mainP99FrameMs": 144.95,
+          "nativeOkHz": 3.508
+        }
+      },
+      "actualBackends": [
+        "pixel-canvas"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "error": null,
+      "sampleCount": 18,
+      "mainAvgFps": 7.6049999999999995,
+      "mainMinFps": 6.803,
+      "mainP95FrameMs": 146.438,
+      "mainP99FrameMs": 146.888,
+      "exitCode": 1,
+      "rssSampleCount": 32,
+      "rssPeakMb": 488.140625,
+      "rssMinMb": 0.03125
+    }
+  ]
+}
