@@ -38,7 +38,7 @@ function requestedRows(params = {}, sourceWidth = 16, sourceHeight = 9, pixelMod
     if (!params.autoRows && Number(params.rows) > 0) return Math.max(1, Math.round(Number(params.rows)));
     const ratio = Math.max(1, Number(sourceWidth) || 16) / Math.max(1, Number(sourceHeight) || 9);
     const aspect = Math.max(0.01, Number(params.aspectCorrection) || 1);
-    if (pixelMode || params.solidMode) return Math.max(1, Math.round(columns / ratio * aspect));
+    if (pixelMode) return Math.max(1, Math.round(columns / ratio * aspect));
     const cellWidth = Math.max(1, Number(params.cellWidth) || 1);
     const cellHeight = Math.max(1, Number(params.cellHeight) || 1);
     return Math.max(1, Math.round(columns / ratio * (cellWidth / cellHeight) * aspect));

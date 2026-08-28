@@ -177,11 +177,15 @@ background, so WebKit throttled requestAnimationFrame and native IPC to roughly
 visible-window 640-column figures above remain the local FPS evidence; physical
 reference-floor and Windows performance acceptance remain separate.
 
-The Unicode atlas retains a fixed 16 MB R8 GPU allocation but is divided into
-sixteen 1024px pages. Only pages required by the active maximum-96-scalar ramp
-are decoded/uploaded, and the shared decoded browser cache retains at most four
-pages. This avoids the multi-second CJK page stalls observed with four 2048px
-pages while keeping package bytes and GPU allocation bounded.
+The base Unicode atlas is a fixed 16 MB R8 allocation divided into sixteen
+1024px pages. Browser GPU renderers add four max-coverage mip levels so thin
+strokes remain visible in small cells without adding per-frame texture reads;
+the bounded browser allocation is 21.25 MB. Only pages required by the active
+maximum-96-scalar ramp are decoded/uploaded, and the shared decoded browser
+cache retains at most four base pages plus their generated mips. This avoids
+the multi-second CJK page stalls observed with four 2048px pages while keeping
+package bytes, CPU cache, and GPU allocation bounded. Native Pop Out retains
+the 16 MB base-page allocation.
 
 The local macOS webview did not expose a usable WebGPU renderer during final
 performance sampling and selected WebGL2. WebGPU parity remains covered by

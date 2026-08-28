@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Restored visible primary-view output for every built-in Demo Image preset by
+  correcting WebGL glyph-page uploads and using cached max-coverage atlas mips
+  for glyphs rendered into very small cells.
+- Kept solid, pixel, and glyph preset canvases at the source aspect ratio by
+  resolving static row counts from the actual cell width and height.
+- Added an all-preset primary-view smoke matrix covering activation, visible
+  output, WebGL errors, lazy glyph-page completion, and canvas aspect.
+
 Version 0.9.11 adds performance-budgeted project palettes, ordered dithering,
 multilingual glyph controls, custom Unicode ramps, density guardrails, and
 renderer/native-output parity. Version 0.9.10 replaces the legacy television artwork with one canonical app

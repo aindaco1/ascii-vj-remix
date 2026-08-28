@@ -38,7 +38,10 @@ import {
   resolveGridDimensions
 } from '../renderers/shared/density-policy.js';
 import {
+  GLYPH_ATLAS_MIP_LEVEL_COUNT,
   GLYPH_ATLAS_PAGE_GLYPHS,
+  GLYPH_ATLAS_PAGE_SIZE,
+  glyphAtlasMipLevels,
   glyphAtlasPagesForRamp,
   glyphRampCodePoints
 } from '../renderers/shared/glyph-atlas.js';
@@ -122,6 +125,13 @@ assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@',
 assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@', glyphDepth: 4, glyphOffset: 2, glyphReverse: true }), '+=-:');
 assert.deepEqual(glyphAtlasPagesForRamp(Uint32Array.from([0x20, 0x4e00, 0xac00])), [0, 4, 10]);
 assert.equal(GLYPH_ATLAS_PAGE_GLYPHS, 4096);
+const glyphPage = new Uint8Array(GLYPH_ATLAS_PAGE_SIZE ** 2);
+glyphPage[2 * GLYPH_ATLAS_PAGE_SIZE + 3] = 255;
+const glyphMips = glyphAtlasMipLevels(glyphPage);
+assert.equal(glyphMips.length, GLYPH_ATLAS_MIP_LEVEL_COUNT);
+assert.equal(glyphMips[1].length, (GLYPH_ATLAS_PAGE_SIZE / 2) ** 2);
+assert.equal(glyphMips[1][1 * (GLYPH_ATLAS_PAGE_SIZE / 2) + 1], 255);
+assert.equal(glyphMips[2][0], 255);
 assert.deepEqual(
   Array.from(glyphRampCodePoints({ charset: 'custom', customGlyphRamp: ' Aあ한' })),
   [0x20, 0x41, 0x3042, 0xd55c]
@@ -150,5 +160,14 @@ const pixelGrid = resolveGridDimensions({
 }, 1920, 1080, { pixelMode: true });
 assert.ok(pixelGrid.cells <= NORMAL_ACCELERATED_MAX_CELLS);
 assert.equal(pixelGrid.clamped, true);
+const solidCellGrid = resolveGridDimensions({
+  backend: 'webgpu', cols: 80, autoRows: true, cellWidth: 12, cellHeight: 16, aspectCorrection: 1, solidMode: true
+}, 1920, 1080, { pixelMode: false });
+assert.equal(solidCellGrid.rows, 34);
+assert.ok(Math.abs((solidCellGrid.columns * 12) / (solidCellGrid.rows * 16) - 16 / 9) < 0.02);
+const squarePixelGrid = resolveGridDimensions({
+  backend: 'webgpu', cols: 80, autoRows: true, cellWidth: 12, cellHeight: 16, aspectCorrection: 1, pixel: true
+}, 1920, 1080, { pixelMode: true });
+assert.equal(squarePixelGrid.rows, 45);
 
 console.log('Renderer math vector checks passed.');

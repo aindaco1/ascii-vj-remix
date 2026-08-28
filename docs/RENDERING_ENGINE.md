@@ -213,8 +213,8 @@ The shared module currently owns:
 - project-native palette ids/colors, a cached 32x32x32 palette lookup table,
   and immutable Bayer matrices.
 - shared accelerated/software column and total-cell density limits.
-- Unicode-scalar glyph ids, 1024px atlas page addressing, a four-page decoded
-  cache, and lazy local page loading.
+- Unicode-scalar glyph ids, 1024px atlas page addressing, cached max-coverage
+  browser mips, a four-page decoded cache, and lazy local page loading.
 - compact charset and luminance-to-glyph helpers.
 
 The Canvas and stream functions are intentionally named separately from the GPU

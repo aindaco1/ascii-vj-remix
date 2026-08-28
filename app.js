@@ -24,6 +24,7 @@ import {
     ADVANCED_MAX_COLUMNS,
     NORMAL_ACCELERATED_MAX_COLUMNS,
     NORMAL_SOFTWARE_MAX_COLUMNS,
+    requestedRows,
     resolveGridDimensions
 } from './renderers/shared/density-policy.js?v=20260828-density-policy';
 import {
@@ -2590,16 +2591,13 @@ async function restoreVideoPlaybackState(source, params, state) {
 }
 
 function computeRows(params, sourceW = 16, sourceH = 9, pixelMode = false) {
-    if (!params.autoRows && params.rows > 0) return Math.max(1, Math.round(params.rows));
-    const ratio = sourceW / Math.max(sourceH, 1);
-    if (pixelMode || params.solidMode) return Math.max(1, Math.round(params.cols / ratio * params.aspectCorrection));
-    return Math.max(1, Math.round(params.cols / ratio * (params.cellWidth / params.cellHeight) * params.aspectCorrection));
+    return requestedRows(params, sourceW, sourceH, pixelMode, params.cols);
 }
 
 function effectiveGridParams(params, sourceWidth = 16, sourceHeight = 9, actualBackend = params.backend) {
     const grid = resolveGridDimensions(params, sourceWidth, sourceHeight, {
         actualBackend,
-        pixelMode: usesPixelCanvas({ ...params, backend: actualBackend })
+        pixelMode: false
     });
     return {
         ...params,
@@ -2620,7 +2618,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     if (!sourceElement || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
 
     let cols = Math.max(1, Math.round(params.cols || DEFAULT_PARAMS.cols));
-    let rows = computeRows(params, sourceWidth, sourceHeight, usesPixelCanvas(params));
+    let rows = computeRows(params, sourceWidth, sourceHeight);
     const maxCells = options.maxCells || Infinity;
     if (Number.isFinite(maxCells) && cols * rows > maxCells) {
         const scale = Math.sqrt(maxCells / (cols * rows));
@@ -3911,7 +3909,7 @@ class CanvasStaticRenderer {
     _configureCanvas() {
         const sw = this.source?.width || 640;
         const sh = this.source?.height || 360;
-        this.rows = computeRows(this.params, sw, sh, usesPixelCanvas(this.params));
+        this.rows = computeRows(this.params, sw, sh);
         this.canvas.width = this.params.cols * this.params.cellWidth;
         this.canvas.height = this.rows * this.params.cellHeight;
         this.canvas.style.aspectRatio = `${sw} / ${sh}`;

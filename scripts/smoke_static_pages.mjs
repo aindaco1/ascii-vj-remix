@@ -912,6 +912,77 @@ async function runSmoke() {
       throw new Error(`Display audio start still hit user gesture gating: ${JSON.stringify(afterDisplaySelect)}`);
     }
 
+    const presetMatrix = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      if (app.audioReactive.enabled || app.audioReactiveRuntime.active) await app._toggleAudioReactive();
+      const originalTransition = app._transitionTo.bind(app);
+      app._transitionTo = (target) => originalTransition(target, 0);
+      const results = [];
+
+      try {
+        for (const preset of app._allPresets()) {
+          await app.applyPreset(preset.id);
+          const renderer = app.staticRuntime?.renderer;
+          const started = performance.now();
+          while (renderer?.pendingGlyphPages?.size && performance.now() - started < 3000) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          renderer?.renderFrame?.();
+
+          const canvas = app._activeRenderSurface?.();
+          let pixels = null;
+          let glError = 0;
+          if (canvas?.width && canvas?.height) {
+            const gl = renderer?.gl;
+            if (gl) {
+              pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+              glError = gl.getError();
+            } else {
+              pixels = canvas.getContext('2d', { willReadFrequently: true })
+                ?.getImageData(0, 0, canvas.width, canvas.height).data || null;
+            }
+          }
+
+          const background = app.params.backgroundColor.match(/[0-9a-f]{2}/gi).map((value) => Number.parseInt(value, 16));
+          let nonBackground = 0;
+          if (pixels) {
+            for (let index = 0; index < pixels.length && nonBackground < 32; index += 4) {
+              const difference = Math.abs(pixels[index] - background[0]) +
+                Math.abs(pixels[index + 1] - background[1]) +
+                Math.abs(pixels[index + 2] - background[2]);
+              if (difference > 12) nonBackground += 1;
+            }
+          }
+
+          const sourceRatio = (renderer?.source?.width || 16) / (renderer?.source?.height || 9);
+          const canvasRatio = canvas?.width && canvas?.height ? canvas.width / canvas.height : 0;
+          results.push({
+            id: preset.id,
+            active: app.activePresetId === preset.id,
+            hasSignal: nonBackground >= 5,
+            aspectError: canvasRatio ? Math.abs(canvasRatio / sourceRatio - 1) : 1,
+            glError,
+            pendingGlyphPages: renderer?.pendingGlyphPages?.size || 0,
+            canvasSize: `${canvas?.width || 0}x${canvas?.height || 0}`
+          });
+        }
+      } finally {
+        app._transitionTo = originalTransition;
+      }
+      return results;
+    });
+    const presetFailures = presetMatrix.filter((preset) =>
+      !preset.active ||
+      !preset.hasSignal ||
+      preset.aspectError > 0.03 ||
+      preset.glError !== 0 ||
+      preset.pendingGlyphPages !== 0
+    );
+    if (presetFailures.length) {
+      throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
+    }
+
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     output.on('console', (msg) => { if (msg.type() === 'error') errors.push(`output:${msg.text()}`); });
     const outputResponse = await output.goto(`${baseUrl}/output.html`, { waitUntil: 'domcontentloaded' });

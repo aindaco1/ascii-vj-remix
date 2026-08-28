@@ -12,9 +12,11 @@ import {
     paletteById
 } from '../../../../shared/palettes.js';
 import {
+    GLYPH_ATLAS_MIP_LEVEL_COUNT,
     GLYPH_ATLAS_PAGE_COUNT,
     GLYPH_ATLAS_PAGE_SIZE,
     GLYPH_RAMP_LIMIT,
+    glyphAtlasMipLevels,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
     glyphResourceInputKey,
@@ -158,16 +160,23 @@ void main() {
         return;
     }
     vec2 local = pixel - cellCoord * u_cellSize;
-    ivec2 glyphPixel = ivec2(clamp(floor(local / u_cellSize * 16.0), vec2(0.0), vec2(15.0)));
+    float glyphScale = 16.0 / max(1.0, min(u_cellSize.x, u_cellSize.y));
+    int glyphMip = int(floor(clamp(log2(glyphScale), 0.0, 4.0)));
+    int glyphTileSize = 16 >> glyphMip;
+    ivec2 glyphPixel = ivec2(clamp(
+        floor(local / u_cellSize * float(glyphTileSize)),
+        vec2(0.0),
+        vec2(float(glyphTileSize - 1))
+    ));
     int rampIndex = min(int(clamp(cell.a, 0.0, 0.99999) * float(u_glyphCount)), u_glyphCount - 1);
     uint glyphId = texelFetch(u_glyphRamp, ivec2(rampIndex, 0), 0).r;
     int page = int(glyphId / 4096u);
     uint slot = glyphId % 4096u;
     ivec2 atlasPixel = ivec2(
-        int(slot % 64u) * 16 + glyphPixel.x,
-        int(slot / 64u) * 16 + glyphPixel.y
+        int(slot % 64u) * glyphTileSize + glyphPixel.x,
+        int(slot / 64u) * glyphTileSize + glyphPixel.y
     );
-    float alpha = texelFetch(u_glyphAtlas, ivec3(atlasPixel, page), 0).r;
+    float alpha = texelFetch(u_glyphAtlas, ivec3(atlasPixel, page), glyphMip).r;
     if (alpha <= 0.5) {
         fragColor = vec4(u_backgroundColor, 1.0);
         return;
@@ -180,6 +189,36 @@ function colorFloats(value, fallback = '#030405') {
     const match = /^#([0-9a-f]{6})$/i.exec(String(value || '')) || /^#([0-9a-f]{6})$/i.exec(fallback);
     const packed = Number.parseInt(match[1], 16);
     return [(packed >> 16 & 255) / 255, (packed >> 8 & 255) / 255, (packed & 255) / 255];
+}
+
+function uploadGlyphAtlasPage(gl, texture, page, pixels) {
+    const previousFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+    const previousAlignment = gl.getParameter(gl.UNPACK_ALIGNMENT);
+    try {
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        for (const [level, levelPixels] of glyphAtlasMipLevels(pixels).entries()) {
+            const size = GLYPH_ATLAS_PAGE_SIZE >> level;
+            gl.texSubImage3D(
+                gl.TEXTURE_2D_ARRAY,
+                level,
+                0,
+                0,
+                page,
+                size,
+                size,
+                1,
+                gl.RED,
+                gl.UNSIGNED_BYTE,
+                levelPixels
+            );
+        }
+    } finally {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, previousFlipY);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, previousAlignment);
+    }
 }
 
 export class WebGL2Renderer {
@@ -360,7 +399,7 @@ export class WebGL2Renderer {
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
         gl.texStorage3D(
             gl.TEXTURE_2D_ARRAY,
-            1,
+            GLYPH_ATLAS_MIP_LEVEL_COUNT,
             gl.R8,
             GLYPH_ATLAS_PAGE_SIZE,
             GLYPH_ATLAS_PAGE_SIZE,
@@ -542,22 +581,7 @@ export class WebGL2Renderer {
             loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
                 .then((pixels) => {
                     if (!this.gl || !this.glyphAtlasTexture) return;
-                    gl.activeTexture(gl.TEXTURE2);
-                    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
-                    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-                    gl.texSubImage3D(
-                        gl.TEXTURE_2D_ARRAY,
-                        0,
-                        0,
-                        0,
-                        page,
-                        GLYPH_ATLAS_PAGE_SIZE,
-                        GLYPH_ATLAS_PAGE_SIZE,
-                        1,
-                        gl.RED,
-                        gl.UNSIGNED_BYTE,
-                        pixels
-                    );
+                    uploadGlyphAtlasPage(gl, this.glyphAtlasTexture, page, pixels);
                     this.loadedGlyphPages.add(page);
                 })
                 .catch((error) => console.warn(`[WebGL2] Glyph atlas page ${page} unavailable:`, error))

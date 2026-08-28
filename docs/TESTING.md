@@ -56,7 +56,7 @@ git diff --check
 | Area | Current Checks |
 | --- | --- |
 | Offline runtime | `npm run check:offline`, `scripts/check_offline_bundle.mjs` |
-| Static UI harness | `npm run smoke:static` |
+| Static UI harness | `npm run smoke:static`, including activation, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
 | Tauri policy | `npm run check:tauri-policy` |
 | App icons | `npm run check:icons` |
 | Unicode glyph atlas | `npm run check:glyph-atlas`, complete-block assertions in renderer math/Rust tests |
