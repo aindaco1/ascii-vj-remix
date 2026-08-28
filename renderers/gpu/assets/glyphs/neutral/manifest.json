@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "id": "neutral",
+  "source": {
+    "name": "GNU Unifont",
+    "version": "17.0.05",
+    "sha256": "2ae5311c8e123e9e85f5331cd012aa99757071df23243f1487fdbf8f3acd86be"
+  },
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "pageWidth": 2048,
+  "pageHeight": 2048,
+  "pageColumns": 128,
+  "pageGlyphs": 16384,
+  "pageCount": 4,
+  "glyphId": "unicode-scalar",
+  "coverage": [
+    {
+      "id": "ascii",
+      "start": 32,
+      "end": 126
+    },
+    {
+      "id": "latin-1",
+      "start": 160,
+      "end": 255
+    },
+    {
+      "id": "latin-extended",
+      "start": 256,
+      "end": 591
+    },
+    {
+      "id": "greek",
+      "start": 880,
+      "end": 1023
+    },
+    {
+      "id": "cyrillic",
+      "start": 1024,
+      "end": 1327
+    },
+    {
+      "id": "arrows",
+      "start": 8592,
+      "end": 8703
+    },
+    {
+      "id": "math",
+      "start": 8704,
+      "end": 8959
+    },
+    {
+      "id": "technical",
+      "start": 8960,
+      "end": 9215
+    },
+    {
+      "id": "box-drawing",
+      "start": 9472,
+      "end": 9599
+    },
+    {
+      "id": "blocks",
+      "start": 9600,
+      "end": 9631
+    },
+    {
+      "id": "shapes",
+      "start": 9632,
+      "end": 9727
+    },
+    {
+      "id": "braille",
+      "start": 10240,
+      "end": 10495
+    },
+    {
+      "id": "cjk-radicals",
+      "start": 11904,
+      "end": 12255
+    },
+    {
+      "id": "cjk-punctuation",
+      "start": 12288,
+      "end": 12351
+    },
+    {
+      "id": "hiragana",
+      "start": 12352,
+      "end": 12447
+    },
+    {
+      "id": "katakana",
+      "start": 12448,
+      "end": 12543
+    },
+    {
+      "id": "cjk-basic",
+      "start": 19968,
+      "end": 40959
+    },
+    {
+      "id": "hangul",
+      "start": 44032,
+      "end": 55215
+    }
+  ],
+  "glyphCount": 34895,
+  "pages": [
+    {
+      "index": 0,
+      "filename": "page-0.png",
+      "glyphCount": 2719,
+      "sha256": "67d07beff4b85e317fb89a203e39f8a526d3832958ffb850a79109ebdafb5acf"
+    },
+    {
+      "index": 1,
+      "filename": "page-1.png",
+      "glyphCount": 12800,
+      "sha256": "d18cc8c724b417251bfb1a3520a490142bfa1a4adefa85e7509a4d6b1cc4cc59"
+    },
+    {
+      "index": 2,
+      "filename": "page-2.png",
+      "glyphCount": 13312,
+      "sha256": "bd552fb0bf47ba14fe65f347e88de5eb027dbd4b66bb7f4fe34cdced7f14bca9"
+    },
+    {
+      "index": 3,
+      "filename": "page-3.png",
+      "glyphCount": 6064,
+      "sha256": "5fef4917810cf5b97bf95a8f04945a02dabc9463915f92aee38ae79e15d224e6"
+    }
+  ]
+}

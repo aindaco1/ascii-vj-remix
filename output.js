@@ -120,6 +120,13 @@ function applyRendererParams(params) {
     renderer.gamma = params.gamma;
     renderer.bgBlend = params.bgBlend;
     renderer.quantizeBits = params.quantizeBits;
+    renderer.paletteId = params.paletteId || 'none';
+    renderer.paletteMapping = params.paletteMapping || 'nearest';
+    renderer.ditherMode = params.ditherMode || 'none';
+    renderer.ditherStrength = params.ditherStrength ?? 0.45;
+    renderer.ditherScale = params.ditherScale || 1;
+    renderer.ditherBias = params.ditherBias || 0;
+    renderer.ditherInvert = params.ditherInvert === true;
     renderer.jitterAmount = params.jitterAmount;
     renderer.jitterSpeed = params.jitterSpeed;
     renderer.sampleX = params.sampleX;
@@ -129,6 +136,17 @@ function applyRendererParams(params) {
     renderer.smoothing = params.smoothing;
     renderer.cellWidth = params.cellWidth;
     renderer.cellHeight = params.cellHeight;
+    renderer.solidMode = params.solidMode === true;
+    renderer.glyphMode = params.glyphMode !== false;
+    renderer.charset = params.charset || 'point-click';
+    renderer.customGlyphRamp = params.customGlyphRamp || '';
+    renderer.glyphDepth = params.glyphDepth || 96;
+    renderer.glyphOffset = params.glyphOffset || 0;
+    renderer.glyphReverse = params.glyphReverse === true;
+    renderer.glyphColorMode = params.glyphColorMode || 'source';
+    renderer.glyphColor = params.glyphColor || '#ffffff';
+    renderer.backgroundColor = params.backgroundColor || '#030405';
+    renderer.syncFeatureResources?.();
     if (renderer._applySourceSmoothing) renderer._applySourceSmoothing();
     if (renderer.canvas) renderer.canvas.style.imageRendering = params.smoothing ? 'auto' : 'pixelated';
 }
@@ -219,6 +237,13 @@ async function applyState(payload) {
         gamma: params.gamma,
         bgBlend: params.bgBlend,
         quantizeBits: params.quantizeBits,
+        paletteId: params.paletteId || 'none',
+        paletteMapping: params.paletteMapping || 'nearest',
+        ditherMode: params.ditherMode || 'none',
+        ditherStrength: params.ditherStrength ?? 0.45,
+        ditherScale: params.ditherScale || 1,
+        ditherBias: params.ditherBias || 0,
+        ditherInvert: params.ditherInvert === true,
         jitterAmount: params.jitterAmount,
         jitterSpeed: params.jitterSpeed,
         sampleX: params.sampleX,
@@ -228,6 +253,14 @@ async function applyState(payload) {
         cellHeight: params.cellHeight,
         solidMode: params.solidMode,
         glyphMode: params.glyphMode,
+        charset: params.charset || 'point-click',
+        customGlyphRamp: params.customGlyphRamp || '',
+        glyphDepth: params.glyphDepth || 96,
+        glyphOffset: params.glyphOffset || 0,
+        glyphReverse: params.glyphReverse === true,
+        glyphColorMode: params.glyphColorMode || 'source',
+        glyphColor: params.glyphColor || '#ffffff',
+        backgroundColor: params.backgroundColor || '#030405',
         preserveDrawingBuffer: false,
         opaqueCanvas: true,
         desynchronized: true,
@@ -296,5 +329,12 @@ if (isTauri()) {
 window.ascilineOutput = {
     applyState,
     applyMirrorFrame,
-    latestPayload: () => latestPayload
+    latestPayload: () => latestPayload,
+    rendererState: () => ({
+        stats: renderer?.getStats?.() || null,
+        glyphRampLength: Number(renderer?.glyphRampLength || 0),
+        loadedGlyphPages: [...(renderer?.loadedGlyphPages || [])].sort((a, b) => a - b),
+        paletteId: renderer?.paletteId || 'none',
+        ditherMode: renderer?.ditherMode || 'none'
+    })
 };

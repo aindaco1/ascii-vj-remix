@@ -13,8 +13,35 @@ import {
 import {
   ASCII_TODAY_CHARACTER_SETS,
   CHARACTER_SET_IDS,
-  CHARACTER_SET_OPTIONS
+  CHARACTER_SET_OPTIONS,
+  GLYPH_COVERAGE_RANGES,
+  MAX_GLYPH_RAMP_SCALARS,
+  UNICODE_CHARACTER_SETS,
+  activeGlyphRamp,
+  isSupportedGlyphCodePoint,
+  sanitizeGlyphRamp
 } from '../renderers/shared/character-sets.js';
+import {
+  DITHER_MATRICES,
+  PALETTES,
+  PALETTE_LUT_SIZE,
+  buildPaletteLut,
+  mapColorToPalette,
+  orderedDitherThreshold,
+  processPaletteDither
+} from '../renderers/shared/palettes.js';
+import {
+  ADVANCED_MAX_COLUMNS,
+  NORMAL_ACCELERATED_MAX_CELLS,
+  NORMAL_ACCELERATED_MAX_COLUMNS,
+  NORMAL_SOFTWARE_MAX_COLUMNS,
+  resolveGridDimensions
+} from '../renderers/shared/density-policy.js';
+import {
+  GLYPH_ATLAS_PAGE_GLYPHS,
+  glyphAtlasPagesForRamp,
+  glyphRampCodePoints
+} from '../renderers/shared/glyph-atlas.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const vectors = JSON.parse(await readFile(path.join(root, 'renderers/shared/render-math-vectors.json'), 'utf8'));
@@ -57,5 +84,71 @@ for (const characterSet of ASCII_TODAY_CHARACTER_SETS) {
   assert.equal(charsetChars({ charset: characterSet.id }), characterSet.chars);
 }
 assert.ok(shaderHash(1, 2) >= 0 && shaderHash(1, 2) < 1);
+
+assert.equal(PALETTES.length, 16);
+assert.equal(new Set(PALETTES.map(({ id }) => id)).size, PALETTES.length);
+for (const palette of PALETTES) {
+  assert.ok(palette.colors.length >= 3 && palette.colors.length <= 16);
+  assert.equal(palette.luminanceOrder.length, palette.colors.length);
+  for (const color of palette.colors) {
+    assert.equal(color.length, 3);
+    assert.ok(color.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255));
+  }
+}
+const emberLut = buildPaletteLut('ember-gold');
+assert.equal(emberLut.length, PALETTE_LUT_SIZE);
+assert.deepEqual(mapColorToPalette([0, 0, 0], 'ember-gold', 'nearest', emberLut), [20, 16, 14]);
+assert.deepEqual(mapColorToPalette([255, 220, 100], 'ember-gold', 'nearest', emberLut), [244, 200, 96]);
+assert.deepEqual(processPaletteDither([0, 0, 0], 0, 0, { paletteId: 'none', ditherMode: 'none' }), [0, 0, 0]);
+assert.equal(DITHER_MATRICES.bayer2.values.length, 4);
+assert.equal(DITHER_MATRICES.bayer4.values.length, 16);
+assert.equal(DITHER_MATRICES.bayer8.values.length, 64);
+assert.equal(orderedDitherThreshold('bayer2', 0, 0), -0.375);
+assert.equal(orderedDitherThreshold('bayer2', 1, 0), 0.125);
+assert.equal(orderedDitherThreshold('bayer2', 0, 1), 0.375);
+assert.equal(orderedDitherThreshold('bayer2', 1, 1), -0.125);
+assert.equal(orderedDitherThreshold('bayer2', 0, 0, 1, true), 0.375);
+
+assert.ok(UNICODE_CHARACTER_SETS.length >= 15);
+assert.ok(UNICODE_CHARACTER_SETS.every(({ chars }) => [...chars].length <= MAX_GLYPH_RAMP_SCALARS));
+assert.ok(GLYPH_COVERAGE_RANGES.some(({ id, start, end }) => id === 'cjk-basic' && start === 0x4e00 && end === 0x9fff));
+assert.ok(isSupportedGlyphCodePoint('中'.codePointAt(0)));
+assert.ok(isSupportedGlyphCodePoint('한'.codePointAt(0)));
+assert.ok(isSupportedGlyphCodePoint('あ'.codePointAt(0)));
+assert.equal(isSupportedGlyphCodePoint('🙂'.codePointAt(0)), false);
+assert.equal(sanitizeGlyphRamp(' A中한🙂\n'), ' A中한');
+assert.equal(sanitizeGlyphRamp('中'.repeat(120)).length, MAX_GLYPH_RAMP_SCALARS);
+assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@', glyphDepth: 4, glyphOffset: 2 }), ':-=+');
+assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@', glyphDepth: 4, glyphOffset: 2, glyphReverse: true }), '+=-:');
+assert.deepEqual(glyphAtlasPagesForRamp(Uint32Array.from([0x20, 0x4e00, 0xac00])), [0, 1, 2]);
+assert.equal(GLYPH_ATLAS_PAGE_GLYPHS, 16384);
+assert.deepEqual(
+  Array.from(glyphRampCodePoints({ charset: 'custom', customGlyphRamp: ' Aあ한' })),
+  [0x20, 0x41, 0x3042, 0xd55c]
+);
+
+const acceleratedGrid = resolveGridDimensions({
+  backend: 'webgpu', cols: 640, autoRows: true, cellWidth: 2, cellHeight: 3, aspectCorrection: 1
+}, 1920, 1080);
+assert.equal(acceleratedGrid.columns, NORMAL_ACCELERATED_MAX_COLUMNS);
+assert.equal(acceleratedGrid.rows, 240);
+assert.equal(acceleratedGrid.cells, 153600);
+assert.equal(acceleratedGrid.clamped, false);
+const softwareGrid = resolveGridDimensions({
+  backend: 'canvas2d', cols: 480, autoRows: true, cellWidth: 2, cellHeight: 3, aspectCorrection: 1
+}, 1920, 1080);
+assert.equal(softwareGrid.columns, NORMAL_SOFTWARE_MAX_COLUMNS);
+assert.ok(softwareGrid.cells <= 6000);
+assert.equal(softwareGrid.clamped, true);
+const advancedGrid = resolveGridDimensions({
+  backend: 'webgpu', advancedDensity: true, cols: 900, autoRows: true, cellWidth: 2, cellHeight: 3, aspectCorrection: 1
+}, 1920, 1080);
+assert.equal(advancedGrid.columns, ADVANCED_MAX_COLUMNS);
+assert.equal(advancedGrid.clamped, false);
+const pixelGrid = resolveGridDimensions({
+  backend: 'webgpu', cols: 640, autoRows: true, cellWidth: 2, cellHeight: 3, aspectCorrection: 1, pixel: true
+}, 1920, 1080, { pixelMode: true });
+assert.ok(pixelGrid.cells <= NORMAL_ACCELERATED_MAX_CELLS);
+assert.equal(pixelGrid.clamped, true);
 
 console.log('Renderer math vector checks passed.');

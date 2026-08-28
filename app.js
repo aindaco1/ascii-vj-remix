@@ -10,8 +10,22 @@ import {
     ASCII_TODAY_CHARACTER_SETS,
     CHARACTER_SET_IDS,
     CHARACTER_SET_OPTIONS,
-    characterSetChars
+    activeGlyphRamp,
+    characterSetChars,
+    sanitizeGlyphRamp
 } from './renderers/shared/character-sets.js?v=20260804-ascii-today';
+import {
+    DITHER_MODE_OPTIONS,
+    PALETTE_OPTIONS,
+    buildPaletteLut,
+    paletteById
+} from './renderers/shared/palettes.js?v=20260828-palette-dither';
+import {
+    ADVANCED_MAX_COLUMNS,
+    NORMAL_ACCELERATED_MAX_COLUMNS,
+    NORMAL_SOFTWARE_MAX_COLUMNS,
+    resolveGridDimensions
+} from './renderers/shared/density-policy.js?v=20260828-density-policy';
 import {
     AUDIO_REACTIVE_CONTROLS,
     AUDIO_REACTIVE_DEFAULTS,
@@ -224,6 +238,13 @@ const DEFAULT_PARAMS = {
     gamma: 1,
     bgBlend: 0.3,
     quantizeBits: 0,
+    paletteId: 'none',
+    paletteMapping: 'nearest',
+    ditherMode: 'none',
+    ditherStrength: 0.45,
+    ditherScale: 1,
+    ditherBias: 0,
+    ditherInvert: false,
     mode: 5,
     pixel: false,
     cellWidth: 2,
@@ -244,8 +265,17 @@ const DEFAULT_PARAMS = {
     glyphMode: true,
     solidMode: false,
     charset: 'point-click',
+    customGlyphRamp: '',
+    glyphDepth: 96,
+    glyphOffset: 0,
+    glyphReverse: false,
+    glyphColorMode: 'source',
+    glyphColor: '#ffffff',
+    backgroundColor: '#030405',
+    atlasStyle: 'neutral',
     fontFamily: 'Courier New',
     minGlyphIntensity: 180,
+    advancedDensity: false,
     statsOverlay: true,
     transitionSeconds: 1.5
 };
@@ -342,6 +372,51 @@ const ASCII_TODAY_PRESETS = Object.freeze(ASCII_TODAY_CHARACTER_SETS.map((charac
     })
 })));
 const ASCII_TODAY_PRESET_IDS = Object.freeze(ASCII_TODAY_PRESETS.map((preset) => preset.id));
+
+const PALETTE_PRESETS = Object.freeze([
+    { id: 'palette-signal-court', name: 'Signal Court', paletteId: 'signal-court', ditherMode: 'bayer4' },
+    { id: 'palette-ember-gold', name: 'Ember Gold Braille', paletteId: 'ember-gold', paletteMapping: 'luminance', ditherMode: 'bayer4', charset: 'braille' },
+    { id: 'palette-prism-armor', name: 'Prism Armor', paletteId: 'prism-armor', ditherMode: 'bayer2', solidMode: true, glyphMode: false, pixel: true },
+    { id: 'palette-verdigris-clay', name: 'Verdigris Clay', paletteId: 'verdigris-clay', ditherMode: 'bayer8' },
+    { id: 'palette-forest-kiln', name: 'Forest Kiln Hangul', paletteId: 'forest-kiln', paletteMapping: 'luminance', ditherMode: 'bayer4', charset: 'hangul' },
+    { id: 'palette-soft-voltage', name: 'Soft Voltage Hiragana', paletteId: 'soft-voltage', paletteMapping: 'luminance', ditherMode: 'bayer4', charset: 'hiragana' },
+    { id: 'palette-midnight-scan', name: 'Midnight Scan CJK', paletteId: 'midnight-scan', paletteMapping: 'luminance', ditherMode: 'bayer8', charset: 'cjk-basic' },
+    { id: 'palette-cyan-fog', name: 'Cyan Fog Katakana', paletteId: 'cyan-fog', paletteMapping: 'luminance', ditherMode: 'bayer4', charset: 'katakana' },
+    { id: 'palette-dark-parade', name: 'Dark Parade Boxes', paletteId: 'dark-parade', ditherMode: 'bayer2', charset: 'box-drawing' },
+    { id: 'palette-sea-glass-array', name: 'Sea Glass Array', paletteId: 'sea-glass-array', ditherMode: 'bayer8', charset: 'cjk-marks' }
+].map((preset) => Object.freeze({
+    id: preset.id,
+    name: preset.name,
+    readonly: true,
+    transitionSeconds: 1.25,
+    params: Object.freeze({
+        cols: preset.charset ? 240 : 360,
+        autoRows: true,
+        cellWidth: preset.charset ? 8 : 3,
+        cellHeight: preset.charset ? 12 : 5,
+        saturationBoost: 1.15,
+        contrastBoost: 1.45,
+        brightness: 1.04,
+        gamma: 1,
+        bgBlend: 0.08,
+        paletteId: preset.paletteId,
+        paletteMapping: preset.paletteMapping || 'nearest',
+        ditherMode: preset.ditherMode,
+        ditherStrength: 0.58,
+        ditherScale: 1,
+        ditherBias: 0,
+        jitterAmount: 0.18,
+        jitterSpeed: 0.65,
+        smoothing: false,
+        solidMode: preset.solidMode || false,
+        glyphMode: preset.glyphMode ?? true,
+        charset: preset.charset || 'point-click',
+        mode: 3,
+        pixel: preset.pixel || false,
+        codecQuality: 'balanced'
+    })
+})));
+const PALETTE_PRESET_IDS = Object.freeze(PALETTE_PRESETS.map((preset) => preset.id));
 
 const BUILTIN_PRESETS = [
     {
@@ -490,6 +565,7 @@ const BUILTIN_PRESETS = [
         }
     },
     ...ASCII_TODAY_PRESETS,
+    ...PALETTE_PRESETS,
     {
         id: 'arcade-rain',
         name: 'Arcade Rain',
@@ -559,7 +635,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1,
         params: {
-            cols: 720,
+            cols: 520,
             cellWidth: 2,
             cellHeight: 2,
             saturationBoost: 1.82,
@@ -601,7 +677,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.1,
         params: {
-            cols: 620,
+            cols: 520,
             cellWidth: 2,
             cellHeight: 2,
             saturationBoost: 1.72,
@@ -623,7 +699,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 0.7,
         params: {
-            cols: 860,
+            cols: 640,
             cellWidth: 1,
             cellHeight: 2,
             saturationBoost: 2.75,
@@ -634,6 +710,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.72,
             jitterSpeed: 2.8,
             quantizeBits: 0,
+            paletteId: 'solar-standard',
+            ditherMode: 'bayer4',
             mode: 5,
             pixel: false,
             codecQuality: 'high'
@@ -645,7 +723,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 0.8,
         params: {
-            cols: 760,
+            cols: 620,
             cellWidth: 1,
             cellHeight: 2,
             saturationBoost: 3,
@@ -678,6 +756,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.46,
             jitterSpeed: 1.9,
             quantizeBits: 1,
+            paletteId: 'moss-ultraviolet',
+            ditherMode: 'bayer4',
             mode: 4,
             pixel: false,
             codecQuality: 'balanced'
@@ -700,6 +780,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.16,
             jitterSpeed: 0.7,
             quantizeBits: 6,
+            paletteId: 'primary-rite',
+            ditherMode: 'bayer2',
             solidMode: true,
             glyphMode: false,
             mode: 2,
@@ -713,7 +795,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 2.6,
         params: {
-            cols: 900,
+            cols: 520,
             cellWidth: 1,
             cellHeight: 1,
             saturationBoost: 0.72,
@@ -757,7 +839,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.3,
         params: {
-            cols: 700,
+            cols: 520,
             cellWidth: 2,
             cellHeight: 2,
             saturationBoost: 0,
@@ -827,7 +909,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 0.85,
         params: {
-            cols: 780,
+            cols: 600,
             cellWidth: 1,
             cellHeight: 2,
             saturationBoost: 3,
@@ -860,6 +942,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.78,
             jitterSpeed: 2.7,
             quantizeBits: 2,
+            paletteId: 'jewel-circuit',
+            ditherMode: 'bayer4',
             mode: 4,
             pixel: false,
             codecQuality: 'balanced'
@@ -895,7 +979,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.45,
         params: {
-            cols: 680,
+            cols: 520,
             cellWidth: 2,
             cellHeight: 2,
             saturationBoost: 2.7,
@@ -917,7 +1001,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 0.75,
         params: {
-            cols: 840,
+            cols: 640,
             cellWidth: 1,
             cellHeight: 2,
             saturationBoost: 2.95,
@@ -950,6 +1034,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.72,
             jitterSpeed: 2.9,
             quantizeBits: 2,
+            paletteId: 'spectrum-vault',
+            ditherMode: 'bayer4',
             solidMode: true,
             glyphMode: false,
             mode: 5,
@@ -985,7 +1071,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 0.95,
         params: {
-            cols: 740,
+            cols: 640,
             cellWidth: 1,
             cellHeight: 3,
             saturationBoost: 2.35,
@@ -1018,6 +1104,8 @@ const BUILTIN_PRESETS = [
             jitterAmount: 0.9,
             jitterSpeed: 3.7,
             quantizeBits: 6,
+            paletteId: 'blush-lichen',
+            ditherMode: 'bayer4',
             solidMode: false,
             glyphMode: true,
             mode: 1,
@@ -1202,6 +1290,7 @@ const BUILTIN_PRESET_DISPLAY_ORDER = [
     'terminal-mono',
     'dense-typewriter',
     ...ASCII_TODAY_PRESET_IDS,
+    ...PALETTE_PRESET_IDS,
     'neon-sledgehammer',
     'arcade-rain',
     'gamma-sinkhole',
@@ -1304,7 +1393,8 @@ const CONTROL_GROUPS = [
     {
         title: 'Grid',
         controls: [
-            { key: 'cols', label: 'Columns', type: 'range', min: 80, max: 900, step: 1 },
+            { key: 'cols', label: 'Columns', type: 'range', min: 80, max: ADVANCED_MAX_COLUMNS, step: 1 },
+            { key: 'advancedDensity', label: 'Advanced density', type: 'checkbox' },
             { key: 'autoRows', label: 'Auto rows', type: 'checkbox' },
             { key: 'rows', label: 'Rows', type: 'range', min: 20, max: 360, step: 1 },
             { key: 'cellWidth', label: 'Cell width', type: 'range', min: 1, max: 12, step: 1, unit: 'px' },
@@ -1321,8 +1411,20 @@ const CONTROL_GROUPS = [
             { key: 'gamma', label: 'Gamma', type: 'range', min: 0.2, max: 3, step: 0.01 },
             { key: 'bgBlend', label: 'Background blend', type: 'range', min: 0, max: 1, step: 0.01 },
             { key: 'quantizeBits', label: 'Quantize bits', type: 'range', min: 0, max: 6, step: 1 },
+            { key: 'paletteId', label: 'Palette', type: 'select', compactSelect: true, options: PALETTE_OPTIONS },
+            { key: 'paletteMapping', label: 'Palette mapping', type: 'select', options: [['nearest', 'Nearest color'], ['luminance', 'Luminance ramp']] },
             { key: 'mode', label: 'Stream mode', type: 'select', options: [['1', '1 B&W'], ['2', '2 512c'], ['3', '3 32K'], ['4', '4 262K'], ['5', '5 16M']] },
             { key: 'pixel', label: 'Pixel stream', type: 'checkbox' }
+        ]
+    },
+    {
+        title: 'Dither',
+        controls: [
+            { key: 'ditherMode', label: 'Ordered dither', type: 'select', options: DITHER_MODE_OPTIONS },
+            { key: 'ditherStrength', label: 'Strength', type: 'range', min: 0, max: 1, step: 0.01 },
+            { key: 'ditherScale', label: 'Pattern scale', type: 'range', min: 1, max: 8, step: 1 },
+            { key: 'ditherBias', label: 'Bias', type: 'range', min: -1, max: 1, step: 0.01 },
+            { key: 'ditherInvert', label: 'Invert pattern', type: 'checkbox' }
         ]
     },
     {
@@ -1366,7 +1468,15 @@ const CONTROL_GROUPS = [
         controls: [
             { key: 'glyphMode', label: 'Glyph mode', type: 'checkbox' },
             { key: 'solidMode', label: 'Solid mode', type: 'checkbox' },
-            { key: 'charset', label: 'Character set', type: 'select', compactSelect: true, options: CHARACTER_SET_OPTIONS },
+            { key: 'atlasStyle', label: 'Atlas style', type: 'select', options: [['neutral', 'Neutral']] },
+            { key: 'charset', label: 'Glyph set', type: 'select', compactSelect: true, options: CHARACTER_SET_OPTIONS },
+            { key: 'customGlyphRamp', label: 'Custom ramp', type: 'text', maxScalars: 96, placeholder: 'Type up to 96 glyphs' },
+            { key: 'glyphDepth', label: 'Glyph depth', type: 'range', min: 1, max: 96, step: 1 },
+            { key: 'glyphOffset', label: 'Glyph offset', type: 'range', min: 0, max: 95, step: 1 },
+            { key: 'glyphReverse', label: 'Reverse ramp', type: 'checkbox' },
+            { key: 'glyphColorMode', label: 'Glyph color', type: 'select', options: [['source', 'Source color'], ['fixed', 'Fixed color'], ['palette', 'Palette color']] },
+            { key: 'glyphColor', label: 'Fixed glyph color', type: 'color' },
+            { key: 'backgroundColor', label: 'Background color', type: 'color' },
             { key: 'fontFamily', label: 'Font family', type: 'select', compactSelect: true, options: FONT_FAMILY_OPTIONS },
             { key: 'minGlyphIntensity', label: 'Min glyph intensity', type: 'range', min: 0, max: 255, step: 1 }
         ]
@@ -1393,6 +1503,8 @@ const CLIENT_TWEEN_KEYS = new Set([
     'brightness',
     'gamma',
     'bgBlend',
+    'ditherStrength',
+    'ditherBias',
     'jitterAmount',
     'jitterSpeed',
     'sampleX',
@@ -1414,6 +1526,7 @@ const STRUCTURAL_KEYS = new Set([
     'cellWidth',
     'cellHeight',
     'aspectCorrection',
+    'advancedDensity',
     'mode',
     'pixel',
     'solidMode',
@@ -1449,7 +1562,7 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay']);
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -1468,6 +1581,7 @@ const CONTROL_APPLIES = {
     statsOverlay: () => true,
 
     cols: () => true,
+    advancedDensity: () => true,
     autoRows: () => true,
     rows: ({ params }) => !params.autoRows,
     cellWidth: ({ params }) => params.sourceMode === 'static' || !params.pixel,
@@ -1480,6 +1594,13 @@ const CONTROL_APPLIES = {
     gamma: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     bgBlend: ({ params }) => params.sourceMode === 'static',
     quantizeBits: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
+    paletteId: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
+    paletteMapping: ({ params }) => params.paletteId !== 'none',
+    ditherMode: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
+    ditherStrength: ({ params }) => params.ditherMode !== 'none',
+    ditherScale: ({ params }) => params.ditherMode !== 'none',
+    ditherBias: ({ params }) => params.ditherMode !== 'none',
+    ditherInvert: ({ params }) => params.ditherMode !== 'none',
     mode: ({ params }) => params.sourceMode === 'stream',
     pixel: ({ params }) => params.sourceMode === 'stream',
 
@@ -1510,7 +1631,15 @@ const CONTROL_APPLIES = {
 
     glyphMode: ({ params }) => !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
     solidMode: ({ params }) => !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    atlasStyle: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
     charset: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
+    customGlyphRamp: ({ params }) => params.charset === 'custom' && params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
+    glyphDepth: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
+    glyphOffset: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
+    glyphReverse: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
+    glyphColorMode: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
+    glyphColor: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && params.glyphColorMode === 'fixed',
+    backgroundColor: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params),
     fontFamily: ({ params }) => params.glyphMode && !params.solidMode && !usesPixelCanvas(params) && (params.sourceMode === 'static' || params.mode > 1),
     minGlyphIntensity: () => false
 };
@@ -1679,8 +1808,7 @@ function nativeOutputGlyphMode(params) {
     return Boolean(
         params?.glyphMode &&
         !params?.solidMode &&
-        !usesPixelCanvas(params) &&
-        backendKind(params) === 'canvas'
+        !usesPixelCanvas(params)
     );
 }
 
@@ -1715,6 +1843,17 @@ function cameraSourceName(params) {
 
 function shouldRendererMirrorCamera() {
     return false;
+}
+
+function sanitizeHexColor(value, fallback) {
+    const text = String(value || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(text) ? text : fallback;
+}
+
+function normalColumnLimit(params) {
+    return STATIC_CANVAS_BACKENDS.has(params?.backend)
+        ? NORMAL_SOFTWARE_MAX_COLUMNS
+        : NORMAL_ACCELERATED_MAX_COLUMNS;
 }
 
 function normalizeParams(params, options = {}) {
@@ -1775,8 +1914,19 @@ function normalizeParams(params, options = {}) {
             const current = String(out[key] ?? '');
             const next = allowedValues.includes(current) ? current : String(DEFAULT_PARAMS[key] ?? allowedValues[0] ?? '');
             out[key] = typeof DEFAULT_PARAMS[key] === 'number' ? Number(next) : next;
+        } else if (config.type === 'text') {
+            out[key] = String(out[key] ?? DEFAULT_PARAMS[key] ?? '');
+        } else if (config.type === 'color') {
+            out[key] = sanitizeHexColor(out[key], DEFAULT_PARAMS[key]);
         }
     }
+    out.customGlyphRamp = sanitizeGlyphRamp(out.customGlyphRamp);
+    out.glyphColor = sanitizeHexColor(out.glyphColor, DEFAULT_PARAMS.glyphColor);
+    out.backgroundColor = sanitizeHexColor(out.backgroundColor, DEFAULT_PARAMS.backgroundColor);
+    out.cols = Math.min(
+        Math.max(80, Math.round(Number(out.cols) || DEFAULT_PARAMS.cols)),
+        out.advancedDensity ? ADVANCED_MAX_COLUMNS : normalColumnLimit(out)
+    );
     return out;
 }
 
@@ -2444,6 +2594,23 @@ function computeRows(params, sourceW = 16, sourceH = 9, pixelMode = false) {
     const ratio = sourceW / Math.max(sourceH, 1);
     if (pixelMode || params.solidMode) return Math.max(1, Math.round(params.cols / ratio * params.aspectCorrection));
     return Math.max(1, Math.round(params.cols / ratio * (params.cellWidth / params.cellHeight) * params.aspectCorrection));
+}
+
+function effectiveGridParams(params, sourceWidth = 16, sourceHeight = 9, actualBackend = params.backend) {
+    const grid = resolveGridDimensions(params, sourceWidth, sourceHeight, {
+        actualBackend,
+        pixelMode: usesPixelCanvas({ ...params, backend: actualBackend })
+    });
+    return {
+        ...params,
+        cols: grid.columns,
+        rows: grid.rows,
+        autoRows: false,
+        densityRequestedColumns: grid.requestedColumns,
+        densityRequestedRows: grid.requestedRows,
+        densityClamped: grid.clamped,
+        densityMode: grid.budget.mode
+    };
 }
 
 function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, frameCount = 0, options = {}) {
@@ -3657,16 +3824,25 @@ class CanvasStaticRenderer {
         this.lastFpsUpdate = 0;
         this.currentFps = 0;
         this.ownsSource = true;
+        this.requestedParams = null;
+        this.paletteLutKey = '';
+        this.paletteLut = null;
+        this.glyphRamp = '';
+        this.colorCssCache = new Map();
     }
 
     async start(params, options = {}) {
-        this.params = { ...params };
+        this.requestedParams = { ...params };
         this.ownsSource = options.ownsSource !== false;
         this.source = options.source || await loadMediaSource(params.mediaUrl, {
             type: forcedMediaType(params),
             loop: params.loop,
             muted: params.muted
         });
+        const actualBackend = params.backend === 'pixel-canvas' ? 'pixel-canvas' : 'canvas2d';
+        this.params = effectiveGridParams(params, this.source?.width, this.source?.height, actualBackend);
+        this._syncPaletteLut();
+        this.glyphRamp = activeGlyphRamp(this.params);
         this.canvas = this.document.createElement('canvas');
         this.canvas.className = 'ascii-canvas';
         this.ctx = this.canvas.getContext('2d', { alpha: false });
@@ -3691,15 +3867,19 @@ class CanvasStaticRenderer {
     }
 
     updateParams(params) {
-        const needsResize = params.cols !== this.params.cols ||
-            params.rows !== this.params.rows ||
-            params.autoRows !== this.params.autoRows ||
-            params.backend !== this.params.backend ||
-            params.cellWidth !== this.params.cellWidth ||
-            params.cellHeight !== this.params.cellHeight ||
-            params.pixel !== this.params.pixel ||
-            params.solidMode !== this.params.solidMode;
-        this.params = { ...params };
+        const actualBackend = params.backend === 'pixel-canvas' ? 'pixel-canvas' : 'canvas2d';
+        const next = effectiveGridParams(params, this.source?.width, this.source?.height, actualBackend);
+        const needsResize = next.cols !== this.params.cols ||
+            next.rows !== this.params.rows ||
+            next.backend !== this.params.backend ||
+            next.cellWidth !== this.params.cellWidth ||
+            next.cellHeight !== this.params.cellHeight ||
+            next.pixel !== this.params.pixel ||
+            next.solidMode !== this.params.solidMode;
+        this.requestedParams = { ...params };
+        this.params = next;
+        this._syncPaletteLut();
+        this.glyphRamp = activeGlyphRamp(this.params);
         if (this.source?.element) {
             this.source.element.volume = params.volume;
             this.source.element.muted = params.muted;
@@ -3707,6 +3887,25 @@ class CanvasStaticRenderer {
         }
         this.source?.updateParams?.(params);
         if (needsResize) this._configureCanvas();
+    }
+
+    _syncPaletteLut() {
+        const key = `${this.params?.paletteId || 'none'}:${this.params?.paletteMapping || 'nearest'}`;
+        if (key === this.paletteLutKey) return;
+        this.paletteLutKey = key;
+        this.paletteLut = buildPaletteLut(this.params?.paletteId, this.params?.paletteMapping);
+        this.colorCssCache.clear();
+    }
+
+    _colorCss(r, g, b) {
+        const key = (r << 16) | (g << 8) | b;
+        let css = this.colorCssCache.get(key);
+        if (!css) {
+            css = `rgb(${r},${g},${b})`;
+            if (this.colorCssCache.size >= 4096) this.colorCssCache.clear();
+            this.colorCssCache.set(key, css);
+        }
+        return css;
     }
 
     _configureCanvas() {
@@ -3782,7 +3981,7 @@ class CanvasStaticRenderer {
         const sourceCellHeight = sampleHeight / this.rows;
         const sampleXOffset = clamp(Number(this.params.sampleX ?? 0.5), 0, 1);
         const sampleYOffset = clamp(Number(this.params.sampleY ?? 0.5), 0, 1);
-        ctx.fillStyle = '#030405';
+        ctx.fillStyle = this.params.backgroundColor || '#030405';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.textBaseline = 'top';
         ctx.font = `bold ${Math.max(1, this.params.cellHeight)}px ${this.params.fontFamily}, monospace`;
@@ -3795,13 +3994,17 @@ class CanvasStaticRenderer {
                 const sampleX = clamp(Math.trunc((x + sampleXOffset) * sourceCellWidth + jitterX), 0, sampleWidth - 1);
                 const sampleY = clamp(Math.trunc((y + sampleYOffset) * sourceCellHeight + jitterY), 0, sampleHeight - 1);
                 const i = (sampleY * sampleWidth + sampleX) * 4;
-                const [r, g, b] = processColor(data[i], data[i + 1], data[i + 2], this.params);
-                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                const [r, g, b] = processColor(
+                    data[i], data[i + 1], data[i + 2], this.params, x, y, this.paletteLut
+                );
+                ctx.fillStyle = this.params.glyphColorMode === 'fixed' && this.params.glyphMode
+                    ? this.params.glyphColor
+                    : this._colorCss(r, g, b);
                 if (usesPixelCanvas(this.params) || this.params.solidMode || !this.params.glyphMode) {
                     ctx.fillRect(x * this.params.cellWidth, y * this.params.cellHeight, this.params.cellWidth, this.params.cellHeight);
                 } else {
                     const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-                    ctx.fillText(glyphForLuma(luma, this.params), x * this.params.cellWidth, y * this.params.cellHeight);
+                    ctx.fillText(glyphForLuma(luma, this.params, this.glyphRamp), x * this.params.cellWidth, y * this.params.cellHeight);
                 }
             }
         }
@@ -3814,6 +4017,8 @@ class CanvasStaticRenderer {
             sourceType: this.source?.type || 'static',
             cols: this.params.cols,
             rows: this.rows,
+            requestedCols: this.requestedParams?.cols || this.params.cols,
+            densityClamped: Boolean(this.params.densityClamped),
             fps: this.params.fps,
             currentFps: this.currentFps,
             canvasSize: this.canvas ? `${this.canvas.width}x${this.canvas.height}` : '-'
@@ -3862,13 +4067,19 @@ class StaticRuntime {
 
     _rendererOptions(params, targetElement) {
         const preferredBackend = params.backend === 'auto' ? undefined : params.backend;
+        const effective = effectiveGridParams(
+            params,
+            this.source?.width,
+            this.source?.height,
+            preferredBackend || 'webgpu'
+        );
         return {
             source: this.source,
             targetElement,
-            cols: params.cols,
-            rows: params.autoRows ? 0 : params.rows,
-            autoRows: params.autoRows,
-            aspectCorrection: params.aspectCorrection,
+            cols: effective.cols,
+            rows: effective.rows,
+            autoRows: false,
+            aspectCorrection: effective.aspectCorrection,
             fps: params.fps,
             saturationBoost: params.saturationBoost,
             contrastBoost: params.contrastBoost,
@@ -3876,6 +4087,13 @@ class StaticRuntime {
             gamma: params.gamma,
             bgBlend: params.bgBlend,
             quantizeBits: params.quantizeBits,
+            paletteId: params.paletteId,
+            paletteMapping: params.paletteMapping,
+            ditherMode: params.ditherMode,
+            ditherStrength: params.ditherStrength,
+            ditherScale: params.ditherScale,
+            ditherBias: params.ditherBias,
+            ditherInvert: params.ditherInvert,
             jitterAmount: params.jitterAmount,
             jitterSpeed: params.jitterSpeed,
             sampleX: params.sampleX,
@@ -3885,6 +4103,15 @@ class StaticRuntime {
             cellHeight: params.cellHeight,
             solidMode: params.solidMode,
             glyphMode: params.glyphMode,
+            charset: params.charset,
+            customGlyphRamp: params.customGlyphRamp,
+            glyphDepth: params.glyphDepth,
+            glyphOffset: params.glyphOffset,
+            glyphReverse: params.glyphReverse,
+            glyphColorMode: params.glyphColorMode,
+            glyphColor: params.glyphColor,
+            backgroundColor: params.backgroundColor,
+            atlasStyle: params.atlasStyle,
             mirrorX: shouldRendererMirrorCamera(params),
             preserveDrawingBuffer: true,
             preferredBackend
@@ -3903,6 +4130,13 @@ class StaticRuntime {
         renderer.gamma = params.gamma;
         renderer.bgBlend = params.bgBlend;
         renderer.quantizeBits = params.quantizeBits;
+        renderer.paletteId = params.paletteId;
+        renderer.paletteMapping = params.paletteMapping;
+        renderer.ditherMode = params.ditherMode;
+        renderer.ditherStrength = params.ditherStrength;
+        renderer.ditherScale = params.ditherScale;
+        renderer.ditherBias = params.ditherBias;
+        renderer.ditherInvert = params.ditherInvert;
         renderer.jitterAmount = params.jitterAmount;
         renderer.jitterSpeed = params.jitterSpeed;
         renderer.sampleX = params.sampleX;
@@ -3912,7 +4146,19 @@ class StaticRuntime {
         renderer.smoothing = params.smoothing;
         renderer.cellWidth = params.cellWidth;
         renderer.cellHeight = params.cellHeight;
+        renderer.solidMode = params.solidMode;
+        renderer.glyphMode = params.glyphMode;
+        renderer.charset = params.charset;
+        renderer.customGlyphRamp = params.customGlyphRamp;
+        renderer.glyphDepth = params.glyphDepth;
+        renderer.glyphOffset = params.glyphOffset;
+        renderer.glyphReverse = params.glyphReverse;
+        renderer.glyphColorMode = params.glyphColorMode;
+        renderer.glyphColor = params.glyphColor;
+        renderer.backgroundColor = params.backgroundColor;
+        renderer.atlasStyle = params.atlasStyle;
         renderer.mirrorX = shouldRendererMirrorCamera(params);
+        renderer.syncFeatureResources?.();
         if (renderer._applySourceSmoothing) renderer._applySourceSmoothing();
         if (renderer.canvas) {
             renderer.canvas.style.filter = 'none';
@@ -4549,10 +4795,13 @@ class StreamRuntime {
     _renderAsciiFrame(frame) {
         const ctx = this.ctx;
         const params = this.app.renderParams();
-        ctx.fillStyle = '#030405';
+        const glyphRamp = activeGlyphRamp(params);
+        ctx.fillStyle = params.backgroundColor || '#030405';
         ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
         ctx.font = `bold ${this.charHeight}px ${params.fontFamily}, monospace`;
         ctx.textBaseline = 'top';
+        const fixedGlyphColor = params.glyphMode && !params.solidMode && params.glyphColorMode === 'fixed';
+        if (fixedGlyphColor) ctx.fillStyle = params.glyphColor;
 
         let col = 0;
         let row = 0;
@@ -4560,15 +4809,16 @@ class StreamRuntime {
         for (let idx = 0; idx < frame.length; idx += 4) {
             const [r, g, b] = processColor(frame[idx + 1], frame[idx + 2], frame[idx + 3], params);
             const packed = (r << 16) | (g << 8) | b;
-            if (packed !== prevPacked) {
+            if (!fixedGlyphColor && packed !== prevPacked) {
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
                 prevPacked = packed;
             }
             const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            const glyph = params.solidMode || !params.glyphMode ? '' : glyphForLuma(luma, params);
+            const glyph = params.solidMode || !params.glyphMode ? '' : glyphForLuma(luma, params, glyphRamp);
             if (glyph) {
                 ctx.fillText(glyph, this.xPos[col], this.yPos[row]);
-                this.selectionBuffer[row * (this.gridCols + 1) + col] = glyph.charCodeAt(0);
+                const codePoint = glyph.codePointAt(0);
+                this.selectionBuffer[row * (this.gridCols + 1) + col] = codePoint <= 0x7e ? codePoint : 32;
             } else {
                 ctx.fillRect(this.xPos[col], this.yPos[row], this.charWidth, this.charHeight);
                 this.selectionBuffer[row * (this.gridCols + 1) + col] = 32;
@@ -6126,6 +6376,8 @@ class RendererLabApp {
                 input.max = config.max;
                 input.step = config.step;
             }
+            if (config.placeholder) input.placeholder = config.placeholder;
+            if (config.type === 'text') input.autocomplete = 'off';
         }
         input.id = `control-${config.key}`;
         input.addEventListener('input', () => this._handleControlInput(config.key));
@@ -6140,6 +6392,11 @@ class RendererLabApp {
         });
         els.backend.addEventListener('change', () => {
             this.params.backend = els.backend.value;
+            if (!this.params.advancedDensity) {
+                this.params.cols = Math.min(this.params.cols, normalColumnLimit(this.params));
+            }
+            this._syncDensityControl();
+            this._syncInputValues(['cols']);
             this._paramChanged('backend', true);
         });
         els.addCustomFile.addEventListener('click', () => this._openCustomFilePicker());
@@ -7097,9 +7354,31 @@ class RendererLabApp {
                 if (isCameraParams(this.params)) this.params.sourceName = cameraSourceName(this.params);
                 this._syncCameraDeviceOptions();
             }
+        } else if (config.type === 'text') {
+            const raw = String(input.value || '');
+            this.params[key] = key === 'customGlyphRamp'
+                ? sanitizeGlyphRamp(raw, { maxScalars: config.maxScalars })
+                : raw;
+            if (key === 'customGlyphRamp') {
+                const removed = Math.max(0, [...raw].length - [...this.params[key]].length);
+                input.dataset.removedScalars = String(removed);
+                input.title = removed
+                    ? `${removed} unsupported or excess Unicode scalar${removed === 1 ? '' : 's'} removed`
+                    : 'Up to 96 supported Unicode scalar values';
+            }
+            if (input.value !== this.params[key]) input.value = this.params[key];
+        } else if (config.type === 'color') {
+            this.params[key] = sanitizeHexColor(input.value, DEFAULT_PARAMS[key]);
         } else {
             const numeric = Number(input.value);
             this.params[key] = Number.isInteger(config.step) ? Math.round(numeric) : numeric;
+        }
+        if (key === 'advancedDensity' && !this.params.advancedDensity) {
+            this.params.cols = Math.min(this.params.cols, normalColumnLimit(this.params));
+            this._syncDensityControl();
+            this._syncInputValues(['cols']);
+        } else if (key === 'advancedDensity') {
+            this._syncDensityControl();
         }
         if (key === 'codecQuality') {
             this.params.codecTolerance = CODEC_TOLERANCE[this.params.codecQuality] ?? this.params.codecTolerance;
@@ -7446,6 +7725,12 @@ button:hover{background:#202a35}
 
     _nativeOutputPayload(params = this.renderParams()) {
         const cameraMeta = this._nativeCameraOutputMeta(this.params);
+        const effective = effectiveGridParams(
+            params,
+            cameraMeta?.captureWidth || this.gpu?.source?.width || 1920,
+            cameraMeta?.captureHeight || this.gpu?.source?.height || 1080,
+            'webgpu'
+        );
         const outputMode = cameraMeta
             ? 'native-camera'
             : this._canUseNativeRenderOutputWindow(this.params)
@@ -7456,9 +7741,10 @@ button:hover{background:#202a35}
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
             params: {
-                ...params,
+                ...effective,
+                paletteColors: paletteById(params.paletteId)?.colors || [],
                 glyphMode: this._nativeOutputGlyphMode(params),
-                charsetRamp: characterSetChars(params.charset),
+                charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
                 sourceMode: this.params.sourceMode,
                 mediaUrl: this.params.mediaUrl,
                 mediaType: this.params.mediaType,
@@ -7875,6 +8161,13 @@ button:hover{background:#202a35}
                 gamma: params.gamma,
                 bgBlend: params.bgBlend,
                 quantizeBits: params.quantizeBits,
+                paletteId: params.paletteId,
+                paletteMapping: params.paletteMapping,
+                ditherMode: params.ditherMode,
+                ditherStrength: params.ditherStrength,
+                ditherScale: params.ditherScale,
+                ditherBias: params.ditherBias,
+                ditherInvert: params.ditherInvert,
                 jitterAmount: params.jitterAmount,
                 jitterSpeed: params.jitterSpeed,
                 sampleX: params.sampleX,
@@ -7884,6 +8177,14 @@ button:hover{background:#202a35}
                 cellHeight: params.cellHeight,
                 solidMode: params.solidMode,
                 glyphMode: params.glyphMode,
+                charset: params.charset,
+                customGlyphRamp: params.customGlyphRamp,
+                glyphDepth: params.glyphDepth,
+                glyphOffset: params.glyphOffset,
+                glyphReverse: params.glyphReverse,
+                glyphColorMode: params.glyphColorMode,
+                glyphColor: params.glyphColor,
+                backgroundColor: params.backgroundColor,
                 mirrorX: shouldRendererMirrorCamera(this.params),
                 preserveDrawingBuffer: true,
                 preferredBackend
@@ -7913,6 +8214,13 @@ button:hover{background:#202a35}
         this.popoutRenderer.gamma = params.gamma;
         this.popoutRenderer.bgBlend = params.bgBlend;
         this.popoutRenderer.quantizeBits = params.quantizeBits;
+        this.popoutRenderer.paletteId = params.paletteId;
+        this.popoutRenderer.paletteMapping = params.paletteMapping;
+        this.popoutRenderer.ditherMode = params.ditherMode;
+        this.popoutRenderer.ditherStrength = params.ditherStrength;
+        this.popoutRenderer.ditherScale = params.ditherScale;
+        this.popoutRenderer.ditherBias = params.ditherBias;
+        this.popoutRenderer.ditherInvert = params.ditherInvert;
         this.popoutRenderer.jitterAmount = params.jitterAmount;
         this.popoutRenderer.jitterSpeed = params.jitterSpeed;
         this.popoutRenderer.sampleX = params.sampleX;
@@ -7922,7 +8230,18 @@ button:hover{background:#202a35}
         this.popoutRenderer.smoothing = params.smoothing;
         this.popoutRenderer.cellWidth = params.cellWidth;
         this.popoutRenderer.cellHeight = params.cellHeight;
+        this.popoutRenderer.solidMode = params.solidMode;
+        this.popoutRenderer.glyphMode = params.glyphMode;
+        this.popoutRenderer.charset = params.charset;
+        this.popoutRenderer.customGlyphRamp = params.customGlyphRamp;
+        this.popoutRenderer.glyphDepth = params.glyphDepth;
+        this.popoutRenderer.glyphOffset = params.glyphOffset;
+        this.popoutRenderer.glyphReverse = params.glyphReverse;
+        this.popoutRenderer.glyphColorMode = params.glyphColorMode;
+        this.popoutRenderer.glyphColor = params.glyphColor;
+        this.popoutRenderer.backgroundColor = params.backgroundColor;
         this.popoutRenderer.mirrorX = shouldRendererMirrorCamera(this.params);
+        this.popoutRenderer.syncFeatureResources?.();
         if (this.popoutRenderer._applySourceSmoothing) this.popoutRenderer._applySourceSmoothing();
         if (this.popoutRenderer.canvas) {
             this.popoutRenderer.canvas.style.filter = 'none';
@@ -8141,7 +8460,18 @@ button:hover{background:#202a35}
     _syncInputs() {
         this._syncSourceControls();
         this._syncCameraDeviceOptions();
+        this._syncDensityControl();
         this._syncInputValues(this.controlInputs.keys());
+    }
+
+    _syncDensityControl() {
+        const entry = this.controlInputs.get('cols');
+        if (!entry) return;
+        const max = this.params.advancedDensity ? ADVANCED_MAX_COLUMNS : normalColumnLimit(this.params);
+        entry.input.max = String(max);
+        entry.input.title = this.params.advancedDensity
+            ? 'Advanced density may render below 30 FPS'
+            : `Normal density is performance-guarded through ${max} columns`;
     }
 
     _syncInputValues(keys) {
@@ -8169,6 +8499,9 @@ button:hover{background:#202a35}
             value.textContent = this._cameraSelectionLabel(this.params);
         } else if (key === 'cameraDeviceId') {
             value.textContent = this._cameraDeviceLabel(current);
+        } else if (key === 'customGlyphRamp') {
+            const removed = Number(entry.input.dataset.removedScalars || 0);
+            value.textContent = `${[...String(current || '')].length}/96${removed ? ` · ${removed} removed` : ''}`;
         } else if (typeof current === 'number') {
             value.textContent = `${Number.isInteger(current) ? current : current.toFixed(2)}${config.unit || ''}`;
         } else {
@@ -8403,6 +8736,13 @@ button:hover{background:#202a35}
             ? randomBetween(0, 0.12)
             : randomBetween(0.12, 0.5), 0.01);
         target.quantizeBits = randomBool(0.64) ? randomInt(5, 6) : randomInt(0, 5);
+        target.paletteId = randomBool(0.72) ? randomChoice(PALETTE_OPTIONS.slice(1))[0] : 'none';
+        target.paletteMapping = randomBool(0.24) ? 'luminance' : 'nearest';
+        target.ditherMode = randomBool(0.74) ? randomChoice(DITHER_MODE_OPTIONS.slice(1))[0] : 'none';
+        target.ditherStrength = snapToStep(randomBetween(0.18, 0.82), 0.01);
+        target.ditherScale = randomInt(1, 4);
+        target.ditherBias = snapToStep(randomBetween(-0.18, 0.18), 0.01);
+        target.ditherInvert = randomBool(0.5);
 
         if (target.sourceMode === 'stream') {
             target.mode = randomInt(1, 5);
@@ -8433,6 +8773,9 @@ button:hover{background:#202a35}
         target.solidMode = Boolean(anchorParams?.solidMode) || (canvasBackend ? randomBool(0.34) : randomBool(0.2));
         target.glyphMode = target.solidMode ? false : (anchorParams?.glyphMode ?? randomBool(0.66));
         target.charset = randomChoice(CHARACTER_SET_IDS);
+        target.glyphDepth = randomInt(12, 96);
+        target.glyphOffset = 0;
+        target.glyphReverse = randomBool(0.28);
         target.fontFamily = randomChoice(FONT_FAMILY_IDS);
         target.minGlyphIntensity = randomInt(70, 230);
         if (asciiAnchor && anchorParams) {
@@ -9167,6 +9510,9 @@ button:hover{background:#202a35}
             ['action.visual.solidMode.toggle', 'Action / Toggle Solid Mode'],
             ['action.visual.smoothing.toggle', 'Action / Toggle Smoothing'],
             ['action.visual.autoRows.toggle', 'Action / Toggle Auto Rows'],
+            ['action.visual.palette.next', 'Action / Next Palette'],
+            ['action.visual.dither.next', 'Action / Next Dither Mode'],
+            ['action.visual.ditherInvert.toggle', 'Action / Invert Dither'],
             ['action.visual.charset.next', 'Action / Next Character Set'],
             ['action.visual.fontFamily.next', 'Action / Next Font'],
             ['action.audio.preset.previous', 'Action / Previous Audio Preset'],
@@ -9329,6 +9675,17 @@ button:hover{background:#202a35}
             case 'action.visual.solidMode.toggle': return this._applyMidiVisualValue('solidMode', !this.params.solidMode);
             case 'action.visual.smoothing.toggle': return this._applyMidiVisualValue('smoothing', !this.params.smoothing);
             case 'action.visual.autoRows.toggle': return this._applyMidiVisualValue('autoRows', !this.params.autoRows);
+            case 'action.visual.palette.next': {
+                const ids = PALETTE_OPTIONS.map(([id]) => id);
+                const current = ids.indexOf(this.params.paletteId);
+                return this._applyMidiVisualValue('paletteId', ids[(current + 1) % ids.length]);
+            }
+            case 'action.visual.dither.next': {
+                const ids = DITHER_MODE_OPTIONS.map(([id]) => id);
+                const current = ids.indexOf(this.params.ditherMode);
+                return this._applyMidiVisualValue('ditherMode', ids[(current + 1) % ids.length]);
+            }
+            case 'action.visual.ditherInvert.toggle': return this._applyMidiVisualValue('ditherInvert', !this.params.ditherInvert);
             case 'action.visual.charset.next': {
                 const current = CHARACTER_SET_IDS.indexOf(this.params.charset);
                 return this._applyMidiVisualValue('charset', CHARACTER_SET_IDS[(current + 1) % CHARACTER_SET_IDS.length]);

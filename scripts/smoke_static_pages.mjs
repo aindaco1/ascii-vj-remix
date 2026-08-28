@@ -586,8 +586,8 @@ async function runSmoke() {
     if (cameraNativeParity.classicMirrors || cameraNativeParity.neonMirrors) {
       throw new Error(`Live camera presets should not use mirror transport by default: ${JSON.stringify(cameraNativeParity)}`);
     }
-    if (!cameraNativeParity.classicNativeGlyphs || cameraNativeParity.pointClickNativeGlyphs || cameraNativeParity.neonNativeGlyphs) {
-      throw new Error(`Native output glyph masking should follow the active backend family: ${JSON.stringify(cameraNativeParity)}`);
+    if (!cameraNativeParity.classicNativeGlyphs || !cameraNativeParity.pointClickNativeGlyphs || cameraNativeParity.neonNativeGlyphs) {
+      throw new Error(`Native output glyph masking should follow glyph and solid-mode controls independently of the preview backend: ${JSON.stringify(cameraNativeParity)}`);
     }
     if (cameraNativeParity.nativeWtfActive !== false) {
       throw new Error(`Native output should consume app-resolved WTF params instead of double-modulating: ${JSON.stringify(cameraNativeParity)}`);
@@ -937,6 +937,13 @@ async function runSmoke() {
         gamma: 1,
         bgBlend: 0.3,
         quantizeBits: 0,
+        paletteId: 'midnight-scan',
+        paletteMapping: 'nearest',
+        ditherMode: 'bayer4',
+        ditherStrength: 0.55,
+        ditherScale: 1,
+        ditherBias: 0,
+        ditherInvert: false,
         jitterAmount: 0.2,
         jitterSpeed: 1,
         sampleX: 0.5,
@@ -946,15 +953,36 @@ async function runSmoke() {
         cellHeight: 3,
         solidMode: false,
         glyphMode: true,
+        charset: 'custom',
+        customGlyphRamp: ' Aあ中한',
+        glyphDepth: 96,
+        glyphOffset: 0,
+        glyphReverse: false,
+        glyphColorMode: 'fixed',
+        glyphColor: '#e6f3ff',
+        backgroundColor: '#030405',
         aspectCorrection: 1
       },
       mediaState: null
     }));
     await output.waitForSelector('#output-stage canvas', { timeout: 15000 });
+    await output.waitForFunction(() => {
+      const state = window.ascilineOutput?.rendererState?.();
+      return state?.glyphRampLength === 5 && [0, 1, 3].every((page) => state.loadedGlyphPages.includes(page));
+    }, null, { timeout: 15000 });
     const outputState = await output.evaluate(() => ({
       status: document.querySelector('#output-status')?.textContent,
-      canvasCount: document.querySelectorAll('#output-stage canvas').length
+      canvasCount: document.querySelectorAll('#output-stage canvas').length,
+      renderer: window.ascilineOutput?.rendererState?.()
     }));
+    if (
+      outputState.renderer?.paletteId !== 'midnight-scan' ||
+      outputState.renderer?.ditherMode !== 'bayer4' ||
+      outputState.renderer?.glyphRampLength !== 5 ||
+      ![0, 1, 3].every((page) => outputState.renderer.loadedGlyphPages.includes(page))
+    ) {
+      throw new Error(`Palette/dither/custom Unicode output did not reach the renderer: ${JSON.stringify(outputState)}`);
+    }
     await output.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 64;
