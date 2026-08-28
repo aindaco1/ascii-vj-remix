@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -57,6 +57,7 @@
     "smoke:static": "npm run build && node scripts/smoke_static_pages.mjs",
     "smoke:native-output": "node scripts/smoke_native_output_perf.mjs",
     "smoke:ui-perf": "node scripts/smoke_ui_perf.mjs",
+    "smoke:primary-presets": "node scripts/smoke_primary_presets.mjs",
     "bench:density": "node scripts/benchmark_renderer_density.mjs",
     "smoke:release-install": "node scripts/smoke_tauri_release_install.mjs",
     "test:decode-resize": "node scripts/check_decode_resize_parity.mjs",

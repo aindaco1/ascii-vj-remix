@@ -1,5 +1,6 @@
 import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
+import { needsWebKitCanvasGlyphPreview } from './renderers/gpu/ascii/renderer/backend-policy.js';
 import {
     glyphForLuma,
     processCanvasColorLegacy as processColor,
@@ -24,6 +25,7 @@ import {
     ADVANCED_MAX_COLUMNS,
     NORMAL_ACCELERATED_MAX_COLUMNS,
     NORMAL_SOFTWARE_MAX_COLUMNS,
+    requestedRows,
     resolveGridDimensions
 } from './renderers/shared/density-policy.js?v=20260828-density-policy';
 import {
@@ -2590,16 +2592,13 @@ async function restoreVideoPlaybackState(source, params, state) {
 }
 
 function computeRows(params, sourceW = 16, sourceH = 9, pixelMode = false) {
-    if (!params.autoRows && params.rows > 0) return Math.max(1, Math.round(params.rows));
-    const ratio = sourceW / Math.max(sourceH, 1);
-    if (pixelMode || params.solidMode) return Math.max(1, Math.round(params.cols / ratio * params.aspectCorrection));
-    return Math.max(1, Math.round(params.cols / ratio * (params.cellWidth / params.cellHeight) * params.aspectCorrection));
+    return requestedRows(params, sourceW, sourceH, pixelMode, params.cols);
 }
 
 function effectiveGridParams(params, sourceWidth = 16, sourceHeight = 9, actualBackend = params.backend) {
     const grid = resolveGridDimensions(params, sourceWidth, sourceHeight, {
         actualBackend,
-        pixelMode: usesPixelCanvas({ ...params, backend: actualBackend })
+        pixelMode: false
     });
     return {
         ...params,
@@ -2620,7 +2619,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     if (!sourceElement || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
 
     let cols = Math.max(1, Math.round(params.cols || DEFAULT_PARAMS.cols));
-    let rows = computeRows(params, sourceWidth, sourceHeight, usesPixelCanvas(params));
+    let rows = computeRows(params, sourceWidth, sourceHeight);
     const maxCells = options.maxCells || Infinity;
     if (Number.isFinite(maxCells) && cols * rows > maxCells) {
         const scale = Math.sqrt(maxCells / (cols * rows));
@@ -2706,13 +2705,14 @@ function cssFilter(params) {
     return `brightness(${params.brightness}) contrast(${params.contrastBoost}) saturate(${params.saturationBoost})`;
 }
 
-function canvasHasVisibleSignal(canvas) {
-    if (!canvas?.width || !canvas?.height) return false;
+function canvasVisualSignal(canvas) {
+    const empty = { visible: false, maxLuma: 0, avgLuma: 0, visibleRatio: 0 };
+    if (!canvas?.width || !canvas?.height) return empty;
     const sample = document.createElement('canvas');
     sample.width = Math.min(120, canvas.width);
     sample.height = Math.min(90, canvas.height);
     const ctx = sample.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return false;
+    if (!ctx) return empty;
 
     try {
         ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
@@ -2729,10 +2729,19 @@ function canvasHasVisibleSignal(canvas) {
         const totalPixels = data.length / 4;
         const avgLuma = sumLuma / Math.max(1, totalPixels);
         const visibleRatio = visiblePixels / Math.max(1, totalPixels);
-        return maxLuma > 28 && (avgLuma > 1.5 || visibleRatio > 0.0025);
+        return {
+            visible: maxLuma > 28 && (avgLuma > 1.5 || visibleRatio > 0.0025),
+            maxLuma,
+            avgLuma,
+            visibleRatio
+        };
     } catch {
-        return false;
+        return empty;
     }
+}
+
+function canvasHasVisibleSignal(canvas) {
+    return canvasVisualSignal(canvas).visible;
 }
 
 function canvasHasSafeVisualSignal(canvas) {
@@ -3911,7 +3920,7 @@ class CanvasStaticRenderer {
     _configureCanvas() {
         const sw = this.source?.width || 640;
         const sh = this.source?.height || 360;
-        this.rows = computeRows(this.params, sw, sh, usesPixelCanvas(this.params));
+        this.rows = computeRows(this.params, sw, sh);
         this.canvas.width = this.params.cols * this.params.cellWidth;
         this.canvas.height = this.rows * this.params.cellHeight;
         this.canvas.style.aspectRatio = `${sw} / ${sh}`;
@@ -4053,6 +4062,13 @@ class StaticRuntime {
         return layer;
     }
 
+    _canvasRendererParams(params) {
+        const explicitCanvas = params.backend === 'canvas2d' || params.backend === 'pixel-canvas';
+        const webKitGlyphPreview = needsWebKitCanvasGlyphPreview(params, navigator.userAgent || '');
+        if (!explicitCanvas && !webKitGlyphPreview) return null;
+        return params.backend === 'pixel-canvas' ? params : { ...params, backend: 'canvas2d' };
+    }
+
     _ensureCurrentRendererLayer() {
         const canvas = this.renderer?.canvas || els.gpuStage.querySelector('canvas');
         const parent = canvas?.parentElement;
@@ -4173,9 +4189,10 @@ class StaticRuntime {
     }
 
     async _createRendererForParams(params, layer) {
-        if (params.backend === 'canvas2d' || params.backend === 'pixel-canvas') {
+        const canvasParams = this._canvasRendererParams(params);
+        if (canvasParams) {
             const renderer = new CanvasStaticRenderer(layer);
-            await renderer.start(params, { source: this.source, ownsSource: false });
+            await renderer.start(canvasParams, { source: this.source, ownsSource: false });
             return { renderer, stats: renderer.getStats(), usingCanvasFallback: true };
         }
 
@@ -4190,7 +4207,8 @@ class StaticRuntime {
         els.gpuStage.classList.add('active');
         els.canvas.style.display = 'none';
         els.player.style.display = 'none';
-        this.usingCanvasFallback = params.backend === 'canvas2d' || params.backend === 'pixel-canvas';
+        const canvasParams = this._canvasRendererParams(params);
+        this.usingCanvasFallback = Boolean(canvasParams);
         const layer = this._makeRendererLayer('renderer-buffer-current');
 
         if (this.usingCanvasFallback) {
@@ -4198,7 +4216,7 @@ class StaticRuntime {
             this.source = source;
             const renderer = new CanvasStaticRenderer(layer);
             this.renderer = renderer;
-            await renderer.start(params, { ...options, source, ownsSource: false });
+            await renderer.start(canvasParams, { ...options, source, ownsSource: false });
             this.mediaUrl = params.mediaUrl;
             this.mediaType = params.mediaType;
             return renderer.getStats();
@@ -6556,7 +6574,99 @@ class RendererLabApp {
         });
     }
 
+    async _runPrimaryPresetSweep() {
+        if (this.uiPerfSmokeActive) return;
+        this.uiPerfSmokeActive = true;
+        const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+        const report = {
+            ok: false,
+            kind: 'primary-preset-sweep',
+            presetCount: BUILTIN_PRESETS.length,
+            passed: 0,
+            failures: [],
+            backends: {},
+            glyphBackends: {},
+            source: 'media/demo.svg'
+        };
+
+        try {
+            this._stopWtf();
+            this.audioReactiveRuntime.stop();
+            this.audioReactive.enabled = false;
+            await this._waitForTransitionIdle(12000);
+            await this._waitForStartIdle(12000);
+            if (!this.running) {
+                await this.start({ autoStart: true });
+                await this._waitForStartIdle(12000);
+            }
+            for (const preset of BUILTIN_PRESETS) {
+                const target = normalizeParams({
+                    ...DEFAULT_PARAMS,
+                    sourceMode: 'static',
+                    mediaUrl: 'media/demo.svg',
+                    mediaType: 'image',
+                    sourceName: 'Demo Image',
+                    statsOverlay: true,
+                    ...stripPresetExcludedParams(preset.params)
+                }, { preserveBlob: true });
+                target.transitionSeconds = this.params.transitionSeconds;
+
+                try {
+                    await this._transitionTo(target, 0.02);
+                    this.activePresetId = preset.id;
+                    await this._paintCurrentFrame(4, 2);
+
+                    let signal = canvasVisualSignal(this.staticRuntime.renderer?.canvas);
+                    for (let attempt = 0; attempt < 2 && !signal.visible; attempt++) {
+                        await wait(100);
+                        await this._paintCurrentFrame(2, 1);
+                        signal = canvasVisualSignal(this.staticRuntime.renderer?.canvas);
+                    }
+
+                    const renderer = this.staticRuntime.renderer;
+                    const stats = this.staticRuntime.getStats() || {};
+                    const backend = String(stats.backend || 'missing');
+                    const sourceRatio = Number(this.staticRuntime.source?.width || 0) /
+                        Math.max(1, Number(this.staticRuntime.source?.height || 0));
+                    const canvasRatio = Number(renderer?.canvas?.width || 0) /
+                        Math.max(1, Number(renderer?.canvas?.height || 0));
+                    const ratioError = sourceRatio > 0 ? Math.abs(canvasRatio - sourceRatio) / sourceRatio : 1;
+                    const expectsCanvas = preset.params.backend === 'canvas2d' ||
+                        preset.params.backend === 'pixel-canvas' ||
+                        needsWebKitCanvasGlyphPreview(target, navigator.userAgent || '');
+                    const backendOk = !expectsCanvas || backend === 'canvas2d' || backend === 'pixel-canvas';
+                    const glError = Number(renderer?.gl?.getError?.() || 0);
+                    const reasons = [];
+                    if (!signal.visible) reasons.push('blank');
+                    if (!backendOk) reasons.push(`backend:${backend}`);
+                    if (!renderer?.running) reasons.push('stopped');
+                    if (ratioError > 0.035) reasons.push(`aspect:${ratioError.toFixed(3)}`);
+                    if (glError) reasons.push(`gl:${glError}`);
+
+                    report.backends[backend] = (report.backends[backend] || 0) + 1;
+                    if (target.glyphMode && !target.solidMode) {
+                        report.glyphBackends[backend] = (report.glyphBackends[backend] || 0) + 1;
+                    }
+                    if (reasons.length) {
+                        report.failures.push({ id: preset.id, reasons });
+                    } else {
+                        report.passed += 1;
+                    }
+                } catch (error) {
+                    report.failures.push({ id: preset.id, reasons: [diagnosticErrorLabel(error)] });
+                }
+            }
+            report.ok = report.passed === report.presetCount && report.failures.length === 0;
+        } finally {
+            this.uiPerfSmokeActive = false;
+            await recordTauriMediaDiagnostic(
+                `[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(report)}`
+            ).catch(() => {});
+        }
+    }
+
     async _runUiPerfSmoke(payload = {}) {
+        if (payload.presetSweep === true) return this._runPrimaryPresetSweep();
         if (this.uiPerfSmokeActive) return;
         this.uiPerfSmokeActive = true;
         const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -6637,6 +6747,7 @@ class RendererLabApp {
             rendererChanges: 0,
             frameResetCount: 0,
             finalFrameCount: 0,
+            hasVisibleSignal: false,
             error: null
         };
 
@@ -6846,11 +6957,16 @@ class RendererLabApp {
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
+            for (let attempt = 0; attempt < 3 && !report.hasVisibleSignal; attempt++) {
+                report.hasVisibleSignal = canvasHasVisibleSignal(this.staticRuntime.renderer?.canvas);
+                if (!report.hasVisibleSignal) await wait(100);
+            }
             report.ok = soak
                 ? (
                     report.phases.soak.mainAvgFps >= 30 &&
                     report.phases.soak.mainP95FrameMs <= 33.3 &&
                     report.phases.soak.nativeOkHz >= 30 &&
+                    report.hasVisibleSignal &&
                     report.nativeFailed === 0
                 )
                 : (
@@ -6858,6 +6974,7 @@ class RendererLabApp {
                     report.phases.popout.mainAvgFps >= 24 &&
                     report.phases.transition.mainAvgFps >= 24 &&
                     (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
+                    report.hasVisibleSignal &&
                     report.nativeFailed === 0
                 );
         } catch (error) {
@@ -6894,6 +7011,7 @@ class RendererLabApp {
                 rendererChanges: report.rendererChanges,
                 frameResetCount: report.frameResetCount,
                 finalFrameCount: report.finalFrameCount,
+                hasVisibleSignal: report.hasVisibleSignal,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (

@@ -1,6 +1,31 @@
 # Changelog
 
-Version 0.9.11 adds performance-budgeted project palettes, ordered dithering,
+## [Unreleased]
+
+## [0.9.12] - 2026-08-28
+
+### Fixed
+
+- Restored visible primary-view output for every built-in Demo Image preset by
+  correcting WebGL glyph-page uploads and using cached max-coverage atlas mips
+  for glyphs rendered into very small cells.
+- Kept solid, pixel, and glyph preset canvases at the source aspect ratio by
+  resolving static row counts from the actual cell width and height.
+- Added an all-preset primary-view smoke matrix covering activation, visible
+  output, WebGL errors, lazy glyph-page completion, and canvas aspect.
+- Prevented blank primary-view glyph canvases in the macOS Apple WebKit runtime
+  by selecting the existing bounded Canvas2D glyph path there. Solid/pixel
+  primary presets retain WebGPU, compatible runtimes retain GPU glyphs, and the
+  native Pop Out renderer is unchanged.
+- Made the packaged desktop performance smoke reject an advancing renderer
+  whose primary canvas has no visible pixel signal.
+- Added a packaged Apple WebKit sweep that activates all 69 built-in Demo Image
+  presets and checks primary-view visibility, renderer family, running state,
+  GPU errors, and source/canvas aspect for each final surface.
+
+Version 0.9.12 restores every built-in preset in the primary app view while
+preserving the source aspect ratio and the native Pop Out path. Version 0.9.11
+adds performance-budgeted project palettes, ordered dithering,
 multilingual glyph controls, custom Unicode ramps, density guardrails, and
 renderer/native-output parity. Version 0.9.10 replaces the legacy television artwork with one canonical app
 icon generated for every packaged platform and carries the post-0.9.9 Reports

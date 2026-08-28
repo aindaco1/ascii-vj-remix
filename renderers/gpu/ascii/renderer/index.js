@@ -6,6 +6,7 @@
 
 import { WebGPURenderer } from './webgpu/webgpu-renderer.js?v=20260618-camera-source';
 import { WebGL2Renderer } from './webgl2/webgl2-renderer.js?v=20260618-camera-source';
+import { selectRendererBackend } from './backend-policy.js';
 
 let capabilities = null;
 
@@ -66,20 +67,7 @@ async function detectCapabilities() {
  */
 async function createRenderer(options = {}) {
     const caps = await detectCapabilities();
-    const preferred = options.preferredBackend;
-
-    let backend = 'cpu';
-    if (preferred === 'webgpu' && caps.webgpu) {
-        backend = 'webgpu';
-    } else if (preferred === 'webgl2' && caps.webgl2) {
-        backend = 'webgl2';
-    } else if (preferred === 'cpu') {
-        backend = 'cpu';
-    } else if (caps.webgpu) {
-        backend = 'webgpu';
-    } else if (caps.webgl2) {
-        backend = 'webgl2';
-    }
+    const backend = selectRendererBackend(caps, options);
 
     console.log(`[Renderer] Using ${backend} backend for ${options.source?.type || 'unknown'} source`);
 

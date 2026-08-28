@@ -13,9 +13,11 @@ import {
     paletteById
 } from '../../../../shared/palettes.js';
 import {
+    GLYPH_ATLAS_MIP_LEVEL_COUNT,
     GLYPH_ATLAS_PAGE_COUNT,
     GLYPH_ATLAS_PAGE_SIZE,
     GLYPH_RAMP_LIMIT,
+    glyphAtlasMipLevels,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
     glyphResourceInputKey,
@@ -309,15 +311,22 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     }
     let localX = pixelX - f32(cellX * params.cellW);
     let localY = pixelY - f32(cellY * params.cellH);
-    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * 16.0), 15u);
-    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * 16.0), 15u);
+    let minCellSize = max(min(params.cellW, params.cellH), 1u);
+    var glyphMip = 0u;
+    var glyphTileSize = 16u;
+    if (minCellSize <= 8u) { glyphMip = 1u; glyphTileSize = 8u; }
+    if (minCellSize <= 4u) { glyphMip = 2u; glyphTileSize = 4u; }
+    if (minCellSize <= 2u) { glyphMip = 3u; glyphTileSize = 2u; }
+    if (minCellSize <= 1u) { glyphMip = 4u; glyphTileSize = 1u; }
+    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(glyphTileSize)), glyphTileSize - 1u);
+    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(glyphTileSize)), glyphTileSize - 1u);
     let rampIndex = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
     let glyphId = glyphRamp[rampIndex];
     let glyphPage = glyphId / 4096u;
     let glyphSlot = glyphId % 4096u;
-    let atlasX = (glyphSlot % 64u) * 16u + glyphX;
-    let atlasY = (glyphSlot / 64u) * 16u + glyphY;
-    let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), i32(glyphPage), 0).r;
+    let atlasX = (glyphSlot % 64u) * glyphTileSize + glyphX;
+    let atlasY = (glyphSlot / 64u) * glyphTileSize + glyphY;
+    let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), i32(glyphPage), i32(glyphMip)).r;
     if (alpha <= 0.5) {
         return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
     }
@@ -498,6 +507,7 @@ export class WebGPURenderer {
 
         this.glyphAtlasTexture = this.device.createTexture({
             size: [GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_COUNT],
+            mipLevelCount: GLYPH_ATLAS_MIP_LEVEL_COUNT,
             format: 'r8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
         });
@@ -670,12 +680,15 @@ export class WebGPURenderer {
                 pending = loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
                     .then((pixels) => {
                         if (!this.glyphAtlasTexture) return;
-                        this.device.queue.writeTexture(
-                            { texture: this.glyphAtlasTexture, origin: [0, 0, page] },
-                            pixels,
-                            { bytesPerRow: GLYPH_ATLAS_PAGE_SIZE, rowsPerImage: GLYPH_ATLAS_PAGE_SIZE },
-                            [GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_SIZE, 1]
-                        );
+                        for (const [mipLevel, levelPixels] of glyphAtlasMipLevels(pixels).entries()) {
+                            const size = GLYPH_ATLAS_PAGE_SIZE >> mipLevel;
+                            this.device.queue.writeTexture(
+                                { texture: this.glyphAtlasTexture, mipLevel, origin: [0, 0, page] },
+                                levelPixels,
+                                { bytesPerRow: size, rowsPerImage: size },
+                                [size, size, 1]
+                            );
+                        }
                         this.loadedGlyphPages.add(page);
                     })
                     .catch((error) => console.warn(`[WebGPU] Glyph atlas page ${page} unavailable:`, error))

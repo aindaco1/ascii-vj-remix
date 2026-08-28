@@ -682,6 +682,9 @@ fn spawn_ui_perf_smoke(app: &App) {
     let soak = env::var("ASCILINE_UI_PERF_SMOKE_SOAK")
         .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
+    let preset_sweep = env::var("ASCILINE_UI_PERF_SMOKE_PRESET_SWEEP")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
     thread::spawn(move || {
         let start = Instant::now();
@@ -700,7 +703,8 @@ fn spawn_ui_perf_smoke(app: &App) {
             "paletteId": palette_id,
             "ditherMode": dither_mode,
             "charset": charset,
-            "soak": soak
+            "soak": soak,
+            "presetSweep": preset_sweep
         });
         for _ in 0..12 {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());

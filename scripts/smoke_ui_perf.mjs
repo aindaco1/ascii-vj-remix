@@ -13,6 +13,7 @@ const defaultReleaseApp = '/private/tmp/ascii-vj-remix-tauri-target/release/bund
 const releaseApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 const durationMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_DURATION_MS || '9000');
 const sampleMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_SAMPLE_MS || '500');
+const presetSweep = process.env.ASCILINE_UI_PERF_SMOKE_PRESET_SWEEP === '1';
 
 if (!existsSync(releaseApp)) {
   console.error(`ui-perf-smoke: missing optimized app: ${releaseApp}`);
@@ -36,6 +37,7 @@ const env = {
   ASCILINE_UI_PERF_SMOKE_DITHER: process.env.ASCILINE_UI_PERF_SMOKE_DITHER || 'none',
   ASCILINE_UI_PERF_SMOKE_CHARSET: process.env.ASCILINE_UI_PERF_SMOKE_CHARSET || 'point-click',
   ASCILINE_UI_PERF_SMOKE_SOAK: process.env.ASCILINE_UI_PERF_SMOKE_SOAK || '0',
+  ASCILINE_UI_PERF_SMOKE_PRESET_SWEEP: presetSweep ? '1' : '0',
   ASCILINE_UI_PERF_SMOKE_MEDIA:
     process.env.ASCILINE_UI_PERF_SMOKE_MEDIA || 'media/point-click-test-30s.mp4'
 };
@@ -90,6 +92,22 @@ if (reportPath) {
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 }
 
+if (presetSweep) {
+  console.log([
+    'Primary preset sweep:',
+    `ok=${report.ok}`,
+    `passed=${report.passed || 0}/${report.presetCount || 0}`,
+    `backends=${JSON.stringify(report.backends || {})}`,
+    `glyphBackends=${JSON.stringify(report.glyphBackends || {})}`,
+    `failures=${report.failures?.length || 0}`
+  ].join(' '));
+  if (!report.ok) {
+    console.error(JSON.stringify(report, null, 2));
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
 console.log([
   'UI perf smoke:',
   `ok=${report.ok}`,
@@ -102,6 +120,7 @@ console.log([
   `nativeOk=${Number(report.nativeOkHz || 0).toFixed(1)}hz`,
   `nativeFailed=${report.nativeFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
+  `visible=${report.hasVisibleSignal ? 'yes' : 'no'}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
   `palette=${report.paletteId || 'none'}`,
   `dither=${report.ditherMode || 'none'}`,

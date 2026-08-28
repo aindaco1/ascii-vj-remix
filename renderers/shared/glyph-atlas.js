@@ -3,12 +3,14 @@ import { activeGlyphRamp } from './character-sets.js';
 const GLYPH_ATLAS_STYLE = 'neutral';
 const GLYPH_ATLAS_TILE_SIZE = 16;
 const GLYPH_ATLAS_PAGE_SIZE = 1024;
+const GLYPH_ATLAS_MIP_LEVEL_COUNT = Math.log2(GLYPH_ATLAS_TILE_SIZE) + 1;
 const GLYPH_ATLAS_PAGE_COLUMNS = GLYPH_ATLAS_PAGE_SIZE / GLYPH_ATLAS_TILE_SIZE;
 const GLYPH_ATLAS_PAGE_GLYPHS = GLYPH_ATLAS_PAGE_COLUMNS * GLYPH_ATLAS_PAGE_COLUMNS;
 const GLYPH_ATLAS_PAGE_COUNT = 16;
 const GLYPH_ATLAS_CACHE_LIMIT = 4;
 const GLYPH_RAMP_LIMIT = 96;
 const glyphPageCache = new Map();
+const glyphMipCache = new WeakMap();
 
 function glyphRampCodePoints(params = {}) {
     return Uint32Array.from(
@@ -115,7 +117,42 @@ function loadGlyphAtlasPage(page, ownerDocument = globalThis.document) {
     return pending;
 }
 
+function glyphAtlasMipLevels(pixels) {
+    if (!(pixels instanceof Uint8Array) || pixels.length !== GLYPH_ATLAS_PAGE_SIZE ** 2) {
+        throw new Error('glyph atlas mip source has unexpected dimensions');
+    }
+    const cached = glyphMipCache.get(pixels);
+    if (cached) return cached;
+
+    const levels = [pixels];
+    let previous = pixels;
+    let previousSize = GLYPH_ATLAS_PAGE_SIZE;
+    for (let level = 1; level < GLYPH_ATLAS_MIP_LEVEL_COUNT; level++) {
+        const size = previousSize / 2;
+        const next = new Uint8Array(size * size);
+        for (let y = 0; y < size; y++) {
+            const sourceRow = y * 2 * previousSize;
+            const targetRow = y * size;
+            for (let x = 0; x < size; x++) {
+                const source = sourceRow + x * 2;
+                next[targetRow + x] = Math.max(
+                    previous[source],
+                    previous[source + 1],
+                    previous[source + previousSize],
+                    previous[source + previousSize + 1]
+                );
+            }
+        }
+        levels.push(next);
+        previous = next;
+        previousSize = size;
+    }
+    glyphMipCache.set(pixels, levels);
+    return levels;
+}
+
 export {
+    GLYPH_ATLAS_MIP_LEVEL_COUNT,
     GLYPH_ATLAS_PAGE_COLUMNS,
     GLYPH_ATLAS_PAGE_COUNT,
     GLYPH_ATLAS_CACHE_LIMIT,
@@ -125,6 +162,7 @@ export {
     GLYPH_ATLAS_TILE_SIZE,
     GLYPH_RAMP_LIMIT,
     glyphAtlasPageUrl,
+    glyphAtlasMipLevels,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
     glyphResourceInputKey,

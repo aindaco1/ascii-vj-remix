@@ -41,6 +41,7 @@ npm run bundle:release           # Release gate, release build, bundle check
 npm run check:windows-authenticode # Inactive signed-Windows path signature check
 npm run smoke:native-output      # Native output performance helper
 npm run smoke:ui-perf            # UI performance helper
+npm run smoke:primary-presets    # Installed WebKit primary-view preset sweep
 npm run bench:density            # Optimized density/feature comparison reports
 npm run smoke:release-install    # Release artifact install/updater smoke
 ```
@@ -56,7 +57,7 @@ git diff --check
 | Area | Current Checks |
 | --- | --- |
 | Offline runtime | `npm run check:offline`, `scripts/check_offline_bundle.mjs` |
-| Static UI harness | `npm run smoke:static` |
+| Static UI harness | `npm run smoke:static`, including activation, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
 | Tauri policy | `npm run check:tauri-policy` |
 | App icons | `npm run check:icons` |
 | Unicode glyph atlas | `npm run check:glyph-atlas`, complete-block assertions in renderer math/Rust tests |
@@ -74,6 +75,7 @@ git diff --check
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
+| Installed primary presets | `npm run smoke:primary-presets`, all 69 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -120,14 +122,19 @@ npm run test:rust
 
 Use an optimized app build before making performance conclusions.
 The UI performance smoke starts from canonical visual defaults, uses fixed
-non-structural numeric transitions, and records each backend visited so repeat
-runs are comparable. Select an exact bundle and a longer sample with:
+non-structural numeric transitions, records each backend visited, and rejects a
+primary canvas with no visible pixel signal even when its FPS counter advances.
+Select an exact bundle and a longer sample with:
 
 ```bash
 ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix.app" \
 ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
 npm run smoke:ui-perf
 ```
+
+For primary preset changes, `npm run smoke:primary-presets` is the installed
+Apple WebKit acceptance gate. The Chromium `smoke:static` matrix remains useful
+but does not substitute for this desktop sweep.
 
 Native log analysis reports both source upload and upload-skip rates. A healthy
 24 FPS source on a 60 Hz display uploads near source rate and skips
