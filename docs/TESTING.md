@@ -15,6 +15,7 @@ npm run check:offline            # Build and verify bundled/offline assets
 npm run smoke:static             # Static UI/renderer smoke harness
 npm run check:tauri-policy       # Production CSP and local-only runtime policy
 npm run check:icons              # Canonical source and generated platform icons
+npm run check:glyph-atlas        # Unicode atlas manifest, dimensions, source, hashes
 npm run test:output-display      # Secondary-display placement simulation
 npm run test:desktop-updater     # Once-per-launch and manual updater orchestration
 npm run test:updater-manifest    # Tauri latest.json/updater manifest tests
@@ -40,6 +41,7 @@ npm run bundle:release           # Release gate, release build, bundle check
 npm run check:windows-authenticode # Inactive signed-Windows path signature check
 npm run smoke:native-output      # Native output performance helper
 npm run smoke:ui-perf            # UI performance helper
+npm run bench:density            # Optimized density/feature comparison reports
 npm run smoke:release-install    # Release artifact install/updater smoke
 ```
 
@@ -57,6 +59,7 @@ git diff --check
 | Static UI harness | `npm run smoke:static` |
 | Tauri policy | `npm run check:tauri-policy` |
 | App icons | `npm run check:icons` |
+| Unicode glyph atlas | `npm run check:glyph-atlas`, complete-block assertions in renderer math/Rust tests |
 | Output display logic | `npm run test:output-display` |
 | Desktop updater behavior | `npm run test:desktop-updater` |
 | Updater manifests | `npm run test:updater-manifest` |
@@ -70,7 +73,7 @@ git diff --check
 | Adaptive codec vectors | `npm run test:vectors` |
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
-| UI performance | `npm run smoke:ui-perf` with fixed defaults/transitions and average/P10/P50/minimum FPS |
+| UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -96,11 +99,15 @@ reactivity when behavior changes.
 ```bash
 npm run build
 npm run test:render-math
+npm run check:glyph-atlas
 npm run smoke:static
 npm run check:media
 ```
 
-Also manually compare WebGPU and WebGL2 output for representative presets.
+Also manually compare WebGPU and WebGL2 output for representative feature-off,
+palette/dither, Braille, CJK/Kana, Hangul, and typed custom-ramp states. Record
+the actual backend; a requested backend that falls back is not evidence for the
+requested backend.
 
 ### Native Output or Pop Out Changes
 
@@ -125,9 +132,34 @@ npm run smoke:ui-perf
 Native log analysis reports both source upload and upload-skip rates. A healthy
 24 FPS source on a 60 Hz display uploads near source rate and skips
 the duplicate display ticks while presentation remains near refresh rate.
-For glyph-mode changes, include at least one traditional ASCII preset in manual
-Pop Out checks and confirm Character Set/Font Family changes do not hide the
-Glyph/Cell controls.
+For glyph-mode changes, include traditional ASCII, Braille, CJK/Kana, Hangul,
+and a mixed typed ramp in main/Pop Out checks. Confirm atlas pages load only for
+the active ramp, unsupported scalars are reported, and Character Set/Font
+Family changes do not hide the Glyph controls.
+
+For the 0.9.11 normal-density contract, run matched feature-off and feature-on
+optimized builds at 640 columns with synthetic audio and native output:
+
+```bash
+ASCILINE_UI_PERF_SMOKE_BACKEND=webgl2 \
+ASCILINE_DENSITY_BENCH_COLUMNS=640 \
+ASCILINE_DENSITY_BENCH_REPORT_PATH=/tmp/feature-off.json \
+npm run bench:density
+
+ASCILINE_UI_PERF_SMOKE_BACKEND=webgl2 \
+ASCILINE_UI_PERF_SMOKE_PALETTE=signal-court \
+ASCILINE_UI_PERF_SMOKE_DITHER=bayer4 \
+ASCILINE_UI_PERF_SMOKE_CHARSET=cjk-basic \
+ASCILINE_DENSITY_BENCH_COLUMNS=640 \
+ASCILINE_DENSITY_BENCH_REPORT_PATH=/tmp/feature-on.json \
+npm run bench:density
+```
+
+`bench:density` is a release gate: it exits nonzero when any child UI smoke
+fails, when its report is not accepted, or when steady RSS grows by more than
+the larger of 64 MB and 25 percent after warm-up. A macOS run whose windows are
+backgrounded can be useful for memory-lifetime testing, but its throttled frame
+rate must not be recorded as visible-window performance acceptance.
 
 ### MIDI, UC-33e, or SysEx Changes
 
@@ -242,13 +274,17 @@ Use this after user-facing renderer, source, audio, or output changes:
 9. Click several presets and confirm smooth transitions.
 10. Select a traditional ASCII preset and confirm Character Set and Font Family
     remain compact and visible.
-11. Toggle WTF mode on and off and confirm it remains responsive and can visit
+11. Select palette/dither presets plus Braille, Hiragana, Katakana, CJK,
+    Hangul, and a mixed custom ramp; confirm main and Pop Out remain in parity.
+12. Toggle Advanced Density and confirm normal mode returns to the guarded
+    ceiling; confirm the preference is not copied into a visual preset.
+13. Toggle WTF mode on and off and confirm it remains responsive and can visit
     traditional ASCII-looking states.
-12. Open Pop Out and confirm the main preview stays responsive.
-13. Confirm Pop Out reflects presets, WTF mode, and audio reactivity while fully
+14. Open Pop Out and confirm the main preview stays responsive.
+15. Confirm Pop Out reflects presets, WTF mode, and audio reactivity while fully
     visible.
-14. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
-15. Close Pop Out and confirm CPU/GPU usage settles.
+16. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
+17. Close Pop Out and confirm CPU/GPU usage settles.
 
 ## Hardware and Platform Checks
 
@@ -309,7 +345,7 @@ Release CI:
 - upload installers, updater packages, signatures, and `latest.json`.
 - validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
   acceptance before publishing macOS artifacts.
-- publishes Windows 0.9.10 artifacts as unsigned previews; the inactive signed
+- publishes Windows artifacts as unsigned previews; the inactive signed
   Windows path includes Authenticode signer and timestamp validation.
 - run install and visible-updater-UI smoke checks after publishing.
 - run macOS updater identity/replacement smoke on `macos-26`.

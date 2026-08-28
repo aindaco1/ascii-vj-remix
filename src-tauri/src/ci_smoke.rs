@@ -665,15 +665,42 @@ fn spawn_ui_perf_smoke(app: &App) {
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(500);
+    let columns = env::var("ASCILINE_UI_PERF_SMOKE_COLUMNS")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .map(|value| value.clamp(80, 900))
+        .unwrap_or(480);
+    let synthetic_audio = env::var("ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let palette_id = env::var("ASCILINE_UI_PERF_SMOKE_PALETTE")
+        .unwrap_or_else(|_| "none".to_string());
+    let dither_mode = env::var("ASCILINE_UI_PERF_SMOKE_DITHER")
+        .unwrap_or_else(|_| "none".to_string());
+    let charset = env::var("ASCILINE_UI_PERF_SMOKE_CHARSET")
+        .unwrap_or_else(|_| "point-click".to_string());
+    let soak = env::var("ASCILINE_UI_PERF_SMOKE_SOAK")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
     thread::spawn(move || {
         let start = Instant::now();
+        if let Some(main_window) = handle.get_webview_window("main") {
+            let _ = main_window.show();
+            let _ = main_window.set_focus();
+        }
         thread::sleep(Duration::from_millis(delay_ms));
         let payload = json!({
             "mediaUrl": media_url,
             "backend": backend,
             "durationMs": duration_ms,
-            "sampleMs": sample_ms
+            "sampleMs": sample_ms,
+            "columns": columns,
+            "syntheticAudio": synthetic_audio,
+            "paletteId": palette_id,
+            "ditherMode": dither_mode,
+            "charset": charset,
+            "soak": soak
         });
         for _ in 0..12 {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());

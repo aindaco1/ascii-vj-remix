@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -32,6 +32,10 @@ const env = {
   ASCILINE_UI_PERF_SMOKE_DURATION_MS: String(durationMs || 9000),
   ASCILINE_UI_PERF_SMOKE_SAMPLE_MS: String(sampleMs || 500),
   ASCILINE_UI_PERF_SMOKE_BACKEND: process.env.ASCILINE_UI_PERF_SMOKE_BACKEND || 'auto',
+  ASCILINE_UI_PERF_SMOKE_PALETTE: process.env.ASCILINE_UI_PERF_SMOKE_PALETTE || 'none',
+  ASCILINE_UI_PERF_SMOKE_DITHER: process.env.ASCILINE_UI_PERF_SMOKE_DITHER || 'none',
+  ASCILINE_UI_PERF_SMOKE_CHARSET: process.env.ASCILINE_UI_PERF_SMOKE_CHARSET || 'point-click',
+  ASCILINE_UI_PERF_SMOKE_SOAK: process.env.ASCILINE_UI_PERF_SMOKE_SOAK || '0',
   ASCILINE_UI_PERF_SMOKE_MEDIA:
     process.env.ASCILINE_UI_PERF_SMOKE_MEDIA || 'media/point-click-test-30s.mp4'
 };
@@ -67,18 +71,42 @@ if (!reportLine) {
 
 const jsonStart = reportLine.indexOf('{');
 const report = JSON.parse(reportLine.slice(jsonStart));
+const phaseValues = Object.values(report.phases || {});
+const phaseAverage = (key) => phaseValues.length
+  ? phaseValues.reduce((sum, phase) => sum + Number(phase?.[key] || 0), 0) / phaseValues.length
+  : 0;
+report.mainAvgFps ??= phaseAverage('mainAvgFps');
+report.mainMinFps ??= phaseValues.length
+  ? Math.min(...phaseValues.map((phase) => Number(phase?.mainMinFps || 0)))
+  : 0;
+report.mainP95FrameMs ??= phaseValues.length
+  ? Math.max(...phaseValues.map((phase) => Number(phase?.mainP95FrameMs || 0)))
+  : 0;
+report.mainP99FrameMs ??= phaseValues.length
+  ? Math.max(...phaseValues.map((phase) => Number(phase?.mainP99FrameMs || 0)))
+  : 0;
+const reportPath = process.env.ASCILINE_UI_PERF_REPORT_PATH;
+if (reportPath) {
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+}
 
 console.log([
   'UI perf smoke:',
   `ok=${report.ok}`,
   `mainAvg=${Number(report.mainAvgFps || 0).toFixed(1)}fps`,
-  `mainP10=${Number(report.mainP10Fps || 0).toFixed(1)}fps`,
-  `mainP50=${Number(report.mainP50Fps || 0).toFixed(1)}fps`,
   `mainMin=${Number(report.mainMinFps || 0).toFixed(1)}fps`,
+  `p95=${Number(report.mainP95FrameMs || 0).toFixed(2)}ms`,
+  `p99=${Number(report.mainP99FrameMs || 0).toFixed(2)}ms`,
+  `cols=${report.columns || 0}`,
+  `audio=${report.syntheticAudio ? 'synthetic' : 'runtime'}`,
   `nativeOk=${Number(report.nativeOkHz || 0).toFixed(1)}hz`,
   `nativeFailed=${report.nativeFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
+  `palette=${report.paletteId || 'none'}`,
+  `dither=${report.ditherMode || 'none'}`,
+  `charset=${report.charset || 'point-click'}`,
+  `soak=${report.soak ? 'yes' : 'no'}`,
   `media=${report.mediaUrl || 'unknown'}`
 ].join(' '));
 
@@ -87,9 +115,9 @@ if (report.phases) {
     console.log([
       `  ${phase}:`,
       `mainAvg=${Number(stats.mainAvgFps || 0).toFixed(1)}fps`,
-      `mainP10=${Number(stats.mainP10Fps || 0).toFixed(1)}fps`,
-      `mainP50=${Number(stats.mainP50Fps || 0).toFixed(1)}fps`,
       `mainMin=${Number(stats.mainMinFps || 0).toFixed(1)}fps`,
+      `p95=${Number(stats.mainP95FrameMs || 0).toFixed(2)}ms`,
+      `p99=${Number(stats.mainP99FrameMs || 0).toFixed(2)}ms`,
       `nativeOk=${Number(stats.nativeOkHz || 0).toFixed(1)}hz`
     ].join(' '));
   }

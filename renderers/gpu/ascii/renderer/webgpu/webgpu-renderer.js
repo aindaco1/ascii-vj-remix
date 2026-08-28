@@ -6,6 +6,22 @@
  * Image: uploads once via copyExternalImageToTexture(), samples texture_2d<f32>
  */
 
+import {
+    DITHER_MATRICES,
+    PALETTE_LUT_SIZE,
+    buildPaletteLut,
+    paletteById
+} from '../../../../shared/palettes.js';
+import {
+    GLYPH_ATLAS_PAGE_COUNT,
+    GLYPH_ATLAS_PAGE_SIZE,
+    GLYPH_RAMP_LIMIT,
+    glyphAtlasPagesForRamp,
+    glyphRampCodePoints,
+    glyphResourceInputKey,
+    loadGlyphAtlasPage
+} from '../../../../shared/glyph-atlas.js';
+
 // Compute shader for VIDEO sources (texture_external)
 const CELL_PASS_VIDEO_WGSL = `
 struct Params {
@@ -27,12 +43,24 @@ struct Params {
     sampleY: f32,
     time: f32,
     mirrorX: u32,
-    _pad1: u32,
+    paletteCount: u32,
+    ditherSize: u32,
+    ditherStrength: f32,
+    ditherScale: u32,
+    ditherBias: f32,
+    ditherInvert: u32,
+};
+
+struct FeatureData {
+    paletteColors: array<vec4<f32>, 16>,
+    ditherValues: array<f32, 64>,
 };
 
 @group(0) @binding(0) var srcTex: texture_external;
 @group(0) @binding(1) var colorOut: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
+@group(0) @binding(4) var<storage, read> features: FeatureData;
 
 fn hash(p: vec2<f32>) -> f32 {
     var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
@@ -40,7 +68,7 @@ fn hash(p: vec2<f32>) -> f32 {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-fn processColor(c: vec3<f32>) -> vec3<f32> {
+fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
     let avg = (c.r + c.g + c.b) * 0.333333333;
     var outColor = vec3<f32>(
         clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
@@ -53,7 +81,23 @@ fn processColor(c: vec3<f32>) -> vec3<f32> {
         let quantum = pow(2.0, f32(params.quantizeBits));
         outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
     }
-    return mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    if (params.ditherSize > 0u) {
+        let scale = max(1u, params.ditherScale);
+        let mx = (cx / scale) % params.ditherSize;
+        let my = (cy / scale) % params.ditherSize;
+        var threshold = features.ditherValues[my * params.ditherSize + mx];
+        if (params.ditherInvert != 0u) { threshold = -threshold; }
+        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
+        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+    if (params.paletteCount > 0u) {
+        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
+        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
+        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
+        result = features.paletteColors[paletteIndex].rgb;
+    }
+    return result;
 }
 
 @compute @workgroup_size(8, 8)
@@ -76,9 +120,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let sampleY = clamp(i32(cellCenterY + jitterY), 0, i32(params.srcH) - 1);
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY));
-    let boosted = processColor(c.rgb);
+    let boosted = processColor(c.rgb, cx, cy);
 
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, 1.0));
+    let luma = dot(boosted, vec3<f32>(0.2126, 0.7152, 0.0722));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, luma));
 }
 `;
 
@@ -104,12 +149,24 @@ struct Params {
     sampleY: f32,
     time: f32,
     mirrorX: u32,
-    _pad1: u32,
+    paletteCount: u32,
+    ditherSize: u32,
+    ditherStrength: f32,
+    ditherScale: u32,
+    ditherBias: f32,
+    ditherInvert: u32,
+};
+
+struct FeatureData {
+    paletteColors: array<vec4<f32>, 16>,
+    ditherValues: array<f32, 64>,
 };
 
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
 @group(0) @binding(1) var colorOut: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
+@group(0) @binding(4) var<storage, read> features: FeatureData;
 
 // Simple hash for per-cell pseudo-random jitter
 fn hash(p: vec2<f32>) -> f32 {
@@ -118,7 +175,7 @@ fn hash(p: vec2<f32>) -> f32 {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-fn processColor(c: vec3<f32>) -> vec3<f32> {
+fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
     let avg = (c.r + c.g + c.b) * 0.333333333;
     var outColor = vec3<f32>(
         clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
@@ -131,7 +188,23 @@ fn processColor(c: vec3<f32>) -> vec3<f32> {
         let quantum = pow(2.0, f32(params.quantizeBits));
         outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
     }
-    return mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    if (params.ditherSize > 0u) {
+        let scale = max(1u, params.ditherScale);
+        let mx = (cx / scale) % params.ditherSize;
+        let my = (cy / scale) % params.ditherSize;
+        var threshold = features.ditherValues[my * params.ditherSize + mx];
+        if (params.ditherInvert != 0u) { threshold = -threshold; }
+        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
+        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+    if (params.paletteCount > 0u) {
+        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
+        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
+        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
+        result = features.paletteColors[paletteIndex].rgb;
+    }
+    return result;
 }
 
 @compute @workgroup_size(8, 8)
@@ -157,9 +230,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
 
-    let boosted = processColor(c.rgb);
+    let boosted = processColor(c.rgb, cx, cy);
 
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, 1.0));
+    let luma = dot(boosted, vec3<f32>(0.2126, 0.7152, 0.0722));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, luma));
 }
 `;
 
@@ -196,12 +270,28 @@ struct RenderParams {
     cellH: u32,
     canvasW: u32,
     canvasH: u32,
+    glyphMode: u32,
+    glyphCount: u32,
+    glyphColorMode: u32,
+    glyphColor: u32,
+    backgroundColor: u32,
     _pad0: u32,
     _pad1: u32,
+    _pad2: u32,
 };
 
 @group(0) @binding(0) var cellColorTex: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: RenderParams;
+@group(0) @binding(2) var glyphAtlasTex: texture_2d_array<f32>;
+@group(0) @binding(3) var<storage, read> glyphRamp: array<u32>;
+
+fn unpackColor(value: u32) -> vec3<f32> {
+    return vec3<f32>(
+        f32(value & 255u),
+        f32((value >> 8u) & 255u),
+        f32((value >> 16u) & 255u)
+    ) / 255.0;
+}
 
 @fragment
 fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
@@ -213,9 +303,34 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let cx = min(cellX, params.cols - 1u);
     let cy = min(cellY, params.rows - 1u);
 
-    return textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    let cell = textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    if (params.glyphMode == 0u || params.glyphCount == 0u) {
+        return vec4<f32>(cell.rgb, 1.0);
+    }
+    let localX = pixelX - f32(cellX * params.cellW);
+    let localY = pixelY - f32(cellY * params.cellH);
+    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * 16.0), 15u);
+    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * 16.0), 15u);
+    let rampIndex = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
+    let glyphId = glyphRamp[rampIndex];
+    let glyphPage = glyphId / 4096u;
+    let glyphSlot = glyphId % 4096u;
+    let atlasX = (glyphSlot % 64u) * 16u + glyphX;
+    let atlasY = (glyphSlot / 64u) * 16u + glyphY;
+    let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), i32(glyphPage), 0).r;
+    if (alpha <= 0.5) {
+        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
+    }
+    let foreground = select(cell.rgb, unpackColor(params.glyphColor), params.glyphColorMode == 1u);
+    return vec4<f32>(foreground, 1.0);
 }
 `;
+
+function packedColor(value, fallback = '#030405') {
+    const match = /^#([0-9a-f]{6})$/i.exec(String(value || '')) || /^#([0-9a-f]{6})$/i.exec(fallback);
+    const rgb = Number.parseInt(match[1], 16);
+    return (rgb >> 16 & 255) | (rgb & 0xff00) | ((rgb & 255) << 16);
+}
 
 export class WebGPURenderer {
     constructor(options = {}) {
@@ -232,6 +347,23 @@ export class WebGPURenderer {
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
+        this.paletteId = options.paletteId || 'none';
+        this.paletteMapping = options.paletteMapping || 'nearest';
+        this.ditherMode = options.ditherMode || 'none';
+        this.ditherStrength = options.ditherStrength ?? 0.45;
+        this.ditherScale = options.ditherScale || 1;
+        this.ditherBias = options.ditherBias || 0;
+        this.ditherInvert = options.ditherInvert === true;
+        this.solidMode = options.solidMode === true;
+        this.glyphMode = options.glyphMode !== false;
+        this.charset = options.charset || 'point-click';
+        this.customGlyphRamp = options.customGlyphRamp || '';
+        this.glyphDepth = options.glyphDepth || GLYPH_RAMP_LIMIT;
+        this.glyphOffset = options.glyphOffset || 0;
+        this.glyphReverse = options.glyphReverse === true;
+        this.glyphColorMode = options.glyphColorMode || 'source';
+        this.glyphColor = options.glyphColor || '#ffffff';
+        this.backgroundColor = options.backgroundColor || '#030405';
         this.jitterAmount = options.jitterAmount || 0;
         this.jitterSpeed = options.jitterSpeed || 1;
         this.sampleX = options.sampleX ?? 0.5;
@@ -265,12 +397,23 @@ export class WebGPURenderer {
         this.renderPipeline = null;
         this.paramsBuffer = null;
         this.renderParamsBuffer = null;
+        this.paletteLutBuffer = null;
+        this.featureBuffer = null;
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
-        this.paramsData = new ArrayBuffer(80);
+        this.paramsData = new ArrayBuffer(96);
         this.paramsView = new DataView(this.paramsData);
-        this.renderData = new ArrayBuffer(32);
+        this.renderData = new ArrayBuffer(64);
         this.renderView = new DataView(this.renderData);
+        this.featureResourceKey = '';
+        this.glyphInputKey = '';
+        this.glyphResourceKey = '';
+        this.glyphRampLength = 0;
+        this.loadedGlyphPages = new Set();
+        this.pendingGlyphPages = new Map();
+        this.glyphAtlasTexture = null;
+        this.glyphAtlasView = null;
+        this.glyphRampBuffer = null;
 
         // Image-specific: static source texture (uploaded once)
         this.imageSourceTexture = null;
@@ -334,14 +477,38 @@ export class WebGPURenderer {
         this._createCellTexture();
 
         this.paramsBuffer = this.device.createBuffer({
-            size: 80,
+            size: 96,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
         this.renderParamsBuffer = this.device.createBuffer({
-            size: 32,
+            size: 64,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
+
+        this.paletteLutBuffer = this.device.createBuffer({
+            size: PALETTE_LUT_SIZE * Uint32Array.BYTES_PER_ELEMENT,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+
+        this.featureBuffer = this.device.createBuffer({
+            size: 16 * 16 + 64 * Float32Array.BYTES_PER_ELEMENT,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+
+        this.glyphAtlasTexture = this.device.createTexture({
+            size: [GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_COUNT],
+            format: 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+        });
+        this.glyphAtlasView = this.glyphAtlasTexture.createView({ dimension: '2d-array' });
+        this.glyphRampBuffer = this.device.createBuffer({
+            size: GLYPH_RAMP_LIMIT * Uint32Array.BYTES_PER_ELEMENT,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+
+        this.syncFeatureResources(true);
+        await this.syncGlyphResources(true);
 
         this._createStableBindGroups();
 
@@ -420,7 +587,9 @@ export class WebGPURenderer {
             layout: this.renderPipeline.getBindGroupLayout(0),
             entries: [
                 { binding: 0, resource: this.cellColorView },
-                { binding: 1, resource: { buffer: this.renderParamsBuffer } }
+                { binding: 1, resource: { buffer: this.renderParamsBuffer } },
+                { binding: 2, resource: this.glyphAtlasView },
+                { binding: 3, resource: { buffer: this.glyphRampBuffer } }
             ]
         });
         if (!this.usesExternalVideoTexture && this.imageComputePipeline && this.imageSourceView) {
@@ -429,10 +598,93 @@ export class WebGPURenderer {
                 entries: [
                     { binding: 0, resource: this.imageSourceView },
                     { binding: 1, resource: this.cellColorView },
-                    { binding: 2, resource: { buffer: this.paramsBuffer } }
+                    { binding: 2, resource: { buffer: this.paramsBuffer } },
+                    { binding: 3, resource: { buffer: this.paletteLutBuffer } },
+                    { binding: 4, resource: { buffer: this.featureBuffer } }
                 ]
             });
         }
+    }
+
+    syncFeatureResources(force = false) {
+        if (!this.device || !this.paletteLutBuffer || !this.featureBuffer) return;
+        const key = `${this.paletteId}:${this.paletteMapping}:${this.ditherMode}`;
+        if (!force && key === this.featureResourceKey) {
+            void this.syncGlyphResources();
+            return;
+        }
+        this.featureResourceKey = key;
+
+        const palette = paletteById(this.paletteId);
+        const lut8 = buildPaletteLut(this.paletteId, this.paletteMapping);
+        const lut32 = new Uint32Array(PALETTE_LUT_SIZE);
+        if (lut8) {
+            for (let index = 0; index < lut8.length; index++) lut32[index] = lut8[index];
+        }
+        const featureData = new ArrayBuffer(16 * 16 + 64 * Float32Array.BYTES_PER_ELEMENT);
+        const featureFloats = new Float32Array(featureData);
+        for (let index = 0; index < (palette?.colors.length || 0); index++) {
+            const color = palette.colors[index];
+            const offset = index * 4;
+            featureFloats[offset] = color[0] / 255;
+            featureFloats[offset + 1] = color[1] / 255;
+            featureFloats[offset + 2] = color[2] / 255;
+            featureFloats[offset + 3] = 1;
+        }
+        const matrix = DITHER_MATRICES[this.ditherMode];
+        if (matrix) {
+            const area = matrix.size * matrix.size;
+            const base = 16 * 4;
+            for (let index = 0; index < area; index++) {
+                featureFloats[base + index] = (matrix.values[index] + 0.5) / area - 0.5;
+            }
+        }
+        this.device.queue.writeBuffer(this.paletteLutBuffer, 0, lut32);
+        this.device.queue.writeBuffer(this.featureBuffer, 0, featureData);
+        this.imageComputeBindGroup = null;
+        this._createStableBindGroups();
+        void this.syncGlyphResources(force);
+    }
+
+    async syncGlyphResources(force = false) {
+        if (!this.device || !this.glyphAtlasTexture || !this.glyphRampBuffer) return;
+        const inputKey = glyphResourceInputKey(this);
+        if (!force && inputKey === this.glyphInputKey) return;
+        this.glyphInputKey = inputKey;
+        const ramp = glyphRampCodePoints(this);
+        this.glyphRampLength = ramp.length;
+        const enabled = this.glyphMode && !this.solidMode && ramp.length > 0;
+        const key = `${enabled}:${Array.from(ramp).join(',')}:${this.glyphColorMode}:${this.glyphColor}:${this.backgroundColor}`;
+        if (!force && key === this.glyphResourceKey) return;
+        this.glyphResourceKey = key;
+
+        const paddedRamp = new Uint32Array(GLYPH_RAMP_LIMIT);
+        paddedRamp.set(ramp.subarray(0, GLYPH_RAMP_LIMIT));
+        this.device.queue.writeBuffer(this.glyphRampBuffer, 0, paddedRamp);
+        if (!enabled) return;
+
+        const tasks = glyphAtlasPagesForRamp(ramp).map((page) => {
+            if (this.loadedGlyphPages.has(page)) return Promise.resolve();
+            let pending = this.pendingGlyphPages.get(page);
+            if (!pending) {
+                pending = loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
+                    .then((pixels) => {
+                        if (!this.glyphAtlasTexture) return;
+                        this.device.queue.writeTexture(
+                            { texture: this.glyphAtlasTexture, origin: [0, 0, page] },
+                            pixels,
+                            { bytesPerRow: GLYPH_ATLAS_PAGE_SIZE, rowsPerImage: GLYPH_ATLAS_PAGE_SIZE },
+                            [GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_SIZE, 1]
+                        );
+                        this.loadedGlyphPages.add(page);
+                    })
+                    .catch((error) => console.warn(`[WebGPU] Glyph atlas page ${page} unavailable:`, error))
+                    .finally(() => this.pendingGlyphPages.delete(page));
+                this.pendingGlyphPages.set(page, pending);
+            }
+            return pending;
+        });
+        await Promise.all(tasks);
     }
 
     _renderFrame() {
@@ -465,6 +717,12 @@ export class WebGPURenderer {
         pv.setFloat32(60, this.sampleY, true);
         pv.setFloat32(64, this.frameCount / Math.max(1, this.fps), true);
         pv.setUint32(68, this.mirrorX ? 1 : 0, true);
+        pv.setUint32(72, paletteById(this.paletteId)?.colors.length || 0, true);
+        pv.setUint32(76, DITHER_MATRICES[this.ditherMode]?.size || 0, true);
+        pv.setFloat32(80, this.ditherStrength, true);
+        pv.setUint32(84, Math.max(1, Math.round(this.ditherScale)), true);
+        pv.setFloat32(88, this.ditherBias, true);
+        pv.setUint32(92, this.ditherInvert ? 1 : 0, true);
         this.device.queue.writeBuffer(this.paramsBuffer, 0, this.paramsData);
 
         // Render params
@@ -475,6 +733,11 @@ export class WebGPURenderer {
         rv.setUint32(12, this.cellHeight, true);
         rv.setUint32(16, this.canvasWidth, true);
         rv.setUint32(20, this.canvasHeight, true);
+        rv.setUint32(24, this.glyphMode && !this.solidMode ? 1 : 0, true);
+        rv.setUint32(28, this.glyphRampLength, true);
+        rv.setUint32(32, this.glyphColorMode === 'fixed' ? 1 : 0, true);
+        rv.setUint32(36, packedColor(this.glyphColor, '#ffffff'), true);
+        rv.setUint32(40, packedColor(this.backgroundColor), true);
         this.device.queue.writeBuffer(this.renderParamsBuffer, 0, this.renderData);
 
         // Create bind groups based on source type
@@ -497,7 +760,9 @@ export class WebGPURenderer {
                 entries: [
                     { binding: 0, resource: externalTexture },
                     { binding: 1, resource: this.cellColorView },
-                    { binding: 2, resource: { buffer: this.paramsBuffer } }
+                    { binding: 2, resource: { buffer: this.paramsBuffer } },
+                    { binding: 3, resource: { buffer: this.paletteLutBuffer } },
+                    { binding: 4, resource: { buffer: this.featureBuffer } }
                 ]
             });
         } else {
@@ -602,10 +867,17 @@ export class WebGPURenderer {
         if (this.imageSourceTexture) this.imageSourceTexture.destroy();
         if (this.paramsBuffer) this.paramsBuffer.destroy();
         if (this.renderParamsBuffer) this.renderParamsBuffer.destroy();
+        if (this.paletteLutBuffer) this.paletteLutBuffer.destroy();
+        if (this.featureBuffer) this.featureBuffer.destroy();
+        if (this.glyphAtlasTexture) this.glyphAtlasTexture.destroy();
+        if (this.glyphRampBuffer) this.glyphRampBuffer.destroy();
         this.cellColorView = null;
         this.imageSourceView = null;
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
+        this.glyphAtlasTexture = null;
+        this.glyphAtlasView = null;
+        this.glyphRampBuffer = null;
         this.initialized = false;
     }
 

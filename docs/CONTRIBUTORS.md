@@ -452,7 +452,7 @@ The repository contains an inactive Azure Artifact Signing path in
 `src-tauri/windows-artifact-sign.cmd`; that wrapper calls
 `scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
 creates updater signatures. The current Windows release path does not use this
-config and publishes unsigned 0.9.10 preview artifacts. Configure the Azure
+config and publishes unsigned Windows preview artifacts. Configure the Azure
 values only after Windows signing is enabled as a release policy:
 
 ```bash

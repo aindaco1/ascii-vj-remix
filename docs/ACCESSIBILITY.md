@@ -62,6 +62,8 @@ The highest-risk accessibility surfaces are:
 9. Permission recovery and error messaging.
 10. MIDI device status, soft-takeover state, SysEx actions, and MIDI Learn.
 11. Reports dialog preference, pending count, Send, and Discard actions.
+12. Palette, mapping, ordered-dither, density-mode, character-set, typed-ramp,
+    and glyph-color controls.
 
 ## UI Control Rules
 
@@ -72,6 +74,12 @@ Use these rules for new UI work:
 - Toggle buttons must expose pressed/on state.
 - Sliders need visible labels, accessible labels, min/max/current values, and
   keyboard support.
+- Palette and character-set choices need readable text labels; swatches or
+  rendered glyph shapes cannot be the only identifier.
+- Custom-ramp length and removed/unsupported-scalar feedback must be available
+  as text, not conveyed only by a changed preview.
+- Advanced Density must identify that it removes the normal performance
+  guarantee and must remain operable independently of visual presets.
 - Mutually exclusive choices use radio buttons, a select, or an ARIA
   pattern that is tested with keyboard input.
 - Checkbox groups need a group label.
@@ -158,6 +166,10 @@ Before shipping meaningful UI changes:
 - Confirm preset buttons are reachable and have useful names.
 - Confirm Import/Export overflow opens, closes, and restores focus.
 - Confirm every slider can be adjusted from the keyboard.
+- Confirm Palette, Mapping, Ordered Dither, Character Set, and Custom Ramp are
+  keyboard reachable and their current values are announced as text.
+- Confirm the custom-ramp counter reports the 96-scalar limit and unsupported
+  removals without relying on color.
 - Confirm WTF mode exposes active/inactive state.
 - Confirm audio permission errors are readable and actionable.
 - Confirm camera permission errors are readable and actionable.

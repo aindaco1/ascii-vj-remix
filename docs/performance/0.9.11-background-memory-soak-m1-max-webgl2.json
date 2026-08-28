@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-08-28T10:35:51.253Z",
+  "sourceApp": "/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app",
+  "durationMs": 900000,
+  "sampleMs": 1000,
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "MacBookPro18,2",
+    "chip": "Apple M1 Max",
+    "memory": "64 GB"
+  },
+  "runs": [
+    {
+      "ok": false,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 640,
+      "syntheticAudio": true,
+      "backend": "webgl2",
+      "paletteId": "signal-court",
+      "ditherMode": "bayer4",
+      "charset": "cjk-basic",
+      "soak": true,
+      "phases": {
+        "soak": {
+          "mainAvgFps": 0.996,
+          "mainMinFps": 0.463,
+          "mainP95FrameMs": 1010.5,
+          "mainP99FrameMs": 1680.825,
+          "nativeOkHz": 0.996
+        }
+      },
+      "actualBackends": [
+        "webgl2"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 896,
+      "error": null,
+      "sampleCount": 452,
+      "mainAvgFps": 0.996,
+      "mainMinFps": 0.463,
+      "mainP95FrameMs": 1010.5,
+      "mainP99FrameMs": 1680.825,
+      "exitCode": 1,
+      "rssSampleCount": 1628,
+      "rssPeakMb": 446.125,
+      "rssMinMb": 0.03125,
+      "rssSteadyStartMb": 156.1109375,
+      "rssSteadyEndMb": 155.48125,
+      "rssSteadyDriftMb": -0.629687500000017
+    }
+  ]
+}

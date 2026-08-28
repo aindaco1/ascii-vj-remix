@@ -1,16 +1,25 @@
 use super::{
-    native_glyph_atlas_bytes, native_glyph_atlas_size, native_glyph_ramp_bytes,
-    native_glyph_ramp_len, native_grid_dimensions, native_render_uses_glyphs, DecodedRgbFrame,
-    NativeRenderParams, DEFAULT_OUTPUT_HEIGHT, DEFAULT_OUTPUT_WIDTH,
-    NATIVE_GLYPH_RAMP_TEXTURE_WIDTH, NATIVE_GLYPH_TILE_HEIGHT, NATIVE_GLYPH_TILE_WIDTH,
+    native_glyph_atlas_page_bytes, native_glyph_ramp_ids, native_grid_dimensions,
+    native_render_uses_glyphs, native_dither_matrix, native_palette_index,
+    DecodedRgbFrame, NativeRenderParams,
+    DEFAULT_OUTPUT_HEIGHT, DEFAULT_OUTPUT_WIDTH,
+    NATIVE_GLYPH_ATLAS_PAGE_COUNT, NATIVE_GLYPH_ATLAS_PAGE_GLYPHS,
+    NATIVE_GLYPH_ATLAS_PAGE_SIZE, NATIVE_GLYPH_RAMP_BUFFER_BYTES,
+    NATIVE_GLYPH_TILE_HEIGHT, NATIVE_GLYPH_TILE_WIDTH,
 };
 use std::borrow::Cow;
+use std::collections::hash_map::DefaultHasher;
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use std::hash::{Hash, Hasher};
 use tauri::{PhysicalSize, Window};
+
+const PALETTE_LUT_EDGE: usize = 32;
+const PALETTE_LUT_SIZE: usize = PALETTE_LUT_EDGE * PALETTE_LUT_EDGE * PALETTE_LUT_EDGE;
+const FEATURE_BUFFER_SIZE: usize = 16 * 16 + 64 * std::mem::size_of::<f32>();
 
 const CELL_PASS_WGSL: &str = r#"
 struct Params {
@@ -32,13 +41,24 @@ struct Params {
     sampleY: f32,
     time: f32,
     mirrorX: u32,
-    _pad0: u32,
-    _pad1: u32,
+    paletteCount: u32,
+    ditherSize: u32,
+    ditherStrength: f32,
+    ditherScale: u32,
+    ditherBias: f32,
+    ditherInvert: u32,
+};
+
+struct FeatureData {
+    paletteColors: array<vec4<f32>, 16>,
+    ditherValues: array<f32, 64>,
 };
 
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
 @group(0) @binding(1) var colorOut: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
+@group(0) @binding(4) var<storage, read> features: FeatureData;
 
 fn hash(p: vec2<f32>) -> f32 {
     var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
@@ -46,7 +66,7 @@ fn hash(p: vec2<f32>) -> f32 {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-fn processColor(c: vec3<f32>) -> vec3<f32> {
+fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
     let avg = (c.r + c.g + c.b) * 0.333333333;
     var outColor = vec3<f32>(
         clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
@@ -59,7 +79,23 @@ fn processColor(c: vec3<f32>) -> vec3<f32> {
         let quantum = pow(2.0, f32(params.quantizeBits));
         outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
     }
-    return mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
+    if (params.ditherSize > 0u) {
+        let scale = max(1u, params.ditherScale);
+        let mx = (cx / scale) % params.ditherSize;
+        let my = (cy / scale) % params.ditherSize;
+        var threshold = features.ditherValues[my * params.ditherSize + mx];
+        if (params.ditherInvert != 0u) { threshold = -threshold; }
+        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
+        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+    if (params.paletteCount > 0u) {
+        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
+        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
+        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
+        result = features.paletteColors[paletteIndex].rgb;
+    }
+    return result;
 }
 
 @compute @workgroup_size(8, 8)
@@ -82,7 +118,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let sampleY = clamp(i32(cellCenterY + jitterY), 0, i32(params.srcH) - 1);
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
-    let processed = processColor(c.rgb);
+    let processed = processColor(c.rgb, cx, cy);
     let luma = dot(processed, vec3<f32>(0.2126, 0.7152, 0.0722));
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(processed, luma));
 }
@@ -117,14 +153,26 @@ struct RenderParams {
     glyphCount: u32,
     glyphTileW: u32,
     glyphTileH: u32,
+    glyphColorMode: u32,
+    glyphColor: u32,
+    backgroundColor: u32,
     _pad0: u32,
     _pad1: u32,
+    _pad2: u32,
 };
 
 @group(0) @binding(0) var cellColorTex: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: RenderParams;
-@group(0) @binding(2) var glyphAtlasTex: texture_2d<f32>;
-@group(0) @binding(3) var glyphRampTex: texture_2d<f32>;
+@group(0) @binding(2) var glyphAtlasTex: texture_2d_array<f32>;
+@group(0) @binding(3) var<storage, read> glyphRamp: array<u32>;
+
+fn unpackColor(value: u32) -> vec3<f32> {
+    return vec3<f32>(
+        f32(value & 255u),
+        f32((value >> 8u) & 255u),
+        f32((value >> 16u) & 255u)
+    ) / 255.0;
+}
 
 @fragment
 fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
@@ -139,7 +187,7 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let renderY = (position.y - offsetY) / scale;
 
     if (renderX < 0.0 || renderY < 0.0 || renderX >= renderW || renderY >= renderH) {
-        return vec4<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0, 1.0);
+        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
     }
 
     let cellX = u32(renderX) / params.cellW;
@@ -156,16 +204,22 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(params.glyphTileW)), params.glyphTileW - 1u);
     let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(params.glyphTileH)), params.glyphTileH - 1u);
     let rampX = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
-    let glyphIndex = u32(textureLoad(glyphRampTex, vec2<i32>(i32(rampX), 0), 0).r * 255.0 + 0.5);
+    let glyphIndex = glyphRamp[rampX];
+    let glyphPage = glyphIndex / 4096u;
+    let glyphSlot = glyphIndex % 4096u;
+    let atlasX = (glyphSlot % 64u) * params.glyphTileW + glyphX;
+    let atlasY = (glyphSlot / 64u) * params.glyphTileH + glyphY;
     let alpha = textureLoad(
         glyphAtlasTex,
-        vec2<i32>(i32(glyphIndex * params.glyphTileW + glyphX), i32(glyphY)),
+        vec2<i32>(i32(atlasX), i32(atlasY)),
+        i32(glyphPage),
         0
     ).r;
     if (alpha <= 0.5) {
-        return vec4<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0, 1.0);
+        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
     }
-    return vec4<f32>(cell.rgb, 1.0);
+    let foreground = select(cell.rgb, unpackColor(params.glyphColor), params.glyphColorMode == 1u);
+    return vec4<f32>(foreground, 1.0);
 }
 "#;
 
@@ -244,6 +298,11 @@ pub(super) struct NativeGpuPresenter {
     render_pipeline: wgpu::RenderPipeline,
     params_buffer: wgpu::Buffer,
     render_params_buffer: wgpu::Buffer,
+    palette_lut_buffer: wgpu::Buffer,
+    feature_buffer: wgpu::Buffer,
+    feature_key: u64,
+    glyph_key: u64,
+    glyph_ramp_len: u32,
     source_texture: Option<wgpu::Texture>,
     source_view: Option<wgpu::TextureView>,
     source_size: (u32, u32),
@@ -253,8 +312,8 @@ pub(super) struct NativeGpuPresenter {
     cell_size: (u32, u32),
     _glyph_atlas_texture: wgpu::Texture,
     glyph_atlas_view: wgpu::TextureView,
-    glyph_ramp_texture: wgpu::Texture,
-    glyph_ramp_view: wgpu::TextureView,
+    glyph_ramp_buffer: wgpu::Buffer,
+    loaded_glyph_pages: [bool; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize],
     compute_bind_group: Option<wgpu::BindGroup>,
     render_bind_group: Option<wgpu::BindGroup>,
     rgba_frame: Vec<u8>,
@@ -386,23 +445,34 @@ impl NativeGpuPresenter {
         });
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU params"),
-            size: 80,
+            size: 96,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let render_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU render params"),
-            size: 48,
+            size: 64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let (glyph_atlas_width, glyph_atlas_height) = native_glyph_atlas_size();
+        let palette_lut_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ASCILINE native GPU palette LUT"),
+            size: (PALETTE_LUT_SIZE * std::mem::size_of::<u32>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let feature_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ASCILINE native GPU palette and dither features"),
+            size: FEATURE_BUFFER_SIZE as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let glyph_atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("ASCILINE native GPU glyph atlas"),
             size: wgpu::Extent3d {
-                width: glyph_atlas_width,
-                height: glyph_atlas_height,
-                depth_or_array_layers: 1,
+                width: NATIVE_GLYPH_ATLAS_PAGE_SIZE,
+                height: NATIVE_GLYPH_ATLAS_PAGE_SIZE,
+                depth_or_array_layers: NATIVE_GLYPH_ATLAS_PAGE_COUNT,
             },
             mip_level_count: 1,
             sample_count: 1,
@@ -411,43 +481,17 @@ impl NativeGpuPresenter {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &glyph_atlas_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &native_glyph_atlas_bytes(),
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(glyph_atlas_width),
-                rows_per_image: Some(glyph_atlas_height),
-            },
-            wgpu::Extent3d {
-                width: glyph_atlas_width,
-                height: glyph_atlas_height,
-                depth_or_array_layers: 1,
-            },
-        );
-        let glyph_atlas_view =
-            glyph_atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let glyph_ramp_texture = device.create_texture(&wgpu::TextureDescriptor {
+        let glyph_atlas_view = glyph_atlas_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("ASCILINE native GPU glyph atlas array view"),
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
+            ..Default::default()
+        });
+        let glyph_ramp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU glyph ramp"),
-            size: wgpu::Extent3d {
-                width: NATIVE_GLYPH_RAMP_TEXTURE_WIDTH,
-                height: 1,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
+            size: NATIVE_GLYPH_RAMP_BUFFER_BYTES as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
-        let glyph_ramp_view =
-            glyph_ramp_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         Ok(Self {
             surface,
@@ -458,6 +502,11 @@ impl NativeGpuPresenter {
             render_pipeline,
             params_buffer,
             render_params_buffer,
+            palette_lut_buffer,
+            feature_buffer,
+            feature_key: u64::MAX,
+            glyph_key: u64::MAX,
+            glyph_ramp_len: 0,
             source_texture: None,
             source_view: None,
             source_size: (0, 0),
@@ -467,8 +516,8 @@ impl NativeGpuPresenter {
             cell_size: (0, 0),
             _glyph_atlas_texture: glyph_atlas_texture,
             glyph_atlas_view,
-            glyph_ramp_texture,
-            glyph_ramp_view,
+            glyph_ramp_buffer,
+            loaded_glyph_pages: [false; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize],
             compute_bind_group: None,
             render_bind_group: None,
             rgba_frame: Vec::new(),
@@ -513,28 +562,31 @@ impl NativeGpuPresenter {
         }
         self.configure_surface(width, height);
 
+        // Acquire before scheduling queue writes. When the output is occluded,
+        // wgpu has no render submission to retire write_texture staging buffers;
+        // uploading first would therefore retain one decoded frame per source
+        // tick for as long as the window stayed hidden.
+        let acquire_started_at = Instant::now();
+        let (output, surface_status) = self.current_surface_texture()?;
+        let acquire_ns = duration_ns_u64(acquire_started_at.elapsed());
+        let Some(output) = output else {
+            return Ok(NativeGpuFrameOutcome {
+                surface_status,
+                presented: false,
+                source_uploaded: false,
+                timing: NativeGpuFrameTiming {
+                    acquire_ns,
+                    total_ns: duration_ns_u64(total_started_at.elapsed()),
+                    ..Default::default()
+                },
+            });
+        };
+
         let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
         let source_uploaded = self.ensure_source_texture(frame, source_frame_version)?;
         self.ensure_cell_texture(cols, rows);
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.glyph_ramp_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &native_glyph_ramp_bytes(params),
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH),
-                rows_per_image: Some(1),
-            },
-            wgpu::Extent3d {
-                width: NATIVE_GLYPH_RAMP_TEXTURE_WIDTH,
-                height: 1,
-                depth_or_array_layers: 1,
-            },
-        );
+        self.ensure_feature_resources(params);
+        self.ensure_glyph_resources(params);
 
         let source_view = self
             .source_view
@@ -562,6 +614,14 @@ impl NativeGpuPresenter {
                             binding: 2,
                             resource: self.params_buffer.as_entire_binding(),
                         },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: self.palette_lut_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 4,
+                            resource: self.feature_buffer.as_entire_binding(),
+                        },
                     ],
                 }));
         }
@@ -585,7 +645,7 @@ impl NativeGpuPresenter {
                         },
                         wgpu::BindGroupEntry {
                             binding: 3,
-                            resource: wgpu::BindingResource::TextureView(&self.glyph_ramp_view),
+                            resource: self.glyph_ramp_buffer.as_entire_binding(),
                         },
                     ],
                 }));
@@ -599,26 +659,17 @@ impl NativeGpuPresenter {
         self.queue.write_buffer(
             &self.render_params_buffer,
             0,
-            &render_params_bytes(params, cols, rows, self.config.width, self.config.height),
+            &render_params_bytes(
+                params,
+                cols,
+                rows,
+                self.config.width,
+                self.config.height,
+                self.glyph_ramp_len,
+            ),
         );
         let prep_ns = duration_ns_u64(prep_started_at.elapsed());
 
-        let acquire_started_at = Instant::now();
-        let (output, surface_status) = self.current_surface_texture()?;
-        let acquire_ns = duration_ns_u64(acquire_started_at.elapsed());
-        let Some(output) = output else {
-            return Ok(NativeGpuFrameOutcome {
-                surface_status,
-                presented: false,
-                source_uploaded,
-                timing: NativeGpuFrameTiming {
-                    prep_ns,
-                    acquire_ns,
-                    total_ns: duration_ns_u64(total_started_at.elapsed()),
-                    ..Default::default()
-                },
-            });
-        };
         let encode_started_at = Instant::now();
         let output_view = output
             .texture
@@ -672,6 +723,10 @@ impl NativeGpuPresenter {
         let present_started_at = Instant::now();
         output.present();
         let present_ns = duration_ns_u64(present_started_at.elapsed());
+        // Reclaim completed queue-write staging resources without blocking the
+        // display-link callback. Native wgpu devices are not driven by a browser
+        // event loop, so regular polling is part of their steady-state upkeep.
+        let _ = self.device.poll(wgpu::PollType::Poll);
         Ok(NativeGpuFrameOutcome {
             surface_status,
             presented: true,
@@ -797,6 +852,80 @@ impl NativeGpuPresenter {
         Ok(true)
     }
 
+    fn ensure_feature_resources(&mut self, params: &NativeRenderParams) {
+        let key = palette_feature_key(params);
+        if self.feature_key == key {
+            return;
+        }
+        self.feature_key = key;
+        self.queue.write_buffer(
+            &self.palette_lut_buffer,
+            0,
+            &palette_lut_bytes(params),
+        );
+        self.queue.write_buffer(
+            &self.feature_buffer,
+            0,
+            &palette_dither_feature_bytes(params),
+        );
+    }
+
+    fn ensure_glyph_resources(&mut self, params: &NativeRenderParams) {
+        let key = glyph_feature_key(params);
+        if self.glyph_key == key {
+            return;
+        }
+        self.glyph_key = key;
+        let ramp = native_glyph_ramp_ids(params);
+        self.glyph_ramp_len = ramp.len() as u32;
+
+        let mut requested = [false; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize];
+        if native_render_uses_glyphs(params) {
+            for glyph_id in ramp.iter().copied() {
+                let page = (glyph_id / NATIVE_GLYPH_ATLAS_PAGE_GLYPHS) as usize;
+                if page < requested.len() {
+                    requested[page] = true;
+                }
+            }
+        }
+        for (page, needed) in requested.into_iter().enumerate() {
+            if !needed || self.loaded_glyph_pages[page] {
+                continue;
+            }
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &self._glyph_atlas_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: page as u32,
+                    },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                native_glyph_atlas_page_bytes(page as u32),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(NATIVE_GLYPH_ATLAS_PAGE_SIZE),
+                    rows_per_image: Some(NATIVE_GLYPH_ATLAS_PAGE_SIZE),
+                },
+                wgpu::Extent3d {
+                    width: NATIVE_GLYPH_ATLAS_PAGE_SIZE,
+                    height: NATIVE_GLYPH_ATLAS_PAGE_SIZE,
+                    depth_or_array_layers: 1,
+                },
+            );
+            self.loaded_glyph_pages[page] = true;
+        }
+
+        let mut bytes = [0; NATIVE_GLYPH_RAMP_BUFFER_BYTES];
+        for (index, glyph_id) in ramp.into_iter().enumerate() {
+            let offset = index * std::mem::size_of::<u32>();
+            bytes[offset..offset + 4].copy_from_slice(&glyph_id.to_le_bytes());
+        }
+        self.queue.write_buffer(&self.glyph_ramp_buffer, 0, &bytes);
+    }
+
     fn ensure_cell_texture(&mut self, cols: u32, rows: u32) {
         if self.cell_size == (cols, rows) {
             return;
@@ -849,14 +978,76 @@ fn duration_ns_u64(duration: Duration) -> u64 {
     duration.as_nanos().min(u128::from(u64::MAX)) as u64
 }
 
+fn palette_feature_key(params: &NativeRenderParams) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    params.palette_id.hash(&mut hasher);
+    params.palette_mapping.hash(&mut hasher);
+    params.palette_colors.hash(&mut hasher);
+    params.dither_mode.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn glyph_feature_key(params: &NativeRenderParams) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    params.glyph_mode.hash(&mut hasher);
+    params.solid_mode.hash(&mut hasher);
+    params.pixel.hash(&mut hasher);
+    params.charset.hash(&mut hasher);
+    params.charset_ramp.hash(&mut hasher);
+    params.glyph_depth.hash(&mut hasher);
+    params.glyph_offset.hash(&mut hasher);
+    params.glyph_reverse.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn palette_lut_bytes(params: &NativeRenderParams) -> Vec<u8> {
+    let mut bytes = vec![0; PALETTE_LUT_SIZE * std::mem::size_of::<u32>()];
+    if params.palette_colors.is_empty() {
+        return bytes;
+    }
+    for r in 0..PALETTE_LUT_EDGE {
+        for g in 0..PALETTE_LUT_EDGE {
+            for b in 0..PALETTE_LUT_EDGE {
+                let index = (r << 10) | (g << 5) | b;
+                let palette_index = native_palette_index(
+                    [(r * 8 + 4) as u8, (g * 8 + 4) as u8, (b * 8 + 4) as u8],
+                    params,
+                ) as u32;
+                put_u32(&mut bytes, index * 4, palette_index);
+            }
+        }
+    }
+    bytes
+}
+
+fn palette_dither_feature_bytes(params: &NativeRenderParams) -> Vec<u8> {
+    let mut bytes = vec![0; FEATURE_BUFFER_SIZE];
+    for (index, color) in params.palette_colors.iter().copied().take(16).enumerate() {
+        let offset = index * 16;
+        put_f32(&mut bytes, offset, f32::from(color[0]) / 255.0);
+        put_f32(&mut bytes, offset + 4, f32::from(color[1]) / 255.0);
+        put_f32(&mut bytes, offset + 8, f32::from(color[2]) / 255.0);
+        put_f32(&mut bytes, offset + 12, 1.0);
+    }
+    let (size, values) = native_dither_matrix(&params.dither_mode);
+    let area = size * size;
+    if area > 0 {
+        for (index, value) in values.iter().copied().enumerate() {
+            let threshold = (f32::from(value) + 0.5) / area as f32 - 0.5;
+            put_f32(&mut bytes, 16 * 16 + index * 4, threshold);
+        }
+    }
+    bytes
+}
+
 fn cell_params_bytes(
     frame: &DecodedRgbFrame,
     params: &NativeRenderParams,
     cols: u32,
     rows: u32,
     frame_index: usize,
-) -> [u8; 80] {
-    let mut bytes = [0u8; 80];
+) -> [u8; 96] {
+    let mut bytes = [0u8; 96];
     put_u32(&mut bytes, 0, frame.width);
     put_u32(&mut bytes, 4, frame.height);
     put_u32(&mut bytes, 8, cols);
@@ -879,6 +1070,12 @@ fn cell_params_bytes(
         (frame_index as f64 / params.fps.max(1.0)) as f32,
     );
     put_u32(&mut bytes, 68, u32::from(params.mirror_x));
+    put_u32(&mut bytes, 72, params.palette_colors.len().min(16) as u32);
+    put_u32(&mut bytes, 76, native_dither_matrix(&params.dither_mode).0);
+    put_f32(&mut bytes, 80, params.dither_strength as f32);
+    put_u32(&mut bytes, 84, params.dither_scale);
+    put_f32(&mut bytes, 88, params.dither_bias as f32);
+    put_u32(&mut bytes, 92, u32::from(params.dither_invert));
     bytes
 }
 
@@ -888,8 +1085,9 @@ fn render_params_bytes(
     rows: u32,
     surface_width: u32,
     surface_height: u32,
-) -> [u8; 48] {
-    let mut bytes = [0u8; 48];
+    glyph_ramp_len: u32,
+) -> [u8; 64] {
+    let mut bytes = [0u8; 64];
     put_u32(&mut bytes, 0, cols);
     put_u32(&mut bytes, 4, rows);
     put_u32(&mut bytes, 8, params.cell_width.max(1));
@@ -897,10 +1095,17 @@ fn render_params_bytes(
     put_u32(&mut bytes, 16, surface_width.max(1));
     put_u32(&mut bytes, 20, surface_height.max(1));
     put_u32(&mut bytes, 24, u32::from(native_render_uses_glyphs(params)));
-    put_u32(&mut bytes, 28, native_glyph_ramp_len(params));
+    put_u32(&mut bytes, 28, glyph_ramp_len);
     put_u32(&mut bytes, 32, NATIVE_GLYPH_TILE_WIDTH);
     put_u32(&mut bytes, 36, NATIVE_GLYPH_TILE_HEIGHT);
+    put_u32(&mut bytes, 40, u32::from(params.glyph_color_mode == "fixed"));
+    put_u32(&mut bytes, 44, pack_rgb(params.glyph_color));
+    put_u32(&mut bytes, 48, pack_rgb(params.background_color));
     bytes
+}
+
+fn pack_rgb(color: [u8; 3]) -> u32 {
+    color[0] as u32 | ((color[1] as u32) << 8) | ((color[2] as u32) << 16)
 }
 
 fn put_u32(bytes: &mut [u8], offset: usize, value: u32) {
@@ -937,6 +1142,14 @@ mod tests {
             gamma: 1.0,
             bg_blend: 0.3,
             quantize_bits: 2,
+            palette_id: "none".to_string(),
+            palette_mapping: "nearest".to_string(),
+            palette_colors: Vec::new(),
+            dither_mode: "none".to_string(),
+            dither_strength: 0.45,
+            dither_scale: 1,
+            dither_bias: 0.0,
+            dither_invert: false,
             jitter_amount: 0.6,
             jitter_speed: 1.0,
             sample_x: 0.5,
@@ -950,6 +1163,13 @@ mod tests {
             glyph_mode: true,
             charset: "point-click".to_string(),
             charset_ramp: String::new(),
+            glyph_depth: 96,
+            glyph_offset: 0,
+            glyph_reverse: false,
+            glyph_color_mode: "source".to_string(),
+            glyph_color: [255, 255, 255],
+            background_color: [3, 4, 5],
+            atlas_style: "neutral".to_string(),
             font_family: "Courier New".to_string(),
             min_glyph_intensity: 180,
             native_wtf_active: false,
@@ -978,25 +1198,33 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[8..12].try_into().unwrap()), 80);
         assert_eq!(u32::from_le_bytes(bytes[44..48].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(bytes[68..72].try_into().unwrap()), 1);
-        assert_eq!(bytes.len(), 80);
+        assert_eq!(bytes.len(), 96);
 
-        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080);
+        let glyph_ramp_len = native_glyph_ramp_ids(&params).len() as u32;
+        let glyph_key = glyph_feature_key(&params);
+        let mut live_only_change = params.clone();
+        live_only_change.brightness = 1.7;
+        assert_eq!(glyph_feature_key(&live_only_change), glyph_key);
+        let mut glyph_change = params.clone();
+        glyph_change.glyph_depth = 12;
+        assert_ne!(glyph_feature_key(&glyph_change), glyph_key);
+        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080, glyph_ramp_len);
         assert_eq!(
             u32::from_le_bytes(render_bytes[24..28].try_into().unwrap()),
             1
         );
         assert_eq!(
             u32::from_le_bytes(render_bytes[28..32].try_into().unwrap()),
-            native_glyph_ramp_len(&params)
+            glyph_ramp_len
         );
         assert_eq!(
             u32::from_le_bytes(render_bytes[32..36].try_into().unwrap()),
-            6
+            16
         );
         assert_eq!(
             u32::from_le_bytes(render_bytes[36..40].try_into().unwrap()),
-            9
+            16
         );
-        assert_eq!(render_bytes.len(), 48);
+        assert_eq!(render_bytes.len(), 64);
     }
 }

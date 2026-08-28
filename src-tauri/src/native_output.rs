@@ -7,6 +7,8 @@ use crate::media_engine::ffmpeg::{
 #[cfg(target_os = "macos")]
 use crate::system_audio::{InputAudioCaptureState, SystemAudioCaptureState, SystemAudioFeatures};
 use base64::{engine::general_purpose, Engine as _};
+#[cfg(target_os = "macos")]
+use objc2::rc::autoreleasepool;
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
@@ -68,7 +70,7 @@ pub struct NativeOutputMediaState {
     pub ended: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeOutputParams {
     pub source_mode: Option<String>,
@@ -87,6 +89,14 @@ pub struct NativeOutputParams {
     pub gamma: Option<f64>,
     pub bg_blend: Option<f64>,
     pub quantize_bits: Option<f64>,
+    pub palette_id: Option<String>,
+    pub palette_mapping: Option<String>,
+    pub palette_colors: Option<Vec<[u8; 3]>>,
+    pub dither_mode: Option<String>,
+    pub dither_strength: Option<f64>,
+    pub dither_scale: Option<f64>,
+    pub dither_bias: Option<f64>,
+    pub dither_invert: Option<bool>,
     pub jitter_amount: Option<f64>,
     pub jitter_speed: Option<f64>,
     pub sample_x: Option<f64>,
@@ -101,6 +111,14 @@ pub struct NativeOutputParams {
     pub glyph_mode: Option<bool>,
     pub charset: Option<String>,
     pub charset_ramp: Option<String>,
+    pub custom_glyph_ramp: Option<String>,
+    pub glyph_depth: Option<f64>,
+    pub glyph_offset: Option<f64>,
+    pub glyph_reverse: Option<bool>,
+    pub glyph_color_mode: Option<String>,
+    pub glyph_color: Option<String>,
+    pub background_color: Option<String>,
+    pub atlas_style: Option<String>,
     pub font_family: Option<String>,
     pub min_glyph_intensity: Option<f64>,
     pub camera_device_label: Option<String>,
@@ -291,6 +309,14 @@ struct NativeRenderParams {
     gamma: f64,
     bg_blend: f64,
     quantize_bits: u32,
+    palette_id: String,
+    palette_mapping: String,
+    palette_colors: Vec<[u8; 3]>,
+    dither_mode: String,
+    dither_strength: f64,
+    dither_scale: u32,
+    dither_bias: f64,
+    dither_invert: bool,
     jitter_amount: f64,
     jitter_speed: f64,
     sample_x: f64,
@@ -304,6 +330,14 @@ struct NativeRenderParams {
     glyph_mode: bool,
     charset: String,
     charset_ramp: String,
+    glyph_depth: u32,
+    glyph_offset: u32,
+    glyph_reverse: bool,
+    glyph_color_mode: String,
+    glyph_color: [u8; 3],
+    background_color: [u8; 3],
+    #[allow(dead_code)]
+    atlas_style: String,
     #[allow(dead_code)]
     font_family: String,
     #[allow(dead_code)]
@@ -323,10 +357,17 @@ struct NativeRenderParams {
     audio_reactive_noise_floor: f64,
 }
 
-const NATIVE_GLYPH_TILE_WIDTH: u32 = 6;
-const NATIVE_GLYPH_TILE_HEIGHT: u32 = 9;
+const NATIVE_GLYPH_TILE_WIDTH: u32 = 16;
+const NATIVE_GLYPH_TILE_HEIGHT: u32 = 16;
+const NATIVE_GLYPH_ATLAS_PAGE_SIZE: u32 = 1024;
+#[cfg(any(not(target_os = "macos"), test))]
+const NATIVE_GLYPH_ATLAS_PAGE_COLUMNS: u32 = 64;
+const NATIVE_GLYPH_ATLAS_PAGE_GLYPHS: u32 = 4_096;
+const NATIVE_GLYPH_ATLAS_PAGE_COUNT: u32 = 16;
 const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH: u32 = 96;
 const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE: usize = NATIVE_GLYPH_RAMP_TEXTURE_WIDTH as usize;
+const NATIVE_GLYPH_RAMP_BUFFER_BYTES: usize =
+    NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE * std::mem::size_of::<u32>();
 const NATIVE_ASCII_POINT_CLICK_CHARS: &str =
     " .'`^\":;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 const NATIVE_ASCII_ASCILINE_CHARS: &str = " .:-=+*#%@";
@@ -358,6 +399,7 @@ fn native_charset_chars(params: &NativeRenderParams) -> &str {
     }
 }
 
+#[allow(dead_code)]
 fn native_glyph_index_for_char(value: char) -> u8 {
     let normalized = if value.is_ascii_lowercase() {
         value.to_ascii_uppercase()
@@ -376,21 +418,35 @@ fn sanitize_native_charset_ramp(value: Option<&str>) -> String {
     let Some(value) = value else {
         return String::new();
     };
-    let chars = value.chars().collect::<Vec<_>>();
-    if chars.len() < 2
-        || chars.len() > NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE
-        || chars.first() != Some(&' ')
-    {
-        return String::new();
-    }
-    for (index, value) in chars.iter().copied().enumerate() {
-        if (value != ' ' && native_glyph_index_for_char(value) == 0)
-            || chars[..index].contains(&value)
-        {
-            return String::new();
-        }
-    }
-    value.to_string()
+    value
+        .chars()
+        .filter(|value| native_glyph_supported(*value as u32))
+        .take(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE)
+        .collect()
+}
+
+fn native_glyph_supported(code_point: u32) -> bool {
+    matches!(
+        code_point,
+        0x0020..=0x007e
+            | 0x00a0..=0x00ff
+            | 0x0100..=0x024f
+            | 0x0370..=0x03ff
+            | 0x0400..=0x052f
+            | 0x2190..=0x21ff
+            | 0x2200..=0x22ff
+            | 0x2300..=0x23ff
+            | 0x2500..=0x257f
+            | 0x2580..=0x259f
+            | 0x25a0..=0x25ff
+            | 0x2800..=0x28ff
+            | 0x2e80..=0x2fdf
+            | 0x3000..=0x303f
+            | 0x3040..=0x309f
+            | 0x30a0..=0x30ff
+            | 0x4e00..=0x9fff
+            | 0xac00..=0xd7af
+    )
 }
 
 fn native_glyph_char(index: u8) -> char {
@@ -595,7 +651,8 @@ fn native_glyph_pattern(value: char) -> [u8; 7] {
     }
 }
 
-fn native_glyph_alpha(index: u8, tile_x: u32, tile_y: u32) -> bool {
+#[allow(dead_code)]
+fn legacy_native_glyph_alpha(index: u8, tile_x: u32, tile_y: u32) -> bool {
     let value = native_glyph_char(index);
     if matches!(value, '█' | '▓' | '▒' | '░') {
         let pattern = native_glyph_pattern(value);
@@ -613,23 +670,30 @@ fn native_glyph_alpha(index: u8, tile_x: u32, tile_y: u32) -> bool {
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
-fn native_glyph_ramp_indices(params: &NativeRenderParams) -> Vec<u8> {
-    native_charset_chars(params)
-        .chars()
-        .map(native_glyph_index_for_char)
-        .collect()
+fn native_glyph_ramp_indices(params: &NativeRenderParams) -> Vec<u32> {
+    native_glyph_ramp_ids(params)
 }
 
-fn native_glyph_ramp_len(params: &NativeRenderParams) -> u32 {
-    native_charset_chars(params)
+fn native_glyph_ramp_ids(params: &NativeRenderParams) -> Vec<u32> {
+    let values = native_charset_chars(params)
         .chars()
-        .count()
-        .max(1)
-        .min(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE) as u32
+        .map(|value| value as u32)
+        .take(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE)
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        return vec![' ' as u32];
+    }
+    let depth = (params.glyph_depth as usize).clamp(1, values.len());
+    let offset = (params.glyph_offset as usize).min(values.len().saturating_sub(depth));
+    let mut active = values[offset..offset + depth].to_vec();
+    if params.glyph_reverse {
+        active.reverse();
+    }
+    active
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
-fn native_glyph_index_for_luma(luma: f64, ramp: &[u8]) -> u8 {
+fn native_glyph_index_for_luma(luma: f64, ramp: &[u32]) -> u32 {
     if ramp.is_empty() {
         return 0;
     }
@@ -637,6 +701,7 @@ fn native_glyph_index_for_luma(luma: f64, ramp: &[u8]) -> u8 {
     ramp[index.min(ramp.len() - 1)]
 }
 
+#[allow(dead_code)]
 fn native_glyph_atlas_size() -> (u32, u32) {
     (
         NATIVE_GLYPH_TILE_WIDTH * native_glyph_chars().len() as u32,
@@ -644,6 +709,7 @@ fn native_glyph_atlas_size() -> (u32, u32) {
     )
 }
 
+#[allow(dead_code)]
 fn native_glyph_atlas_bytes() -> Vec<u8> {
     let (width, height) = native_glyph_atlas_size();
     let mut out = vec![0; width as usize * height as usize];
@@ -654,7 +720,7 @@ fn native_glyph_atlas_bytes() -> Vec<u8> {
                 let dst = y as usize * width as usize
                     + glyph_index as usize * NATIVE_GLYPH_TILE_WIDTH as usize
                     + x as usize;
-                out[dst] = if native_glyph_alpha(glyph_index, x, y) {
+                out[dst] = if legacy_native_glyph_alpha(glyph_index, x, y) {
                     255
                 } else {
                     0
@@ -665,19 +731,56 @@ fn native_glyph_atlas_bytes() -> Vec<u8> {
     out
 }
 
-fn native_glyph_ramp_bytes(
-    params: &NativeRenderParams,
-) -> [u8; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE] {
-    let mut out = [0; NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE];
-    for (index, glyph_index) in native_charset_chars(params)
-        .chars()
-        .map(native_glyph_index_for_char)
-        .take(NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE)
-        .enumerate()
-    {
-        out[index] = glyph_index;
+fn native_glyph_atlas_page_png(page: u32) -> &'static [u8] {
+    match page {
+        0 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-0.png"),
+        1 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-1.png"),
+        2 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-2.png"),
+        3 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-3.png"),
+        4 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-4.png"),
+        5 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-5.png"),
+        6 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-6.png"),
+        7 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-7.png"),
+        8 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-8.png"),
+        9 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-9.png"),
+        10 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-10.png"),
+        11 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-11.png"),
+        12 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-12.png"),
+        13 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-13.png"),
+        14 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-14.png"),
+        15 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-15.png"),
+        _ => &[],
     }
-    out
+}
+
+fn decode_native_glyph_atlas_page(page: u32) -> Vec<u8> {
+    let image = image::load_from_memory(native_glyph_atlas_page_png(page))
+        .unwrap_or_else(|error| panic!("neutral glyph atlas page {page} failed to decode: {error}"))
+        .to_luma8();
+    assert_eq!(image.width(), NATIVE_GLYPH_ATLAS_PAGE_SIZE);
+    assert_eq!(image.height(), NATIVE_GLYPH_ATLAS_PAGE_SIZE);
+    image.into_raw()
+}
+
+fn native_glyph_atlas_page_bytes(page: u32) -> &'static [u8] {
+    static PAGES: [OnceLock<Vec<u8>>; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize] =
+        [const { OnceLock::new() }; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize];
+    let Some(slot) = PAGES.get(page as usize) else {
+        return &[];
+    };
+    slot.get_or_init(|| decode_native_glyph_atlas_page(page))
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn native_glyph_alpha(glyph_id: u32, tile_x: u32, tile_y: u32) -> bool {
+    if !native_glyph_supported(glyph_id) || tile_x >= 16 || tile_y >= 16 {
+        return false;
+    }
+    let page = glyph_id / NATIVE_GLYPH_ATLAS_PAGE_GLYPHS;
+    let slot = glyph_id % NATIVE_GLYPH_ATLAS_PAGE_GLYPHS;
+    let x = (slot % NATIVE_GLYPH_ATLAS_PAGE_COLUMNS) * NATIVE_GLYPH_TILE_WIDTH + tile_x;
+    let y = (slot / NATIVE_GLYPH_ATLAS_PAGE_COLUMNS) * NATIVE_GLYPH_TILE_HEIGHT + tile_y;
+    native_glyph_atlas_page_bytes(page)[(y * NATIVE_GLYPH_ATLAS_PAGE_SIZE + x) as usize] > 127
 }
 
 #[tauri::command]
@@ -843,6 +946,26 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             gamma: Some(0.72 + (phase * 0.41).cos().abs() * 1.2),
             bg_blend: Some(0.04 + (phase * 0.31).sin().abs() * 0.46),
             quantize_bits: Some(((step / 24) % 5) as f64),
+            palette_id: Some("midnight-scan".to_string()),
+            palette_mapping: Some("nearest".to_string()),
+            palette_colors: Some(vec![
+                [0, 0, 1],
+                [3, 1, 9],
+                [10, 3, 27],
+                [20, 9, 46],
+                [0, 20, 62],
+                [2, 34, 85],
+                [35, 47, 101],
+                [11, 109, 154],
+                [46, 116, 175],
+                [113, 130, 144],
+                [142, 171, 199],
+            ]),
+            dither_mode: Some("bayer4".to_string()),
+            dither_strength: Some(0.55),
+            dither_scale: Some(1.0),
+            dither_bias: Some(0.0),
+            dither_invert: Some(false),
             jitter_amount: Some((phase * 0.9).sin().abs()),
             jitter_speed: Some(0.8 + (phase * 0.3).cos().abs() * 3.2),
             sample_x: Some(0.2 + (phase * 0.17).sin().abs() * 0.6),
@@ -855,8 +978,15 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             pixel: Some(false),
             solid_mode: Some(false),
             glyph_mode: Some(true),
-            charset: Some("point-click".to_string()),
-            charset_ramp: None,
+            charset: Some("custom".to_string()),
+            charset_ramp: Some(" Aあ中한".to_string()),
+            glyph_depth: Some(5.0),
+            glyph_offset: Some(0.0),
+            glyph_reverse: Some(false),
+            glyph_color_mode: Some("fixed".to_string()),
+            glyph_color: Some("#e6f3ff".to_string()),
+            background_color: Some("#030405".to_string()),
+            atlas_style: Some("neutral".to_string()),
             font_family: Some("Courier New".to_string()),
             min_glyph_intensity: Some(180.0),
             camera_device_label: None,
@@ -879,6 +1009,7 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             audio_reactive_presence_amount: None,
             audio_reactive_density_dampening: None,
             audio_reactive_noise_floor: None,
+            ..Default::default()
         },
         media_state: Some(NativeOutputMediaState {
             current_time: Some(0.0),
@@ -2337,7 +2468,11 @@ unsafe extern "C" fn native_display_link_callback(
     let context = unsafe { Arc::from_raw(context as *const NativeMacDisplayLinkContext) };
     let tick_context = context.clone();
     std::mem::forget(context);
-    tick_context.request_tick();
+    // CVDisplayLink owns a long-lived worker thread rather than entering through
+    // the AppKit run loop. Give every Metal-backed tick the same autorelease
+    // boundary AppKit would normally provide so Objective-C temporaries cannot
+    // accumulate for the lifetime of the display-link thread.
+    autoreleasepool(|_| tick_context.request_tick());
     0
 }
 
@@ -2722,6 +2857,35 @@ impl NativeRenderParams {
             gamma: f64_param(params.gamma, 1.0).clamp(0.01, 8.0),
             bg_blend: f64_param(params.bg_blend, 0.0).clamp(0.0, 1.0),
             quantize_bits: u32_param(params.quantize_bits, 0).min(8),
+            palette_id: params
+                .palette_id
+                .as_deref()
+                .filter(|value| value.len() <= 64)
+                .unwrap_or("none")
+                .to_string(),
+            palette_mapping: match params.palette_mapping.as_deref() {
+                Some("luminance") => "luminance",
+                _ => "nearest",
+            }
+            .to_string(),
+            palette_colors: params
+                .palette_colors
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .take(16)
+                .collect(),
+            dither_mode: match params.dither_mode.as_deref() {
+                Some("bayer2") => "bayer2",
+                Some("bayer4") => "bayer4",
+                Some("bayer8") => "bayer8",
+                _ => "none",
+            }
+            .to_string(),
+            dither_strength: f64_param(params.dither_strength, 0.45).clamp(0.0, 1.0),
+            dither_scale: u32_param(params.dither_scale, 1).clamp(1, 8),
+            dither_bias: f64_param(params.dither_bias, 0.0).clamp(-1.0, 1.0),
+            dither_invert: params.dither_invert.unwrap_or(false),
             jitter_amount: f64_param(params.jitter_amount, 0.0).clamp(0.0, 8.0),
             jitter_speed: f64_param(params.jitter_speed, 1.0).clamp(0.0, 16.0),
             sample_x: f64_param(params.sample_x, 0.5).clamp(0.0, 1.0),
@@ -2748,6 +2912,22 @@ impl NativeRenderParams {
             }
             .to_string(),
             charset_ramp: sanitize_native_charset_ramp(params.charset_ramp.as_deref()),
+            glyph_depth: u32_param(params.glyph_depth, 96).clamp(1, 96),
+            glyph_offset: u32_param(params.glyph_offset, 0).min(95),
+            glyph_reverse: params.glyph_reverse.unwrap_or(false),
+            glyph_color_mode: match params.glyph_color_mode.as_deref() {
+                Some("fixed") => "fixed",
+                Some("palette") => "palette",
+                _ => "source",
+            }
+            .to_string(),
+            glyph_color: parse_hex_rgb(params.glyph_color.as_deref(), [255, 255, 255]),
+            background_color: parse_hex_rgb(params.background_color.as_deref(), [3, 4, 5]),
+            atlas_style: match params.atlas_style.as_deref() {
+                Some("neutral") | None => "neutral",
+                _ => "neutral",
+            }
+            .to_string(),
             font_family: params
                 .font_family
                 .clone()
@@ -2793,6 +2973,20 @@ fn f64_param(value: Option<f64>, fallback: f64) -> f64 {
 
 fn u32_param(value: Option<f64>, fallback: u32) -> u32 {
     f64_param(value, fallback as f64).round().max(0.0) as u32
+}
+
+fn parse_hex_rgb(value: Option<&str>, fallback: [u8; 3]) -> [u8; 3] {
+    let Some(hex) = value.and_then(|value| value.strip_prefix('#')) else {
+        return fallback;
+    };
+    if hex.len() != 6 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return fallback;
+    }
+    let parse = |start| u8::from_str_radix(&hex[start..start + 2], 16).ok();
+    match (parse(0), parse(2), parse(4)) {
+        (Some(r), Some(g), Some(b)) => [r, g, b],
+        _ => fallback,
+    }
 }
 
 fn u32_param_option(value: Option<f64>) -> Option<u32> {
@@ -3715,6 +3909,7 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     audio_reactive_presence_amount: None,
                     audio_reactive_density_dampening: None,
                     audio_reactive_noise_floor: None,
+                    ..Default::default()
                 },
                 media_state: None,
             })
@@ -3753,7 +3948,12 @@ fn render_native_frame_to_buffer(
     if buffer.len() < width_usize.saturating_mul(height_usize) {
         return;
     }
-    buffer.fill(rgb_u32(3, 4, 5));
+    let background = rgb_u32(
+        params.background_color[0],
+        params.background_color[1],
+        params.background_color[2],
+    );
+    buffer.fill(background);
 
     let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
     let cell_width = params.cell_width.max(1);
@@ -3780,7 +3980,7 @@ fn render_native_frame_to_buffer(
     if !native_axis_spans_cover(&x_spans, width_usize)
         || !native_axis_spans_cover(&y_spans, height_usize)
     {
-        buffer.fill(rgb_u32(3, 4, 5));
+        buffer.fill(background);
     }
 
     let cols_usize = cols as usize;
@@ -3814,7 +4014,13 @@ fn render_native_frame_to_buffer(
                         / span_width as u32)
                         .min(NATIVE_GLYPH_TILE_WIDTH - 1);
                     if native_glyph_alpha(glyph_index, tile_x, tile_y) {
-                        dst[x] = color;
+                        dst[x] = if params.glyph_color_mode == "fixed" {
+                            rgb_u32(params.glyph_color[0], params.glyph_color[1], params.glyph_color[2])
+                        } else {
+                            color
+                        };
+                    } else {
+                        dst[x] = background;
                     }
                 }
             }
@@ -3947,11 +4153,13 @@ fn native_cell_colors(
                 .clamp(0.0, (height - 1) as f64) as u32;
             let index = ((sample_y as usize * width as usize + sample_x as usize) * 3)
                 .min(frame.data.len().saturating_sub(3));
-            let (r, g, b) = process_gpu_cell_color(
+            let (r, g, b) = process_gpu_cell_color_at(
                 frame.data[index],
                 frame.data[index + 1],
                 frame.data[index + 2],
                 params,
+                col,
+                row,
             );
             out.push(rgb_u32(r, g, b));
         }
@@ -3962,6 +4170,18 @@ fn native_cell_colors(
 
 #[cfg(any(not(target_os = "macos"), test))]
 fn process_gpu_cell_color(r: u8, g: u8, b: u8, params: &NativeRenderParams) -> (u8, u8, u8) {
+    process_gpu_cell_color_at(r, g, b, params, 0, 0)
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn process_gpu_cell_color_at(
+    r: u8,
+    g: u8,
+    b: u8,
+    params: &NativeRenderParams,
+    x: u32,
+    y: u32,
+) -> (u8, u8, u8) {
     let mut rr = r as f64 / 255.0;
     let mut gg = g as f64 / 255.0;
     let mut bb = b as f64 / 255.0;
@@ -3989,11 +4209,90 @@ fn process_gpu_cell_color(r: u8, g: u8, b: u8, params: &NativeRenderParams) -> (
     gg = gg * (1.0 - bg_blend) + (4.0 / 255.0) * bg_blend;
     bb = bb * (1.0 - bg_blend) + (5.0 / 255.0) * bg_blend;
 
+    let (dither_size, dither_values) = native_dither_matrix(&params.dither_mode);
+    if dither_size > 0 {
+        let scale = params.dither_scale.max(1);
+        let mx = (x / scale) % dither_size;
+        let my = (y / scale) % dither_size;
+        let index = (my * dither_size + mx) as usize;
+        let mut threshold = (f64::from(dither_values[index]) + 0.5)
+            / f64::from(dither_size * dither_size)
+            - 0.5;
+        if params.dither_invert {
+            threshold = -threshold;
+        }
+        let delta = threshold * params.dither_strength * (64.0 / 255.0)
+            + params.dither_bias * (32.0 / 255.0);
+        rr = clamp01(rr + delta);
+        gg = clamp01(gg + delta);
+        bb = clamp01(bb + delta);
+    }
+
+    if !params.palette_colors.is_empty() {
+        let color = [
+            (clamp01(rr) * 255.0).round() as u8,
+            (clamp01(gg) * 255.0).round() as u8,
+            (clamp01(bb) * 255.0).round() as u8,
+        ];
+        let index = native_palette_index(color, params);
+        let mapped = params.palette_colors[index.min(params.palette_colors.len() - 1)];
+        return (mapped[0], mapped[1], mapped[2]);
+    }
+
     (
         (clamp01(rr) * 255.0).round() as u8,
         (clamp01(gg) * 255.0).round() as u8,
         (clamp01(bb) * 255.0).round() as u8,
     )
+}
+
+fn native_palette_index(color: [u8; 3], params: &NativeRenderParams) -> usize {
+    if params.palette_mapping == "luminance" {
+        let mut order = (0..params.palette_colors.len()).collect::<Vec<_>>();
+        order.sort_by(|a, b| {
+            native_palette_luma(params.palette_colors[*a])
+                .total_cmp(&native_palette_luma(params.palette_colors[*b]))
+                .then_with(|| a.cmp(b))
+        });
+        let position = ((native_palette_luma(color) / 256.0) * order.len() as f64).floor() as usize;
+        return order[position.min(order.len() - 1)];
+    }
+    let mut best_index = 0;
+    let mut best_distance = u64::MAX;
+    for (index, candidate) in params.palette_colors.iter().copied().enumerate() {
+        let dr = i64::from(color[0]) - i64::from(candidate[0]);
+        let dg = i64::from(color[1]) - i64::from(candidate[1]);
+        let db = i64::from(color[2]) - i64::from(candidate[2]);
+        let distance = (dr * dr + dg * dg + db * db) as u64;
+        if distance < best_distance {
+            best_distance = distance;
+            best_index = index;
+        }
+    }
+    best_index
+}
+
+fn native_palette_luma(color: [u8; 3]) -> f64 {
+    f64::from(color[0]) * 0.2126
+        + f64::from(color[1]) * 0.7152
+        + f64::from(color[2]) * 0.0722
+}
+
+fn native_dither_matrix(mode: &str) -> (u32, &'static [u8]) {
+    const BAYER_2: [u8; 4] = [0, 2, 3, 1];
+    const BAYER_4: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const BAYER_8: [u8; 64] = [
+        0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14,
+        46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19,
+        59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29,
+        53, 21,
+    ];
+    match mode {
+        "bayer2" => (2, &BAYER_2),
+        "bayer4" => (4, &BAYER_4),
+        "bayer8" => (8, &BAYER_8),
+        _ => (0, &[]),
+    }
 }
 
 fn rgb_u32(r: u8, g: u8, b: u8) -> u32 {
@@ -4092,6 +4391,7 @@ mod tests {
                 audio_reactive_presence_amount: None,
                 audio_reactive_density_dampening: None,
                 audio_reactive_noise_floor: None,
+                ..Default::default()
             },
             media_state: None,
         }
@@ -4145,18 +4445,28 @@ mod tests {
     }
 
     #[test]
-    fn native_params_reject_unbounded_or_unsupported_charset_ramps() {
+    fn native_params_sanitize_bounded_multilingual_charset_ramps() {
         let mut payload = base_payload();
         payload.params.charset = Some("asciline".to_string());
         payload.params.charset_ramp = Some("not-leading-with-space".to_string());
         let params = NativeRenderParams::from_payload(&payload);
-        assert!(params.charset_ramp.is_empty());
-        assert_eq!(native_charset_chars(&params), NATIVE_ASCII_ASCILINE_CHARS);
+        assert_eq!(params.charset_ramp, "not-leading-with-space");
 
-        payload.params.charset_ramp = Some(" aa".to_string());
-        assert!(NativeRenderParams::from_payload(&payload)
-            .charset_ramp
-            .is_empty());
+        payload.params.charset_ramp = Some(format!(" Aあ中한🙂{}", "界".repeat(120)));
+        let params = NativeRenderParams::from_payload(&payload);
+        assert_eq!(params.charset_ramp.chars().count(), 96);
+        assert!(params.charset_ramp.starts_with(" Aあ中한"));
+        assert!(!params.charset_ramp.contains('🙂'));
+    }
+
+    #[test]
+    fn native_glyph_controls_resolve_to_bounded_scalar_ids_once() {
+        let mut params = params();
+        params.charset_ramp = " Aあ中한".to_string();
+        params.glyph_depth = 3;
+        params.glyph_offset = 1;
+        params.glyph_reverse = true;
+        assert_eq!(native_glyph_ramp_ids(&params), vec!['中' as u32, 'あ' as u32, 'A' as u32]);
     }
 
     #[test]

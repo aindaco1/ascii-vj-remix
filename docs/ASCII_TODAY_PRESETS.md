@@ -55,9 +55,11 @@ those files are not redistributed by ASCII VJ Remix.
 - Canvas2D preview, stream fallback, WTF anchors, MIDI character-set stepping,
   saved presets, and native Pop Out consume the same canonical character-set
   id.
-- Native Pop Out receives the resolved ramp, rejects unsupported, duplicate,
-  non-space-leading, or oversized data, and draws only from the fixed bundled
-  glyph atlas.
+- Native Pop Out receives the resolved ramp, bounds it to supported Unicode
+  scalar ids, and draws only from the locally bundled neutral atlas. These
+  ASCII ramps retain their stricter space-leading/unique catalog contract even
+  though the general custom-ramp control also supports documented Unicode
+  blocks.
 - `npm run test:render-math` validates catalog ids, bounds, uniqueness, source
   metadata, and luminance lookup. Rust tests validate native ramp filtering.
 

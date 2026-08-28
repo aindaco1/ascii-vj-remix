@@ -1,4 +1,5 @@
-import { ASCII_CHARS, characterSetChars } from './character-sets.js';
+import { ASCII_CHARS, activeGlyphRamp } from './character-sets.js';
+import { processPaletteDither } from './palettes.js';
 
 const GPU_BACKGROUND = [3 / 255, 4 / 255, 5 / 255];
 
@@ -31,17 +32,23 @@ function applyBasicColorAdjustments(r, g, b, params) {
     return [rr, gg, bb];
 }
 
-function processCanvasColorLegacy(r, g, b, params) {
+function processCanvasColorLegacy(r, g, b, params, x = 0, y = 0, paletteLut = null) {
     const [rr, gg, bb] = applyBasicColorAdjustments(r, g, b, params);
+    let color;
     if ((params?.quantizeBits || 0) > 0) {
         const mask = (255 << params.quantizeBits) & 255;
-        return [
+        color = [
             Math.round(rr * 255) & mask,
             Math.round(gg * 255) & mask,
             Math.round(bb * 255) & mask
         ];
+    } else {
+        color = [Math.round(rr * 255), Math.round(gg * 255), Math.round(bb * 255)];
     }
-    return [Math.round(rr * 255), Math.round(gg * 255), Math.round(bb * 255)];
+    if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
+        return color;
+    }
+    return processPaletteDither(color, x, y, params, paletteLut);
 }
 
 function processStreamColorLegacy(r, g, b, params) {
@@ -59,7 +66,7 @@ function shaderHash(x, y) {
     return fract((p3x + p3y) * p3z);
 }
 
-function processGpuCellColor(r, g, b, params) {
+function processGpuCellColor(r, g, b, params, x = 0, y = 0, paletteLut = null) {
     let [rr, gg, bb] = applyBasicColorAdjustments(r, g, b, params);
     const quantizeBits = Math.max(0, Math.round(params?.quantizeBits || 0));
     if (quantizeBits > 0) {
@@ -73,15 +80,19 @@ function processGpuCellColor(r, g, b, params) {
     rr = rr * (1 - bgBlend) + GPU_BACKGROUND[0] * bgBlend;
     gg = gg * (1 - bgBlend) + GPU_BACKGROUND[1] * bgBlend;
     bb = bb * (1 - bgBlend) + GPU_BACKGROUND[2] * bgBlend;
-    return [Math.round(rr * 255), Math.round(gg * 255), Math.round(bb * 255)];
+    const color = [Math.round(rr * 255), Math.round(gg * 255), Math.round(bb * 255)];
+    if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
+        return color;
+    }
+    return processPaletteDither(color, x, y, params, paletteLut);
 }
 
 function charsetChars(params) {
-    return characterSetChars(params?.charset);
+    return activeGlyphRamp(params);
 }
 
-function glyphForLuma(luma, params) {
-    const chars = charsetChars(params);
+function glyphForLuma(luma, params, resolvedRamp = null) {
+    const chars = resolvedRamp || charsetChars(params);
     const idx = Math.min(chars.length - 1, Math.floor(luma / 256 * chars.length));
     return chars[idx] || ' ';
 }

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "id": "neutral",
+  "source": {
+    "name": "GNU Unifont",
+    "version": "17.0.05",
+    "sha256": "2ae5311c8e123e9e85f5331cd012aa99757071df23243f1487fdbf8f3acd86be"
+  },
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "pageWidth": 1024,
+  "pageHeight": 1024,
+  "pageColumns": 64,
+  "pageGlyphs": 4096,
+  "pageCount": 16,
+  "glyphId": "unicode-scalar",
+  "coverage": [
+    {
+      "id": "ascii",
+      "start": 32,
+      "end": 126
+    },
+    {
+      "id": "latin-1",
+      "start": 160,
+      "end": 255
+    },
+    {
+      "id": "latin-extended",
+      "start": 256,
+      "end": 591
+    },
+    {
+      "id": "greek",
+      "start": 880,
+      "end": 1023
+    },
+    {
+      "id": "cyrillic",
+      "start": 1024,
+      "end": 1327
+    },
+    {
+      "id": "arrows",
+      "start": 8592,
+      "end": 8703
+    },
+    {
+      "id": "math",
+      "start": 8704,
+      "end": 8959
+    },
+    {
+      "id": "technical",
+      "start": 8960,
+      "end": 9215
+    },
+    {
+      "id": "box-drawing",
+      "start": 9472,
+      "end": 9599
+    },
+    {
+      "id": "blocks",
+      "start": 9600,
+      "end": 9631
+    },
+    {
+      "id": "shapes",
+      "start": 9632,
+      "end": 9727
+    },
+    {
+      "id": "braille",
+      "start": 10240,
+      "end": 10495
+    },
+    {
+      "id": "cjk-radicals",
+      "start": 11904,
+      "end": 12255
+    },
+    {
+      "id": "cjk-punctuation",
+      "start": 12288,
+      "end": 12351
+    },
+    {
+      "id": "hiragana",
+      "start": 12352,
+      "end": 12447
+    },
+    {
+      "id": "katakana",
+      "start": 12448,
+      "end": 12543
+    },
+    {
+      "id": "cjk-basic",
+      "start": 19968,
+      "end": 40959
+    },
+    {
+      "id": "hangul",
+      "start": 44032,
+      "end": 55215
+    }
+  ],
+  "glyphCount": 34895,
+  "pages": [
+    {
+      "index": 0,
+      "filename": "page-0.png",
+      "glyphCount": 975,
+      "sha256": "7f4d71ffc28fa6e36f9bd638b31b2d4b324a8712a91b15a5d26b744e55843adc"
+    },
+    {
+      "index": 1,
+      "filename": "page-1.png",
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
+    },
+    {
+      "index": 2,
+      "filename": "page-2.png",
+      "glyphCount": 1488,
+      "sha256": "0b987c14afc66c6f0080a129aed702b8b1381ab44cd941a92faf20082eac1c84"
+    },
+    {
+      "index": 3,
+      "filename": "page-3.png",
+      "glyphCount": 256,
+      "sha256": "ee6bd413707213ba1ddbe512397244a644884eda08f4542a98edc6cdca86b0ce"
+    },
+    {
+      "index": 4,
+      "filename": "page-4.png",
+      "glyphCount": 512,
+      "sha256": "f4cc5320c5caa66808f55fb28c0d530ab070a6111b28ee92569832f87da0116c"
+    },
+    {
+      "index": 5,
+      "filename": "page-5.png",
+      "glyphCount": 4096,
+      "sha256": "301229db34ab294808caaed588dcf4b336e7c1fd740b7baa1f6454f6a92f6d04"
+    },
+    {
+      "index": 6,
+      "filename": "page-6.png",
+      "glyphCount": 4096,
+      "sha256": "f219e4852d60bd76dd9efaf80032e5103a87dc17113a95476fd3c7bbaf0988e3"
+    },
+    {
+      "index": 7,
+      "filename": "page-7.png",
+      "glyphCount": 4096,
+      "sha256": "80ab5bb64489af04dfdb044f9e3513ca79cb5979f1f07136cd810b094001ab39"
+    },
+    {
+      "index": 8,
+      "filename": "page-8.png",
+      "glyphCount": 4096,
+      "sha256": "d3082c3d9814f0439e7be962638b733be932061f3c4edd4fd64cf6d8930f37b7"
+    },
+    {
+      "index": 9,
+      "filename": "page-9.png",
+      "glyphCount": 4096,
+      "sha256": "1a34ec20c8e4188feff25c48720e57a05caf6fc00fda4f5859e84e3fcf550e36"
+    },
+    {
+      "index": 10,
+      "filename": "page-10.png",
+      "glyphCount": 1024,
+      "sha256": "9b5be4a47ca6dbaf889f2df151e518ee775e637a88dc822dddb8ac590197bf62"
+    },
+    {
+      "index": 11,
+      "filename": "page-11.png",
+      "glyphCount": 4096,
+      "sha256": "3b0c9f26aa969c234ed7a1a01574ee3f54ade966d3dd8c3784ad3e0aca606b37"
+    },
+    {
+      "index": 12,
+      "filename": "page-12.png",
+      "glyphCount": 4096,
+      "sha256": "b39ffb708705f1f886dd9bb80d8d34bbdc1cca61769ee6552565bd6be5ec6e32"
+    },
+    {
+      "index": 13,
+      "filename": "page-13.png",
+      "glyphCount": 1968,
+      "sha256": "46a35140d916440a6e5648223b87a888d14a2ae70741de0a35a17c9518f016ce"
+    },
+    {
+      "index": 14,
+      "filename": "page-14.png",
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
+    },
+    {
+      "index": 15,
+      "filename": "page-15.png",
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
+    }
+  ]
+}

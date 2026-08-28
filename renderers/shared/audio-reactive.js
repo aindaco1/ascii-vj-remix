@@ -36,7 +36,8 @@ export const AUDIO_REACTIVE_PRESETS = [
             ['jitterAmount', 'flux', 0.36],
             ['jitterSpeed', 'treble', 1],
             ['saturationBoost', 'mid', 0.44],
-            ['gamma', 'beatPulse', -0.15]
+            ['gamma', 'beatPulse', -0.15],
+            ['ditherStrength', 'flux', 0.18]
         ],
         sway: 0.07
     },
@@ -143,7 +144,9 @@ export const AUDIO_REACTIVE_SAFE_LIMITS = {
     jitterAmount: [0, 1],
     jitterSpeed: [0, 4],
     sampleX: [0.04, 0.96],
-    sampleY: [0.04, 0.96]
+    sampleY: [0.04, 0.96],
+    ditherStrength: [0, 1],
+    ditherBias: [-1, 1]
 };
 
 export const AUDIO_REACTIVE_PRESET_MAP = new Map(AUDIO_REACTIVE_PRESETS.map((preset) => [preset.id, preset]));

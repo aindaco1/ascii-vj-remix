@@ -8,9 +8,10 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current packaged version and latest public release are 0.9.10. Unreleased
-changes are recorded in the [Changelog](CHANGELOG.md); prospective work belongs
-in the [Roadmap](docs/ROADMAP.md).
+The current source/package version is 0.9.11. The latest verified public
+release is 0.9.10 until 0.9.11 publication and post-publication acceptance are
+complete. Release history is recorded in the [Changelog](CHANGELOG.md);
+prospective work belongs in the [Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
 
@@ -75,6 +76,18 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   - Vulkan/GLES on Linux.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets instead of flattening them into solid cells.
+- Sixteen project-native palettes, nearest-color/luminance mapping, and ordered
+  Bayer 2x2/4x4/8x8 dithering share one parameter and lookup-table contract
+  across browser, Canvas, and native output paths.
+- Glyph controls cover depth, offset, reverse, source/fixed color, background,
+  Braille, common drawing/symbol blocks, Latin Extended, Greek, Cyrillic, CJK
+  marks, Hiragana, Katakana, CJK Unified U+4E00-U+9FFF, Hangul, and custom typed
+  ramps of up to 96 supported Unicode scalars.
+- The neutral Unicode atlas is generated and verified offline, bundled locally,
+  and loaded in bounded 1024px pages only as selected glyphs need them.
+- Normal density is performance-guarded by shared column and total-cell limits.
+  The global Advanced Density preference exposes up to 900 columns without a
+  30 FPS guarantee and is never stored in visual presets.
 - Version 0.9.6 removes duplicate native source-frame uploads, reuses stable GPU
   resources, and bounds transition-time UI work without changing renderer math
   or quality settings.
@@ -96,6 +109,11 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   [ascii.today Character Presets](docs/ASCII_TODAY_PRESETS.md).
 - Character Set and Font Family controls stay compact so traditional ASCII
   tuning does not crowd the dense live-control surface.
+- Palette, mapping, ordered-dither, glyph-ramp, and glyph-color controls are
+  independently tunable and saved through the existing visual-preset schema.
+- Ten built-in palette/glyph variants include Braille, box drawing, CJK marks,
+  Hiragana, Katakana, CJK Unified, and Hangul looks. The other six palettes are
+  incorporated into existing presets.
 - User presets can be saved, duplicated, updated, deleted, imported, and
   exported.
 - Preset transitions crossfade instead of fading to black.
@@ -207,7 +225,7 @@ output windows all increase load.
 
 | Level | Requirement |
 | --- | --- |
-| Minimum | Apple Silicon Mac, macOS 13 Ventura or newer, 8 GB RAM, Metal-capable GPU, 2 GB free disk space. Official macOS builds are Apple Silicon first. |
+| Minimum | Apple M1 or newer, macOS 13 Ventura or newer, 16 GB RAM, Metal-capable GPU, 2 GB free disk space. Official macOS builds are Apple Silicon first. |
 | Optimal | M1 Pro/Max, M2 Pro/Max, M3 Pro/Max, or newer; 16 GB RAM or more; macOS 14 Sonoma, macOS 15 Sequoia, or newer; external display/projector for Pop Out. |
 
 Notes:
@@ -223,7 +241,7 @@ Notes:
 
 | Level | Requirement |
 | --- | --- |
-| Minimum | Windows 10 22H2 or Windows 11, x64 CPU, WebView2 runtime, D3D12 or WebGL2-capable GPU, 8 GB RAM, 2 GB free disk space. |
+| Minimum | Windows 10 22H2 or Windows 11, x64 CPU, WebView2 runtime, integrated GPU broadly comparable to Apple M1 graphics with D3D12 or WebGL2 support, 16 GB RAM, 2 GB free disk space. |
 | Optimal | Windows 11, recent Intel/AMD/NVIDIA GPU with current drivers, 16 GB RAM or more, hardware media decode, dedicated output display. |
 
 Notes:
@@ -253,7 +271,7 @@ Notes:
 
 | Level | Hardware |
 | --- | --- |
-| Minimum | 4-core CPU, 8 GB RAM, integrated GPU with WebGL2/Metal/D3D12/Vulkan/GLES support, 1080p display, one camera or one local media source at a time. |
+| Minimum | Apple M1-class or comparable 4-core-plus CPU/integrated GPU, 16 GB RAM, WebGL2/Metal/D3D12/Vulkan/GLES support, 1080p display, one camera or one local media source at a time. |
 | Optimal | 8 or more performance cores, 16 to 32 GB RAM, Apple Silicon Pro/Max or a recent discrete GPU, hardware video decode, SSD storage, external display/projector, USB or HDMI capture hardware, class-compliant audio interface. |
 
 For live camera work, the best upgrade is often not raw CPU. Use stable USB
@@ -271,6 +289,8 @@ On laptops:
 - Expect higher battery drain than a normal media player.
 - Use AC power for performances or long sessions.
 - Lower columns, FPS, camera resolution, and jitter if the machine gets hot.
+- Leave Advanced Density off for the performance-guarded range; high column
+  counts can increase total cells sharply when auto rows are active.
 - Close Pop Out when you do not need a second output surface.
 - Prefer the built-in Demo Image or a single video when testing on battery.
 
@@ -332,10 +352,12 @@ portal packages are installed for your distribution.
 2. The renderer starts automatically on Demo Image.
 3. Choose a built-in preset from the Presets panel.
 4. Use Source to switch to Demo Video, Camera, or a custom local file.
-5. Use Audio Reactivity to select Mic/Input, Audio File, or System/Display
+5. Tune Palette, Dither, and Glyph controls independently, or choose one of the
+   built-in palette/glyph presets.
+6. Use Audio Reactivity to select Mic/Input, Audio File, or System/Display
    audio.
-6. Use Pop Out to create a separate output window for another screen.
-7. Use WTF when you want the app to keep generating extreme or traditional
+7. Use Pop Out to create a separate output window for another screen.
+8. Use WTF when you want the app to keep generating extreme or traditional
    ASCII-flavored transitions.
 
 If the renderer does not start, press Start once. If it still does not start,

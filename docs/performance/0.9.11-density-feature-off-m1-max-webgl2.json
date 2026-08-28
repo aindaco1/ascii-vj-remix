@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-08-28T09:39:28.309Z",
+  "sourceApp": "/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app",
+  "durationMs": 9000,
+  "sampleMs": 250,
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "MacBookPro18,2",
+    "chip": "Apple M1 Max",
+    "memory": "64 GB"
+  },
+  "runs": [
+    {
+      "ok": true,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 640,
+      "syntheticAudio": true,
+      "backend": "webgl2",
+      "paletteId": "none",
+      "ditherMode": "none",
+      "charset": "point-click",
+      "phases": {
+        "main": {
+          "mainAvgFps": 39.053,
+          "mainMinFps": 32,
+          "mainP95FrameMs": 29.524,
+          "mainP99FrameMs": 30.905,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 39.877,
+          "mainMinFps": 32,
+          "mainP95FrameMs": 29.463,
+          "mainP99FrameMs": 30.893,
+          "nativeOkHz": 49.183
+        },
+        "transition": {
+          "mainAvgFps": 35.384,
+          "mainMinFps": 27.778,
+          "mainP95FrameMs": 33.525,
+          "mainP99FrameMs": 35.505,
+          "nativeOkHz": 77.381
+        }
+      },
+      "actualBackends": [
+        "webgl2"
+      ],
+      "nativeFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 409,
+      "error": null,
+      "sampleCount": 36,
+      "mainAvgFps": 38.10466666666667,
+      "mainMinFps": 27.778,
+      "mainP95FrameMs": 33.525,
+      "mainP99FrameMs": 35.505,
+      "exitCode": 0,
+      "rssSampleCount": 29,
+      "rssPeakMb": 444.15625,
+      "rssMinMb": 0.03125
+    }
+  ]
+}

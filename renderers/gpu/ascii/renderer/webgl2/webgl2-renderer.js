@@ -6,6 +6,21 @@
  * Image: texImage2D() once on init
  */
 
+import {
+    DITHER_MATRICES,
+    buildPaletteLut,
+    paletteById
+} from '../../../../shared/palettes.js';
+import {
+    GLYPH_ATLAS_PAGE_COUNT,
+    GLYPH_ATLAS_PAGE_SIZE,
+    GLYPH_RAMP_LIMIT,
+    glyphAtlasPagesForRamp,
+    glyphRampCodePoints,
+    glyphResourceInputKey,
+    loadGlyphAtlasPage
+} from '../../../../shared/glyph-atlas.js';
+
 const CELL_PASS_VERT = `#version 300 es
 in vec2 a_position;
 out vec2 v_texCoord;
@@ -30,6 +45,15 @@ uniform float u_sampleX;
 uniform float u_sampleY;
 uniform float u_time;
 uniform int u_mirrorX;
+uniform sampler2D u_paletteLut;
+uniform vec3 u_paletteColors[16];
+uniform int u_paletteCount;
+uniform float u_ditherValues[64];
+uniform int u_ditherSize;
+uniform float u_ditherStrength;
+uniform int u_ditherScale;
+uniform float u_ditherBias;
+uniform int u_ditherInvert;
 in vec2 v_texCoord;
 out vec4 fragColor;
 
@@ -38,6 +62,15 @@ float hash(vec2 p) {
     vec3 p3 = fract(vec3(p.x, p.y, p.x) * 0.1031);
     p3 += dot(p3, vec3(p3.y + 33.33, p3.z + 33.33, p3.x + 33.33));
     return fract((p3.x + p3.y) * p3.z);
+}
+
+float orderedThreshold(ivec2 cellCoord) {
+    if (u_ditherSize <= 0) return 0.0;
+    int scale = max(1, u_ditherScale);
+    int mx = (cellCoord.x / scale) % u_ditherSize;
+    int my = (cellCoord.y / scale) % u_ditherSize;
+    float threshold = u_ditherValues[my * u_ditherSize + mx];
+    return u_ditherInvert == 1 ? -threshold : threshold;
 }
 
 void main() {
@@ -72,7 +105,21 @@ void main() {
 
     boosted = mix(boosted, vec3(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(u_bgBlend, 0.0, 1.0));
 
-    fragColor = vec4(boosted, 1.0);
+    if (u_ditherSize > 0) {
+        float delta = orderedThreshold(ivec2(cellCoord)) * u_ditherStrength * (64.0 / 255.0) +
+            u_ditherBias * (32.0 / 255.0);
+        boosted = clamp(boosted + vec3(delta), 0.0, 1.0);
+    }
+
+    if (u_paletteCount > 0) {
+        ivec3 q = ivec3(clamp(floor(boosted * 255.0 / 8.0), 0.0, 31.0));
+        int row = q.r * 32 + q.g;
+        int paletteIndex = int(round(texelFetch(u_paletteLut, ivec2(q.b, row), 0).r * 255.0));
+        boosted = u_paletteColors[clamp(paletteIndex, 0, u_paletteCount - 1)];
+    }
+
+    float luma = dot(boosted, vec3(0.2126, 0.7152, 0.0722));
+    fragColor = vec4(boosted, luma);
 }`;
 
 const RENDER_PASS_VERT = `#version 300 es
@@ -85,10 +132,19 @@ void main() {
 
 const RENDER_PASS_FRAG = `#version 300 es
 precision highp float;
+precision highp sampler2DArray;
+precision highp usampler2D;
 uniform sampler2D u_cellColors;
+uniform sampler2DArray u_glyphAtlas;
+uniform usampler2D u_glyphRamp;
 uniform vec2 u_gridSize;
 uniform vec2 u_cellSize;
 uniform vec2 u_canvasSize;
+uniform int u_glyphMode;
+uniform int u_glyphCount;
+uniform int u_glyphColorMode;
+uniform vec3 u_glyphColor;
+uniform vec3 u_backgroundColor;
 in vec2 v_texCoord;
 out vec4 fragColor;
 
@@ -96,9 +152,35 @@ void main() {
     vec2 pixel = v_texCoord * u_canvasSize;
     vec2 cellCoord = floor(pixel / u_cellSize);
     cellCoord = clamp(cellCoord, vec2(0.0), u_gridSize - 1.0);
-    vec4 color = texelFetch(u_cellColors, ivec2(cellCoord), 0);
-    fragColor = color;
+    vec4 cell = texelFetch(u_cellColors, ivec2(cellCoord), 0);
+    if (u_glyphMode == 0 || u_glyphCount <= 0) {
+        fragColor = vec4(cell.rgb, 1.0);
+        return;
+    }
+    vec2 local = pixel - cellCoord * u_cellSize;
+    ivec2 glyphPixel = ivec2(clamp(floor(local / u_cellSize * 16.0), vec2(0.0), vec2(15.0)));
+    int rampIndex = min(int(clamp(cell.a, 0.0, 0.99999) * float(u_glyphCount)), u_glyphCount - 1);
+    uint glyphId = texelFetch(u_glyphRamp, ivec2(rampIndex, 0), 0).r;
+    int page = int(glyphId / 4096u);
+    uint slot = glyphId % 4096u;
+    ivec2 atlasPixel = ivec2(
+        int(slot % 64u) * 16 + glyphPixel.x,
+        int(slot / 64u) * 16 + glyphPixel.y
+    );
+    float alpha = texelFetch(u_glyphAtlas, ivec3(atlasPixel, page), 0).r;
+    if (alpha <= 0.5) {
+        fragColor = vec4(u_backgroundColor, 1.0);
+        return;
+    }
+    vec3 foreground = u_glyphColorMode == 1 ? u_glyphColor : cell.rgb;
+    fragColor = vec4(foreground, 1.0);
 }`;
+
+function colorFloats(value, fallback = '#030405') {
+    const match = /^#([0-9a-f]{6})$/i.exec(String(value || '')) || /^#([0-9a-f]{6})$/i.exec(fallback);
+    const packed = Number.parseInt(match[1], 16);
+    return [(packed >> 16 & 255) / 255, (packed >> 8 & 255) / 255, (packed & 255) / 255];
+}
 
 export class WebGL2Renderer {
     constructor(options = {}) {
@@ -114,6 +196,23 @@ export class WebGL2Renderer {
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
+        this.paletteId = options.paletteId || 'none';
+        this.paletteMapping = options.paletteMapping || 'nearest';
+        this.ditherMode = options.ditherMode || 'none';
+        this.ditherStrength = options.ditherStrength ?? 0.45;
+        this.ditherScale = options.ditherScale || 1;
+        this.ditherBias = options.ditherBias || 0;
+        this.ditherInvert = options.ditherInvert === true;
+        this.solidMode = options.solidMode === true;
+        this.glyphMode = options.glyphMode !== false;
+        this.charset = options.charset || 'point-click';
+        this.customGlyphRamp = options.customGlyphRamp || '';
+        this.glyphDepth = options.glyphDepth || GLYPH_RAMP_LIMIT;
+        this.glyphOffset = options.glyphOffset || 0;
+        this.glyphReverse = options.glyphReverse === true;
+        this.glyphColorMode = options.glyphColorMode || 'source';
+        this.glyphColor = options.glyphColor || '#ffffff';
+        this.backgroundColor = options.backgroundColor || '#030405';
         this.jitterAmount = options.jitterAmount || 0;
         this.jitterSpeed = options.jitterSpeed || 1;
         this.sampleX = options.sampleX ?? 0.5;
@@ -150,6 +249,15 @@ export class WebGL2Renderer {
         this.sourceTexture = null;
         this.cellColorTexture = null;
         this.cellFramebuffer = null;
+        this.paletteLutTexture = null;
+        this.glyphAtlasTexture = null;
+        this.glyphRampTexture = null;
+        this.loadedGlyphPages = new Set();
+        this.pendingGlyphPages = new Set();
+        this.glyphInputKey = '';
+        this.glyphResourceKey = '';
+        this.glyphRampLength = 0;
+        this.featureResourceKey = '';
         this.quadVAO = null;
 
         this.rows = 0;
@@ -193,13 +301,29 @@ export class WebGL2Renderer {
             'u_sampleX',
             'u_sampleY',
             'u_time',
-            'u_mirrorX'
+            'u_mirrorX',
+            'u_paletteLut',
+            'u_paletteColors[0]',
+            'u_paletteCount',
+            'u_ditherValues[0]',
+            'u_ditherSize',
+            'u_ditherStrength',
+            'u_ditherScale',
+            'u_ditherBias',
+            'u_ditherInvert'
         ]);
         this.renderUniforms = this._uniformLocations(this.renderProgram, [
             'u_cellColors',
+            'u_glyphAtlas',
+            'u_glyphRamp',
             'u_gridSize',
             'u_cellSize',
-            'u_canvasSize'
+            'u_canvasSize',
+            'u_glyphMode',
+            'u_glyphCount',
+            'u_glyphColorMode',
+            'u_glyphColor',
+            'u_backgroundColor'
         ]);
 
         // Fullscreen quad VAO
@@ -230,8 +354,30 @@ export class WebGL2Renderer {
         }
 
         this._createCellTexture();
+        this.paletteLutTexture = gl.createTexture();
+        this.glyphAtlasTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
+        gl.texStorage3D(
+            gl.TEXTURE_2D_ARRAY,
+            1,
+            gl.R8,
+            GLYPH_ATLAS_PAGE_SIZE,
+            GLYPH_ATLAS_PAGE_SIZE,
+            GLYPH_ATLAS_PAGE_COUNT
+        );
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this.glyphRampTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.glyphRampTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
         this.initialized = true;
+        this.syncFeatureResources(true);
         console.log(`[WebGL2] ${this.source.type} source, ${this.cols}x${this.rows} cells, ${this.canvasWidth}x${this.canvasHeight}px`);
     }
 
@@ -315,6 +461,110 @@ export class WebGL2Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
     }
 
+    syncFeatureResources(force = false) {
+        if (!this.gl || !this.paletteLutTexture) return;
+        const key = `${this.paletteId}:${this.paletteMapping}:${this.ditherMode}`;
+        if (!force && key === this.featureResourceKey) {
+            this.syncGlyphResources();
+            return;
+        }
+        this.featureResourceKey = key;
+
+        const gl = this.gl;
+        const palette = paletteById(this.paletteId);
+        const lut = buildPaletteLut(this.paletteId, this.paletteMapping) || new Uint8Array(32 * 32 * 32);
+        const paletteColors = new Float32Array(16 * 3);
+        for (let index = 0; index < (palette?.colors.length || 0); index++) {
+            const color = palette.colors[index];
+            paletteColors[index * 3] = color[0] / 255;
+            paletteColors[index * 3 + 1] = color[1] / 255;
+            paletteColors[index * 3 + 2] = color[2] / 255;
+        }
+        const matrix = DITHER_MATRICES[this.ditherMode];
+        const ditherValues = new Float32Array(64);
+        if (matrix) {
+            const area = matrix.size * matrix.size;
+            for (let index = 0; index < area; index++) {
+                ditherValues[index] = (matrix.values[index] + 0.5) / area - 0.5;
+            }
+        }
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 1024, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.useProgram(this.cellProgram);
+        gl.uniform1i(this.cellUniforms.u_paletteLut, 1);
+        gl.uniform3fv(this.cellUniforms['u_paletteColors[0]'], paletteColors);
+        gl.uniform1i(this.cellUniforms.u_paletteCount, palette?.colors.length || 0);
+        gl.uniform1fv(this.cellUniforms['u_ditherValues[0]'], ditherValues);
+        gl.uniform1i(this.cellUniforms.u_ditherSize, matrix?.size || 0);
+        this.syncGlyphResources(force);
+    }
+
+    syncGlyphResources(force = false) {
+        if (!this.gl || !this.glyphAtlasTexture || !this.glyphRampTexture) return;
+        const inputKey = glyphResourceInputKey(this);
+        if (!force && inputKey === this.glyphInputKey) return;
+        this.glyphInputKey = inputKey;
+        const ramp = glyphRampCodePoints(this);
+        this.glyphRampLength = ramp.length;
+        const enabled = this.glyphMode && !this.solidMode && ramp.length > 0;
+        const key = `${enabled}:${Array.from(ramp).join(',')}:${this.glyphColorMode}:${this.glyphColor}:${this.backgroundColor}`;
+        if (!force && key === this.glyphResourceKey) return;
+        this.glyphResourceKey = key;
+
+        const gl = this.gl;
+        const paddedRamp = new Uint32Array(GLYPH_RAMP_LIMIT);
+        paddedRamp.set(ramp.subarray(0, GLYPH_RAMP_LIMIT));
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.glyphRampTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.R32UI,
+            GLYPH_RAMP_LIMIT,
+            1,
+            0,
+            gl.RED_INTEGER,
+            gl.UNSIGNED_INT,
+            paddedRamp
+        );
+
+        if (!enabled) return;
+        for (const page of glyphAtlasPagesForRamp(ramp)) {
+            if (this.loadedGlyphPages.has(page) || this.pendingGlyphPages.has(page)) continue;
+            this.pendingGlyphPages.add(page);
+            loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
+                .then((pixels) => {
+                    if (!this.gl || !this.glyphAtlasTexture) return;
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
+                    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+                    gl.texSubImage3D(
+                        gl.TEXTURE_2D_ARRAY,
+                        0,
+                        0,
+                        0,
+                        page,
+                        GLYPH_ATLAS_PAGE_SIZE,
+                        GLYPH_ATLAS_PAGE_SIZE,
+                        1,
+                        gl.RED,
+                        gl.UNSIGNED_BYTE,
+                        pixels
+                    );
+                    this.loadedGlyphPages.add(page);
+                })
+                .catch((error) => console.warn(`[WebGL2] Glyph atlas page ${page} unavailable:`, error))
+                .finally(() => this.pendingGlyphPages.delete(page));
+        }
+    }
+
     _renderFrame() {
         if (!this.initialized) return;
 
@@ -352,6 +602,13 @@ export class WebGL2Renderer {
         gl.uniform1f(cellUniforms.u_sampleY, this.sampleY);
         gl.uniform1f(cellUniforms.u_time, this.frameCount / Math.max(1, this.fps));
         gl.uniform1i(cellUniforms.u_mirrorX, this.mirrorX ? 1 : 0);
+        gl.uniform1f(cellUniforms.u_ditherStrength, this.ditherStrength);
+        gl.uniform1i(cellUniforms.u_ditherScale, Math.max(1, Math.round(this.ditherScale)));
+        gl.uniform1f(cellUniforms.u_ditherBias, this.ditherBias);
+        gl.uniform1i(cellUniforms.u_ditherInvert, this.ditherInvert ? 1 : 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
 
         gl.bindVertexArray(this.quadVAO);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -368,6 +625,17 @@ export class WebGL2Renderer {
         gl.uniform2f(renderUniforms.u_gridSize, this.cols, this.rows);
         gl.uniform2f(renderUniforms.u_cellSize, this.cellWidth, this.cellHeight);
         gl.uniform2f(renderUniforms.u_canvasSize, this.canvasWidth, this.canvasHeight);
+        gl.uniform1i(renderUniforms.u_glyphMode, this.glyphMode && !this.solidMode ? 1 : 0);
+        gl.uniform1i(renderUniforms.u_glyphCount, this.glyphRampLength);
+        gl.uniform1i(renderUniforms.u_glyphColorMode, this.glyphColorMode === 'fixed' ? 1 : 0);
+        gl.uniform3fv(renderUniforms.u_glyphColor, colorFloats(this.glyphColor, '#ffffff'));
+        gl.uniform3fv(renderUniforms.u_backgroundColor, colorFloats(this.backgroundColor));
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
+        gl.uniform1i(renderUniforms.u_glyphAtlas, 2);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.glyphRampTexture);
+        gl.uniform1i(renderUniforms.u_glyphRamp, 3);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         gl.bindVertexArray(null);
@@ -443,6 +711,9 @@ export class WebGL2Renderer {
         const gl = this.gl;
         if (gl) {
             if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
+            if (this.paletteLutTexture) gl.deleteTexture(this.paletteLutTexture);
+            if (this.glyphAtlasTexture) gl.deleteTexture(this.glyphAtlasTexture);
+            if (this.glyphRampTexture) gl.deleteTexture(this.glyphRampTexture);
             if (this.sourceTexture) gl.deleteTexture(this.sourceTexture);
             if (this.cellFramebuffer) gl.deleteFramebuffer(this.cellFramebuffer);
             if (this.cellProgram) gl.deleteProgram(this.cellProgram);
