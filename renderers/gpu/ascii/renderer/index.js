@@ -6,10 +6,7 @@
 
 import { WebGPURenderer } from './webgpu/webgpu-renderer.js?v=20260618-camera-source';
 import { WebGL2Renderer } from './webgl2/webgl2-renderer.js?v=20260618-camera-source';
-import {
-    needsWebKitGlyphFallback,
-    selectRendererBackend
-} from './backend-policy.js';
+import { selectRendererBackend } from './backend-policy.js';
 
 let capabilities = null;
 
@@ -70,16 +67,7 @@ async function detectCapabilities() {
  */
 async function createRenderer(options = {}) {
     const caps = await detectCapabilities();
-    const userAgent = navigator.userAgent || '';
-    const backend = selectRendererBackend(caps, options, userAgent);
-
-    if (
-        backend === 'webgl2' &&
-        caps.webgpu &&
-        needsWebKitGlyphFallback(options, userAgent)
-    ) {
-        console.info('[Renderer] Using WebGL2 for Apple WebKit glyph compatibility');
-    }
+    const backend = selectRendererBackend(caps, options);
 
     console.log(`[Renderer] Using ${backend} backend for ${options.source?.type || 'unknown'} source`);
 

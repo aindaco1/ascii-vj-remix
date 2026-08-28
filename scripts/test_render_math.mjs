@@ -47,7 +47,7 @@ import {
 } from '../renderers/shared/glyph-atlas.js';
 import {
   isAppleWebKitUserAgent,
-  needsWebKitGlyphFallback,
+  needsWebKitCanvasGlyphPreview,
   selectRendererBackend
 } from '../renderers/gpu/ascii/renderer/backend-policy.js';
 
@@ -147,16 +147,17 @@ const chromeUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWe
 const acceleratedCapabilities = { webgpu: true, webgl2: true, cpu: true };
 assert.equal(isAppleWebKitUserAgent(safariUserAgent), true);
 assert.equal(isAppleWebKitUserAgent(chromeUserAgent), false);
-assert.equal(needsWebKitGlyphFallback({ glyphMode: true, solidMode: false }, safariUserAgent), true);
-assert.equal(selectRendererBackend(acceleratedCapabilities, { glyphMode: true }, safariUserAgent), 'webgl2');
+assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: true, solidMode: false }, safariUserAgent), true);
+assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: false, solidMode: true }, safariUserAgent), false);
+assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: true }, chromeUserAgent), false);
+assert.equal(selectRendererBackend(acceleratedCapabilities, { glyphMode: true }), 'webgpu');
 assert.equal(selectRendererBackend(acceleratedCapabilities, {
   preferredBackend: 'webgpu', glyphMode: true
-}, safariUserAgent), 'webgl2');
+}), 'webgpu');
 assert.equal(selectRendererBackend(acceleratedCapabilities, {
   preferredBackend: 'webgpu', glyphMode: false, solidMode: true
-}, safariUserAgent), 'webgpu');
-assert.equal(selectRendererBackend(acceleratedCapabilities, { glyphMode: true }, chromeUserAgent), 'webgpu');
-assert.equal(selectRendererBackend({ webgpu: true, webgl2: false }, { glyphMode: true }, safariUserAgent), 'webgpu');
+}), 'webgpu');
+assert.equal(selectRendererBackend({ webgpu: false, webgl2: true }, { glyphMode: true }), 'webgl2');
 
 const acceleratedGrid = resolveGridDimensions({
   backend: 'webgpu', cols: 640, autoRows: true, cellWidth: 2, cellHeight: 3, aspectCorrection: 1

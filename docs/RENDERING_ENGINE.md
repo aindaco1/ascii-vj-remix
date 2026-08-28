@@ -257,12 +257,12 @@ active backend are hidden or disabled.
 
 Backend choice is resolved once per renderer construction in
 `renderers/gpu/ascii/renderer/backend-policy.js`; it is not evaluated in the
-frame loop. Apple WebKit glyph mode uses WebGL2 even when WebGPU is available
-or manually requested because the WebKit WebGPU atlas path can expose a live
-renderer while presenting an empty canvas. Solid-cell mode can still use
-WebGPU, and glyph mode retains WebGPU on compatible runtimes. If WebGL2 is not
-available, WebGPU remains the last accelerated option rather than falling
-straight to an unavailable CPU renderer.
+frame loop. The macOS Apple WebKit primary view uses the bounded Canvas2D path
+for glyph mode even when a browser GPU backend is available or manually
+requested, because both browser GPU glyph-atlas paths can expose a live
+renderer while presenting an empty canvas there. Solid/pixel primary presets
+can still use WebGPU, and glyph mode retains browser GPU rendering on compatible
+runtimes. Native Pop Out backend selection is separate and unchanged.
 
 ## WebGPU Renderer
 
@@ -326,9 +326,9 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
 - all 18 shader uniform locations are cached after program linking rather than
   queried again during each frame.
 
-WebGL2 is the most important browser fallback because it is widely available on
-machines that do not expose WebGPU and is the accelerated glyph path in the
-macOS Apple WebKit webview.
+WebGL2 is the most important browser GPU fallback because it is widely available
+on machines that do not expose WebGPU. The macOS Apple WebKit primary glyph
+view currently uses Canvas2D instead of either browser GPU atlas path.
 
 ## Canvas Renderers
 
