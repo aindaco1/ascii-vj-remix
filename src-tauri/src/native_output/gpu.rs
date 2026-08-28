@@ -205,10 +205,10 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(params.glyphTileH)), params.glyphTileH - 1u);
     let rampX = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
     let glyphIndex = glyphRamp[rampX];
-    let glyphPage = glyphIndex / 16384u;
-    let glyphSlot = glyphIndex % 16384u;
-    let atlasX = (glyphSlot % 128u) * params.glyphTileW + glyphX;
-    let atlasY = (glyphSlot / 128u) * params.glyphTileH + glyphY;
+    let glyphPage = glyphIndex / 4096u;
+    let glyphSlot = glyphIndex % 4096u;
+    let atlasX = (glyphSlot % 64u) * params.glyphTileW + glyphX;
+    let atlasY = (glyphSlot / 64u) * params.glyphTileH + glyphY;
     let alpha = textureLoad(
         glyphAtlasTex,
         vec2<i32>(i32(atlasX), i32(atlasY)),

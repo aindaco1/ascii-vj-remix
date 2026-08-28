@@ -968,7 +968,7 @@ async function runSmoke() {
     await output.waitForSelector('#output-stage canvas', { timeout: 15000 });
     await output.waitForFunction(() => {
       const state = window.ascilineOutput?.rendererState?.();
-      return state?.glyphRampLength === 5 && [0, 1, 3].every((page) => state.loadedGlyphPages.includes(page));
+      return state?.glyphRampLength === 5 && [0, 3, 4, 13].every((page) => state.loadedGlyphPages.includes(page));
     }, null, { timeout: 15000 });
     const outputState = await output.evaluate(() => ({
       status: document.querySelector('#output-status')?.textContent,
@@ -979,7 +979,7 @@ async function runSmoke() {
       outputState.renderer?.paletteId !== 'midnight-scan' ||
       outputState.renderer?.ditherMode !== 'bayer4' ||
       outputState.renderer?.glyphRampLength !== 5 ||
-      ![0, 1, 3].every((page) => outputState.renderer.loadedGlyphPages.includes(page))
+      ![0, 3, 4, 13].every((page) => outputState.renderer.loadedGlyphPages.includes(page))
     ) {
       throw new Error(`Palette/dither/custom Unicode output did not reach the renderer: ${JSON.stringify(outputState)}`);
     }

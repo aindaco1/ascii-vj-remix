@@ -10,10 +10,10 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const sourcePath = path.join(root, 'third_party/unifont/unifont-17.0.05.hex.gz');
 const outputDir = path.join(root, 'renderers/gpu/assets/glyphs/neutral');
 const TILE_SIZE = 16;
-const PAGE_SIZE = 2048;
+const PAGE_SIZE = 1024;
 const PAGE_COLUMNS = PAGE_SIZE / TILE_SIZE;
 const PAGE_GLYPHS = PAGE_COLUMNS * PAGE_COLUMNS;
-const PAGE_COUNT = 4;
+const PAGE_COUNT = 16;
 
 function crc32(bytes) {
   let value = 0xffffffff;

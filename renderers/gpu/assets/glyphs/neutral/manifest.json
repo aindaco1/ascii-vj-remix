@@ -8,11 +8,11 @@
   },
   "tileWidth": 16,
   "tileHeight": 16,
-  "pageWidth": 2048,
-  "pageHeight": 2048,
-  "pageColumns": 128,
-  "pageGlyphs": 16384,
-  "pageCount": 4,
+  "pageWidth": 1024,
+  "pageHeight": 1024,
+  "pageColumns": 64,
+  "pageGlyphs": 4096,
+  "pageCount": 16,
   "glyphId": "unicode-scalar",
   "coverage": [
     {
@@ -111,26 +111,98 @@
     {
       "index": 0,
       "filename": "page-0.png",
-      "glyphCount": 2719,
-      "sha256": "67d07beff4b85e317fb89a203e39f8a526d3832958ffb850a79109ebdafb5acf"
+      "glyphCount": 975,
+      "sha256": "7f4d71ffc28fa6e36f9bd638b31b2d4b324a8712a91b15a5d26b744e55843adc"
     },
     {
       "index": 1,
       "filename": "page-1.png",
-      "glyphCount": 12800,
-      "sha256": "d18cc8c724b417251bfb1a3520a490142bfa1a4adefa85e7509a4d6b1cc4cc59"
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
     },
     {
       "index": 2,
       "filename": "page-2.png",
-      "glyphCount": 13312,
-      "sha256": "bd552fb0bf47ba14fe65f347e88de5eb027dbd4b66bb7f4fe34cdced7f14bca9"
+      "glyphCount": 1488,
+      "sha256": "0b987c14afc66c6f0080a129aed702b8b1381ab44cd941a92faf20082eac1c84"
     },
     {
       "index": 3,
       "filename": "page-3.png",
-      "glyphCount": 6064,
-      "sha256": "5fef4917810cf5b97bf95a8f04945a02dabc9463915f92aee38ae79e15d224e6"
+      "glyphCount": 256,
+      "sha256": "ee6bd413707213ba1ddbe512397244a644884eda08f4542a98edc6cdca86b0ce"
+    },
+    {
+      "index": 4,
+      "filename": "page-4.png",
+      "glyphCount": 512,
+      "sha256": "f4cc5320c5caa66808f55fb28c0d530ab070a6111b28ee92569832f87da0116c"
+    },
+    {
+      "index": 5,
+      "filename": "page-5.png",
+      "glyphCount": 4096,
+      "sha256": "301229db34ab294808caaed588dcf4b336e7c1fd740b7baa1f6454f6a92f6d04"
+    },
+    {
+      "index": 6,
+      "filename": "page-6.png",
+      "glyphCount": 4096,
+      "sha256": "f219e4852d60bd76dd9efaf80032e5103a87dc17113a95476fd3c7bbaf0988e3"
+    },
+    {
+      "index": 7,
+      "filename": "page-7.png",
+      "glyphCount": 4096,
+      "sha256": "80ab5bb64489af04dfdb044f9e3513ca79cb5979f1f07136cd810b094001ab39"
+    },
+    {
+      "index": 8,
+      "filename": "page-8.png",
+      "glyphCount": 4096,
+      "sha256": "d3082c3d9814f0439e7be962638b733be932061f3c4edd4fd64cf6d8930f37b7"
+    },
+    {
+      "index": 9,
+      "filename": "page-9.png",
+      "glyphCount": 4096,
+      "sha256": "1a34ec20c8e4188feff25c48720e57a05caf6fc00fda4f5859e84e3fcf550e36"
+    },
+    {
+      "index": 10,
+      "filename": "page-10.png",
+      "glyphCount": 1024,
+      "sha256": "9b5be4a47ca6dbaf889f2df151e518ee775e637a88dc822dddb8ac590197bf62"
+    },
+    {
+      "index": 11,
+      "filename": "page-11.png",
+      "glyphCount": 4096,
+      "sha256": "3b0c9f26aa969c234ed7a1a01574ee3f54ade966d3dd8c3784ad3e0aca606b37"
+    },
+    {
+      "index": 12,
+      "filename": "page-12.png",
+      "glyphCount": 4096,
+      "sha256": "b39ffb708705f1f886dd9bb80d8d34bbdc1cca61769ee6552565bd6be5ec6e32"
+    },
+    {
+      "index": 13,
+      "filename": "page-13.png",
+      "glyphCount": 1968,
+      "sha256": "46a35140d916440a6e5648223b87a888d14a2ae70741de0a35a17c9518f016ce"
+    },
+    {
+      "index": 14,
+      "filename": "page-14.png",
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
+    },
+    {
+      "index": 15,
+      "filename": "page-15.png",
+      "glyphCount": 0,
+      "sha256": "1eb50a3ee3fcac0adc60c0e90baa6d051c642f3a930330ac9aec9dd92996f3f7"
     }
   ]
 }

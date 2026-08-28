@@ -18,6 +18,7 @@ import {
     GLYPH_RAMP_LIMIT,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
+    glyphResourceInputKey,
     loadGlyphAtlasPage
 } from '../../../../shared/glyph-atlas.js';
 
@@ -312,10 +313,10 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * 16.0), 15u);
     let rampIndex = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
     let glyphId = glyphRamp[rampIndex];
-    let glyphPage = glyphId / 16384u;
-    let glyphSlot = glyphId % 16384u;
-    let atlasX = (glyphSlot % 128u) * 16u + glyphX;
-    let atlasY = (glyphSlot / 128u) * 16u + glyphY;
+    let glyphPage = glyphId / 4096u;
+    let glyphSlot = glyphId % 4096u;
+    let atlasX = (glyphSlot % 64u) * 16u + glyphX;
+    let atlasY = (glyphSlot / 64u) * 16u + glyphY;
     let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), i32(glyphPage), 0).r;
     if (alpha <= 0.5) {
         return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
@@ -405,6 +406,7 @@ export class WebGPURenderer {
         this.renderData = new ArrayBuffer(64);
         this.renderView = new DataView(this.renderData);
         this.featureResourceKey = '';
+        this.glyphInputKey = '';
         this.glyphResourceKey = '';
         this.glyphRampLength = 0;
         this.loadedGlyphPages = new Set();
@@ -646,6 +648,9 @@ export class WebGPURenderer {
 
     async syncGlyphResources(force = false) {
         if (!this.device || !this.glyphAtlasTexture || !this.glyphRampBuffer) return;
+        const inputKey = glyphResourceInputKey(this);
+        if (!force && inputKey === this.glyphInputKey) return;
+        this.glyphInputKey = inputKey;
         const ramp = glyphRampCodePoints(this);
         this.glyphRampLength = ramp.length;
         const enabled = this.glyphMode && !this.solidMode && ramp.length > 0;

@@ -120,8 +120,8 @@ assert.equal(sanitizeGlyphRamp(' A中한🙂\n'), ' A中한');
 assert.equal(sanitizeGlyphRamp('中'.repeat(120)).length, MAX_GLYPH_RAMP_SCALARS);
 assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@', glyphDepth: 4, glyphOffset: 2 }), ':-=+');
 assert.equal(activeGlyphRamp({ charset: 'custom', customGlyphRamp: ' .:-=+*#%@', glyphDepth: 4, glyphOffset: 2, glyphReverse: true }), '+=-:');
-assert.deepEqual(glyphAtlasPagesForRamp(Uint32Array.from([0x20, 0x4e00, 0xac00])), [0, 1, 2]);
-assert.equal(GLYPH_ATLAS_PAGE_GLYPHS, 16384);
+assert.deepEqual(glyphAtlasPagesForRamp(Uint32Array.from([0x20, 0x4e00, 0xac00])), [0, 4, 10]);
+assert.equal(GLYPH_ATLAS_PAGE_GLYPHS, 4096);
 assert.deepEqual(
   Array.from(glyphRampCodePoints({ charset: 'custom', customGlyphRamp: ' Aあ한' })),
   [0x20, 0x41, 0x3042, 0xd55c]

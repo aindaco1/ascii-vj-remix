@@ -32,6 +32,9 @@ const env = {
   ASCILINE_UI_PERF_SMOKE_DURATION_MS: String(durationMs || 9000),
   ASCILINE_UI_PERF_SMOKE_SAMPLE_MS: String(sampleMs || 500),
   ASCILINE_UI_PERF_SMOKE_BACKEND: process.env.ASCILINE_UI_PERF_SMOKE_BACKEND || 'auto',
+  ASCILINE_UI_PERF_SMOKE_PALETTE: process.env.ASCILINE_UI_PERF_SMOKE_PALETTE || 'none',
+  ASCILINE_UI_PERF_SMOKE_DITHER: process.env.ASCILINE_UI_PERF_SMOKE_DITHER || 'none',
+  ASCILINE_UI_PERF_SMOKE_CHARSET: process.env.ASCILINE_UI_PERF_SMOKE_CHARSET || 'point-click',
   ASCILINE_UI_PERF_SMOKE_MEDIA:
     process.env.ASCILINE_UI_PERF_SMOKE_MEDIA || 'media/point-click-test-30s.mp4'
 };
@@ -99,6 +102,9 @@ console.log([
   `nativeFailed=${report.nativeFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
+  `palette=${report.paletteId || 'none'}`,
+  `dither=${report.ditherMode || 'none'}`,
+  `charset=${report.charset || 'point-click'}`,
   `media=${report.mediaUrl || 'unknown'}`
 ].join(' '));
 

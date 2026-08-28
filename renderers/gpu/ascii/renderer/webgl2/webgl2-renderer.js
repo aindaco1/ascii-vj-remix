@@ -17,6 +17,7 @@ import {
     GLYPH_RAMP_LIMIT,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
+    glyphResourceInputKey,
     loadGlyphAtlasPage
 } from '../../../../shared/glyph-atlas.js';
 
@@ -160,11 +161,11 @@ void main() {
     ivec2 glyphPixel = ivec2(clamp(floor(local / u_cellSize * 16.0), vec2(0.0), vec2(15.0)));
     int rampIndex = min(int(clamp(cell.a, 0.0, 0.99999) * float(u_glyphCount)), u_glyphCount - 1);
     uint glyphId = texelFetch(u_glyphRamp, ivec2(rampIndex, 0), 0).r;
-    int page = int(glyphId / 16384u);
-    uint slot = glyphId % 16384u;
+    int page = int(glyphId / 4096u);
+    uint slot = glyphId % 4096u;
     ivec2 atlasPixel = ivec2(
-        int(slot % 128u) * 16 + glyphPixel.x,
-        int(slot / 128u) * 16 + glyphPixel.y
+        int(slot % 64u) * 16 + glyphPixel.x,
+        int(slot / 64u) * 16 + glyphPixel.y
     );
     float alpha = texelFetch(u_glyphAtlas, ivec3(atlasPixel, page), 0).r;
     if (alpha <= 0.5) {
@@ -253,6 +254,7 @@ export class WebGL2Renderer {
         this.glyphRampTexture = null;
         this.loadedGlyphPages = new Set();
         this.pendingGlyphPages = new Set();
+        this.glyphInputKey = '';
         this.glyphResourceKey = '';
         this.glyphRampLength = 0;
         this.featureResourceKey = '';
@@ -506,6 +508,9 @@ export class WebGL2Renderer {
 
     syncGlyphResources(force = false) {
         if (!this.gl || !this.glyphAtlasTexture || !this.glyphRampTexture) return;
+        const inputKey = glyphResourceInputKey(this);
+        if (!force && inputKey === this.glyphInputKey) return;
+        this.glyphInputKey = inputKey;
         const ramp = glyphRampCodePoints(this);
         this.glyphRampLength = ramp.length;
         const enabled = this.glyphMode && !this.solidMode && ramp.length > 0;

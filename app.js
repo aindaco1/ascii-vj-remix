@@ -6568,6 +6568,9 @@ class RendererLabApp {
         const backend = STATIC_GPU_BACKENDS.has(payload.backend) || STATIC_CANVAS_BACKENDS.has(payload.backend)
             ? payload.backend
             : 'auto';
+        const paletteId = String(payload.paletteId || DEFAULT_PARAMS.paletteId);
+        const ditherMode = String(payload.ditherMode || DEFAULT_PARAMS.ditherMode);
+        const charset = String(payload.charset || DEFAULT_PARAMS.charset);
         const sourceName = sourceNameFromUrl(mediaUrl) || 'UI Perf Demo';
         const startedAt = performance.now();
         const syncStart = {
@@ -6575,9 +6578,15 @@ class RendererLabApp {
             ok: this.nativeOutputSyncOkCount,
             failed: this.nativeOutputSyncFailedCount
         };
+        let sampledRenderer = null;
+        let rendererChanges = 0;
 
         const sample = () => {
             const renderer = this.staticRuntime.renderer;
+            if (renderer && renderer !== sampledRenderer) {
+                sampledRenderer = renderer;
+                rendererChanges += 1;
+            }
             const stats = this.staticRuntime.getStats();
             return {
                 t: performance.now() - startedAt,
@@ -6607,6 +6616,9 @@ class RendererLabApp {
             columns,
             syntheticAudio,
             backend,
+            paletteId,
+            ditherMode,
+            charset,
             samples: [],
             phases: {},
             mainAvgFps: 0,
@@ -6620,6 +6632,9 @@ class RendererLabApp {
             nativeOkHz: 0,
             nativeFailed: 0,
             outputDisplayCount: 0,
+            rendererChanges: 0,
+            frameResetCount: 0,
+            finalFrameCount: 0,
             error: null
         };
 
@@ -6721,7 +6736,10 @@ class RendererLabApp {
                 muted: true,
                 fps: DEFAULT_PARAMS.fps,
                 cols: columns,
-                statsOverlay: true
+                statsOverlay: true,
+                paletteId,
+                ditherMode,
+                charset
             }, { preserveBlob: true });
             this._syncInputs();
             this._persist();
@@ -6816,6 +6834,9 @@ class RendererLabApp {
             report.nativeSyncHz = overall.nativeSyncHz;
             report.nativeOkHz = overall.nativeOkHz;
             report.nativeFailed = Math.max(0, this.nativeOutputSyncFailedCount - syncStart.failed);
+            report.rendererChanges = rendererChanges;
+            report.frameResetCount = usable.filter((item) => item.frameReset).length;
+            report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
             report.ok = (
                 report.phases.main.mainAvgFps >= 30 &&
                 report.phases.popout.mainAvgFps >= 24 &&
@@ -6846,10 +6867,16 @@ class RendererLabApp {
                 columns: report.columns,
                 syntheticAudio: report.syntheticAudio,
                 backend: report.backend,
+                paletteId: report.paletteId,
+                ditherMode: report.ditherMode,
+                charset: report.charset,
                 phases: compactPhases,
                 actualBackends: report.actualBackends,
                 nativeFailed: report.nativeFailed,
                 outputDisplayCount: report.outputDisplayCount,
+                rendererChanges: report.rendererChanges,
+                frameResetCount: report.frameResetCount,
+                finalFrameCount: report.finalFrameCount,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (

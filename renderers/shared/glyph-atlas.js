@@ -2,10 +2,11 @@ import { activeGlyphRamp } from './character-sets.js';
 
 const GLYPH_ATLAS_STYLE = 'neutral';
 const GLYPH_ATLAS_TILE_SIZE = 16;
-const GLYPH_ATLAS_PAGE_SIZE = 2048;
+const GLYPH_ATLAS_PAGE_SIZE = 1024;
 const GLYPH_ATLAS_PAGE_COLUMNS = GLYPH_ATLAS_PAGE_SIZE / GLYPH_ATLAS_TILE_SIZE;
 const GLYPH_ATLAS_PAGE_GLYPHS = GLYPH_ATLAS_PAGE_COLUMNS * GLYPH_ATLAS_PAGE_COLUMNS;
-const GLYPH_ATLAS_PAGE_COUNT = 4;
+const GLYPH_ATLAS_PAGE_COUNT = 16;
+const GLYPH_ATLAS_CACHE_LIMIT = 4;
 const GLYPH_RAMP_LIMIT = 96;
 const glyphPageCache = new Map();
 
@@ -14,6 +15,22 @@ function glyphRampCodePoints(params = {}) {
         [...activeGlyphRamp(params)].slice(0, GLYPH_RAMP_LIMIT),
         (scalar) => scalar.codePointAt(0)
     );
+}
+
+function glyphResourceInputKey(params = {}) {
+    return [
+        params.glyphMode === true,
+        params.solidMode === true,
+        params.charset || '',
+        params.customGlyphRamp || '',
+        Number(params.glyphDepth) || 0,
+        Number(params.glyphOffset) || 0,
+        params.glyphReverse === true,
+        params.glyphColorMode || '',
+        params.glyphColor || '',
+        params.backgroundColor || '',
+        params.atlasStyle || GLYPH_ATLAS_STYLE
+    ].join(':');
 }
 
 function glyphAtlasPagesForRamp(ramp) {
@@ -89,6 +106,11 @@ function loadGlyphAtlasPage(page, ownerDocument = globalThis.document) {
             throw error;
         });
         glyphPageCache.set(cacheKey, pending);
+        while (glyphPageCache.size > GLYPH_ATLAS_CACHE_LIMIT) {
+            const oldestKey = glyphPageCache.keys().next().value;
+            if (!oldestKey || oldestKey === cacheKey) break;
+            glyphPageCache.delete(oldestKey);
+        }
     }
     return pending;
 }
@@ -96,6 +118,7 @@ function loadGlyphAtlasPage(page, ownerDocument = globalThis.document) {
 export {
     GLYPH_ATLAS_PAGE_COLUMNS,
     GLYPH_ATLAS_PAGE_COUNT,
+    GLYPH_ATLAS_CACHE_LIMIT,
     GLYPH_ATLAS_PAGE_GLYPHS,
     GLYPH_ATLAS_PAGE_SIZE,
     GLYPH_ATLAS_STYLE,
@@ -104,5 +127,6 @@ export {
     glyphAtlasPageUrl,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
+    glyphResourceInputKey,
     loadGlyphAtlasPage
 };

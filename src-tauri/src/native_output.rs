@@ -357,11 +357,11 @@ struct NativeRenderParams {
 
 const NATIVE_GLYPH_TILE_WIDTH: u32 = 16;
 const NATIVE_GLYPH_TILE_HEIGHT: u32 = 16;
-const NATIVE_GLYPH_ATLAS_PAGE_SIZE: u32 = 2048;
+const NATIVE_GLYPH_ATLAS_PAGE_SIZE: u32 = 1024;
 #[cfg(any(not(target_os = "macos"), test))]
-const NATIVE_GLYPH_ATLAS_PAGE_COLUMNS: u32 = 128;
-const NATIVE_GLYPH_ATLAS_PAGE_GLYPHS: u32 = 16_384;
-const NATIVE_GLYPH_ATLAS_PAGE_COUNT: u32 = 4;
+const NATIVE_GLYPH_ATLAS_PAGE_COLUMNS: u32 = 64;
+const NATIVE_GLYPH_ATLAS_PAGE_GLYPHS: u32 = 4_096;
+const NATIVE_GLYPH_ATLAS_PAGE_COUNT: u32 = 16;
 const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH: u32 = 96;
 const NATIVE_GLYPH_RAMP_TEXTURE_WIDTH_USIZE: usize = NATIVE_GLYPH_RAMP_TEXTURE_WIDTH as usize;
 const NATIVE_GLYPH_RAMP_BUFFER_BYTES: usize =
@@ -751,6 +751,18 @@ fn native_glyph_atlas_page_png(page: u32) -> &'static [u8] {
         1 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-1.png"),
         2 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-2.png"),
         3 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-3.png"),
+        4 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-4.png"),
+        5 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-5.png"),
+        6 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-6.png"),
+        7 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-7.png"),
+        8 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-8.png"),
+        9 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-9.png"),
+        10 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-10.png"),
+        11 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-11.png"),
+        12 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-12.png"),
+        13 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-13.png"),
+        14 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-14.png"),
+        15 => include_bytes!("../../renderers/gpu/assets/glyphs/neutral/page-15.png"),
         _ => &[],
     }
 }
@@ -765,17 +777,12 @@ fn decode_native_glyph_atlas_page(page: u32) -> Vec<u8> {
 }
 
 fn native_glyph_atlas_page_bytes(page: u32) -> &'static [u8] {
-    static PAGE_0: OnceLock<Vec<u8>> = OnceLock::new();
-    static PAGE_1: OnceLock<Vec<u8>> = OnceLock::new();
-    static PAGE_2: OnceLock<Vec<u8>> = OnceLock::new();
-    static PAGE_3: OnceLock<Vec<u8>> = OnceLock::new();
-    match page {
-        0 => PAGE_0.get_or_init(|| decode_native_glyph_atlas_page(0)),
-        1 => PAGE_1.get_or_init(|| decode_native_glyph_atlas_page(1)),
-        2 => PAGE_2.get_or_init(|| decode_native_glyph_atlas_page(2)),
-        3 => PAGE_3.get_or_init(|| decode_native_glyph_atlas_page(3)),
-        _ => &[],
-    }
+    static PAGES: [OnceLock<Vec<u8>>; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize] =
+        [const { OnceLock::new() }; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize];
+    let Some(slot) = PAGES.get(page as usize) else {
+        return &[];
+    };
+    slot.get_or_init(|| decode_native_glyph_atlas_page(page))
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
