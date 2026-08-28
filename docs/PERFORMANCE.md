@@ -159,6 +159,23 @@ Machine-readable evidence:
 - `docs/performance/0.9.10-phase-zero-baseline.md`
 - `docs/performance/0.9.11-density-feature-off-m1-max-webgl2.json`
 - `docs/performance/0.9.11-density-feature-on-m1-max-webgl2.json`
+- `docs/performance/0.9.11-pre-fix-occluded-output-soak-m1-max-webgl2.json`
+- `docs/performance/0.9.11-background-memory-soak-m1-max-webgl2.json`
+
+The first 15-minute unattended soak exposed an occluded-native-output resource
+retention bug: steady RSS climbed from 156.5 MB to 9,411.9 MB because source
+frames were uploaded before an output surface was available to submit them.
+Native output now acquires the surface before queue writes, skips uploads while
+occluded, drains the display-link thread's autorelease pool per tick, and polls
+completed GPU work without blocking. The repeat 15-minute run began at 156.1 MB
+steady RSS and ended at 155.5 MB, a -0.6 MB drift, with 446.1 MB startup peak
+and no native-sync failures.
+
+The repeat ran while the unattended macOS session kept the application in the
+background, so WebKit throttled requestAnimationFrame and native IPC to roughly
+1 Hz. That run is memory-lifetime evidence only, not frame-rate acceptance. The
+visible-window 640-column figures above remain the local FPS evidence; physical
+reference-floor and Windows performance acceptance remain separate.
 
 The Unicode atlas retains a fixed 16 MB R8 GPU allocation but is divided into
 sixteen 1024px pages. Only pages required by the active maximum-96-scalar ramp

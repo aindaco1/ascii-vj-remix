@@ -115,6 +115,8 @@ async function runDensity(columnCount, tempDir) {
   const edgeCount = Math.min(10, Math.max(1, Math.floor(steadySamplesKb.length / 4)));
   const steadyStartMb = averageMb(steadySamplesKb.slice(0, edgeCount));
   const steadyEndMb = averageMb(steadySamplesKb.slice(-edgeCount));
+  const steadyDriftMb = steadyEndMb - steadyStartMb;
+  const steadyDriftBudgetMb = Math.max(64, steadyStartMb * 0.25);
   return {
     ...report,
     exitCode,
@@ -123,7 +125,9 @@ async function runDensity(columnCount, tempDir) {
     rssMinMb: rssSamplesKb.length ? Math.min(...rssSamplesKb) / 1024 : 0,
     rssSteadyStartMb: steadyStartMb,
     rssSteadyEndMb: steadyEndMb,
-    rssSteadyDriftMb: steadyEndMb - steadyStartMb
+    rssSteadyDriftMb: steadyDriftMb,
+    rssSteadyDriftBudgetMb: steadyDriftBudgetMb,
+    rssStable: steadyDriftMb <= steadyDriftBudgetMb
   };
 }
 
@@ -147,15 +151,22 @@ const encoded = `${JSON.stringify(result, null, 2)}\n`;
 if (outputPath) writeFileSync(outputPath, encoded);
 console.log('\nDensity benchmark summary:');
 for (const run of result.runs) {
+  const main = run.phases?.main || run.phases?.soak || {};
   const popout = run.phases?.popout || {};
   console.log([
     `cols=${run.columns}`,
-    `main=${Number(run.phases?.main?.mainAvgFps || 0).toFixed(1)}fps`,
+    `main=${Number(main.mainAvgFps || 0).toFixed(1)}fps`,
     `popout=${Number(popout.mainAvgFps || 0).toFixed(1)}fps`,
     `popoutP95=${Number(popout.mainP95FrameMs || 0).toFixed(2)}ms`,
     `peakRss=${Number(run.rssPeakMb || 0).toFixed(1)}MB`,
+    `rssDrift=${Number(run.rssSteadyDriftMb || 0).toFixed(1)}MB`,
+    `rssStable=${run.rssStable !== false}`,
     `exit=${run.exitCode}`
   ].join(' '));
 }
 
-if (result.runs.some((run) => run.error)) process.exit(1);
+if (result.runs.some((run) => (
+  run.error || run.exitCode !== 0 || run.ok === false || run.rssStable === false
+))) {
+  process.exit(1);
+}

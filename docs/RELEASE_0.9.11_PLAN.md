@@ -1,6 +1,18 @@
 # ASCII VJ Remix 0.9.11 Implementation Plan
 
-Status: approved for implementation on 2026-08-28.
+Status: implemented; local release gates completed on 2026-08-28. Cross-platform
+CI, publication, and post-publication acceptance remain release-stage evidence.
+
+Implementation record: all five phases are complete in the release branch.
+The selected scope shipped as 16 project-native palettes, three ordered Bayer
+modes, one paged neutral atlas covering 34,895 approved scalars, typed ramps
+bounded to 96 scalars, a 640-column normal accelerated ceiling, a 900-column
+Advanced Density preference, and retuned presets. Matched optimized WebGL2
+samples cleared the local 30 FPS/P95 budget on an M1 Max/64 GB host. The
+15-minute soak found and drove a fix for occluded-output frame retention; its
+fixed repeat held steady RSS within 0.6 MB. This host is faster than the
+reference floor, WebGPU was unavailable in its webview, and physical M1/16 GB
+and Windows performance acceptance are not claimed.
 
 Version 0.9.11 adds performance-budgeted built-in color palettes, ordered
 dithering, expanded glyph controls, custom Unicode ramps, and a generated

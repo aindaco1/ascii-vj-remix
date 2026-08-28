@@ -61,6 +61,10 @@ baseline for the current ASCII VJ Remix feature set.
 - Added a glyph-resource input key so 60 Hz audio and transition updates do not
   reconstruct ramps, allocate buffers, or upload glyph resources when glyph
   settings are unchanged.
+- Native Pop Out now checks for an available surface before source-frame queue
+  writes, drains macOS display-link autorelease work per tick, and polls
+  completed GPU work. Occluded outputs no longer retain one upload staging
+  allocation per decoded frame.
 - Retuned built-in presets that previously requested 700 to 900 columns into
   the measured normal-density envelope. Advanced Density remains available as
   an explicit machine preference.
@@ -78,6 +82,10 @@ baseline for the current ASCII VJ Remix feature set.
 - The full Signal Court/Bayer 4/CJK workload measured 37.9, 40.1, and 37.0 FPS
   for the same phases, with a worst phase P95 of 31.6 ms and about 446 MB peak
   RSS. Native Pop Out presented near 60 FPS with zero GPU failures.
+- A pre-fix unattended 15-minute occlusion run grew from 156.5 MB to 9,411.9 MB
+  steady RSS. The fixed repeat began at 156.1 MB and ended at 155.5 MB, with a
+  446.1 MB startup peak and no native-sync failures. Background-window
+  throttling made that repeat memory evidence rather than FPS evidence.
 - These figures are local evidence from a faster-than-floor host, not physical
   M1/16 GB or Windows integrated-GPU acceptance.
 
@@ -89,6 +97,9 @@ baseline for the current ASCII VJ Remix feature set.
   reaches the WebGL2 output renderer and loads only the required atlas pages.
 - Extended UI performance reports with requested feature configuration,
   renderer replacement counts, frame resets, and actual backend selection.
+- Density benchmarks now fail their process when a child run fails its FPS
+  contract or exceeds the steady-memory drift budget; a failed report can no
+  longer be printed from a successful benchmark command.
 - Renderer math, atlas verification, optimized static smoke, native Pop Out
   smoke, and all 48 Rust tests pass locally. WebGPU was not exposed by the
   local macOS webview during the optimized acceptance run, so it fell back to

@@ -155,6 +155,12 @@ ASCILINE_DENSITY_BENCH_REPORT_PATH=/tmp/feature-on.json \
 npm run bench:density
 ```
 
+`bench:density` is a release gate: it exits nonzero when any child UI smoke
+fails, when its report is not accepted, or when steady RSS grows by more than
+the larger of 64 MB and 25 percent after warm-up. A macOS run whose windows are
+backgrounded can be useful for memory-lifetime testing, but its throttled frame
+rate must not be recorded as visible-window performance acceptance.
+
 ### MIDI, UC-33e, or SysEx Changes
 
 ```bash
