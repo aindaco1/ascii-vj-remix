@@ -1,7 +1,7 @@
 use super::{
-    native_glyph_atlas_page_bytes, native_glyph_ramp_bytes, native_glyph_ramp_len,
-    native_glyph_ramp_ids, native_grid_dimensions, native_render_uses_glyphs,
-    native_dither_matrix, native_palette_index, DecodedRgbFrame, NativeRenderParams,
+    native_glyph_atlas_page_bytes, native_glyph_ramp_ids, native_grid_dimensions,
+    native_render_uses_glyphs, native_dither_matrix, native_palette_index,
+    DecodedRgbFrame, NativeRenderParams,
     DEFAULT_OUTPUT_HEIGHT, DEFAULT_OUTPUT_WIDTH,
     NATIVE_GLYPH_ATLAS_PAGE_COUNT, NATIVE_GLYPH_ATLAS_PAGE_GLYPHS,
     NATIVE_GLYPH_ATLAS_PAGE_SIZE, NATIVE_GLYPH_RAMP_BUFFER_BYTES,
@@ -301,6 +301,8 @@ pub(super) struct NativeGpuPresenter {
     palette_lut_buffer: wgpu::Buffer,
     feature_buffer: wgpu::Buffer,
     feature_key: u64,
+    glyph_key: u64,
+    glyph_ramp_len: u32,
     source_texture: Option<wgpu::Texture>,
     source_view: Option<wgpu::TextureView>,
     source_size: (u32, u32),
@@ -503,6 +505,8 @@ impl NativeGpuPresenter {
             palette_lut_buffer,
             feature_buffer,
             feature_key: u64::MAX,
+            glyph_key: u64::MAX,
+            glyph_ramp_len: 0,
             source_texture: None,
             source_view: None,
             source_size: (0, 0),
@@ -562,8 +566,7 @@ impl NativeGpuPresenter {
         let source_uploaded = self.ensure_source_texture(frame, source_frame_version)?;
         self.ensure_cell_texture(cols, rows);
         self.ensure_feature_resources(params);
-        self.ensure_glyph_pages(params);
-        self.queue.write_buffer(&self.glyph_ramp_buffer, 0, &native_glyph_ramp_bytes(params));
+        self.ensure_glyph_resources(params);
 
         let source_view = self
             .source_view
@@ -636,7 +639,14 @@ impl NativeGpuPresenter {
         self.queue.write_buffer(
             &self.render_params_buffer,
             0,
-            &render_params_bytes(params, cols, rows, self.config.width, self.config.height),
+            &render_params_bytes(
+                params,
+                cols,
+                rows,
+                self.config.width,
+                self.config.height,
+                self.glyph_ramp_len,
+            ),
         );
         let prep_ns = duration_ns_u64(prep_started_at.elapsed());
 
@@ -852,15 +862,22 @@ impl NativeGpuPresenter {
         );
     }
 
-    fn ensure_glyph_pages(&mut self, params: &NativeRenderParams) {
-        if !native_render_uses_glyphs(params) {
+    fn ensure_glyph_resources(&mut self, params: &NativeRenderParams) {
+        let key = glyph_feature_key(params);
+        if self.glyph_key == key {
             return;
         }
+        self.glyph_key = key;
+        let ramp = native_glyph_ramp_ids(params);
+        self.glyph_ramp_len = ramp.len() as u32;
+
         let mut requested = [false; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize];
-        for glyph_id in native_glyph_ramp_ids(params) {
-            let page = (glyph_id / NATIVE_GLYPH_ATLAS_PAGE_GLYPHS) as usize;
-            if page < requested.len() {
-                requested[page] = true;
+        if native_render_uses_glyphs(params) {
+            for glyph_id in ramp.iter().copied() {
+                let page = (glyph_id / NATIVE_GLYPH_ATLAS_PAGE_GLYPHS) as usize;
+                if page < requested.len() {
+                    requested[page] = true;
+                }
             }
         }
         for (page, needed) in requested.into_iter().enumerate() {
@@ -892,6 +909,13 @@ impl NativeGpuPresenter {
             );
             self.loaded_glyph_pages[page] = true;
         }
+
+        let mut bytes = [0; NATIVE_GLYPH_RAMP_BUFFER_BYTES];
+        for (index, glyph_id) in ramp.into_iter().enumerate() {
+            let offset = index * std::mem::size_of::<u32>();
+            bytes[offset..offset + 4].copy_from_slice(&glyph_id.to_le_bytes());
+        }
+        self.queue.write_buffer(&self.glyph_ramp_buffer, 0, &bytes);
     }
 
     fn ensure_cell_texture(&mut self, cols: u32, rows: u32) {
@@ -952,6 +976,19 @@ fn palette_feature_key(params: &NativeRenderParams) -> u64 {
     params.palette_mapping.hash(&mut hasher);
     params.palette_colors.hash(&mut hasher);
     params.dither_mode.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn glyph_feature_key(params: &NativeRenderParams) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    params.glyph_mode.hash(&mut hasher);
+    params.solid_mode.hash(&mut hasher);
+    params.pixel.hash(&mut hasher);
+    params.charset.hash(&mut hasher);
+    params.charset_ramp.hash(&mut hasher);
+    params.glyph_depth.hash(&mut hasher);
+    params.glyph_offset.hash(&mut hasher);
+    params.glyph_reverse.hash(&mut hasher);
     hasher.finish()
 }
 
@@ -1040,6 +1077,7 @@ fn render_params_bytes(
     rows: u32,
     surface_width: u32,
     surface_height: u32,
+    glyph_ramp_len: u32,
 ) -> [u8; 64] {
     let mut bytes = [0u8; 64];
     put_u32(&mut bytes, 0, cols);
@@ -1049,7 +1087,7 @@ fn render_params_bytes(
     put_u32(&mut bytes, 16, surface_width.max(1));
     put_u32(&mut bytes, 20, surface_height.max(1));
     put_u32(&mut bytes, 24, u32::from(native_render_uses_glyphs(params)));
-    put_u32(&mut bytes, 28, native_glyph_ramp_len(params));
+    put_u32(&mut bytes, 28, glyph_ramp_len);
     put_u32(&mut bytes, 32, NATIVE_GLYPH_TILE_WIDTH);
     put_u32(&mut bytes, 36, NATIVE_GLYPH_TILE_HEIGHT);
     put_u32(&mut bytes, 40, u32::from(params.glyph_color_mode == "fixed"));
@@ -1154,14 +1192,22 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[68..72].try_into().unwrap()), 1);
         assert_eq!(bytes.len(), 96);
 
-        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080);
+        let glyph_ramp_len = native_glyph_ramp_ids(&params).len() as u32;
+        let glyph_key = glyph_feature_key(&params);
+        let mut live_only_change = params.clone();
+        live_only_change.brightness = 1.7;
+        assert_eq!(glyph_feature_key(&live_only_change), glyph_key);
+        let mut glyph_change = params.clone();
+        glyph_change.glyph_depth = 12;
+        assert_ne!(glyph_feature_key(&glyph_change), glyph_key);
+        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080, glyph_ramp_len);
         assert_eq!(
             u32::from_le_bytes(render_bytes[24..28].try_into().unwrap()),
             1
         );
         assert_eq!(
             u32::from_le_bytes(render_bytes[28..32].try_into().unwrap()),
-            native_glyph_ramp_len(&params)
+            glyph_ramp_len
         );
         assert_eq!(
             u32::from_le_bytes(render_bytes[32..36].try_into().unwrap()),

@@ -690,10 +690,6 @@ fn native_glyph_ramp_ids(params: &NativeRenderParams) -> Vec<u32> {
     active
 }
 
-fn native_glyph_ramp_len(params: &NativeRenderParams) -> u32 {
-    native_glyph_ramp_ids(params).len() as u32
-}
-
 #[cfg(any(not(target_os = "macos"), test))]
 fn native_glyph_index_for_luma(luma: f64, ramp: &[u32]) -> u32 {
     if ramp.is_empty() {
@@ -729,18 +725,6 @@ fn native_glyph_atlas_bytes() -> Vec<u8> {
                 };
             }
         }
-    }
-    out
-}
-
-fn native_glyph_ramp_bytes(
-    params: &NativeRenderParams,
-) -> [u8; NATIVE_GLYPH_RAMP_BUFFER_BYTES] {
-    let mut out = [0; NATIVE_GLYPH_RAMP_BUFFER_BYTES];
-    for (index, glyph_id) in native_glyph_ramp_ids(params).into_iter().enumerate()
-    {
-        let offset = index * std::mem::size_of::<u32>();
-        out[offset..offset + 4].copy_from_slice(&glyph_id.to_le_bytes());
     }
     out
 }
