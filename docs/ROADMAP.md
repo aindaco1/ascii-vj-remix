@@ -78,6 +78,11 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 - Add synthetic timestamped camera-latency and audio-response tests.
 - Track frame rate, frame drops, upload/skip counts, and parameter propagation
   with comparable benchmark output.
+- After the first neutral bundled Unicode atlas style ships, add optional
+  project-owned atlas styles without changing glyph-set ids, Unicode coverage,
+  custom-ramp semantics, or renderer bindings. Keep styles build-time generated,
+  locally bundled, lazily loaded, and subject to explicit package/GPU-memory
+  budgets rather than introducing runtime system-font lookup.
 
 ## Presets and User Profiles
 
