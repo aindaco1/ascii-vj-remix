@@ -144,7 +144,26 @@ async function runSmoke() {
       null,
       { timeout: 15000 }
     );
+    await page.waitForFunction(() => {
+      const mark = document.querySelector('.brand-mark');
+      return mark instanceof HTMLImageElement && mark.complete && mark.naturalWidth > 0;
+    }, null, { timeout: 15000 });
     const main = await page.evaluate(() => ({
+      brandMark: (() => {
+        const mark = document.querySelector('.brand-mark');
+        const bounds = mark?.getBoundingClientRect();
+        return {
+          tagName: mark?.tagName || '',
+          alt: mark?.getAttribute('alt'),
+          text: mark?.textContent || '',
+          source: mark instanceof HTMLImageElement ? mark.currentSrc : '',
+          complete: mark instanceof HTMLImageElement && mark.complete,
+          naturalWidth: mark instanceof HTMLImageElement ? mark.naturalWidth : 0,
+          naturalHeight: mark instanceof HTMLImageElement ? mark.naturalHeight : 0,
+          renderedWidth: bounds?.width || 0,
+          renderedHeight: bounds?.height || 0
+        };
+      })(),
       sourceModeHidden: Boolean(document.querySelector('.source-mode-field')?.hidden),
       bufferHidden: Boolean(document.querySelector('#buffer-meter')?.hidden),
       connectionHidden: Boolean(document.querySelector('#connection-status')?.hidden),
@@ -194,6 +213,19 @@ async function runSmoke() {
     }
     if (!main.backendStatusAbsent) {
       throw new Error('The duplicate top-bar backend status should be absent.');
+    }
+    if (
+      main.brandMark.tagName !== 'IMG' ||
+      main.brandMark.alt !== '' ||
+      main.brandMark.text !== '' ||
+      !main.brandMark.source.includes('/assets/build/') ||
+      !main.brandMark.complete ||
+      main.brandMark.naturalWidth !== 128 ||
+      main.brandMark.naturalHeight !== 128 ||
+      Math.round(main.brandMark.renderedWidth) !== 34 ||
+      Math.round(main.brandMark.renderedHeight) !== 34
+    ) {
+      throw new Error(`Header should use the bundled canonical app icon at 34x34: ${JSON.stringify(main.brandMark)}`);
     }
     if (
       main.defaultSource.mediaUrl !== 'media/demo.svg' ||

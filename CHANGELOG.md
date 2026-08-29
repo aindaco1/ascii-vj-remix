@@ -12,6 +12,11 @@
   Windows development installer for 14 days after the Windows desktop gate
   passes, allowing physical QA without replacing the production app.
 
+### Changed
+
+- Replaced the text-only `VJ` header badge with the canonical neon
+  play-and-pixel app icon while preserving the existing top-bar footprint.
+
 ### Fixed
 
 - Replaced the Unix-only `/tmp` media-diagnostics path with the operating
