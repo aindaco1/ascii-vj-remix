@@ -100,6 +100,7 @@ attributes do not break app signing. You can override the build directory with
 | `npm run preview` | Preview the production build. |
 | `npm run check:offline` | Build and verify no remote runtime assets are required. |
 | `npm run smoke:static` | Browser smoke test for source UI, renderer startup, output fallback, and audio fake devices. |
+| `npm run test:renderer-fallback` | Deterministic GPU-to-Canvas fallback and bounded renderer-report contract tests. |
 | `npm run tauri:dev` | Tauri desktop dev mode. |
 | `npm run check:desktop` | Offline build, Tauri policy, output-display simulation, updater manifest, FFmpeg resource policy, Rust tests, and debug no-bundle build. |
 | `npm run icons:generate` | Regenerate every Tauri platform icon from the canonical 1024px source. |
@@ -114,6 +115,11 @@ attributes do not break app signing. You can override the build directory with
 | `npm run smoke:ui-perf` | UI performance smoke helper. |
 | `npm run test:midi` | MIDI map, scaling, soft-takeover, action, and scope tests. |
 | `npm run midi:probe` | List physical MIDI inputs/outputs; add `-- --connect` to open both mioXC directions. |
+
+Same-repository pull requests also package an updater-disabled, unsigned
+`ASCII VJ Remix Dev` Windows installer after the Windows desktop gate passes.
+The `ascii-vj-remix-windows-test-<commit>` workflow artifact is retained for 14
+days and installs alongside the production identity for physical Windows QA.
 
 ## Podman Development Shell
 

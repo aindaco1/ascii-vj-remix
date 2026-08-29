@@ -52,3 +52,18 @@ jobs:
 
       - name: Verify desktop build
         run: npm run check:desktop
+
+      - name: Build unsigned Windows test installer
+        if: runner.os == 'Windows' && github.event_name == 'pull_request'
+        run: npm run bundle:debug
+
+      - name: Upload unsigned Windows test installer
+        if: runner.os == 'Windows' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ascii-vj-remix-windows-test-${{ github.sha }}
+          path: |
+            src-tauri/target/debug/bundle/nsis/*.exe
+            src-tauri/target/debug/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14

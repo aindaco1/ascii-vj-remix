@@ -134,6 +134,8 @@ The crash reporter can capture:
 - frontend `unhandledrejection` events.
 - Tauri command failures.
 - Rust panic-hook reports imported on the next launch.
+- renderer fallback/failure reports containing only bounded preset/backend,
+  source-class, error-summary, and recent renderer-event fields.
 
 Security requirements:
 
@@ -142,6 +144,8 @@ Security requirements:
   passwords, and auth-like context keys.
 - Reports must not include user media files, decoded frames, screenshots, raw
   audio, local storage dumps, environment dumps, or arbitrary logs.
+- Renderer diagnostics are limited to the eight most recent sanitized
+  structured events. They must not become a general local-log upload path.
 - The app stores at most a small local queue and lets the user choose `ask`,
   `always`, or `off`.
 - The Reports control remains reachable with an empty queue so the preference
@@ -171,6 +175,10 @@ kind, surface, platform, command/backend/source mode, native-output state, and
 explicit error-code fields; normalized stack frame or message are fallbacks.
 Issue bodies keep bounded aggregate state rather than concatenating every
 report.
+
+Failures from the best-effort local media-diagnostics writer are non-fatal and
+must be ignored by both the desktop adapter and relay. They do not describe an
+application crash and must not create GitHub issues.
 
 The opt-in production acceptance canary is hard-coded and refuses to run when a
 user report is already pending or the preference is `off`. It must never be

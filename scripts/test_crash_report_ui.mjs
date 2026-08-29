@@ -5,6 +5,7 @@ import {
   isCrashReportControlLabel,
   pendingCrashReportCount
 } from '../renderers/desktop/crash-report-ui.js';
+import { isReportableTauriCommandFailure } from '../renderers/desktop/tauri-adapter.js';
 
 assert.equal(pendingCrashReportCount({ pendingCount: -2 }), 0);
 assert.equal(pendingCrashReportCount({ pendingCount: 2.9 }), 2);
@@ -21,7 +22,7 @@ assert.deepEqual(
     pending: false,
     pendingCount: 0,
     label: 'Reports',
-    title: 'Review crash reporting preferences',
+    title: 'Review diagnostic reporting preferences',
     sendDisabled: true,
     discardDisabled: true
   }
@@ -34,7 +35,7 @@ assert.deepEqual(
     pending: false,
     pendingCount: 0,
     label: 'Reports',
-    title: 'Review crash reporting preferences',
+    title: 'Review diagnostic reporting preferences',
     sendDisabled: true,
     discardDisabled: true
   }
@@ -47,7 +48,7 @@ assert.deepEqual(
     pending: true,
     pendingCount: 2,
     label: 'Reports 2',
-    title: '2 pending crash reports',
+    title: '2 pending diagnostic reports',
     sendDisabled: false,
     discardDisabled: false
   }
@@ -62,5 +63,27 @@ assert.equal(disabled.hidden, false);
 assert.equal(disabled.label, 'Reports 1');
 assert.equal(disabled.sendDisabled, true);
 assert.equal(disabled.discardDisabled, true);
+
+assert.equal(
+  isReportableTauriCommandFailure(
+    'record_media_diagnostic',
+    new Error('Could not open media diagnostics log: path not found')
+  ),
+  false
+);
+assert.equal(
+  isReportableTauriCommandFailure(
+    'request_media_permission',
+    new Error('Camera permission denied')
+  ),
+  false
+);
+assert.equal(
+  isReportableTauriCommandFailure(
+    'open_native_output_window',
+    new Error('Native renderer failed')
+  ),
+  true
+);
 
 console.log('Crash report UI tests passed.');

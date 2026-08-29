@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nativeLogPath = path.join(tmpdir(), 'asciline-native-output.log');
-const mediaLogPath = '/tmp/asciline-media-diagnostics.log';
+const mediaLogPath = path.join(tmpdir(), 'asciline-media-diagnostics.log');
 const defaultReleaseApp = '/private/tmp/ascii-vj-remix-tauri-target/release/bundle/macos/ASCII VJ Remix Dev.app';
 const releaseApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 const durationMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_DURATION_MS || '9000');

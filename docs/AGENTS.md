@@ -98,6 +98,9 @@ Rendering:
 - WebGPU is the primary quality target.
 - WebGL2 is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas remain compatibility fallbacks.
+- Packaged Apple WebKit and Windows WebView2 glyph previews use Canvas2D when
+  their GPU glyph-atlas paths can initialize without producing visible output;
+  solid/pixel GPU paths remain available.
 - Native Pop Out output uses `wgpu` where available, with Metal on macOS and
   corresponding GPU backends on Windows/Linux.
 - The active renderer is controlled by one canonical parameter model.
@@ -148,7 +151,9 @@ UI:
 - Do not reduce control density when changing visual styling.
 - Avoid adding explanatory marketing text inside the app UI.
 - Keep the top-bar Reports control reachable with an empty queue; pending state
-  is additive. Do not attach local media diagnostics or arbitrary logs.
+  is additive. Renderer failures may attach the bounded, sanitized renderer
+  event summary defined by the security contract. Do not attach local media
+  diagnostics or arbitrary logs.
 - Keep backend selection in the center control. Resolved-backend diagnostics
   belong in the user-owned Stats Overlay, not a duplicate top-bar readout.
 

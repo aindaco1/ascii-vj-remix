@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added bounded renderer diagnostics to the existing Reports workflow. A failed
+  renderer creation records the preset, requested and resolved backends,
+  fallback result, source class, error summary, and up to eight recent renderer
+  events without attaching media, screenshots, local paths, or arbitrary logs.
+- Same-repository pull requests now retain an updater-disabled, unsigned
+  Windows development installer for 14 days after the Windows desktop gate
+  passes, allowing physical QA without replacing the production app.
+
+### Fixed
+
+- Replaced the Unix-only `/tmp` media-diagnostics path with the operating
+  system temporary directory so Windows diagnostic writes no longer fail and
+  become spurious crash reports. Diagnostic-writer failures are also classified
+  as non-fatal by both current clients and the relay.
+- Applied the WebGPU/WebGL2-to-Canvas fallback to live preset transitions as
+  well as initial startup. If both the requested renderer and Canvas fallback
+  fail, the prior preset remains active and a reviewable diagnostic report is
+  queued.
+- Route glyph-atlas presets through the bounded Canvas2D renderer in the
+  packaged Windows WebView2 runtime. Physical Windows 11 testing showed that
+  WebGPU and WebGL2 could both report successful initialization while producing
+  a blank glyph surface; solid/pixel GPU presets remain accelerated.
+
 ## [0.9.12] - 2026-08-28
 
 ### Fixed

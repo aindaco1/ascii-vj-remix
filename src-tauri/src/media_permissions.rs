@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 #[cfg(target_os = "macos")]
 use std::sync::mpsc;
 #[cfg(target_os = "macos")]
@@ -42,13 +43,18 @@ pub fn record_media_diagnostic(message: String) -> Result<(), String> {
     let sanitized = sanitize_media_diagnostic(&message);
     let line = format!("[ASCILINE media] {sanitized}\n");
     eprint!("{line}");
+    let log_path = media_diagnostics_log_path();
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/asciline-media-diagnostics.log")
+        .open(&log_path)
         .map_err(|error| format!("Could not open media diagnostics log: {error}"))?;
     file.write_all(line.as_bytes())
         .map_err(|error| format!("Could not write media diagnostics log: {error}"))
+}
+
+fn media_diagnostics_log_path() -> PathBuf {
+    std::env::temp_dir().join("asciline-media-diagnostics.log")
 }
 
 fn sanitize_media_diagnostic(message: &str) -> String {
@@ -111,7 +117,8 @@ async fn request_platform_media_permission<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        sanitize_media_diagnostic, MAX_MEDIA_DIAGNOSTIC_CHARS, MAX_MEDIA_DIAGNOSTIC_TOKENS,
+        media_diagnostics_log_path, sanitize_media_diagnostic, MAX_MEDIA_DIAGNOSTIC_CHARS,
+        MAX_MEDIA_DIAGNOSTIC_TOKENS,
     };
 
     #[test]
@@ -151,6 +158,14 @@ mod tests {
         let bounded = sanitize_media_diagnostic(&long_message);
         assert!(bounded.ends_with("[truncated]"));
         assert!(bounded.len() <= MAX_MEDIA_DIAGNOSTIC_CHARS + " [truncated]".len());
+    }
+
+    #[test]
+    fn diagnostic_log_uses_the_platform_temp_directory() {
+        assert_eq!(
+            media_diagnostics_log_path(),
+            std::env::temp_dir().join("asciline-media-diagnostics.log")
+        );
     }
 }
 

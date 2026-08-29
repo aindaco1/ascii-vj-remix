@@ -73,7 +73,8 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 - Reduce remaining duplicated color and quantization behavior across WebGPU,
   WebGL2, Canvas, stream, and native `wgpu` paths.
 - Add golden-output or bounded visual tests for representative presets.
-- Make backend fallbacks visible and diagnosable.
+- Add a persistent in-canvas fallback indicator beyond the current Stats
+  Overlay and bounded Reports diagnostics.
 - Add repeatable optimized-build benchmarks for main preview and Pop Out.
 - Add synthetic timestamped camera-latency and audio-response tests.
 - Track frame rate, frame drops, upload/skip counts, and parameter propagation

@@ -18,8 +18,8 @@ function crashReportUiState({ tauri = false, state = null, busy = false } = {}) 
         pendingCount,
         label: pending ? `Reports ${pendingCount}` : 'Reports',
         title: pending
-            ? `${pendingCount} pending crash report${pendingCount === 1 ? '' : 's'}`
-            : 'Review crash reporting preferences',
+            ? `${pendingCount} pending diagnostic report${pendingCount === 1 ? '' : 's'}`
+            : 'Review diagnostic reporting preferences',
         sendDisabled: Boolean(busy || !pending || state?.preference === 'off'),
         discardDisabled: Boolean(busy || !pending)
     };

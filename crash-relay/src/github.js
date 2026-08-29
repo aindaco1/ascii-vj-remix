@@ -104,12 +104,36 @@ function parseState(body, fingerprint) {
 
 function summarizeContext(context = {}) {
   const rows = [];
-  for (const key of ['surface', 'command', 'backend', 'sourceMode', 'mediaType', 'nativeOutputActive', 'errorCode', 'code', 'statusCode']) {
+  for (const key of [
+    'surface',
+    'command',
+    'phase',
+    'presetId',
+    'backend',
+    'requestedBackend',
+    'actualBackend',
+    'fallbackBackend',
+    'recovered',
+    'sourceMode',
+    'mediaType',
+    'nativeOutputActive',
+    'errorCode',
+    'code',
+    'statusCode'
+  ]) {
     const value = context[key];
     if (value === undefined || value === null || value === '') continue;
     rows.push(`- ${key}: \`${String(value).slice(0, 160)}\``);
   }
   return rows.length ? rows.join('\n') : '- none';
+}
+
+function summarizeRendererDiagnostics(context = {}) {
+  const diagnostics = Array.isArray(context.rendererDiagnostics)
+    ? context.rendererDiagnostics.slice(-8)
+    : [];
+  if (!diagnostics.length) return '_No renderer diagnostics captured._';
+  return `\`\`\`json\n${JSON.stringify(diagnostics, null, 2)}\n\`\`\``;
 }
 
 function countRows(map = {}) {
@@ -193,6 +217,10 @@ ${report.message}
 ## Context
 
 ${summarizeContext(report.context)}
+
+## Renderer Diagnostics
+
+${summarizeRendererDiagnostics(report.context)}
 
 ## Versions
 
