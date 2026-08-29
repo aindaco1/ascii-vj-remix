@@ -8,8 +8,8 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 0.10.0. The latest verified public release
-is 0.9.12. Release history is recorded in the [Changelog](CHANGELOG.md);
+The current source/package version and latest verified public release are
+0.10.0. Release history is recorded in the [Changelog](CHANGELOG.md);
 prospective work belongs in the [Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
@@ -192,8 +192,8 @@ and requires a manually captured and verified hardware profile.
 - The Reports control remains visible when no crash reports are pending so the
   `ask`, `always`, and `off` preference is always reachable. A pending count and
   warning state appear only after a bounded, sanitized report is captured.
-- Public 0.9.12 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.9.12 Windows artifacts are unsigned previews.
+- Public 0.10.0 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 0.10.0 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
   app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
   replace or inherit privacy grants from the production app.
@@ -233,7 +233,7 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Public 0.9.12 release builds are Developer ID signed, notarized, stapled, and
+- Public 0.10.0 release builds are Developer ID signed, notarized, stapled, and
   accepted by Gatekeeper. Local or test builds may require the normal macOS
   right-click Open or Open Anyway flow.
 
@@ -302,7 +302,7 @@ Download the latest desktop build from:
 
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
-The 0.9.12 release contains a notarized Apple Silicon macOS DMG, Windows
+The 0.10.0 release contains a notarized Apple Silicon macOS DMG, Windows
 EXE/MSI installers, Linux AppImage/deb/rpm packages, and signed updater
 metadata. The Windows installers are unsigned previews.
 
@@ -312,7 +312,7 @@ metadata. The Windows installers are unsigned previews.
    artifact, not the primary manual installer.
 2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
 3. Eject the DMG, then open the installed app from `/Applications` in Finder.
-4. The public 0.9.12 macOS release is Developer ID signed, notarized, stapled,
+4. The public 0.10.0 macOS release is Developer ID signed, notarized, stapled,
    and accepted by Gatekeeper. Local or test builds may still require the
    normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
@@ -322,7 +322,7 @@ metadata. The Windows installers are unsigned previews.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 0.9.12 artifacts are unsigned previews. Windows may show Unknown
+3. Windows 0.10.0 artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.
