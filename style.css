@@ -129,15 +129,11 @@ button:disabled {
 }
 
 .brand-mark {
-    display: grid;
-    place-items: center;
+    display: block;
     width: 34px;
     height: 34px;
-    border: 1px solid var(--cyan);
-    border-radius: var(--radius);
-    color: var(--panel-2);
-    font: 12px/1 var(--font-mono);
-    background: var(--cyan);
+    flex: 0 0 34px;
+    object-fit: contain;
 }
 
 .brand h1,
