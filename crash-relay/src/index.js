@@ -25,6 +25,10 @@ const EXPECTED_PERMISSION_COMMANDS = new Set([
   'start_system_audio_capture'
 ]);
 
+const NON_FATAL_DIAGNOSTIC_COMMANDS = new Set([
+  'record_media_diagnostic'
+]);
+
 function isPermissionLikeText(value) {
   const raw = String(value || '').toLowerCase();
   return raw.includes('permission') ||
@@ -36,15 +40,23 @@ function isPermissionLikeText(value) {
     raw.includes('tcc');
 }
 
-function isIgnoredCrashReport(sanitized) {
+function ignoredCrashReportReason(sanitized) {
   const report = sanitized?.report || {};
   const context = report.context || {};
-  if (report.kind !== 'tauri-command' || report.surface !== 'tauri-command') return false;
-  if (!EXPECTED_PERMISSION_COMMANDS.has(String(context.command || ''))) return false;
-  return isPermissionLikeText(report.message) ||
+  if (report.kind !== 'tauri-command' || report.surface !== 'tauri-command') return '';
+  const command = String(context.command || '');
+  if (NON_FATAL_DIAGNOSTIC_COMMANDS.has(command)) return 'nonfatal-diagnostic-write-failure';
+  if (!EXPECTED_PERMISSION_COMMANDS.has(command)) return '';
+  return (isPermissionLikeText(report.message) ||
     isPermissionLikeText(context.name) ||
     isPermissionLikeText(context.code) ||
-    isPermissionLikeText(context.statusCode);
+    isPermissionLikeText(context.statusCode))
+    ? 'expected-permission-denial'
+    : '';
+}
+
+function isIgnoredCrashReport(sanitized) {
+  return Boolean(ignoredCrashReportReason(sanitized));
 }
 
 async function readBoundedJson(request, env) {
@@ -102,12 +114,13 @@ async function handleReport(request, env) {
     return json({ error: error.message || 'Crash report rejected' }, 400);
   }
 
-  if (isIgnoredCrashReport(sanitized)) {
+  const ignoredReason = ignoredCrashReportReason(sanitized);
+  if (ignoredReason) {
     return json({
       ok: true,
       reportId: sanitized.report.id,
       action: 'ignored',
-      reason: 'expected-permission-denial'
+      reason: ignoredReason
     });
   }
 
@@ -144,4 +157,4 @@ export default {
   }
 };
 
-export { isIgnoredCrashReport, isPermissionLikeText };
+export { ignoredCrashReportReason, isIgnoredCrashReport, isPermissionLikeText };

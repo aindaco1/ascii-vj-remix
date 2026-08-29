@@ -201,8 +201,9 @@ and requires a manually captured and verified hardware profile.
   production-only reviewed/sanitized crash report submission.
 - Crash report submission goes through the Rust desktop layer to the
   `https://crash.dustwave.xyz` Cloudflare Worker relay. The webview does not get
-  arbitrary HTTP capability and selected media is never uploaded. Local media
-  diagnostics and arbitrary logs are not attached to crash reports.
+  arbitrary HTTP capability and selected media is never uploaded. Renderer
+  failures may attach a bounded, sanitized event summary with preset/backend
+  state; local media diagnostics and arbitrary logs are not attached.
 
 ### Advanced and Development-Only Paths
 
@@ -448,7 +449,9 @@ ASCII VJ Remix is designed to be local-first.
   media providers at runtime.
 - Intentional online paths are limited to the Tauri updater and production-only
   reviewed/sanitized crash reports.
-- Crash reports exclude local media diagnostics and arbitrary logs.
+- Crash reports exclude local media diagnostics and arbitrary logs. Renderer
+  failures include only bounded, sanitized preset/backend events so users can
+  review and send enough context to diagnose a fallback.
 - Custom desktop file access is session-scoped. If the app says a custom file
   needs access after restart, reselect the file.
 
@@ -477,6 +480,15 @@ updater, Tauri capability, and FFmpeg sidecar security model.
 Display capture can expose video without an audio track, especially for
 app/window capture on macOS. Use System Audio where available. Native Core
 Audio Tap capture is not implemented in the current release.
+
+### A preset does not load or changes renderer on Windows
+
+The app automatically retries failed WebGPU/WebGL2 renderer creation with the
+Canvas compatibility renderer, including during live preset changes. Open
+Stats Overlay to see the resolved backend. If the preset still fails, open the
+persistent Reports control to review and send the bounded renderer diagnostic;
+it contains preset/backend state and recent renderer events, never selected
+media or an unrestricted log file.
 
 ### Pop Out is slow
 

@@ -1,6 +1,7 @@
 import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import { needsWebKitCanvasGlyphPreview } from './renderers/gpu/ascii/renderer/backend-policy.js';
+import { createRendererWithFallback } from './renderers/gpu/ascii/renderer/fallback.js';
 import {
     glyphForLuma,
     processCanvasColorLegacy as processColor,
@@ -93,6 +94,11 @@ import {
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
 import { crashReportUiState } from './renderers/desktop/crash-report-ui.js?v=20260826-reports';
+import {
+    RendererDiagnosticLog,
+    rendererFailureKey,
+    rendererFailureReport
+} from './renderers/desktop/renderer-diagnostics.js';
 import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
@@ -2182,7 +2188,7 @@ function errorCrashContext(error) {
 
 function crashReportPreview(state) {
     const reports = Array.isArray(state?.reports) ? state.reports : [];
-    if (!reports.length) return 'No pending crash reports.';
+    if (!reports.length) return 'No pending diagnostic reports.';
     return reports.map((report, index) => {
         const context = report.context ? JSON.stringify(report.context, null, 2) : '{}';
         return [
@@ -4188,18 +4194,83 @@ class StaticRuntime {
         this.source?.updateParams?.(params);
     }
 
-    async _createRendererForParams(params, layer) {
+    async _createCanvasRenderer(params, layer, options = {}) {
+        layer.innerHTML = '';
+        const renderer = new CanvasStaticRenderer(layer);
+        await renderer.start(params, {
+            source: this.source,
+            ownsSource: false,
+            mediaState: options.mediaState || null
+        });
+        return { renderer, stats: renderer.getStats(), usingCanvasFallback: true };
+    }
+
+    async _createRendererForParams(params, layer, options = {}) {
+        const rendererContext = options.rendererContext || {};
         const canvasParams = this._canvasRendererParams(params);
         if (canvasParams) {
-            const renderer = new CanvasStaticRenderer(layer);
-            await renderer.start(canvasParams, { source: this.source, ownsSource: false });
-            return { renderer, stats: renderer.getStats(), usingCanvasFallback: true };
+            return this._createCanvasRenderer(canvasParams, layer, options);
         }
 
-        const renderer = await createRenderer(this._rendererOptions(params, layer));
-        renderer.start();
-        this._applyRendererParams(renderer, params);
-        return { renderer, stats: renderer.getStats?.() || null, usingCanvasFallback: false };
+        this.app._recordRendererDiagnostic({
+            event: 'create-start',
+            requestedBackend: params.backend,
+            ...rendererContext
+        });
+        let preferredRenderer = null;
+        const created = await createRendererWithFallback(
+            async () => {
+                preferredRenderer = await createRenderer(this._rendererOptions(params, layer));
+                if (this.source?.isVideo && options.mediaState) {
+                    await restoreVideoPlaybackState(this.source, params, options.mediaState);
+                }
+                preferredRenderer.start();
+                this._applyRendererParams(preferredRenderer, params);
+                return {
+                    renderer: preferredRenderer,
+                    stats: preferredRenderer.getStats?.() || null,
+                    usingCanvasFallback: false
+                };
+            },
+            async (error) => {
+                console.warn('[StaticRuntime] GPU renderer failed, falling back to canvas:', error);
+                preferredRenderer?.stop?.();
+                preferredRenderer?.destroy?.();
+                this.app._recordRendererDiagnostic({
+                    event: 'create-failed',
+                    requestedBackend: params.backend,
+                    errorName: error?.name,
+                    errorCode: error?.errorCode ?? error?.code,
+                    message: error?.message || error,
+                    ...rendererContext
+                });
+                return this._createCanvasRenderer(
+                    { ...params, backend: 'canvas2d' },
+                    layer,
+                    options
+                );
+            }
+        );
+        const result = created.value;
+        const actualBackend = result.stats?.backend || (result.usingCanvasFallback ? 'canvas2d' : params.backend);
+        this.app._recordRendererDiagnostic({
+            event: created.fallbackError ? 'fallback-active' : 'create-success',
+            requestedBackend: params.backend,
+            actualBackend,
+            fallbackBackend: created.fallbackError ? actualBackend : '',
+            ...rendererContext
+        });
+        if (created.fallbackError) {
+            this.app._queueRendererFailureReport(created.fallbackError, {
+                phase: rendererContext.phase || 'renderer-create',
+                presetId: rendererContext.presetId,
+                requestedBackend: params.backend,
+                actualBackend,
+                fallbackBackend: actualBackend,
+                recovered: true
+            });
+        }
+        return result;
     }
 
     async start(params, options = {}) {
@@ -4207,44 +4278,21 @@ class StaticRuntime {
         els.gpuStage.classList.add('active');
         els.canvas.style.display = 'none';
         els.player.style.display = 'none';
-        const canvasParams = this._canvasRendererParams(params);
-        this.usingCanvasFallback = Boolean(canvasParams);
         const layer = this._makeRendererLayer('renderer-buffer-current');
-
-        if (this.usingCanvasFallback) {
-            const source = await this.app.loadStaticSource(params, options);
-            this.source = source;
-            const renderer = new CanvasStaticRenderer(layer);
-            this.renderer = renderer;
-            await renderer.start(canvasParams, { ...options, source, ownsSource: false });
-            this.mediaUrl = params.mediaUrl;
-            this.mediaType = params.mediaType;
-            return renderer.getStats();
-        }
-
-        try {
-            this.source = await this.app.loadStaticSource(params, options);
-            this.mediaUrl = params.mediaUrl;
-            this.mediaType = params.mediaType;
-            const renderer = await createRenderer(this._rendererOptions(params, layer));
-            this.renderer = renderer;
-            if (this.source.isVideo) await restoreVideoPlaybackState(this.source, params, options.mediaState);
-            renderer.start();
-            this.updateParams(params);
-            return renderer.getStats();
-        } catch (error) {
-            console.warn('[StaticRuntime] GPU renderer failed, falling back to canvas:', error);
-            this.usingCanvasFallback = true;
-            layer.innerHTML = '';
-            const renderer = new CanvasStaticRenderer(layer);
-            this.renderer = renderer;
-            const source = this.source || await this.app.loadStaticSource(params, options);
-            this.source = source;
-            await renderer.start({ ...params, backend: 'canvas2d' }, { ...options, source, ownsSource: false });
-            this.mediaUrl = params.mediaUrl;
-            this.mediaType = params.mediaType;
-            return renderer.getStats();
-        }
+        this.source = await this.app.loadStaticSource(params, options);
+        this.mediaUrl = params.mediaUrl;
+        this.mediaType = params.mediaType;
+        const next = await this._createRendererForParams(params, layer, {
+            mediaState: options.mediaState,
+            rendererContext: options.rendererContext || {
+                phase: 'start',
+                presetId: this.app.activePresetId
+            }
+        });
+        this.renderer = next.renderer;
+        this.usingCanvasFallback = next.usingCanvasFallback;
+        this.updateParams(params);
+        return next.stats;
     }
 
     canReuseSource(params) {
@@ -4256,7 +4304,7 @@ class StaticRuntime {
         );
     }
 
-    async rebuildRenderer(params) {
+    async rebuildRenderer(params, rendererContext = {}) {
         if (!this.canReuseSource(params)) {
             return this.start(params);
         }
@@ -4267,14 +4315,14 @@ class StaticRuntime {
         oldLayer?.remove?.();
 
         const layer = this._makeRendererLayer('renderer-buffer-current');
-        const next = await this._createRendererForParams(params, layer);
+        const next = await this._createRendererForParams(params, layer, { rendererContext });
         this.renderer = next.renderer;
         this.usingCanvasFallback = next.usingCanvasFallback;
         this.updateParams(params);
         return next.stats;
     }
 
-    async prepareCrossfadeRenderer(params) {
+    async prepareCrossfadeRenderer(params, rendererContext = {}) {
         if (!this.canReuseSource(params)) return null;
 
         const oldRenderer = this.renderer;
@@ -4289,7 +4337,7 @@ class StaticRuntime {
         nextLayer.style.opacity = '1';
         els.gpuStage.insertBefore(nextLayer, oldLayer);
 
-        const next = await this._createRendererForParams(params, nextLayer);
+        const next = await this._createRendererForParams(params, nextLayer, { rendererContext });
         const nextRenderer = next.renderer;
         this.renderer = nextRenderer;
         this.mediaUrl = params.mediaUrl;
@@ -5471,6 +5519,8 @@ class RendererLabApp {
         });
         this.crashReportState = null;
         this.crashReportBusy = false;
+        this.rendererDiagnostics = new RendererDiagnosticLog();
+        this.reportedRendererFailureKeys = new Set();
         this.warmMediaElements = [];
     }
 
@@ -5569,6 +5619,48 @@ class RendererLabApp {
         }
     }
 
+    _recordRendererDiagnostic(event = {}) {
+        return this.rendererDiagnostics.record({
+            sourceMode: this.params.sourceMode,
+            mediaType: this.params.mediaType,
+            presetId: event.presetId || this.activePresetId,
+            atMs: performance.now(),
+            ...event
+        });
+    }
+
+    _queueRendererFailureReport(error, context = {}) {
+        const stats = this.staticRuntime?.getStats?.() || {};
+        const reportContext = {
+            phase: context.phase || 'renderer',
+            presetId: context.presetId || this.activePresetId,
+            requestedBackend: context.requestedBackend || this.params.backend,
+            actualBackend: context.actualBackend || stats.backend || '',
+            fallbackBackend: context.fallbackBackend || '',
+            recovered: Boolean(context.recovered),
+            sourceMode: this.params.sourceMode,
+            mediaType: this.params.mediaType
+        };
+        this._recordRendererDiagnostic({
+            event: reportContext.recovered ? 'renderer-fallback' : 'renderer-failed',
+            ...reportContext,
+            errorName: error?.name,
+            errorCode: error?.errorCode ?? error?.code,
+            message: error?.message || error
+        });
+
+        const key = rendererFailureKey(error, reportContext);
+        if (this.reportedRendererFailureKeys.has(key)) return;
+        this.reportedRendererFailureKeys.add(key);
+        if (this.reportedRendererFailureKeys.size > 16) {
+            this.reportedRendererFailureKeys.delete(this.reportedRendererFailureKeys.values().next().value);
+        }
+        const report = rendererFailureReport(error, reportContext, this.rendererDiagnostics.snapshot());
+        this._captureCrashReport(report).catch((captureError) => {
+            console.warn('[CrashReporter] Renderer diagnostic capture failed:', captureError);
+        });
+    }
+
     async _refreshCrashReportState() {
         if (!isTauriRuntime()) return;
         try {
@@ -5646,11 +5738,11 @@ class RendererLabApp {
             const state = await submitTauriCrashReports();
             this._setCrashReportState(state);
             if (!options.automatic && state?.lastResult?.failed > 0) {
-                alert('Crash report submission failed. The report remains queued.');
+                alert('Diagnostic report submission failed. The report remains queued.');
             }
         } catch (error) {
             console.warn('[CrashReporter] Submission failed:', error);
-            if (!options.automatic) alert('Crash report submission failed. The report remains queued.');
+            if (!options.automatic) alert('Diagnostic report submission failed. The report remains queued.');
         } finally {
             this.crashReportBusy = false;
             this._syncCrashReportUi();
@@ -7681,7 +7773,7 @@ class RendererLabApp {
             this.staticRuntime.canReuseSource(this.params);
 
         if (canReuseStaticSource) {
-            await this.staticRuntime.rebuildRenderer(this.params);
+            await this.staticRuntime.rebuildRenderer(this.params, options.rendererContext);
             await this._ensureStaticVideoPlayback();
             this.setConnection(this._staticConnectionLabel());
             this._applyEffectiveRendererParams(this.renderParams());
@@ -9049,6 +9141,7 @@ button:hover{background:#202a35}
             if (!ready) return;
         }
         const previousPresetId = this.activePresetId;
+        const previousParams = { ...this.params };
         const presetParams = stripPresetExcludedParams(preset.params);
         const target = normalizeParams(
             { ...this._baseForPreset(preset), ...presetParams },
@@ -9063,7 +9156,10 @@ button:hover{background:#202a35}
             return;
         }
         try {
-            await this._transitionTo(target, transitionSeconds);
+            await this._transitionTo(target, transitionSeconds, {
+                phase: 'preset-transition',
+                presetId: preset.id
+            });
             if (!preset.readonly) {
                 preset.params = presetParams;
                 this._persistPresets();
@@ -9071,13 +9167,25 @@ button:hover{background:#202a35}
             this.activePresetId = preset.id;
         } catch (error) {
             this.activePresetId = previousPresetId;
+            this.params = previousParams;
+            this._syncInputs();
+            this._persist();
+            this._applyVisualState();
+            this._applyEffectiveRendererParams(this.renderParams(), 'preset-rollback');
+            this._queueRendererFailureReport(error, {
+                phase: 'preset-transition',
+                presetId: preset.id,
+                requestedBackend: target.backend,
+                actualBackend: this.staticRuntime.getStats()?.backend || '',
+                recovered: false
+            });
             console.error(error);
         }
         this.midiRuntime?.rearmSoftTakeover();
         this._renderPresets();
     }
 
-    async _transitionTo(target, seconds) {
+    async _transitionTo(target, seconds, rendererContext = {}) {
         const token = ++this.transitionToken;
         const before = { ...this.params };
         const changed = Object.keys(target).filter((key) => target[key] !== before[key]);
@@ -9093,7 +9201,7 @@ button:hover{background:#202a35}
             return token === this.transitionToken;
         }
         if (needsRebuild) {
-            return this._crossfadeRebuild(target, seconds, token);
+            return this._crossfadeRebuild(target, seconds, token, rendererContext);
         }
         return this._tweenParams(before, target, seconds, {}, token);
     }
@@ -9276,7 +9384,7 @@ button:hover{background:#202a35}
         return advanced;
     }
 
-    _crossfadeLiveRenderer(target, seconds, token = this.transitionToken) {
+    _crossfadeLiveRenderer(target, seconds, token = this.transitionToken, rendererContext = {}) {
         this.transitioning = true;
         return new Promise((resolve, reject) => {
             const duration = Math.max(80, seconds * 1000);
@@ -9317,7 +9425,7 @@ button:hover{background:#202a35}
                 this._persist();
                 this._applyVisualState();
 
-                prepared = await runtime.prepareCrossfadeRenderer(target);
+                prepared = await runtime.prepareCrossfadeRenderer(target, rendererContext);
                 if (!active()) {
                     cancel();
                     return;
@@ -9361,20 +9469,27 @@ button:hover{background:#202a35}
 
             run().catch((error) => {
                 runtime.cancelCrossfadeRenderer(prepared);
-                if (active()) this.transitioning = false;
+                if (active()) {
+                    this.params = from;
+                    this._syncInputs();
+                    this._persist();
+                    this._applyVisualState();
+                    this._applyEffectiveRendererParams(this.renderParams(), 'transition-rollback');
+                    this.transitioning = false;
+                }
                 reject(error);
             });
         });
     }
 
-    _crossfadeRebuild(target, seconds, token = this.transitionToken) {
+    _crossfadeRebuild(target, seconds, token = this.transitionToken, rendererContext = {}) {
         if (
             this.running &&
             this.params.sourceMode === 'static' &&
             target.sourceMode === 'static' &&
             this.staticRuntime.canReuseSource(target)
         ) {
-            return this._crossfadeLiveRenderer(target, seconds, token);
+            return this._crossfadeLiveRenderer(target, seconds, token, rendererContext);
         }
 
         this.transitioning = true;
@@ -9465,7 +9580,7 @@ button:hover{background:#202a35}
                 this._syncInputs();
                 this._persist();
                 if (this.running) {
-                    await this.restart({ mediaState });
+                    await this.restart({ mediaState, rendererContext });
                     if (!active()) {
                         cancel();
                         return;

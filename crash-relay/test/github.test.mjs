@@ -19,7 +19,21 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
       message: 'Renderer failed',
       stack: 'Error: Renderer failed',
       capturedAt: '2026-06-25T00:00:00Z',
-      context: { backend: 'webgpu' }
+      context: {
+        phase: 'preset-transition',
+        presetId: 'palette-signal-court',
+        backend: 'webgpu',
+        requestedBackend: 'webgpu',
+        actualBackend: 'canvas2d',
+        fallbackBackend: 'canvas2d',
+        recovered: true,
+        rendererDiagnostics: [{
+          event: 'fallback-active',
+          presetId: 'palette-signal-court',
+          requestedBackend: 'webgpu',
+          actualBackend: 'canvas2d'
+        }]
+      }
     }
   };
   const state = {
@@ -42,5 +56,8 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
   assert.match(body, /crash-fingerprint:abc123/);
   assert.match(body, /basis: `error-code`/);
   assert.match(body, /macos\/aarch64: 2/);
+  assert.match(body, /presetId: `palette-signal-court`/);
+  assert.match(body, /## Renderer Diagnostics/);
+  assert.match(body, /"event": "fallback-active"/);
   assert.equal(parseState(body, 'abc123').count, 2);
 });

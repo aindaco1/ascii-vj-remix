@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { crashFingerprint, crashGroupingSummary } from '../src/fingerprint.js';
-import { isIgnoredCrashReport } from '../src/index.js';
+import { ignoredCrashReportReason, isIgnoredCrashReport } from '../src/index.js';
 import { sanitizeCrashPayload } from '../src/sanitize.js';
 
 const env = { CRASH_ALLOWED_APP_IDENTIFIER: 'com.asciline.remix' };
@@ -160,4 +160,24 @@ test('keeps unexpected Tauri command failures reportable', () => {
   }, env);
 
   assert.equal(isIgnoredCrashReport(report), false);
+});
+
+test('ignores non-fatal media diagnostic writer failures', () => {
+  const report = sanitizeCrashPayload({
+    app: { identifier: 'com.asciline.remix', version: '0.9.12' },
+    report: {
+      kind: 'tauri-command',
+      surface: 'tauri-command',
+      message: 'Could not open media diagnostics log: The system cannot find the path specified.',
+      context: {
+        command: 'record_media_diagnostic',
+        backend: 'auto',
+        sourceMode: 'static',
+        mediaType: 'image'
+      }
+    }
+  }, env);
+
+  assert.equal(isIgnoredCrashReport(report), true);
+  assert.equal(ignoredCrashReportReason(report), 'nonfatal-diagnostic-write-failure');
 });

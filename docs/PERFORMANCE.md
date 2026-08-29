@@ -317,10 +317,14 @@ Rules:
 
 - Capture small structured reports only; do not attach frames, screenshots,
   media files, raw audio, or long logs.
+- Renderer failures may attach at most the eight most recent sanitized
+  renderer events; keep collection bounded and outside frame-loop work.
 - Keep local queues bounded by report count and byte size.
 - Submit asynchronously from Rust with short network timeouts.
 - Never wait on crash-report submission before starting renderers, switching
   sources, opening Pop Out, or applying live controls.
+- Attempt Canvas fallback immediately after a GPU construction failure; queue
+  its diagnostic asynchronously after the replacement renderer is active.
 - In debug/dev builds, capture locally but refuse network submission.
 
 ### Experimental MIDI Control

@@ -148,7 +148,9 @@ UI:
 - Do not reduce control density when changing visual styling.
 - Avoid adding explanatory marketing text inside the app UI.
 - Keep the top-bar Reports control reachable with an empty queue; pending state
-  is additive. Do not attach local media diagnostics or arbitrary logs.
+  is additive. Renderer failures may attach the bounded, sanitized renderer
+  event summary defined by the security contract. Do not attach local media
+  diagnostics or arbitrary logs.
 - Keep backend selection in the center control. Resolved-backend diagnostics
   belong in the user-owned Stats Overlay, not a duplicate top-bar readout.
 

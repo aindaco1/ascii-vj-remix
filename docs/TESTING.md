@@ -27,6 +27,7 @@ npm run test:frame-prep          # Rust/JS frame-prep parity
 npm run test:decode-resize       # Decode/resize parity checks
 npm run check:media              # Media pipeline checks
 npm run test:render-math         # Shared renderer math vectors
+npm run test:renderer-fallback   # GPU-to-Canvas fallback and bounded diagnostics
 npm run test:audio-reactive      # Audio-reactive controls, clamps, dense-mix damping
 npm run test:midi                # UC-33e map, scaling, pickup, actions, coalescing
 npm run midi:probe -- --connect  # Physical mioXC input/output open test
@@ -68,7 +69,7 @@ git diff --check
 | macOS secret handling | `npm run test:macos-secret-args` |
 | FFmpeg policy/resources | `npm run test:ffmpeg-policy`, `npm run check:ffmpeg-resources`, `npm run check:ffmpeg-release` |
 | Media frame prep/decode | `npm run test:frame-prep`, `npm run test:decode-resize`, `npm run check:media` |
-| Renderer math parity | `npm run test:render-math`, Rust shared-vector tests through `npm run test:rust` |
+| Renderer math/fallback | `npm run test:render-math`, `npm run test:renderer-fallback`, Rust shared-vector tests through `npm run test:rust` |
 | MIDI | `npm run test:midi`, Rust MIDI/SysEx tests, `npm run midi:probe -- --connect` |
 | Crash reports | `npm run test:crash-report-ui`, `npm run test:crash-relay` |
 | Adaptive codec vectors | `npm run test:vectors` |
@@ -101,6 +102,7 @@ reactivity when behavior changes.
 ```bash
 npm run build
 npm run test:render-math
+npm run test:renderer-fallback
 npm run check:glyph-atlas
 npm run smoke:static
 npm run check:media
@@ -197,7 +199,10 @@ behavior when the permission model changes.
 For crash-report changes, also verify that debug builds capture locally but do
 not submit, release builds use only `https://crash.dustwave.xyz/v1/reports`, and
 the output window has no crash-report permissions. The Reports control stays
-visible with an empty queue, and local media diagnostics are never submitted.
+visible with an empty queue, local media diagnostics are never submitted, and
+renderer reports contain only the bounded structured event summary. Windows
+WebView2 fallback still requires physical Windows acceptance in addition to
+these cross-platform contract checks.
 
 ### FFmpeg and Media Engine
 

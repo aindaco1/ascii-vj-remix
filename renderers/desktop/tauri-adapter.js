@@ -91,6 +91,10 @@ const EXPECTED_MIDI_HARDWARE_COMMANDS = new Set([
     'send_midi_sysex'
 ]);
 
+const NON_FATAL_DIAGNOSTIC_COMMANDS = new Set([
+    'record_media_diagnostic'
+]);
+
 function tauriErrorText(error) {
     return `${error?.name || ''} ${error?.message || error || ''}`.toLowerCase();
 }
@@ -117,10 +121,17 @@ function isExpectedMidiHardwareFailure(command, error) {
         raw.includes('disconnected');
 }
 
+function isReportableTauriCommandFailure(command, error) {
+    const normalizedCommand = String(command || '');
+    if (!normalizedCommand || normalizedCommand.includes('crash_report')) return false;
+    if (NON_FATAL_DIAGNOSTIC_COMMANDS.has(normalizedCommand)) return false;
+    if (isExpectedPermissionCommandFailure(normalizedCommand, error)) return false;
+    if (isExpectedMidiHardwareFailure(normalizedCommand, error)) return false;
+    return true;
+}
+
 function reportTauriCommandFailure(command, error) {
-    if (!crashReportHandler || String(command || '').includes('crash_report')) return;
-    if (isExpectedPermissionCommandFailure(command, error)) return;
-    if (isExpectedMidiHardwareFailure(command, error)) return;
+    if (!crashReportHandler || !isReportableTauriCommandFailure(command, error)) return;
     crashReportHandler({
         kind: 'tauri-command',
         surface: 'tauri-command',
@@ -587,6 +598,7 @@ export {
     installTauriUpdate,
     isTauriRuntime,
     isTauriUpdaterAvailable,
+    isReportableTauriCommandFailure,
     listenTauriEvent,
     listTauriMidiPorts,
     listTauriOutputDisplays,

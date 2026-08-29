@@ -330,6 +330,11 @@ WebGL2 is the most important browser GPU fallback because it is widely available
 on machines that do not expose WebGPU. The macOS Apple WebKit primary glyph
 view currently uses Canvas2D instead of either browser GPU atlas path.
 
+`StaticRuntime` treats GPU construction as a recoverable operation. If the
+requested WebGPU/WebGL2 renderer cannot initialize, it creates the equivalent
+Canvas renderer for both initial startup and live preset transitions. A failed
+Canvas fallback leaves the previous transition surface active.
+
 ## Canvas Renderers
 
 Canvas paths preserve ASCILINE compatibility and low-level fallback behavior.
@@ -365,6 +370,13 @@ Responsibilities:
 - preserve video playback state when changing presets that do not change the
   source.
 - update stats.
+
+Renderer construction records a bounded sequence of structured events. A GPU
+failure that activates Canvas, or a total transition failure, queues one
+deduplicated Reports item with requested/resolved backend, preset, source class,
+and recent event summaries. Reporting is asynchronous and never blocks the
+fallback or transition; no frame, media payload, or arbitrary local log is
+included.
 
 For structural changes, the runtime uses layered renderer surfaces:
 
