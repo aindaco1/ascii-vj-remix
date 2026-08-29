@@ -22,6 +22,10 @@
   well as initial startup. If both the requested renderer and Canvas fallback
   fail, the prior preset remains active and a reviewable diagnostic report is
   queued.
+- Route glyph-atlas presets through the bounded Canvas2D renderer in the
+  packaged Windows WebView2 runtime. Physical Windows 11 testing showed that
+  WebGPU and WebGL2 could both report successful initialization while producing
+  a blank glyph surface; solid/pixel GPU presets remain accelerated.
 
 ## [0.9.12] - 2026-08-28
 

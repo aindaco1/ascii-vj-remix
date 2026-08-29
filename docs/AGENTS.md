@@ -98,6 +98,9 @@ Rendering:
 - WebGPU is the primary quality target.
 - WebGL2 is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas remain compatibility fallbacks.
+- Packaged Apple WebKit and Windows WebView2 glyph previews use Canvas2D when
+  their GPU glyph-atlas paths can initialize without producing visible output;
+  solid/pixel GPU paths remain available.
 - Native Pop Out output uses `wgpu` where available, with Metal on macOS and
   corresponding GPU backends on Windows/Linux.
 - The active renderer is controlled by one canonical parameter model.

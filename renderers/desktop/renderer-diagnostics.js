@@ -26,6 +26,7 @@ function rendererDiagnosticEvent(input = {}) {
     const atMs = Number(input.atMs);
     const event = {
         event: boundedRendererToken(input.event, 'renderer-event'),
+        reason: boundedRendererToken(input.reason),
         phase: boundedRendererToken(input.phase),
         presetId: boundedRendererToken(input.presetId),
         requestedBackend: boundedRendererToken(input.requestedBackend),

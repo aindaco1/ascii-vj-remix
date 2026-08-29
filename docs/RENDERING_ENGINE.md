@@ -335,6 +335,13 @@ requested WebGPU/WebGL2 renderer cannot initialize, it creates the equivalent
 Canvas renderer for both initial startup and live preset transitions. A failed
 Canvas fallback leaves the previous transition surface active.
 
+Physical Windows 11 WebView2 acceptance found a narrower failure mode: GPU
+construction and frame counters succeeded, but glyph-atlas output stayed
+blank, while solid/pixel output remained visible. The packaged Windows Tauri
+runtime therefore routes glyph previews through Canvas2D before construction.
+This compatibility rule does not affect normal Chromium browser use or
+solid/pixel GPU presets.
+
 ## Canvas Renderers
 
 Canvas paths preserve ASCILINE compatibility and low-level fallback behavior.

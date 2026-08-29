@@ -37,8 +37,14 @@ assert.equal(fallbackCalls, 1);
 const diagnostics = new RendererDiagnosticLog(2);
 diagnostics.record({ event: 'create-start', presetId: 'palette-signal-court', atMs: 1 });
 diagnostics.record({ event: 'gpu-failed', message: failure.message, atMs: 2 });
-diagnostics.record({ event: 'canvas-fallback', actualBackend: 'canvas2d', atMs: 3 });
+diagnostics.record({
+  event: 'compatibility-fallback',
+  reason: 'windows-webview2-glyph',
+  actualBackend: 'canvas2d',
+  atMs: 3
+});
 assert.equal(diagnostics.snapshot().length, 2);
+assert.equal(diagnostics.snapshot().at(-1).reason, 'windows-webview2-glyph');
 assert.doesNotMatch(JSON.stringify(diagnostics.snapshot()), /alice|private\.mov/i);
 
 const report = rendererFailureReport(failure, {

@@ -1,6 +1,9 @@
 import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
-import { needsWebKitCanvasGlyphPreview } from './renderers/gpu/ascii/renderer/backend-policy.js';
+import {
+    glyphPreviewCompatibilityReason,
+    needsCompatibilityCanvasGlyphPreview
+} from './renderers/gpu/ascii/renderer/backend-policy.js';
 import { createRendererWithFallback } from './renderers/gpu/ascii/renderer/fallback.js';
 import {
     glyphForLuma,
@@ -4068,11 +4071,20 @@ class StaticRuntime {
         return layer;
     }
 
-    _canvasRendererParams(params) {
+    _canvasRendererDecision(params) {
         const explicitCanvas = params.backend === 'canvas2d' || params.backend === 'pixel-canvas';
-        const webKitGlyphPreview = needsWebKitCanvasGlyphPreview(params, navigator.userAgent || '');
-        if (!explicitCanvas && !webKitGlyphPreview) return null;
-        return params.backend === 'pixel-canvas' ? params : { ...params, backend: 'canvas2d' };
+        const compatibilityReason = explicitCanvas
+            ? ''
+            : glyphPreviewCompatibilityReason(
+                params,
+                navigator.userAgent || '',
+                isTauriRuntime()
+            );
+        if (!explicitCanvas && !compatibilityReason) return null;
+        return {
+            params: params.backend === 'pixel-canvas' ? params : { ...params, backend: 'canvas2d' },
+            compatibilityReason
+        };
     }
 
     _ensureCurrentRendererLayer() {
@@ -4207,9 +4219,19 @@ class StaticRuntime {
 
     async _createRendererForParams(params, layer, options = {}) {
         const rendererContext = options.rendererContext || {};
-        const canvasParams = this._canvasRendererParams(params);
-        if (canvasParams) {
-            return this._createCanvasRenderer(canvasParams, layer, options);
+        const canvasDecision = this._canvasRendererDecision(params);
+        if (canvasDecision) {
+            if (canvasDecision.compatibilityReason) {
+                this.app._recordRendererDiagnostic({
+                    event: 'compatibility-fallback',
+                    reason: canvasDecision.compatibilityReason,
+                    requestedBackend: params.backend,
+                    actualBackend: 'canvas2d',
+                    fallbackBackend: 'canvas2d',
+                    ...rendererContext
+                });
+            }
+            return this._createCanvasRenderer(canvasDecision.params, layer, options);
         }
 
         this.app._recordRendererDiagnostic({
@@ -6725,7 +6747,11 @@ class RendererLabApp {
                     const ratioError = sourceRatio > 0 ? Math.abs(canvasRatio - sourceRatio) / sourceRatio : 1;
                     const expectsCanvas = preset.params.backend === 'canvas2d' ||
                         preset.params.backend === 'pixel-canvas' ||
-                        needsWebKitCanvasGlyphPreview(target, navigator.userAgent || '');
+                        needsCompatibilityCanvasGlyphPreview(
+                            target,
+                            navigator.userAgent || '',
+                            isTauriRuntime()
+                        );
                     const backendOk = !expectsCanvas || backend === 'canvas2d' || backend === 'pixel-canvas';
                     const glError = Number(renderer?.gl?.getError?.() || 0);
                     const reasons = [];

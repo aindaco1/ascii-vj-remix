@@ -204,6 +204,12 @@ renderer reports contain only the bounded structured event summary. Windows
 WebView2 fallback still requires physical Windows acceptance in addition to
 these cross-platform contract checks.
 
+The 2026-08-29 Windows 11 test established that Signal Court and Midnight Scan
+CJK could initialize blank under both WebGPU and WebGL2, while Neon
+Sledgehammer's solid/pixel path remained visible and Camera opened without a
+spurious media-diagnostics report. Recheck the Windows Tauri glyph-to-Canvas
+compatibility policy on the replacement installer before merging.
+
 ### FFmpeg and Media Engine
 
 ```bash

@@ -484,11 +484,14 @@ Audio Tap capture is not implemented in the current release.
 ### A preset does not load or changes renderer on Windows
 
 The app automatically retries failed WebGPU/WebGL2 renderer creation with the
-Canvas compatibility renderer, including during live preset changes. Open
-Stats Overlay to see the resolved backend. If the preset still fails, open the
-persistent Reports control to review and send the bounded renderer diagnostic;
-it contains preset/backend state and recent renderer events, never selected
-media or an unrestricted log file.
+Canvas compatibility renderer, including during live preset changes. Because
+Windows WebView2 can accept GPU glyph initialization while producing a blank
+surface, the packaged Windows app resolves glyph presets directly to Canvas2D;
+solid/pixel presets can remain GPU-accelerated. Open Stats Overlay to see the
+resolved backend. If a preset still fails, open the persistent Reports control
+to review and send the bounded renderer diagnostic; it contains preset/backend
+state and recent renderer events, never selected media or an unrestricted log
+file.
 
 ### Pop Out is slow
 
