@@ -80,8 +80,8 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current source/package version and latest verified public release are
-0.9.12. The Changelog owns release history; the Roadmap is prospective only.
+The current source/package version is 0.10.0. The latest verified public release
+is 0.9.12. The Changelog owns release history; the Roadmap is prospective only.
 
 Sources:
 

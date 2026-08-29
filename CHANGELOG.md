@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-29
+
 ### Added
 
 - Added bounded renderer diagnostics to the existing Reports workflow. A failed
@@ -32,6 +34,12 @@
   WebGPU and WebGL2 could both report successful initialization while producing
   a blank glyph surface; solid/pixel GPU presets remain accelerated.
 
+Version 0.10.0 makes Windows glyph presets reliable through a bounded Canvas2D
+compatibility path, extends renderer failures into the existing privacy-bounded
+Reports workflow, and replaces the main-header `VJ` badge with the canonical
+app icon. Version 0.9.12 restores every built-in preset in the primary app view
+while preserving the source aspect ratio and the native Pop Out path.
+
 ## [0.9.12] - 2026-08-28
 
 ### Fixed
@@ -53,9 +61,7 @@
   presets and checks primary-view visibility, renderer family, running state,
   GPU errors, and source/canvas aspect for each final surface.
 
-Version 0.9.12 restores every built-in preset in the primary app view while
-preserving the source aspect ratio and the native Pop Out path. Version 0.9.11
-adds performance-budgeted project palettes, ordered dithering,
+Version 0.9.11 adds performance-budgeted project palettes, ordered dithering,
 multilingual glyph controls, custom Unicode ramps, density guardrails, and
 renderer/native-output parity. Version 0.9.10 replaces the legacy television artwork with one canonical app
 icon generated for every packaged platform and carries the post-0.9.9 Reports
