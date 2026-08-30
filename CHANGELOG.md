@@ -31,6 +31,11 @@
 
 ### Fixed
 
+- Decoupled the clean-profile Classic Camera ASCII look from the global
+  renderer preference. Built-ins that do not explicitly request a compatibility
+  backend now start from Auto and resolve to WebGPU/WebGL2 when available,
+  while the bounded Apple WebKit and Windows WebView2 glyph fallback remains in
+  place.
 - Synchronized primary-view and native Pop Out transitions on one timestamped
   clock. Numeric transitions now use the same easing progress on both surfaces,
   renderer-family changes use the same crossfade curve, and native presentation

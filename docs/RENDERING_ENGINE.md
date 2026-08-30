@@ -330,6 +330,13 @@ WebGL2 is the most important browser GPU fallback because it is widely available
 on machines that do not expose WebGPU. The macOS Apple WebKit primary glyph
 view currently uses Canvas2D instead of either browser GPU atlas path.
 
+The clean-profile visual default and renderer preference have separate owners:
+Classic Camera ASCII supplies the initial visual parameters, while the global
+backend remains Auto. A built-in preset inherits Auto unless it explicitly
+declares a compatibility backend. This keeps solid/pixel presets on WebGPU or
+WebGL2 without changing the intentional Canvas2D routing for affected packaged
+glyph surfaces.
+
 `StaticRuntime` treats GPU construction as a recoverable operation. If the
 requested WebGPU/WebGL2 renderer cannot initialize, it creates the equivalent
 Canvas renderer for both initial startup and live preset transitions. A failed

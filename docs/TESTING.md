@@ -215,6 +215,12 @@ Sledgehammer's solid/pixel path remained visible and Camera opened without a
 spurious media-diagnostics report. Recheck the Windows Tauri glyph-to-Canvas
 compatibility policy on the replacement installer before merging.
 
+The static preset matrix also verifies backend ownership: clean state and
+built-ins without an explicit compatibility backend retain Auto and resolve to
+WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
+separately requires GPU-eligible presets to remain accelerated while validating
+the Apple WebKit or Windows WebView2 Canvas glyph policy.
+
 ### FFmpeg and Media Engine
 
 ```bash

@@ -204,6 +204,7 @@ const MIDI_CUSTOM_BINDINGS_KEY = 'ascii-vj-remix-midi-custom-bindings-v1';
 const MIDI_SYSEX_PROFILE_KEY = 'ascii-vj-remix-uc33e-sysex-v1';
 const MIDI_PRESET_SLOTS_KEY = 'ascii-vj-remix-midi-preset-slots-v1';
 const DEFAULT_PRESET_ID = 'classic-camera-ascii';
+const DEFAULT_RENDERER_BACKEND = 'auto';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -267,6 +268,10 @@ const DEFAULT_PARAMS = {
     muted: true,
     volume: 1,
     ...CLASSIC_CAMERA_ASCII_PARAMS,
+    // The clean-profile look is Classic Camera ASCII, but renderer selection
+    // remains a global capability decision. Individual presets can still opt
+    // into a specific compatibility backend.
+    backend: DEFAULT_RENDERER_BACKEND,
     rows: 0,
     fps: 60,
     fpsCap: 30,
@@ -6725,6 +6730,8 @@ class RendererLabApp {
             failures: [],
             backends: {},
             glyphBackends: {},
+            acceleratedEligible: 0,
+            acceleratedPassed: 0,
             source: 'media/demo.svg'
         };
 
@@ -6777,7 +6784,10 @@ class RendererLabApp {
                             navigator.userAgent || '',
                             isTauriRuntime()
                         );
-                    const backendOk = !expectsCanvas || backend === 'canvas2d' || backend === 'pixel-canvas';
+                    const expectsAcceleration = !expectsCanvas && STATIC_GPU_BACKENDS.has(target.backend);
+                    const usesCanvas = backend === 'canvas2d' || backend === 'pixel-canvas';
+                    const usesAcceleration = backend === 'webgpu' || backend === 'webgl2';
+                    const backendOk = expectsCanvas ? usesCanvas : !expectsAcceleration || usesAcceleration;
                     const glError = Number(renderer?.gl?.getError?.() || 0);
                     const reasons = [];
                     if (!signal.visible) reasons.push('blank');
@@ -6787,6 +6797,10 @@ class RendererLabApp {
                     if (glError) reasons.push(`gl:${glError}`);
 
                     report.backends[backend] = (report.backends[backend] || 0) + 1;
+                    if (expectsAcceleration) {
+                        report.acceleratedEligible += 1;
+                        if (usesAcceleration) report.acceleratedPassed += 1;
+                    }
                     if (target.glyphMode && !target.solidMode) {
                         report.glyphBackends[backend] = (report.glyphBackends[backend] || 0) + 1;
                     }

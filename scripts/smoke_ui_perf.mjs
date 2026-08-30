@@ -101,6 +101,7 @@ if (presetSweep) {
     `passed=${report.passed || 0}/${report.presetCount || 0}`,
     `backends=${JSON.stringify(report.backends || {})}`,
     `glyphBackends=${JSON.stringify(report.glyphBackends || {})}`,
+    `accelerated=${report.acceleratedPassed || 0}/${report.acceleratedEligible || 0}`,
     `failures=${report.failures?.length || 0}`
   ].join(' '));
   if (!report.ok) {

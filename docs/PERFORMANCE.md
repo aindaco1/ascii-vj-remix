@@ -209,6 +209,10 @@ development-host regression results, not M1/16 GB floor certification.
 WebGPU is the primary visual quality target and the first choice on capable
 Chromium/WebView runtimes.
 
+The clean-profile preset must not own the global renderer preference. The
+default backend is Auto, and built-ins without an explicit compatibility
+backend are expected to resolve to WebGPU first and WebGL2 second.
+
 Watch for:
 
 - external texture import costs on video frames.

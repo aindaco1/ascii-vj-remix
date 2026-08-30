@@ -7,6 +7,8 @@ acceptance, and public release state.
 ## Candidate scope
 
 - Classic Camera ASCII is the clean-profile visual default.
+- The clean-profile backend remains Auto; built-ins without an explicit
+  compatibility backend resolve to WebGPU/WebGL2 when available.
 - Point & Click Default is displayed as Dense Color ASCII while retaining its
   stable preset id.
 - Built-in and My Presets are separate, independently alphabetized, and
@@ -27,11 +29,12 @@ acceptance, and public release state.
 | Layer | State | Evidence |
 | --- | --- | --- |
 | Source metadata | Pass | Package, npm lock, Cargo package/lock, and Tauri config agree on 1.0.0. |
-| Static UI/renderer | Pass | Clean-profile default, all 69 built-ins, live search, alphabetical sections, overflow focus, and minimum-window select geometry pass `npm run smoke:static`. |
-| Desktop gate | Pass | `npm run check:desktop` passes, including 49 Rust tests and the native debug build. |
+| Static UI/renderer | Pass | Clean-profile Auto ownership, accelerated built-in resolution, all 69 built-ins, live search, alphabetical sections, overflow focus, and minimum-window select geometry pass `npm run smoke:static`. |
+| Desktop gate | Pass | `npm run check:desktop` passes, including 53 Rust tests and the native debug build. |
 | Release runtime gate | Pass | Pinned FFmpeg 8.1.2 Apple Silicon resources are staged and `npm run check:release` passes. |
 | Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources. |
-| Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, zero failures. |
+| Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, 7/7 GPU-eligible presets on WebGPU, 62 glyph presets on the bounded Canvas2D compatibility path, zero failures. |
+| Native Pop Out | Pass | Structural packaged smoke reports 60.0 FPS average native presentation, five synchronized transitions, zero transition failures, zero GPU failures, and a visible primary surface. |
 | Windows CI installer | Pending | Draft-PR Windows gate must build the pinned FFmpeg resources, unsigned release-profile development EXE/MSI, and pass the GUI-subsystem check. |
 | Windows physical QA | Pending | Install and exercise the development artifact on the Windows 11 Pro / RTX 2070 machine. |
 | Linux CI packages | Pending | Draft-PR Ubuntu 24.04 gate must build the pinned FFmpeg resources and development AppImage/deb/rpm artifact. |

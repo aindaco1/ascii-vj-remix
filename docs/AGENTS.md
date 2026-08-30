@@ -105,6 +105,9 @@ Rendering:
 - Native Pop Out output uses `wgpu` where available, with Metal on macOS and
   corresponding GPU backends on Windows/Linux.
 - The active renderer is controlled by one canonical parameter model.
+- Classic Camera ASCII owns the clean-profile visual state, not the global
+  renderer preference. Keep the default backend on Auto; built-ins inherit it
+  unless they explicitly declare a compatibility backend.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets.
 - Sixteen project-native palettes, nearest/luminance mapping, and Bayer

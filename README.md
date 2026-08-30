@@ -106,7 +106,10 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
   Newsprint, Terminal Mono, and Dense Typewriter.
 - Classic Camera ASCII is the default for a clean profile. Existing persisted
-  profiles keep their visual settings instead of being silently reset.
+  profiles keep their visual settings instead of being silently reset. The
+  clean-profile visual choice does not override the global Auto renderer
+  preference; presets without an explicit compatibility backend use
+  WebGPU/WebGL2 when the runtime supports them.
 - Twenty-three read-only character presets adapted from
   [ascii.today](https://ascii.today/), including Broadway KB, Computer, Doom,
   Ghost, Modular, Standard, Univers, and Doh. The complete credited pack is in

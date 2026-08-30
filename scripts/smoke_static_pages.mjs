@@ -262,7 +262,7 @@ async function runSmoke() {
     if (
       main.defaultPreset.id !== 'classic-camera-ascii' ||
       main.defaultPreset.label !== 'Classic Camera ASCII' ||
-      main.defaultPreset.backend !== 'canvas2d' ||
+      main.defaultPreset.backend !== 'auto' ||
       main.defaultPreset.charset !== 'classic-camera' ||
       !main.defaultPreset.glyphMode
     ) {
@@ -1174,6 +1174,8 @@ async function runSmoke() {
           results.push({
             id: preset.id,
             active: app.activePresetId === preset.id,
+            requestedBackend: app.params.backend,
+            resolvedBackend: app.staticRuntime?.getStats?.()?.backend || '',
             hasSignal: nonBackground >= 5,
             aspectError: canvasRatio ? Math.abs(canvasRatio / sourceRatio - 1) : 1,
             glError,
@@ -1195,6 +1197,16 @@ async function runSmoke() {
     );
     if (presetFailures.length) {
       throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
+    }
+    const acceleratedPresetResults = presetMatrix.filter((preset) => preset.requestedBackend === 'auto');
+    const acceleratedPresetFailures = acceleratedPresetResults.filter((preset) =>
+      preset.resolvedBackend !== 'webgpu' && preset.resolvedBackend !== 'webgl2'
+    );
+    if (!acceleratedPresetResults.length || acceleratedPresetFailures.length) {
+      throw new Error(`Auto built-in presets should resolve to WebGPU or WebGL2 in the capable Chromium smoke runtime: ${JSON.stringify({
+        eligible: acceleratedPresetResults.length,
+        failures: acceleratedPresetFailures
+      })}`);
     }
 
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });
