@@ -1,6 +1,6 @@
 [package]
 name = "ascii-vj-remix"
-version = "0.10.0"
+version = "1.0.0"
 description = "ASCII VJ Remix renderer lab desktop shell"
 authors = ["ASCII VJ Remix Contributors"]
 edition = "2021"

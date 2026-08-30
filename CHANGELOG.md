@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added live preset-name search with separate, independently alphabetized
+  Built-in and My Presets sections, result status, keyboard clearing, and
+  no-results states.
+- Added release-profile pull-request packages for physical QA: an unsigned,
+  updater-disabled Windows development installer plus AppImage, deb, and rpm
+  Linux development packages retained for 14 days.
+- Added a non-destructive Hyper-V bootstrap and acceptance guide for Ubuntu
+  24.04 and Fedora 44 x86_64 test VMs on Windows 11 Pro.
+- Added a PE subsystem gate that rejects a Windows release-mode executable
+  unless it is marked as a graphical application.
+
+### Changed
+
+- Bumped the source/package version to the 1.0.0 release candidate while
+  leaving 0.10.0 as the latest verified public release until publication.
+- Made Classic Camera ASCII the default visual state for a clean profile while
+  preserving persisted profiles, and renamed the Point & Click Default display
+  label to Dense Color ASCII without changing its stable preset id.
+- Standardized sidebar select widths, heights, label columns, row spacing, and
+  value presentation; removed the redundant one-option Atlas Style control.
+- Labeled Advanced Density with its `Up to 900 columns` and no-30-FPS-guarantee
+  constraint directly in the control row.
+- Pinned Linux build and release acceptance runners to Ubuntu 24.04.
+
+### Fixed
+
+- Prevented release-mode Windows app and FFmpeg/ffprobe child processes from
+  opening visible console windows. Debug builds retain normal diagnostic
+  console behavior.
+- Made the preset overflow menu focus its first action, close with Escape, and
+  restore focus to its trigger.
+- Made the local signing bootstrap import its temporary PKCS#12 identity with a
+  Keychain-compatible password, and made the local launcher refuse to delete a
+  bundle when its source and install paths are the same.
+
 ## [0.10.0] - 2026-08-29
 
 ### Added

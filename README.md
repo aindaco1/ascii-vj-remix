@@ -8,9 +8,11 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version and latest verified public release are
-0.10.0. Release history is recorded in the [Changelog](CHANGELOG.md);
-prospective work belongs in the [Roadmap](docs/ROADMAP.md).
+The current source/package version is the 1.0.0 release candidate. The latest
+verified public release remains 0.10.0 until the candidate completes physical
+QA and is published. Release history is recorded in the
+[Changelog](CHANGELOG.md); prospective work belongs in the
+[Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
 
@@ -22,6 +24,7 @@ prospective work belongs in the [Roadmap](docs/ROADMAP.md).
 - [Security guide](docs/SECURITY.md)
 - [Performance guide](docs/PERFORMANCE.md)
 - [Testing guide](docs/TESTING.md)
+- [1.0.0 release candidate QA](docs/RELEASE_1.0.0_RC.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -102,12 +105,18 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
 - Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
   Newsprint, Terminal Mono, and Dense Typewriter.
+- Classic Camera ASCII is the default for a clean profile. Existing persisted
+  profiles keep their visual settings instead of being silently reset.
 - Twenty-three read-only character presets adapted from
   [ascii.today](https://ascii.today/), including Broadway KB, Computer, Doom,
   Ghost, Modular, Standard, Univers, and Doh. The complete credited pack is in
   [ascii.today Character Presets](docs/ASCII_TODAY_PRESETS.md).
-- Character Set and Font Family controls stay compact so traditional ASCII
-  tuning does not crowd the dense live-control surface.
+- Built-in and My Presets are shown as separate, independently alphabetized
+  sections with a live name search. The prior Point & Click Default display
+  name is now the more descriptive Dense Color ASCII; its stable preset id is
+  unchanged.
+- Character Set, Font Family, Palette, and other selects share the same control
+  geometry so traditional ASCII tuning stays aligned in the dense sidebar.
 - Palette, mapping, ordered-dither, glyph-ramp, and glyph-color controls are
   independently tunable and saved through the existing visual-preset schema.
 - Ten built-in palette/glyph variants include Braille, box drawing, CJK marks,
@@ -257,7 +266,7 @@ Notes:
 | Level | Requirement |
 | --- | --- |
 | Minimum | Modern x86_64 Linux distribution, WebKitGTK 4.1 runtime, Mesa or vendor GPU drivers with WebGL2, 8 GB RAM, 2 GB free disk space. |
-| Optimal | Ubuntu 24.04, Fedora 40, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU. |
+| Optimal | Ubuntu 24.04, Fedora 44, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU. |
 
 Notes:
 
@@ -349,8 +358,9 @@ portal packages are installed for your distribution.
 ## First Run
 
 1. Launch the app.
-2. The renderer starts automatically on Demo Image.
-3. Choose a built-in preset from the Presets panel.
+2. A clean profile starts on Demo Image with Classic Camera ASCII.
+3. Search or choose a preset from the alphabetized Built-in section. Presets
+   you save appear alphabetically under My Presets.
 4. Use Source to switch to Demo Video, Camera, or a custom local file.
 5. Tune Palette, Dither, and Glyph controls independently, or choose one of the
    built-in palette/glyph presets.

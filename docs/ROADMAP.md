@@ -97,7 +97,8 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Presets and User Profiles
 
-- Add user-preset rename, startup selection, folders/tags, and search/filter.
+- Add user-preset rename, optional user-selected startup behavior, and
+  folders/tags.
 - Separate visual preset packs from MIDI mapping profiles.
 - Improve import validation with readable, localized errors.
 - Evaluate export bundles containing visual presets, audio-reactive settings,

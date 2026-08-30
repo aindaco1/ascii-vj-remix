@@ -38,8 +38,11 @@ npm run test:rust                # Rust tests
 npm run check:desktop            # Main desktop validation gate
 npm run check:release            # Release-oriented gate; expects staged FFmpeg sidecar
 npm run bundle:debug             # Build and validate local debug bundle
+npm run bundle:test              # Windows release-profile dev installer + GUI check
+npm run bundle:test:linux        # Linux release-profile dev AppImage/deb/rpm
 npm run bundle:release           # Release gate, release build, bundle check
 npm run check:windows-authenticode # Inactive signed-Windows path signature check
+npm run check:windows-gui        # Require the release EXE GUI subsystem
 npm run smoke:native-output      # Native output performance helper
 npm run smoke:ui-perf            # UI performance helper
 npm run smoke:primary-presets    # Installed WebKit primary-view preset sweep
@@ -58,7 +61,7 @@ git diff --check
 | Area | Current Checks |
 | --- | --- |
 | Offline runtime | `npm run check:offline`, `scripts/check_offline_bundle.mjs` |
-| Static UI harness | `npm run smoke:static`, including activation, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
+| Static UI harness | `npm run smoke:static`, including activation, clean-profile default, live preset search, independent alphabetical sections, overflow-menu focus, aligned select geometry, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
 | Tauri policy | `npm run check:tauri-policy` |
 | App icons | `npm run check:icons` |
 | Unicode glyph atlas | `npm run check:glyph-atlas`, complete-block assertions in renderer math/Rust tests |
@@ -315,7 +318,9 @@ Important manual matrices:
 - macOS with external USB camera.
 - macOS with system audio capture.
 - Windows with WebView2, D3D12/WebGL2, camera, mic, and installer path.
-- Linux with WebKitGTK, GPU acceleration, camera, mic, and AppImage/deb path.
+- Linux with WebKitGTK, GPU acceleration, camera, mic, and AppImage/deb/rpm
+  paths. The maintained VM matrix and package checklist are in
+  [Linux VM QA](LINUX_VM_QA.md).
 - Experimental macOS Apple Silicon MIDI rig: Evolution/M-Audio UC-33e through
   both DIN directions of an iConnectivity mioXC, powered separately.
 
@@ -365,6 +370,8 @@ Release CI:
   acceptance before publishing macOS artifacts.
 - publishes Windows artifacts as unsigned previews; the inactive signed
   Windows path includes Authenticode signer and timestamp validation.
+- marks the Windows release executable as a GUI application and launches
+  FFmpeg/ffprobe without visible child consoles.
 - run install and visible-updater-UI smoke checks after publishing.
 - run macOS updater identity/replacement smoke on `macos-26`.
 

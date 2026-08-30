@@ -140,6 +140,8 @@ const els = {
     statsOverlay: $('stats-overlay'),
     audio: $('ascii-audio'),
     presetList: $('preset-list'),
+    presetSearch: $('preset-search'),
+    presetSearchStatus: $('preset-search-status'),
     savePreset: $('save-preset'),
     duplicatePreset: $('duplicate-preset'),
     updatePreset: $('update-preset'),
@@ -201,6 +203,7 @@ const MIDI_SETTINGS_KEY = 'ascii-vj-remix-midi-settings-v1';
 const MIDI_CUSTOM_BINDINGS_KEY = 'ascii-vj-remix-midi-custom-bindings-v1';
 const MIDI_SYSEX_PROFILE_KEY = 'ascii-vj-remix-uc33e-sysex-v1';
 const MIDI_PRESET_SLOTS_KEY = 'ascii-vj-remix-midi-preset-slots-v1';
+const DEFAULT_PRESET_ID = 'classic-camera-ascii';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -221,9 +224,34 @@ const CUSTOM_MEDIA_PICKER_OPTIONS = {
     }]
 };
 
+const CLASSIC_CAMERA_ASCII_PARAMS = Object.freeze({
+    backend: 'canvas2d',
+    cols: 170,
+    autoRows: true,
+    cellWidth: 6,
+    cellHeight: 9,
+    saturationBoost: 0,
+    contrastBoost: 1.75,
+    brightness: 1.08,
+    gamma: 1,
+    bgBlend: 0.04,
+    quantizeBits: 0,
+    jitterAmount: 0.32,
+    jitterSpeed: 0.85,
+    sampleX: 0.5,
+    sampleY: 0.5,
+    smoothing: false,
+    solidMode: false,
+    glyphMode: true,
+    charset: 'classic-camera',
+    fontFamily: 'Courier New',
+    mode: 1,
+    pixel: false,
+    codecQuality: 'balanced'
+});
+
 const DEFAULT_PARAMS = {
     sourceMode: 'static',
-    backend: 'auto',
     mediaUrl: 'media/demo.svg',
     mediaType: 'image',
     sourceName: 'Demo Image',
@@ -238,17 +266,10 @@ const DEFAULT_PARAMS = {
     loop: true,
     muted: true,
     volume: 1,
-    cols: 480,
+    ...CLASSIC_CAMERA_ASCII_PARAMS,
     rows: 0,
-    autoRows: true,
     fps: 60,
     fpsCap: 30,
-    saturationBoost: 1.4,
-    contrastBoost: 1.2,
-    brightness: 1,
-    gamma: 1,
-    bgBlend: 0.3,
-    quantizeBits: 0,
     paletteId: 'none',
     paletteMapping: 'nearest',
     ditherMode: 'none',
@@ -256,26 +277,13 @@ const DEFAULT_PARAMS = {
     ditherScale: 1,
     ditherBias: 0,
     ditherInvert: false,
-    mode: 5,
-    pixel: false,
-    cellWidth: 2,
-    cellHeight: 3,
     aspectCorrection: 1,
-    jitterAmount: 0.6,
-    jitterSpeed: 1,
-    sampleX: 0.5,
-    sampleY: 0.5,
-    smoothing: true,
     codec: 'adaptive',
-    codecQuality: 'lossless',
     codecTolerance: 0,
     bufferSize: 4,
     maxBufferMultiplier: 5,
     lateDropThreshold: 0.1,
     futureWaitThreshold: 0.05,
-    glyphMode: true,
-    solidMode: false,
-    charset: 'point-click',
     customGlyphRamp: '',
     glyphDepth: 96,
     glyphOffset: 0,
@@ -284,7 +292,6 @@ const DEFAULT_PARAMS = {
     glyphColor: '#ffffff',
     backgroundColor: '#030405',
     atlasStyle: 'neutral',
-    fontFamily: 'Courier New',
     minGlyphIntensity: 180,
     advancedDensity: false,
     statsOverlay: true,
@@ -432,7 +439,7 @@ const PALETTE_PRESET_IDS = Object.freeze(PALETTE_PRESETS.map((preset) => preset.
 const BUILTIN_PRESETS = [
     {
         id: 'point-click-default',
-        name: 'Point & Click Default',
+        name: 'Dense Color ASCII',
         readonly: true,
         transitionSeconds: 1.5,
         params: {
@@ -456,31 +463,7 @@ const BUILTIN_PRESETS = [
         name: 'Classic Camera ASCII',
         readonly: true,
         transitionSeconds: 1.1,
-        params: {
-            backend: 'canvas2d',
-            cols: 170,
-            autoRows: true,
-            cellWidth: 6,
-            cellHeight: 9,
-            saturationBoost: 0,
-            contrastBoost: 1.75,
-            brightness: 1.08,
-            gamma: 1,
-            bgBlend: 0.04,
-            quantizeBits: 0,
-            jitterAmount: 0.32,
-            jitterSpeed: 0.85,
-            sampleX: 0.5,
-            sampleY: 0.5,
-            smoothing: false,
-            solidMode: false,
-            glyphMode: true,
-            charset: 'classic-camera',
-            fontFamily: 'Courier New',
-            mode: 1,
-            pixel: false,
-            codecQuality: 'balanced'
-        }
+        params: CLASSIC_CAMERA_ASCII_PARAMS
     },
     {
         id: 'ansi-newsprint',
@@ -1367,6 +1350,17 @@ const BUILTIN_PRESETS_DISPLAY = [
     ...BUILTIN_PRESET_DISPLAY_ORDER.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean),
     ...BUILTIN_PRESETS.filter((preset) => !BUILTIN_PRESET_DISPLAY_ORDER.includes(preset.id))
 ];
+const PRESET_NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+
+function sortPresetsByName(presets) {
+    return [...presets].sort((left, right) => (
+        PRESET_NAME_COLLATOR.compare(left.name, right.name) || String(left.id).localeCompare(String(right.id))
+    ));
+}
+
+function normalizePresetSearch(value) {
+    return String(value || '').trim().toLocaleLowerCase('en-US');
+}
 const ASCII_WTF_PRESETS = ASCII_WTF_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 const WTF_ANCHOR_PRESETS = WTF_ANCHOR_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 const CANVAS_ASCII_JITTER_MIGRATIONS = ASCII_WTF_PRESETS.map((preset) => ({
@@ -1405,7 +1399,7 @@ const CONTROL_GROUPS = [
         title: 'Grid',
         controls: [
             { key: 'cols', label: 'Columns', type: 'range', min: 80, max: ADVANCED_MAX_COLUMNS, step: 1 },
-            { key: 'advancedDensity', label: 'Advanced density', type: 'checkbox' },
+            { key: 'advancedDensity', label: 'Advanced density', description: 'Up to 900 columns · no 30 FPS guarantee', type: 'checkbox' },
             { key: 'autoRows', label: 'Auto rows', type: 'checkbox' },
             { key: 'rows', label: 'Rows', type: 'range', min: 20, max: 360, step: 1 },
             { key: 'cellWidth', label: 'Cell width', type: 'range', min: 1, max: 12, step: 1, unit: 'px' },
@@ -1422,7 +1416,7 @@ const CONTROL_GROUPS = [
             { key: 'gamma', label: 'Gamma', type: 'range', min: 0.2, max: 3, step: 0.01 },
             { key: 'bgBlend', label: 'Background blend', type: 'range', min: 0, max: 1, step: 0.01 },
             { key: 'quantizeBits', label: 'Quantize bits', type: 'range', min: 0, max: 6, step: 1 },
-            { key: 'paletteId', label: 'Palette', type: 'select', compactSelect: true, options: PALETTE_OPTIONS },
+            { key: 'paletteId', label: 'Palette', type: 'select', options: PALETTE_OPTIONS },
             { key: 'paletteMapping', label: 'Palette mapping', type: 'select', options: [['nearest', 'Nearest color'], ['luminance', 'Luminance ramp']] },
             { key: 'mode', label: 'Stream mode', type: 'select', options: [['1', '1 B&W'], ['2', '2 512c'], ['3', '3 32K'], ['4', '4 262K'], ['5', '5 16M']] },
             { key: 'pixel', label: 'Pixel stream', type: 'checkbox' }
@@ -1479,8 +1473,7 @@ const CONTROL_GROUPS = [
         controls: [
             { key: 'glyphMode', label: 'Glyph mode', type: 'checkbox' },
             { key: 'solidMode', label: 'Solid mode', type: 'checkbox' },
-            { key: 'atlasStyle', label: 'Atlas style', type: 'select', options: [['neutral', 'Neutral']] },
-            { key: 'charset', label: 'Glyph set', type: 'select', compactSelect: true, options: CHARACTER_SET_OPTIONS },
+            { key: 'charset', label: 'Glyph set', type: 'select', options: CHARACTER_SET_OPTIONS },
             { key: 'customGlyphRamp', label: 'Custom ramp', type: 'text', maxScalars: 96, placeholder: 'Type up to 96 glyphs' },
             { key: 'glyphDepth', label: 'Glyph depth', type: 'range', min: 1, max: 96, step: 1 },
             { key: 'glyphOffset', label: 'Glyph offset', type: 'range', min: 0, max: 95, step: 1 },
@@ -1488,7 +1481,7 @@ const CONTROL_GROUPS = [
             { key: 'glyphColorMode', label: 'Glyph color', type: 'select', options: [['source', 'Source color'], ['fixed', 'Fixed color'], ['palette', 'Palette color']] },
             { key: 'glyphColor', label: 'Fixed glyph color', type: 'color' },
             { key: 'backgroundColor', label: 'Background color', type: 'color' },
-            { key: 'fontFamily', label: 'Font family', type: 'select', compactSelect: true, options: FONT_FAMILY_OPTIONS },
+            { key: 'fontFamily', label: 'Font family', type: 'select', options: FONT_FAMILY_OPTIONS },
             { key: 'minGlyphIntensity', label: 'Min glyph intensity', type: 'range', min: 0, max: 255, step: 1 }
         ]
     }
@@ -1931,6 +1924,7 @@ function normalizeParams(params, options = {}) {
             out[key] = sanitizeHexColor(out[key], DEFAULT_PARAMS[key]);
         }
     }
+    if (out.atlasStyle !== 'neutral') out.atlasStyle = 'neutral';
     out.customGlyphRamp = sanitizeGlyphRamp(out.customGlyphRamp);
     out.glyphColor = sanitizeHexColor(out.glyphColor, DEFAULT_PARAMS.glyphColor);
     out.backgroundColor = sanitizeHexColor(out.backgroundColor, DEFAULT_PARAMS.backgroundColor);
@@ -5465,6 +5459,7 @@ class MidiControllerRuntime {
 
 class RendererLabApp {
     constructor() {
+        const hasStoredParams = localStorage.getItem(STORAGE_KEY) !== null;
         this.params = startupSafeParams(migrateStoredParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS)));
         this.effectiveParams = null;
         this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS };
@@ -5477,7 +5472,8 @@ class RendererLabApp {
         this.midiRuntime = new MidiControllerRuntime(this);
         this._midiTargetDescriptors = null;
         this.userPresets = parseStoredJson(PRESET_KEY, []);
-        this.activePresetId = 'point-click-default';
+        this.activePresetId = hasStoredParams ? null : DEFAULT_PRESET_ID;
+        this.presetSearchQuery = '';
         this.transitionToken = 0;
         this.staticRuntime = new StaticRuntime(this);
         this.streamRuntime = new StreamRuntime(this);
@@ -6420,16 +6416,26 @@ class RendererLabApp {
             for (const config of group.controls) {
                 const row = document.createElement('div');
                 row.className = 'control-row';
-                if (config.compactSelect) row.classList.add('compact-select');
                 row.dataset.controlKey = config.key;
+                row.dataset.controlType = config.type;
                 const label = document.createElement('label');
                 label.className = 'control-label';
                 label.htmlFor = `control-${config.key}`;
-                label.innerHTML = `<span>${config.label}</span><small>${config.key}</small>`;
+                const labelText = document.createElement('span');
+                labelText.textContent = config.label;
+                label.appendChild(labelText);
+                if (config.description) {
+                    const description = document.createElement('small');
+                    description.id = `description-${config.key}`;
+                    description.textContent = config.description;
+                    label.appendChild(description);
+                }
                 const input = this._makeControl(config);
+                if (config.description) input.setAttribute('aria-describedby', `description-${config.key}`);
                 const value = document.createElement('output');
                 value.className = 'control-value';
                 value.id = `value-${config.key}`;
+                if (config.type === 'select') value.hidden = true;
                 row.append(label, input, value);
                 section.appendChild(row);
                 this.controlInputs.set(config.key, { input, value, config, row, section });
@@ -6551,17 +6557,29 @@ class RendererLabApp {
         els.duplicatePreset.addEventListener('click', () => this._duplicatePreset());
         els.updatePreset.addEventListener('click', () => this._updatePreset());
         els.deletePreset.addEventListener('click', () => this._deletePreset());
+        els.presetSearch?.addEventListener('input', () => {
+            this.presetSearchQuery = normalizePresetSearch(els.presetSearch.value);
+            this._renderPresets();
+        });
+        els.presetSearch?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !els.presetSearch.value) return;
+            event.preventDefault();
+            event.stopPropagation();
+            els.presetSearch.value = '';
+            this.presetSearchQuery = '';
+            this._renderPresets();
+        });
         els.morePresets.addEventListener('click', (event) => {
             event.stopPropagation();
             this._togglePresetOverflow();
         });
         els.presetOverflowMenu.addEventListener('click', (event) => event.stopPropagation());
         els.exportPresets.addEventListener('click', () => {
-            this._closePresetOverflow();
+            this._closePresetOverflow({ restoreFocus: true });
             this._exportPresets();
         });
         els.importPresets.addEventListener('click', () => {
-            this._closePresetOverflow();
+            this._closePresetOverflow({ restoreFocus: true });
             this._importPresets();
         });
         els.popoutWindow.addEventListener('click', () => this.openPopout());
@@ -6621,7 +6639,7 @@ class RendererLabApp {
         document.addEventListener('click', () => this._closePresetOverflow());
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
-                this._closePresetOverflow();
+                this._closePresetOverflow({ restoreFocus: true });
                 this._closeCrashReportDialog();
             }
         });
@@ -8793,6 +8811,13 @@ button:hover{background:#202a35}
         return [...BUILTIN_PRESETS_DISPLAY, ...this.userPresets];
     }
 
+    _alphabeticalPresets() {
+        return [
+            ...sortPresetsByName(BUILTIN_PRESETS_DISPLAY),
+            ...sortPresetsByName(this.userPresets)
+        ];
+    }
+
     _currentPresetName() {
         if (this.wtfActive) return 'WTF';
         const active = this._allPresets().find((p) => p.id === this.activePresetId);
@@ -8801,29 +8826,81 @@ button:hover{background:#202a35}
 
     _renderPresets() {
         els.presetList.innerHTML = '';
-        for (const preset of this._allPresets()) {
-            const transitionSeconds = Number(preset.transitionSeconds ?? this.params.transitionSeconds);
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'preset-item';
-            if (preset.id === this.activePresetId) button.classList.add('active');
-            if (preset.readonly) button.classList.add('readonly');
-            button.title = `${preset.name} - ${transitionSeconds.toFixed(1)}s transition${preset.readonly ? ' - built-in' : ''}`;
+        const query = normalizePresetSearch(this.presetSearchQuery || els.presetSearch?.value);
+        const matchesQuery = (preset) => !query || normalizePresetSearch(preset.name).includes(query);
+        const sections = [
+            {
+                id: 'builtin',
+                label: 'Built-in',
+                presets: sortPresetsByName(BUILTIN_PRESETS_DISPLAY).filter(matchesQuery),
+                empty: 'No built-in matches'
+            },
+            {
+                id: 'user',
+                label: 'My Presets',
+                presets: sortPresetsByName(this.userPresets).filter(matchesQuery),
+                empty: query ? 'No saved matches' : 'No saved presets'
+            }
+        ];
+        let visibleCount = 0;
 
-            const name = document.createElement('span');
-            name.className = 'preset-name';
-            name.textContent = preset.name;
+        for (const section of sections) {
+            const group = document.createElement('section');
+            group.className = 'preset-section';
+            group.setAttribute('aria-labelledby', `preset-section-${section.id}`);
 
-            const meta = document.createElement('span');
-            meta.className = 'preset-meta';
-            meta.textContent = `${transitionSeconds.toFixed(1)}s`;
+            const heading = document.createElement('h3');
+            heading.id = `preset-section-${section.id}`;
+            heading.textContent = section.label;
+            group.appendChild(heading);
 
-            button.append(name, meta);
-            button.addEventListener('click', () => this.applyPreset(preset.id));
-            els.presetList.appendChild(button);
+            const items = document.createElement('div');
+            items.className = 'preset-section-items';
+            if (!section.presets.length) {
+                const empty = document.createElement('p');
+                empty.className = 'preset-empty';
+                empty.textContent = section.empty;
+                items.appendChild(empty);
+            }
+
+            for (const preset of section.presets) {
+                visibleCount += 1;
+                items.appendChild(this._presetButton(preset));
+            }
+            group.appendChild(items);
+            els.presetList.appendChild(group);
+        }
+
+        if (els.presetSearchStatus) {
+            const total = BUILTIN_PRESETS_DISPLAY.length + this.userPresets.length;
+            els.presetSearchStatus.textContent = query
+                ? `${visibleCount} of ${total} presets`
+                : `${BUILTIN_PRESETS_DISPLAY.length} built-in · ${this.userPresets.length} saved`;
         }
         els.activePresetLabel.textContent = this._currentPresetName();
         this._syncPresetToolbar();
+    }
+
+    _presetButton(preset) {
+        const transitionSeconds = Number(preset.transitionSeconds ?? this.params.transitionSeconds);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'preset-item';
+        if (preset.id === this.activePresetId) button.classList.add('active');
+        if (preset.readonly) button.classList.add('readonly');
+        button.title = `${preset.name} - ${transitionSeconds.toFixed(1)}s transition${preset.readonly ? ' - built-in' : ''}`;
+
+        const name = document.createElement('span');
+        name.className = 'preset-name';
+        name.textContent = preset.name;
+
+        const meta = document.createElement('span');
+        meta.className = 'preset-meta';
+        meta.textContent = `${transitionSeconds.toFixed(1)}s`;
+
+        button.append(name, meta);
+        button.addEventListener('click', () => this.applyPreset(preset.id));
+        return button;
     }
 
     _syncPresetToolbar() {
@@ -8844,12 +8921,15 @@ button:hover{background:#202a35}
     _openPresetOverflow() {
         els.presetOverflowMenu.hidden = false;
         els.morePresets.setAttribute('aria-expanded', 'true');
+        const firstAction = els.exportPresets.disabled ? els.importPresets : els.exportPresets;
+        firstAction?.focus();
     }
 
-    _closePresetOverflow() {
+    _closePresetOverflow(options = {}) {
         if (!els.presetOverflowMenu || els.presetOverflowMenu.hidden) return;
         els.presetOverflowMenu.hidden = true;
         els.morePresets.setAttribute('aria-expanded', 'false');
+        if (options.restoreFocus) els.morePresets.focus();
     }
 
     _savedUserPresetParams(preset) {
@@ -9684,7 +9764,7 @@ button:hover{background:#202a35}
         if (!preset) return;
         if (!confirm(`Delete preset "${preset.name}"?`)) return;
         this.userPresets = this.userPresets.filter((p) => p.id !== preset.id);
-        this.activePresetId = 'point-click-default';
+        this.activePresetId = DEFAULT_PRESET_ID;
         this._persistPresets();
         const fallback = BUILTIN_PRESETS.find((item) => item.id === this.activePresetId);
         if (fallback) {
@@ -9744,7 +9824,7 @@ button:hover{background:#202a35}
                 { strict: true, usedIds }
             ));
             if (!this._allPresets().some((preset) => preset.id === this.activePresetId)) {
-                this.activePresetId = 'point-click-default';
+                this.activePresetId = DEFAULT_PRESET_ID;
             }
             this._persistPresets();
             this._renderPresets();
@@ -9897,7 +9977,7 @@ button:hover{background:#202a35}
     }
 
     _cycleMidiPreset(direction) {
-        const presets = this._allPresets();
+        const presets = this._alphabeticalPresets();
         if (!presets.length) return false;
         const current = Math.max(0, presets.findIndex((preset) => preset.id === this.activePresetId));
         const index = (current + direction + presets.length) % presets.length;

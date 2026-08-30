@@ -16,6 +16,10 @@ Accessibility is early for this project. The current app benefits from:
   picker flows.
 - compact but visible control grouping.
 - persistent Stats Overlay for renderer state.
+- native preset search with polite result status, Escape-to-clear behavior, and
+  visible empty states for both preset sections.
+- a preset overflow menu that focuses its first enabled action and restores
+  trigger focus when Escape closes it.
 - polite live status for user-triggered updater checks and available releases;
   silent launch checks do not announce current/offline results.
 - a persistent Reports control that keeps crash-report preferences reachable
@@ -145,12 +149,16 @@ Rules:
 
 ## Current Automated Coverage
 
-Current checks are indirect:
+Current checks cover a focused subset of the preset/control interactions:
 
 ```bash
 npm run build
 npm run smoke:static
 ```
+
+The static smoke verifies live preset filtering, Escape-to-clear, focus
+restoration for the preset overflow menu, descriptive Advanced Density text,
+and consistent visible select geometry at the minimum supported window size.
 
 There is no dedicated keyboard, axe, ARIA-snapshot, focus-order, reduced-motion,
 or automated contrast suite. Those gaps are also summarized in

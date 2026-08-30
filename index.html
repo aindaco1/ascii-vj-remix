@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-store">
     <title>ASCII VJ Remix Renderer Lab</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css?v=20260624-glyph-controls">
+    <link rel="stylesheet" href="style.css?v=20260829-v1-ui">
 </head>
 
 <body>
@@ -54,7 +54,7 @@
             <section class="preview-region">
                 <div class="preview-toolbar">
                     <div>
-                        <strong id="active-preset-label">Point & Click Default</strong>
+                        <strong id="active-preset-label">Classic Camera ASCII</strong>
                         <span id="source-label">Demo Image</span>
                     </div>
                     <div class="preview-toolbar-right">
@@ -109,7 +109,12 @@
                     <div class="panel-heading">
                         <h2>Presets</h2>
                     </div>
-                    <div id="preset-list" class="preset-list"></div>
+                    <label class="preset-search-field" for="preset-search">
+                        <span class="visually-hidden">Search presets</span>
+                        <input id="preset-search" type="search" placeholder="Search presets" autocomplete="off" spellcheck="false">
+                    </label>
+                    <div id="preset-search-status" class="preset-search-status" role="status" aria-live="polite" aria-atomic="true"></div>
+                    <div id="preset-list" class="preset-list" aria-label="Visual presets"></div>
                     <div class="preset-toolbar">
                         <button id="save-preset" type="button" title="Save current preset" aria-label="Save current preset">Save</button>
                         <button id="duplicate-preset" type="button" title="Duplicate preset" aria-label="Duplicate preset">Copy</button>

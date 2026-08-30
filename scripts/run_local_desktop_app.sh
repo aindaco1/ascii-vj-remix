@@ -15,6 +15,11 @@ if [[ "$INSTALL_APP" == "$PRODUCTION_APP" || "$(basename "$INSTALL_APP")" == "AS
   exit 1
 fi
 
+if [[ "$SOURCE_APP" == "$INSTALL_APP" ]]; then
+  echo "ASCII VJ Remix local run: source and install app must be different paths." >&2
+  exit 1
+fi
+
 if [[ "$CODESIGN_IDENTITY" == "-" && "${ASCILINE_ALLOW_ADHOC_LOCAL:-0}" != "1" ]]; then
   echo "ASCII VJ Remix local run: ad-hoc signing changes identity on every rebuild." >&2
   echo "Run npm run desktop:codesign:local once, or set ASCILINE_ALLOW_ADHOC_LOCAL=1 for a permission-disposable build." >&2
