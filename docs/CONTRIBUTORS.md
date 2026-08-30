@@ -316,6 +316,11 @@ ASCILINE_FFMPEG=/path/to/ffmpeg
 ASCILINE_FFPROBE=/path/to/ffprobe
 ```
 
+On macOS and Windows, the Podman wrappers reuse a healthy default Podman
+connection before starting `podman-machine-default`. This avoids colliding with
+another checkout's already-running VM. Set `ASCILINE_PODMAN_MACHINE` only when
+the fallback machine has a different name.
+
 Preview the media pipeline:
 
 ```bash

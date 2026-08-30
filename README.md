@@ -55,11 +55,11 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 ### Sources
 
 - Built-in Demo Image, used as the default startup source.
-- Built-in Demo Video.
+- Built-in VP8/WebM Demo Video for clean-install Linux webview compatibility.
 - User-selected local image and video files.
-- MKV selection support in the desktop file picker. Playback depends on the
-  active platform decoder path; MP4/H.264 is the most consistently supported
-  format.
+- MKV selection support in the desktop file picker. If the platform webview
+  cannot decode a selected video, the desktop app retries it through the
+  bundled FFmpeg path.
 - Local webcam/camera input.
 - Multiple simultaneous cameras when the operating system and desktop runtime
   allow it.

@@ -6,6 +6,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = path.join(root, 'dist');
 const scannedExtensions = new Set(['.html', '.js', '.css', '.json', '.svg', '.webmanifest']);
 const issues = [];
+const demoVideoPath = path.join(dist, 'media', 'demo-video-2.webm');
 
 const forbidden = [
   {
@@ -80,6 +81,16 @@ try {
 }
 
 await walk(dist);
+
+try {
+  const demoVideo = await readFile(demoVideoPath);
+  const webmMagic = [0x1a, 0x45, 0xdf, 0xa3];
+  if (demoVideo.length < webmMagic.length || !webmMagic.every((value, index) => demoVideo[index] === value)) {
+    issues.push('dist/media/demo-video-2.webm is not a WebM/Matroska asset');
+  }
+} catch (error) {
+  issues.push(`dist/media/demo-video-2.webm is missing: ${error?.message || error}`);
+}
 
 if (issues.length > 0) {
   console.error('Offline bundle check failed. Runtime assets must not reference remote URLs.');

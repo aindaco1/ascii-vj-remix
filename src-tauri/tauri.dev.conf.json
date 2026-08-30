@@ -2,23 +2,6 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ASCII VJ Remix Dev",
   "identifier": "com.asciline.remix.dev",
-  "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "ASCII VJ Remix Dev",
-        "width": 1440,
-        "height": 920,
-        "minWidth": 1024,
-        "minHeight": 720,
-        "resizable": true,
-        "useHttpsScheme": true,
-        "backgroundThrottling": "disabled",
-        "fullscreen": false,
-        "center": true
-      }
-    ]
-  },
   "bundle": {
     "createUpdaterArtifacts": false
   },

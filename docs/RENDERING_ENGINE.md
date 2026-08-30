@@ -51,7 +51,8 @@ chooses the best backend for the active source and environment.
 The visible built-ins are:
 
 - Demo Image: `media/demo.svg`.
-- Demo Video: `media/demo-video-2.mp4`.
+- Demo Video: `media/demo-video-2.webm` (VP8, chosen so clean Linux webviews do
+  not require an optional H.264 GStreamer plugin).
 
 Additional bundled media files remain hidden development fixtures for parity
 tests and performance smoke tests.
@@ -61,6 +62,9 @@ tests and performance smoke tests.
 Browser mode uses browser file APIs and blob URLs. Tauri mode uses a native
 dialog command and registers the selected file under a session-local media id.
 That media id is exposed to the webview through Tauri's asset protocol.
+MKV files use the bundled FFmpeg raw-frame path immediately. Other selected
+videos try the platform decoder first and retry through bundled FFmpeg if that
+decoder rejects the file.
 
 The important security boundary is that the renderer receives a playable media
 URL or registered id. It does not gain broad filesystem access.

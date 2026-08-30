@@ -9,6 +9,8 @@ Renderer reports may include at most eight sanitized structured events with
 preset/backend state; the relay never accepts media or arbitrary client logs.
 Best-effort local media-diagnostics writer failures are ignored as non-fatal so
 older Windows clients cannot turn a missing log path into a GitHub crash issue.
+Expected unavailable or disconnected microphone hardware is also ignored so a
+Linux VM without microphone passthrough does not become a crash issue.
 
 ## Setup
 

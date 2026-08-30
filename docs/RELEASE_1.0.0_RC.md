@@ -23,6 +23,9 @@ acceptance, and public release state.
   processes do not create visible consoles.
 - Linux CI is pinned to Ubuntu 24.04; the virtual acceptance matrix exercises
   Ubuntu 26.04.1 and Fedora 44 while retaining AppImage, deb, and rpm coverage.
+- Linux opens at a platform-owned 1000x680 size, the bundled demo uses VP8/WebM,
+  selected videos can fall back to bundled FFmpeg, and WebGL2 is accepted when
+  a Hyper-V guest does not expose WebGPU.
 - Experimental MIDI remains explicitly labeled and its physical validation
   claims remain limited to the documented macOS UC-33e/mioXC path.
 
@@ -39,8 +42,8 @@ acceptance, and public release state.
 | Native Pop Out | Pass | 30-second structural packaged smoke reports 60.0 FPS average native presentation, 16 synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. |
 | Windows CI installer | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and unsigned development EXE/MSI and passed the GUI-subsystem check. |
 | Windows physical QA | Pass | User-verified development artifact on the Windows 11 Pro / RTX 2070 machine. |
-| Linux CI packages | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
-| Linux VM QA | Pending | Install Ubuntu 26.04.1 and Fedora 44 in the Hyper-V guests and execute [Linux VM QA](LINUX_VM_QA.md). |
+| Linux CI packages | Pass | [Desktop run 33330609894](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33330609894) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
+| Linux VM QA | Retest required | Ubuntu 26.04.1 and Fedora 44 both rendered cleanly through WebGL2 but rejected WebGPU and the H.264 demo; Ubuntu also exposed an unusable virtual microphone. The scoped fixes require a refreshed package pass. |
 | Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
 
 ## Physical Windows checklist

@@ -40,12 +40,27 @@ function isPermissionLikeText(value) {
     raw.includes('tcc');
 }
 
+function isUnavailableInputHardwareText(value) {
+  const raw = String(value || '').toLowerCase();
+  return raw.includes('no default microphone input device') ||
+    raw.includes('requested audio device is not available') ||
+    raw.includes('audio device is unavailable') ||
+    raw.includes('devicenotavailable') ||
+    raw.includes('device disconnected') ||
+    raw.includes('device has been disconnected');
+}
+
 function ignoredCrashReportReason(sanitized) {
   const report = sanitized?.report || {};
   const context = report.context || {};
   if (report.kind !== 'tauri-command' || report.surface !== 'tauri-command') return '';
   const command = String(context.command || '');
   if (NON_FATAL_DIAGNOSTIC_COMMANDS.has(command)) return 'nonfatal-diagnostic-write-failure';
+  if (command === 'start_input_audio_capture' && (
+    isUnavailableInputHardwareText(report.message) ||
+    isUnavailableInputHardwareText(context.name) ||
+    isUnavailableInputHardwareText(context.code)
+  )) return 'expected-hardware-unavailable';
   if (!EXPECTED_PERMISSION_COMMANDS.has(command)) return '';
   return (isPermissionLikeText(report.message) ||
     isPermissionLikeText(context.name) ||

@@ -80,6 +80,13 @@ assert.equal(
 );
 assert.equal(
   isReportableTauriCommandFailure(
+    'start_input_audio_capture',
+    new Error('Could not build microphone input stream: The requested audio device is not available. It may have been disconnected.')
+  ),
+  false
+);
+assert.equal(
+  isReportableTauriCommandFailure(
     'open_native_output_window',
     new Error('Native renderer failed')
   ),

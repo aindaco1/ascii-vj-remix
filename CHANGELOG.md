@@ -31,6 +31,19 @@
 
 ### Fixed
 
+- Added Linux-owned 1000x680 startup geometry with a 900x600 minimum instead of
+  inheriting the larger macOS/Windows window, while deriving the development
+  window title from its product identity rather than duplicating geometry.
+- Re-encoded the built-in Demo Video as VP8/WebM so clean Ubuntu and Fedora
+  webviews do not depend on optional H.264 GStreamer codecs. User-selected
+  videos now retry through the bundled FFmpeg decoder if the platform decoder
+  rejects them.
+- Treat unavailable or disconnected microphone devices as an expected hardware
+  condition. The app can attempt its browser fallback and no longer queues a
+  crash report merely because a VM has no usable microphone.
+- Made the Podman wrappers reuse an already-healthy default connection before
+  starting their fallback VM, avoiding macOS's one-active-machine collision
+  with other project checkouts.
 - Decoupled the clean-profile Classic Camera ASCII look from the global
   renderer preference. Built-ins that do not explicitly request a compatibility
   backend now start from Auto and resolve to WebGPU/WebGL2 when available,

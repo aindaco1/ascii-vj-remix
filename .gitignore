@@ -13,6 +13,7 @@ __pycache__/
 *.mov
 *.mkv
 *.webm
+!media/demo-video-2.webm
 
 # Environment & IDE
 .env

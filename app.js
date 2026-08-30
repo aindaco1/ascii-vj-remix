@@ -324,7 +324,7 @@ const FONT_FAMILY_IDS = Object.freeze(FONT_FAMILY_OPTIONS.map(([id]) => id));
 
 const SOURCE_PRESETS = [
     { id: 'demo-image', name: 'Demo Image', mediaUrl: 'media/demo.svg', mediaType: 'image' },
-    { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.mp4', mediaType: 'video' }
+    { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.webm', mediaType: 'video' }
 ];
 
 const CAMERA_RESOLUTION_OPTIONS = [
@@ -6269,10 +6269,20 @@ class RendererLabApp {
         }
     }
 
-    _shouldUseTauriRawVideoSource(params) {
+    _canUseTauriRawVideoSource(params) {
         if (!isTauriRuntime() || params.mediaType !== 'video') return false;
         if (!this.customTauriFile?.id || params.mediaUrl !== this.customTauriFile.url) return false;
+        return true;
+    }
+
+    _shouldUseTauriRawVideoSource(params) {
+        if (!this._canUseTauriRawVideoSource(params)) return false;
         return isMkvName(this.customTauriFile.name || params.mediaUrl);
+    }
+
+    async _loadTauriRawVideoSource(params, options) {
+        const source = new TauriRawVideoSource(this.customTauriFile, params, options);
+        return source.start();
     }
 
     async loadStaticSource(params, options = {}) {
@@ -6288,14 +6298,19 @@ class RendererLabApp {
 
         this._stopCameraStream();
         if (this._shouldUseTauriRawVideoSource(params)) {
-            const source = new TauriRawVideoSource(this.customTauriFile, params, options);
-            return source.start();
+            return this._loadTauriRawVideoSource(params, options);
         }
-        return loadMediaSource(params.mediaUrl, {
-            type: forcedMediaType(params),
-            loop: params.loop,
-            muted: params.muted
-        });
+        try {
+            return await loadMediaSource(params.mediaUrl, {
+                type: forcedMediaType(params),
+                loop: params.loop,
+                muted: params.muted
+            });
+        } catch (error) {
+            if (!this._canUseTauriRawVideoSource(params)) throw error;
+            console.warn('[Source] Platform video decoder failed; retrying with bundled FFmpeg:', error);
+            return this._loadTauriRawVideoSource(params, options);
+        }
     }
 
     _cameraSourceEntry() {

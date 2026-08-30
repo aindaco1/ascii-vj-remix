@@ -23,6 +23,9 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            if let Some(main_window) = app.get_webview_window("main") {
+                main_window.set_title(&app.package_info().name)?;
+            }
             if let Ok(data_dir) = app.path().app_data_dir() {
                 crash_reporter::install_panic_hook(data_dir);
             }
