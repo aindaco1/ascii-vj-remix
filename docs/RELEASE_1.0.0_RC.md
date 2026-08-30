@@ -21,8 +21,8 @@ acceptance, and public release state.
   of a 30 FPS guarantee.
 - Release-mode Windows binaries use the graphical subsystem and FFmpeg child
   processes do not create visible consoles.
-- Linux CI is pinned to Ubuntu 24.04; the virtual acceptance matrix adds Fedora
-  44 and retains AppImage, deb, and rpm coverage.
+- Linux CI is pinned to Ubuntu 24.04; the virtual acceptance matrix exercises
+  Ubuntu 26.04.1 and Fedora 44 while retaining AppImage, deb, and rpm coverage.
 - Experimental MIDI remains explicitly labeled and its physical validation
   claims remain limited to the documented macOS UC-33e/mioXC path.
 
@@ -37,10 +37,10 @@ acceptance, and public release state.
 | Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources. |
 | Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, 41/41 GPU-eligible presets on WebGPU, 28 explicit Canvas2D compatibility presets, zero failures. |
 | Native Pop Out | Pass | 30-second structural packaged smoke reports 60.0 FPS average native presentation, 16 synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. |
-| Windows CI installer | Pending | Draft-PR Windows gate must build the pinned FFmpeg resources, unsigned release-profile development EXE/MSI, and pass the GUI-subsystem check. |
-| Windows physical QA | Pending | Install and exercise the development artifact on the Windows 11 Pro / RTX 2070 machine. |
-| Linux CI packages | Pending | Draft-PR Ubuntu 24.04 gate must build the pinned FFmpeg resources and development AppImage/deb/rpm artifact. |
-| Linux VM QA | Pending | Create Ubuntu 24.04 and Fedora 44 Hyper-V guests and execute [Linux VM QA](LINUX_VM_QA.md). |
+| Windows CI installer | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and unsigned development EXE/MSI and passed the GUI-subsystem check. |
+| Windows physical QA | Pass | User-verified development artifact on the Windows 11 Pro / RTX 2070 machine. |
+| Linux CI packages | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
+| Linux VM QA | Pending | Install Ubuntu 26.04.1 and Fedora 44 in the Hyper-V guests and execute [Linux VM QA](LINUX_VM_QA.md). |
 | Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
 
 ## Physical Windows checklist

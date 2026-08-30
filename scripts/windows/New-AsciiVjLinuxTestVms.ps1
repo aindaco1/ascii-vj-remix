@@ -105,7 +105,7 @@ if (-not (Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue)) {
 }
 
 $ubuntu = New-AsciiVjLinuxVm `
-    -Name "ASCII-VJ-Ubuntu-24.04" `
+    -Name "ASCII-VJ-Ubuntu-26.04.1" `
     -IsoPath (Resolve-Path -LiteralPath $UbuntuIso)
 $fedora = New-AsciiVjLinuxVm `
     -Name "ASCII-VJ-Fedora-44" `
@@ -116,4 +116,4 @@ $fedora = New-AsciiVjLinuxVm `
     Select-Object Name, State, Generation, ProcessorCount, MemoryStartup |
     Format-Table -AutoSize
 
-Write-Host "Install each distro through Hyper-V Manager, then take a clean-install checkpoint."
+Write-Host "Next: open Hyper-V Manager, install Ubuntu 26.04.1 and Fedora 44, apply updates, then create a 'clean-updated' checkpoint before installing ASCII VJ Remix."

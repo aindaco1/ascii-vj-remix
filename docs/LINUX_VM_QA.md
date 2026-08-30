@@ -3,12 +3,13 @@
 The release-candidate Linux matrix uses two x86_64 Hyper-V guests on the
 Windows 11 Pro test machine:
 
-- Ubuntu 24.04 LTS for AppImage and deb acceptance.
+- Ubuntu 26.04.1 for AppImage and deb acceptance.
 - Fedora 44 Workstation for AppImage and rpm acceptance.
 
-The VMs complement the pinned Ubuntu 24.04 CI build. They do not establish
-physical Linux camera, audio, or GPU acceptance; Hyper-V exposes virtualized
-display and input hardware.
+The VMs complement the pinned Ubuntu 24.04 CI build by exercising the packages
+on Ubuntu 26.04.1 and Fedora 44. They do not establish physical Linux camera,
+audio, or GPU acceptance; Hyper-V exposes virtualized display and input
+hardware.
 
 ## Create the VMs
 
@@ -20,19 +21,31 @@ display and input hardware.
 
 ```powershell
 .\scripts\windows\New-AsciiVjLinuxTestVms.ps1 `
-  -UbuntuIso "C:\Users\you\Downloads\ubuntu-24.04-desktop-amd64.iso" `
+  -UbuntuIso "C:\Users\you\Downloads\ubuntu-26.04.1-desktop-amd64.iso" `
   -FedoraIso "C:\Users\you\Downloads\Fedora-Workstation-Live-x86_64-44.iso" `
   -StartAfterCreation
 ```
 
-The script creates `ASCII-VJ-Ubuntu-24.04` and `ASCII-VJ-Fedora-44` with four
+The script creates `ASCII-VJ-Ubuntu-26.04.1` and `ASCII-VJ-Fedora-44` with four
 virtual processors, 8 GB startup memory, an 80 GB dynamic disk, Secure Boot,
 and production checkpoints. It refuses to replace an existing VM or storage
 directory.
 
-Complete each graphical installer, apply operating-system updates, install the
-Hyper-V integration packages offered by the distro, and take a checkpoint
-named `clean-updated` before installing ASCII VJ Remix.
+If the Ubuntu guest was created with the earlier helper while already pointing
+at an Ubuntu 26.04.1 ISO, rename its Hyper-V display name before installation:
+
+```powershell
+Rename-VM `
+  -Name "ASCII-VJ-Ubuntu-24.04" `
+  -NewName "ASCII-VJ-Ubuntu-26.04.1"
+```
+
+Renaming the VM does not move or replace its virtual disk.
+
+Complete each graphical installer, confirm Ubuntu reports version 26.04.1 and
+Fedora reports version 44, apply operating-system updates, install the Hyper-V
+integration packages offered by the distro, and take a checkpoint named
+`clean-updated` before installing ASCII VJ Remix.
 
 ## Retrieve test packages
 

@@ -12,7 +12,7 @@
   Linux development packages retained for 14 days. Each package set includes
   the pinned, platform-built, verified FFmpeg/ffprobe resources.
 - Added a non-destructive Hyper-V bootstrap and acceptance guide for Ubuntu
-  24.04 and Fedora 44 x86_64 test VMs on Windows 11 Pro.
+  26.04.1 and Fedora 44 x86_64 test VMs on Windows 11 Pro.
 - Added a PE subsystem gate that rejects a Windows release-mode executable
   unless it is marked as a graphical application.
 
