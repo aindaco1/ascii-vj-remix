@@ -14,6 +14,7 @@ const releaseApp = process.env.ASCILINE_SOURCE_APP || defaultReleaseApp;
 const durationMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_DURATION_MS || '9000');
 const sampleMs = Number(process.env.ASCILINE_UI_PERF_SMOKE_SAMPLE_MS || '500');
 const presetSweep = process.env.ASCILINE_UI_PERF_SMOKE_PRESET_SWEEP === '1';
+const structuralTransitions = process.env.ASCILINE_UI_PERF_SMOKE_STRUCTURAL === '1';
 
 if (!existsSync(releaseApp)) {
   console.error(`ui-perf-smoke: missing optimized app: ${releaseApp}`);
@@ -38,6 +39,7 @@ const env = {
   ASCILINE_UI_PERF_SMOKE_CHARSET: process.env.ASCILINE_UI_PERF_SMOKE_CHARSET || 'point-click',
   ASCILINE_UI_PERF_SMOKE_SOAK: process.env.ASCILINE_UI_PERF_SMOKE_SOAK || '0',
   ASCILINE_UI_PERF_SMOKE_PRESET_SWEEP: presetSweep ? '1' : '0',
+  ASCILINE_UI_PERF_SMOKE_STRUCTURAL: structuralTransitions ? '1' : '0',
   ASCILINE_UI_PERF_SMOKE_MEDIA:
     process.env.ASCILINE_UI_PERF_SMOKE_MEDIA || 'media/point-click-test-30s.mp4'
 };
@@ -119,6 +121,8 @@ console.log([
   `audio=${report.syntheticAudio ? 'synthetic' : 'runtime'}`,
   `nativeOk=${Number(report.nativeOkHz || 0).toFixed(1)}hz`,
   `nativeFailed=${report.nativeFailed || 0}`,
+  `nativeTransitions=${report.nativeTransitionArmed || 0}`,
+  `nativeTransitionFailed=${report.nativeTransitionFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
   `visible=${report.hasVisibleSignal ? 'yes' : 'no'}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
@@ -126,6 +130,7 @@ console.log([
   `dither=${report.ditherMode || 'none'}`,
   `charset=${report.charset || 'point-click'}`,
   `soak=${report.soak ? 'yes' : 'no'}`,
+  `structural=${report.structuralTransitions ? 'yes' : 'no'}`,
   `media=${report.mediaUrl || 'unknown'}`
 ].join(' '));
 

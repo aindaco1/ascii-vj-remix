@@ -156,7 +156,7 @@ struct RenderParams {
     glyphColorMode: u32,
     glyphColor: u32,
     backgroundColor: u32,
-    _pad0: u32,
+    opacity: f32,
     _pad1: u32,
     _pad2: u32,
 };
@@ -187,7 +187,7 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let renderY = (position.y - offsetY) / scale;
 
     if (renderX < 0.0 || renderY < 0.0 || renderX >= renderW || renderY >= renderH) {
-        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
+        return vec4<f32>(unpackColor(params.backgroundColor), params.opacity);
     }
 
     let cellX = u32(renderX) / params.cellW;
@@ -196,7 +196,7 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let cy = min(cellY, params.rows - 1u);
     let cell = textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
     if (params.glyphMode == 0u || params.glyphCount == 0u) {
-        return vec4<f32>(cell.rgb, 1.0);
+        return vec4<f32>(cell.rgb, params.opacity);
     }
 
     let localX = renderX - f32(cellX * params.cellW);
@@ -216,10 +216,10 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
         0
     ).r;
     if (alpha <= 0.5) {
-        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
+        return vec4<f32>(unpackColor(params.backgroundColor), params.opacity);
     }
     let foreground = select(cell.rgb, unpackColor(params.glyphColor), params.glyphColorMode == 1u);
-    return vec4<f32>(foreground, 1.0);
+    return vec4<f32>(foreground, params.opacity);
 }
 "#;
 
@@ -399,7 +399,7 @@ impl NativeGpuPresenter {
             .get_default_config(&adapter, width, height)
             .ok_or_else(|| "native GPU surface is not supported by adapter".to_string())?;
         config.present_mode = present_mode;
-        config.desired_maximum_frame_latency = 3;
+        config.desired_maximum_frame_latency = 1;
         surface.configure(&device, &config);
 
         let compute_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -435,7 +435,7 @@ impl NativeGpuPresenter {
                 entry_point: Some("fragmentMain"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: None,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: Default::default(),
@@ -533,8 +533,9 @@ impl NativeGpuPresenter {
         frame: &DecodedRgbFrame,
         params: &NativeRenderParams,
         frame_index: usize,
+        crossfade: Option<(&NativeRenderParams, f64)>,
     ) -> Result<(), String> {
-        self.render_frame_with_source_version(window, frame, params, frame_index, None)
+        self.render_frame_with_source_version(window, frame, params, frame_index, None, crossfade)
             .map(|_| ())
     }
 
@@ -545,6 +546,7 @@ impl NativeGpuPresenter {
         params: &NativeRenderParams,
         frame_index: usize,
         source_frame_version: Option<u64>,
+        crossfade: Option<(&NativeRenderParams, f64)>,
     ) -> Result<NativeGpuFrameOutcome, String> {
         let total_started_at = Instant::now();
         let prep_started_at = Instant::now();
@@ -582,8 +584,72 @@ impl NativeGpuPresenter {
             });
         };
 
-        let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
         let source_uploaded = self.ensure_source_texture(frame, source_frame_version)?;
+        let output_view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut prep_ns = 0;
+        let mut encode_ns = 0;
+        let mut submit_ns = 0;
+        if let Some((from, mix)) = crossfade {
+            let timing = self.submit_render_pass(&output_view, frame, from, frame_index, true, 1.0)?;
+            prep_ns += timing.0;
+            encode_ns += timing.1;
+            submit_ns += timing.2;
+            let timing = self.submit_render_pass(
+                &output_view,
+                frame,
+                params,
+                frame_index,
+                false,
+                mix.clamp(0.0, 1.0) as f32,
+            )?;
+            prep_ns += timing.0;
+            encode_ns += timing.1;
+            submit_ns += timing.2;
+        } else {
+            let timing =
+                self.submit_render_pass(&output_view, frame, params, frame_index, true, 1.0)?;
+            prep_ns = timing.0;
+            encode_ns = timing.1;
+            submit_ns = timing.2;
+        }
+        prep_ns += duration_ns_u64(prep_started_at.elapsed()).saturating_sub(
+            prep_ns.saturating_add(encode_ns).saturating_add(submit_ns),
+        );
+        let present_started_at = Instant::now();
+        output.present();
+        let present_ns = duration_ns_u64(present_started_at.elapsed());
+        // Reclaim completed queue-write staging resources without blocking the
+        // display-link callback. Native wgpu devices are not driven by a browser
+        // event loop, so regular polling is part of their steady-state upkeep.
+        let _ = self.device.poll(wgpu::PollType::Poll);
+        Ok(NativeGpuFrameOutcome {
+            surface_status,
+            presented: true,
+            source_uploaded,
+            timing: NativeGpuFrameTiming {
+                prep_ns,
+                acquire_ns,
+                encode_ns,
+                submit_ns,
+                present_ns,
+                total_ns: duration_ns_u64(total_started_at.elapsed()),
+            },
+        })
+    }
+
+    fn submit_render_pass(
+        &mut self,
+        output_view: &wgpu::TextureView,
+        frame: &DecodedRgbFrame,
+        params: &NativeRenderParams,
+        frame_index: usize,
+        clear: bool,
+        opacity: f32,
+    ) -> Result<(u64, u64, u64), String> {
+        let prep_started_at = Instant::now();
+        let (cols, rows) = native_grid_dimensions(params, frame.width, frame.height);
         self.ensure_cell_texture(cols, rows);
         self.ensure_feature_resources(params);
         self.ensure_glyph_resources(params);
@@ -597,8 +663,8 @@ impl NativeGpuPresenter {
             .as_ref()
             .ok_or_else(|| "native GPU cell texture is unavailable".to_string())?;
         if self.compute_bind_group.is_none() {
-            self.compute_bind_group =
-                Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            self.compute_bind_group = Some(self.device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
                     label: Some("ASCILINE native GPU compute bind group"),
                     layout: &self.compute_pipeline.get_bind_group_layout(0),
                     entries: &[
@@ -623,11 +689,12 @@ impl NativeGpuPresenter {
                             resource: self.feature_buffer.as_entire_binding(),
                         },
                     ],
-                }));
+                },
+            ));
         }
         if self.render_bind_group.is_none() {
-            self.render_bind_group =
-                Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            self.render_bind_group = Some(self.device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
                     label: Some("ASCILINE native GPU render bind group"),
                     layout: &self.render_pipeline.get_bind_group_layout(0),
                     entries: &[
@@ -648,9 +715,9 @@ impl NativeGpuPresenter {
                             resource: self.glyph_ramp_buffer.as_entire_binding(),
                         },
                     ],
-                }));
+                },
+            ));
         }
-
         self.queue.write_buffer(
             &self.params_buffer,
             0,
@@ -666,20 +733,17 @@ impl NativeGpuPresenter {
                 self.config.width,
                 self.config.height,
                 self.glyph_ramp_len,
+                opacity,
             ),
         );
         let prep_ns = duration_ns_u64(prep_started_at.elapsed());
 
         let encode_started_at = Instant::now();
-        let output_view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("ASCILINE native GPU frame"),
             });
-
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("ASCILINE native GPU cell pass"),
@@ -690,18 +754,23 @@ impl NativeGpuPresenter {
             pass.dispatch_workgroups(cols.div_ceil(8), rows.div_ceil(8), 1);
         }
         {
+            let load = if clear {
+                wgpu::LoadOp::Clear(wgpu::Color {
+                    r: 3.0 / 255.0,
+                    g: 4.0 / 255.0,
+                    b: 5.0 / 255.0,
+                    a: 1.0,
+                })
+            } else {
+                wgpu::LoadOp::Load
+            };
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ASCILINE native GPU render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &output_view,
+                    view: output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 3.0 / 255.0,
-                            g: 4.0 / 255.0,
-                            b: 5.0 / 255.0,
-                            a: 1.0,
-                        }),
+                        load,
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
@@ -716,30 +785,10 @@ impl NativeGpuPresenter {
             pass.draw(0..3, 0..1);
         }
         let encode_ns = duration_ns_u64(encode_started_at.elapsed());
-
         let submit_started_at = Instant::now();
         self.queue.submit(Some(encoder.finish()));
         let submit_ns = duration_ns_u64(submit_started_at.elapsed());
-        let present_started_at = Instant::now();
-        output.present();
-        let present_ns = duration_ns_u64(present_started_at.elapsed());
-        // Reclaim completed queue-write staging resources without blocking the
-        // display-link callback. Native wgpu devices are not driven by a browser
-        // event loop, so regular polling is part of their steady-state upkeep.
-        let _ = self.device.poll(wgpu::PollType::Poll);
-        Ok(NativeGpuFrameOutcome {
-            surface_status,
-            presented: true,
-            source_uploaded,
-            timing: NativeGpuFrameTiming {
-                prep_ns,
-                acquire_ns,
-                encode_ns,
-                submit_ns,
-                present_ns,
-                total_ns: duration_ns_u64(total_started_at.elapsed()),
-            },
-        })
+        Ok((prep_ns, encode_ns, submit_ns))
     }
 
     fn current_surface_texture(
@@ -1086,6 +1135,7 @@ fn render_params_bytes(
     surface_width: u32,
     surface_height: u32,
     glyph_ramp_len: u32,
+    opacity: f32,
 ) -> [u8; 64] {
     let mut bytes = [0u8; 64];
     put_u32(&mut bytes, 0, cols);
@@ -1101,6 +1151,7 @@ fn render_params_bytes(
     put_u32(&mut bytes, 40, u32::from(params.glyph_color_mode == "fixed"));
     put_u32(&mut bytes, 44, pack_rgb(params.glyph_color));
     put_u32(&mut bytes, 48, pack_rgb(params.background_color));
+    put_f32(&mut bytes, 52, opacity.clamp(0.0, 1.0));
     bytes
 }
 
@@ -1208,7 +1259,7 @@ mod tests {
         let mut glyph_change = params.clone();
         glyph_change.glyph_depth = 12;
         assert_ne!(glyph_feature_key(&glyph_change), glyph_key);
-        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080, glyph_ramp_len);
+        let render_bytes = render_params_bytes(&params, 80, 45, 1920, 1080, glyph_ramp_len, 1.0);
         assert_eq!(
             u32::from_le_bytes(render_bytes[24..28].try_into().unwrap()),
             1

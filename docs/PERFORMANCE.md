@@ -253,6 +253,11 @@ Rules:
   small glyph ramp/params, not trigger unbounded font loading or large dynamic
   atlas allocation.
 - Avoid blocking the main UI while the output window presents.
+- Arm preset transitions once with a shared timestamp. Do not serialize one
+  request/response parameter update per animation frame while a native tween or
+  crossfade can advance on the display link.
+- Keep the native surface at minimum supported frame latency so swapchain
+  buffering does not add avoidable main-to-output delay.
 - Upload source textures on source-frame version changes rather than display
   refresh; unversioned fallback callers must continue to upload.
 - Keep counters/logs available for frame acquisition, presentation, param
@@ -391,6 +396,11 @@ ASCILINE_SOURCE_APP="/absolute/path/ASCII VJ Remix Dev.app" \
 ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
 npm run smoke:ui-perf
 ```
+
+Add `ASCILINE_UI_PERF_SMOKE_STRUCTURAL=1` to alternate glyph and solid renderer
+families during the transition phase. This exercises the native two-pass
+crossfade and reports display-link `transitioned` frame cadence in addition to
+parameter and audio-modulation cadence.
 
 `smoke:primary-presets` separately activates every built-in Demo Image preset
 inside the installed Apple WebKit app. It verifies the final primary canvas for

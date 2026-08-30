@@ -129,6 +129,8 @@ Use an optimized app build before making performance conclusions.
 The UI performance smoke starts from canonical visual defaults, uses fixed
 non-structural numeric transitions, records each backend visited, and rejects a
 primary canvas with no visible pixel signal even when its FPS counter advances.
+Set `ASCILINE_UI_PERF_SMOKE_STRUCTURAL=1` to alternate glyph and solid renderer
+families and exercise the shared-clock native crossfade path.
 Select an exact bundle and a longer sample with:
 
 ```bash

@@ -698,6 +698,42 @@ async function runSmoke() {
     ) {
       throw new Error(`Solid-to-glyph static transitions should keep video playback live: ${JSON.stringify(liveFamilyTransition)}`);
     }
+    const nativeTransitionContract = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const from = { ...app.params, brightness: 0.7, glyphMode: false, solidMode: true };
+      const to = { ...app.params, brightness: 1.3, glyphMode: true, solidMode: false };
+      const startAtUnixMs = Date.now() + 80;
+      const payload = app._nativeOutputPayload(to, {
+        kind: 'crossfade',
+        startAtUnixMs,
+        durationMs: 650,
+        fromParams: from
+      });
+      return {
+        kind: payload.transition?.kind,
+        startDeltaMs: Number(payload.transition?.startAtUnixMs || 0) - Date.now(),
+        durationMs: payload.transition?.durationMs,
+        fromBrightness: payload.transition?.fromParams?.brightness,
+        fromGlyphMode: payload.transition?.fromParams?.glyphMode,
+        targetBrightness: payload.params?.brightness,
+        targetGlyphMode: payload.params?.glyphMode,
+        capturedAtUnixMs: payload.mediaState?.capturedAtUnixMs
+      };
+    });
+    if (
+      nativeTransitionContract.kind !== 'crossfade' ||
+      nativeTransitionContract.startDeltaMs < 0 ||
+      nativeTransitionContract.startDeltaMs > 100 ||
+      nativeTransitionContract.durationMs !== 650 ||
+      nativeTransitionContract.fromBrightness !== 0.7 ||
+      nativeTransitionContract.fromGlyphMode ||
+      nativeTransitionContract.targetBrightness !== 1.3 ||
+      !nativeTransitionContract.targetGlyphMode ||
+      (nativeTransitionContract.capturedAtUnixMs !== undefined &&
+        !Number.isFinite(nativeTransitionContract.capturedAtUnixMs))
+    ) {
+      throw new Error(`Native transition payload should preserve one shared clock and both parameter endpoints: ${JSON.stringify(nativeTransitionContract)}`);
+    }
     await page.click('#source-list [data-source-id="camera"]');
     await page.waitForFunction(
       () => {

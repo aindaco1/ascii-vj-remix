@@ -20,7 +20,7 @@ use std::num::NonZeroU32;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, Window,
     WindowBuilder, WindowEvent,
@@ -60,6 +60,7 @@ pub struct NativeOutputPayload {
     pub native_source_id: Option<String>,
     pub params: NativeOutputParams,
     pub media_state: Option<NativeOutputMediaState>,
+    pub transition: Option<NativeOutputTransition>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -68,6 +69,17 @@ pub struct NativeOutputMediaState {
     pub current_time: Option<f64>,
     pub paused: Option<bool>,
     pub ended: Option<bool>,
+    pub playback_rate: Option<f64>,
+    pub captured_at_unix_ms: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeOutputTransition {
+    pub kind: Option<String>,
+    pub start_at_unix_ms: Option<f64>,
+    pub duration_ms: Option<f64>,
+    pub from_params: NativeOutputParams,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -197,6 +209,7 @@ struct NativeOutputHandle {
     source_key: String,
     stop: Arc<AtomicBool>,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     param_version: Arc<AtomicU64>,
     mirror_slot: Option<Arc<NativeMirrorFrameSlot>>,
     #[cfg(target_os = "macos")]
@@ -210,6 +223,8 @@ struct NativeOutputSource {
     source_key: String,
     media_type: String,
     start_seconds: Option<f64>,
+    captured_at_unix_ms: Option<f64>,
+    playback_rate: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -355,6 +370,182 @@ struct NativeRenderParams {
     audio_reactive_presence_amount: f64,
     audio_reactive_density_dampening: f64,
     audio_reactive_noise_floor: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NativeTransitionKind {
+    Tween,
+    Crossfade,
+}
+
+#[derive(Debug, Clone)]
+struct NativeRenderTransition {
+    kind: NativeTransitionKind,
+    from: NativeRenderParams,
+    to: NativeRenderParams,
+    start_at: Instant,
+    duration: Duration,
+}
+
+#[derive(Debug, Clone)]
+struct NativeRenderSample {
+    params: NativeRenderParams,
+    crossfade: Option<(NativeRenderParams, f64)>,
+    transition_active: bool,
+}
+
+impl NativeRenderTransition {
+    fn sample(&self, now: Instant) -> NativeRenderSample {
+        let raw = if now <= self.start_at {
+            0.0
+        } else {
+            now.duration_since(self.start_at).as_secs_f64()
+                / self.duration.as_secs_f64().max(0.001)
+        }
+        .clamp(0.0, 1.0);
+
+        match self.kind {
+            NativeTransitionKind::Tween => NativeRenderSample {
+                params: transition_frame_params(&self.from, &self.to, raw),
+                crossfade: None,
+                transition_active: true,
+            },
+            NativeTransitionKind::Crossfade => NativeRenderSample {
+                params: self.to.clone(),
+                crossfade: Some((self.from.clone(), 1.0 - crossfade_out(raw))),
+                transition_active: true,
+            },
+        }
+    }
+
+    fn finished(&self, now: Instant) -> bool {
+        now >= self.start_at + self.duration
+    }
+}
+
+fn transition_ease_in_out(value: f64) -> f64 {
+    let value = value.clamp(0.0, 1.0);
+    if value < 0.5 {
+        2.0 * value * value
+    } else {
+        1.0 - (-2.0 * value + 2.0).powi(2) / 2.0
+    }
+}
+
+fn crossfade_out(value: f64) -> f64 {
+    (1.0 - value.clamp(0.0, 1.0)).powf(1.45)
+}
+
+fn transition_frame_params(
+    from: &NativeRenderParams,
+    to: &NativeRenderParams,
+    progress: f64,
+) -> NativeRenderParams {
+    let eased = transition_ease_in_out(progress);
+    let mut frame = if progress < 0.5 {
+        from.clone()
+    } else {
+        to.clone()
+    };
+    macro_rules! tween {
+        ($field:ident) => {
+            frame.$field = from.$field + (to.$field - from.$field) * eased;
+        };
+    }
+    tween!(saturation_boost);
+    tween!(contrast_boost);
+    tween!(brightness);
+    tween!(gamma);
+    tween!(bg_blend);
+    tween!(dither_strength);
+    tween!(dither_bias);
+    tween!(jitter_amount);
+    tween!(jitter_speed);
+    tween!(sample_x);
+    tween!(sample_y);
+    frame
+}
+
+fn unix_time_ms() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
+        * 1000.0
+}
+
+fn instant_for_unix_ms(value: f64) -> Instant {
+    let now = Instant::now();
+    let delta_ms = value - unix_time_ms();
+    if delta_ms >= 0.0 {
+        now + Duration::from_secs_f64((delta_ms / 1000.0).min(10.0))
+    } else {
+        now.checked_sub(Duration::from_secs_f64((-delta_ms / 1000.0).min(10.0)))
+            .unwrap_or(now)
+    }
+}
+
+fn render_transition_from_payload(
+    payload: &NativeOutputPayload,
+    target: &NativeRenderParams,
+) -> Option<NativeRenderTransition> {
+    let transition = payload.transition.as_ref()?;
+    let duration_ms = transition.duration_ms?.clamp(1.0, 8_000.0);
+    let start_at_unix_ms = transition.start_at_unix_ms?;
+    if !start_at_unix_ms.is_finite() || !duration_ms.is_finite() {
+        return None;
+    }
+    let kind = match transition.kind.as_deref() {
+        Some("crossfade") => NativeTransitionKind::Crossfade,
+        _ => NativeTransitionKind::Tween,
+    };
+    let from_payload = NativeOutputPayload {
+        output_mode: payload.output_mode.clone(),
+        label: payload.label.clone(),
+        native_source_id: payload.native_source_id.clone(),
+        params: transition.from_params.clone(),
+        media_state: payload.media_state.clone(),
+        transition: None,
+    };
+    Some(NativeRenderTransition {
+        kind,
+        from: NativeRenderParams::from_payload(&from_payload),
+        to: target.clone(),
+        start_at: instant_for_unix_ms(start_at_unix_ms),
+        duration: Duration::from_secs_f64(duration_ms / 1000.0),
+    })
+}
+
+fn render_sample(
+    params: &Arc<Mutex<NativeRenderParams>>,
+    transition: &Arc<Mutex<Option<NativeRenderTransition>>>,
+) -> NativeRenderSample {
+    let target = params_snapshot(params);
+    let now = Instant::now();
+    let Ok(mut active) = transition.lock() else {
+        return NativeRenderSample {
+            params: target,
+            crossfade: None,
+            transition_active: false,
+        };
+    };
+    let Some(current) = active.as_ref() else {
+        return NativeRenderSample {
+            params: target,
+            crossfade: None,
+            transition_active: false,
+        };
+    };
+    let sample = current.sample(now);
+    if current.finished(now) {
+        *active = None;
+        return NativeRenderSample {
+            params: target,
+            crossfade: None,
+            transition_active: false,
+        };
+    }
+    sample
 }
 
 const NATIVE_GLYPH_TILE_WIDTH: u32 = 16;
@@ -921,6 +1112,8 @@ fn native_output_smoke_source(
         source_key: format!("smoke:{media_url}"),
         media_type: "video".to_string(),
         start_seconds: None,
+        captured_at_unix_ms: None,
+        playback_rate: 1.0,
     })
 }
 
@@ -1015,7 +1208,10 @@ fn native_output_smoke_payload(media_url: &str, step: u64) -> NativeOutputPayloa
             current_time: Some(0.0),
             paused: Some(false),
             ended: Some(false),
+            playback_rate: Some(1.0),
+            captured_at_unix_ms: Some(unix_time_ms()),
         }),
+        transition: None,
     }
 }
 
@@ -1057,6 +1253,7 @@ async fn start_or_update_native_static_output(
     request: &NativeOutputWindowRequest,
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
+    let requested_transition = render_transition_from_payload(&request.payload, &params);
     {
         let mut inner = state
             .inner
@@ -1069,6 +1266,11 @@ async fn start_or_update_native_static_output(
                     .lock()
                     .map_err(|_| "native output params lock poisoned".to_string())? =
                     params.clone();
+                *handle
+                    .transition
+                    .lock()
+                    .map_err(|_| "native output transition lock poisoned".to_string())? =
+                    requested_transition;
                 handle.param_version.fetch_add(1, Ordering::Release);
                 show_native_output_window_if_requested(app, handle, request);
                 invalidate_native_output_view(&handle.window);
@@ -1088,6 +1290,7 @@ async fn start_or_update_native_static_output(
     let generation = state.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
     let stop = Arc::new(AtomicBool::new(false));
     let params_arc = Arc::new(Mutex::new(params));
+    let transition = Arc::new(Mutex::new(requested_transition));
     let param_version = Arc::new(AtomicU64::new(1));
 
     install_close_watcher(app, state, &window, generation, stop.clone());
@@ -1100,6 +1303,7 @@ async fn start_or_update_native_static_output(
             window.clone(),
             frame_slot.clone(),
             params_arc.clone(),
+            transition.clone(),
             param_version.clone(),
             stop.clone(),
         )?;
@@ -1119,6 +1323,7 @@ async fn start_or_update_native_static_output(
         window.clone(),
         source.clone(),
         params_arc.clone(),
+        transition.clone(),
         stop.clone(),
     );
 
@@ -1131,6 +1336,7 @@ async fn start_or_update_native_static_output(
         source_key: source.source_key,
         stop,
         params: params_arc,
+        transition,
         param_version,
         mirror_slot: None,
         #[cfg(target_os = "macos")]
@@ -1153,6 +1359,7 @@ async fn start_or_update_native_camera_output(
     request: &NativeOutputWindowRequest,
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
+    let requested_transition = render_transition_from_payload(&request.payload, &params);
     {
         let mut inner = state
             .inner
@@ -1165,6 +1372,11 @@ async fn start_or_update_native_camera_output(
                     .lock()
                     .map_err(|_| "native output params lock poisoned".to_string())? =
                     params.clone();
+                *handle
+                    .transition
+                    .lock()
+                    .map_err(|_| "native output transition lock poisoned".to_string())? =
+                    requested_transition;
                 handle.param_version.fetch_add(1, Ordering::Release);
                 show_native_output_window_if_requested(app, handle, request);
                 invalidate_native_output_view(&handle.window);
@@ -1184,6 +1396,7 @@ async fn start_or_update_native_camera_output(
     let generation = state.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
     let stop = Arc::new(AtomicBool::new(false));
     let params_arc = Arc::new(Mutex::new(params));
+    let transition = Arc::new(Mutex::new(requested_transition));
     let param_version = Arc::new(AtomicU64::new(1));
 
     install_close_watcher(app, state, &window, generation, stop.clone());
@@ -1196,6 +1409,7 @@ async fn start_or_update_native_camera_output(
             window.clone(),
             frame_slot.clone(),
             params_arc.clone(),
+            transition.clone(),
             param_version.clone(),
             stop.clone(),
         )?;
@@ -1215,6 +1429,7 @@ async fn start_or_update_native_camera_output(
         window.clone(),
         source.clone(),
         params_arc.clone(),
+        transition.clone(),
         stop.clone(),
     );
 
@@ -1227,6 +1442,7 @@ async fn start_or_update_native_camera_output(
         source_key: source.source_key,
         stop,
         params: params_arc,
+        transition,
         param_version,
         mirror_slot: None,
         #[cfg(target_os = "macos")]
@@ -1248,6 +1464,7 @@ async fn start_or_update_native_mirror_output(
     request: &NativeOutputWindowRequest,
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
+    let requested_transition = render_transition_from_payload(&request.payload, &params);
     {
         let mut inner = state
             .inner
@@ -1260,6 +1477,11 @@ async fn start_or_update_native_mirror_output(
                     .lock()
                     .map_err(|_| "native output params lock poisoned".to_string())? =
                     params.clone();
+                *handle
+                    .transition
+                    .lock()
+                    .map_err(|_| "native output transition lock poisoned".to_string())? =
+                    requested_transition;
                 handle.param_version.fetch_add(1, Ordering::Release);
                 show_native_output_window_if_requested(app, handle, request);
                 invalidate_native_output_view(&handle.window);
@@ -1279,6 +1501,7 @@ async fn start_or_update_native_mirror_output(
     let generation = state.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
     let stop = Arc::new(AtomicBool::new(false));
     let params_arc = Arc::new(Mutex::new(params));
+    let transition = Arc::new(Mutex::new(requested_transition));
     let param_version = Arc::new(AtomicU64::new(1));
     let mirror_slot = Arc::new(NativeMirrorFrameSlot::default());
 
@@ -1294,6 +1517,7 @@ async fn start_or_update_native_mirror_output(
         source_key: MIRROR_SOURCE_KEY.to_string(),
         stop,
         params: params_arc,
+        transition,
         param_version,
         mirror_slot: Some(mirror_slot),
         #[cfg(target_os = "macos")]
@@ -1482,6 +1706,7 @@ struct NativeMacDisplayLinkContext {
     window: Window,
     frame_slot: Arc<NativeRenderFrameSlot>,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     param_version: Arc<AtomicU64>,
     stop: Arc<AtomicBool>,
     pending_tick: AtomicBool,
@@ -1495,6 +1720,7 @@ struct NativeMacDisplayLinkContext {
     render_attempts: AtomicU64,
     frames_presented: AtomicU64,
     modulated_frames: AtomicU64,
+    transitioned_frames: AtomicU64,
     no_surface_frames: AtomicU64,
     gpu_failures: AtomicU64,
     source_frame_uploads: AtomicU64,
@@ -1521,6 +1747,7 @@ impl NativeMacDisplayLinkContext {
         window: Window,
         frame_slot: Arc<NativeRenderFrameSlot>,
         params: Arc<Mutex<NativeRenderParams>>,
+        transition: Arc<Mutex<Option<NativeRenderTransition>>>,
         param_version: Arc<AtomicU64>,
         stop: Arc<AtomicBool>,
     ) -> Self {
@@ -1530,6 +1757,7 @@ impl NativeMacDisplayLinkContext {
             window,
             frame_slot,
             params,
+            transition,
             param_version,
             stop,
             pending_tick: AtomicBool::new(false),
@@ -1543,6 +1771,7 @@ impl NativeMacDisplayLinkContext {
             render_attempts: AtomicU64::new(0),
             frames_presented: AtomicU64::new(0),
             modulated_frames: AtomicU64::new(0),
+            transitioned_frames: AtomicU64::new(0),
             no_surface_frames: AtomicU64::new(0),
             gpu_failures: AtomicU64::new(0),
             source_frame_uploads: AtomicU64::new(0),
@@ -1568,8 +1797,8 @@ impl NativeMacDisplayLinkContext {
         if self.stop.load(Ordering::Relaxed) {
             return;
         }
-        let current_params = params_snapshot(&self.params);
-        let present_fps = native_output_present_fps(&current_params);
+        let current_sample = render_sample(&self.params, &self.transition);
+        let present_fps = native_output_present_fps(&current_sample.params);
         self.last_present_fps_x1000
             .store((present_fps * 1000.0).round() as u64, Ordering::Relaxed);
         if !self.should_render_now(present_fps) {
@@ -1592,7 +1821,7 @@ impl NativeMacDisplayLinkContext {
             self.main_dispatch_count.fetch_add(1, Ordering::Relaxed);
             self.last_main_dispatch_ns.store(0, Ordering::Relaxed);
             let render_started_at = Instant::now();
-            self.render_tick(current_params);
+            self.render_tick(current_sample);
             let render_ns = duration_ns_u64(render_started_at.elapsed());
             self.render_total_ns.fetch_add(render_ns, Ordering::Relaxed);
             self.render_max_ns.fetch_max(render_ns, Ordering::Relaxed);
@@ -1614,7 +1843,7 @@ impl NativeMacDisplayLinkContext {
                 .last_main_dispatch_ns
                 .store(dispatch_ns, Ordering::Relaxed);
             let render_started_at = Instant::now();
-            context.render_tick(current_params);
+            context.render_tick(current_sample);
             let render_ns = duration_ns_u64(render_started_at.elapsed());
             context
                 .render_total_ns
@@ -1633,11 +1862,24 @@ impl NativeMacDisplayLinkContext {
         }
     }
 
-    fn render_tick(&self, current_params: NativeRenderParams) {
+    fn render_tick(&self, current_sample: NativeRenderSample) {
         if self.stop.load(Ordering::Relaxed) {
             return;
         }
-        let current_params = self.modulated_params(current_params);
+        if current_sample.transition_active {
+            self.transitioned_frames.fetch_add(1, Ordering::Relaxed);
+        }
+        let (current_params, current_modulated) = self.modulated_params(current_sample.params);
+        let (crossfade, crossfade_modulated) = current_sample
+            .crossfade
+            .map(|(from, mix)| {
+                let (from, changed) = self.modulated_params(from);
+                (Some((from, mix)), changed)
+            })
+            .unwrap_or((None, false));
+        if current_modulated || crossfade_modulated {
+            self.modulated_frames.fetch_add(1, Ordering::Relaxed);
+        }
 
         let Some((frame_version, frame)) = self.frame_slot.latest() else {
             self.no_frame_skips.fetch_add(1, Ordering::Relaxed);
@@ -1691,6 +1933,7 @@ impl NativeMacDisplayLinkContext {
                 &current_params,
                 frame_index,
                 Some(frame_version),
+                crossfade.as_ref().map(|(from, mix)| (from, *mix)),
             );
         match result {
             Ok(outcome) => {
@@ -1721,7 +1964,7 @@ impl NativeMacDisplayLinkContext {
         self.maybe_log_diagnostics();
     }
 
-    fn modulated_params(&self, params: NativeRenderParams) -> NativeRenderParams {
+    fn modulated_params(&self, params: NativeRenderParams) -> (NativeRenderParams, bool) {
         let audio_features = if params.audio_reactive_active {
             match params.audio_reactive_source.as_str() {
                 "display" => self
@@ -1740,12 +1983,7 @@ impl NativeMacDisplayLinkContext {
             None
         };
         let elapsed = self.started_at.elapsed().as_secs_f64();
-        let (modulated, changed) =
-            native_modulated_params(params, elapsed, audio_features.as_ref());
-        if changed {
-            self.modulated_frames.fetch_add(1, Ordering::Relaxed);
-        }
-        modulated
+        native_modulated_params(params, elapsed, audio_features.as_ref())
     }
 
     fn should_render_now(&self, fps: f64) -> bool {
@@ -1799,7 +2037,7 @@ impl NativeMacDisplayLinkContext {
             .unwrap_or_default();
         let elapsed_ms = now.duration_since(self.started_at).as_secs_f64() * 1000.0;
         let line = format!(
-            "[NativeOutputDisplayLinkStats] elapsedMs={:.3} ticks={} pendingSkips={} noFrame={} fpsSkips={} attempts={} presented={} modulated={} noSurface={} gpuFailures={} surface={} paramVersion={} frameVersion={} sourceUploads={} sourceUploadSkips={} presentFps={:.3} dispatchMs={:.3}/{:.3} renderMs={:.3}/{:.3}/{:.3} gpuLastMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuAvgMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuMaxMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3}",
+            "[NativeOutputDisplayLinkStats] elapsedMs={:.3} ticks={} pendingSkips={} noFrame={} fpsSkips={} attempts={} presented={} modulated={} transitioned={} noSurface={} gpuFailures={} surface={} paramVersion={} frameVersion={} sourceUploads={} sourceUploadSkips={} presentFps={:.3} dispatchMs={:.3}/{:.3} renderMs={:.3}/{:.3}/{:.3} gpuLastMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuAvgMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3} gpuMaxMs=prep:{:.3},acq:{:.3},enc:{:.3},submit:{:.3},present:{:.3},total:{:.3}",
             elapsed_ms,
             self.ticks.load(Ordering::Relaxed),
             self.pending_skips.load(Ordering::Relaxed),
@@ -1808,6 +2046,7 @@ impl NativeMacDisplayLinkContext {
             self.render_attempts.load(Ordering::Relaxed),
             self.frames_presented.load(Ordering::Relaxed),
             self.modulated_frames.load(Ordering::Relaxed),
+            self.transitioned_frames.load(Ordering::Relaxed),
             self.no_surface_frames.load(Ordering::Relaxed),
             self.gpu_failures.load(Ordering::Relaxed),
             surface_status,
@@ -2379,6 +2618,7 @@ impl NativeMacDisplayLinkPresenter {
         window: Window,
         frame_slot: Arc<NativeRenderFrameSlot>,
         params: Arc<Mutex<NativeRenderParams>>,
+        transition: Arc<Mutex<Option<NativeRenderTransition>>>,
         param_version: Arc<AtomicU64>,
         stop: Arc<AtomicBool>,
     ) -> Result<Self, String> {
@@ -2387,6 +2627,7 @@ impl NativeMacDisplayLinkPresenter {
             window,
             frame_slot,
             params,
+            transition,
             param_version,
             stop,
         ));
@@ -2708,12 +2949,26 @@ fn resolve_output_source(
             .current_time
             .filter(|value| value.is_finite() && *value > 0.0)
     });
+    let captured_at_unix_ms = payload
+        .media_state
+        .as_ref()
+        .and_then(|state| state.captured_at_unix_ms)
+        .filter(|value| value.is_finite() && *value > 0.0);
+    let playback_rate = payload
+        .media_state
+        .as_ref()
+        .and_then(|state| state.playback_rate)
+        .filter(|value| value.is_finite())
+        .unwrap_or(1.0)
+        .clamp(0.25, 4.0);
 
     Ok(Some(NativeOutputSource {
         path,
         source_key,
         media_type,
         start_seconds,
+        captured_at_unix_ms,
+        playback_rate,
     }))
 }
 
@@ -3083,6 +3338,7 @@ fn run_render_producer_loop(
                     &binaries,
                     &NativeOutputSource {
                         start_seconds: None,
+                        captured_at_unix_ms: None,
                         ..source.clone()
                     },
                     sample_width,
@@ -3110,10 +3366,11 @@ fn spawn_render_thread(
     window: Window,
     source: NativeOutputSource,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
-        if let Err(error) = run_render_loop(app, window, source, params, stop.clone()) {
+        if let Err(error) = run_render_loop(app, window, source, params, transition, stop.clone()) {
             eprintln!("[NativeOutput] {error}");
             stop.store(true, Ordering::Relaxed);
         }
@@ -3125,6 +3382,7 @@ struct NativeSoftbufferPresenter {
     _context: softbuffer::Context<Window>,
     surface: softbuffer::Surface<Window, Window>,
     last_size: (u32, u32),
+    transition_buffer: Vec<u32>,
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -3135,6 +3393,7 @@ impl NativeSoftbufferPresenter {
             _context: context,
             surface,
             last_size: (0, 0),
+            transition_buffer: Vec::new(),
         })
     }
 
@@ -3144,6 +3403,7 @@ impl NativeSoftbufferPresenter {
         frame: &DecodedRgbFrame,
         params: &NativeRenderParams,
         frame_index: usize,
+        crossfade: Option<(&NativeRenderParams, f64)>,
     ) -> Result<(), String> {
         let size = window
             .inner_size()
@@ -3162,6 +3422,19 @@ impl NativeSoftbufferPresenter {
             .buffer_mut()
             .map_err(|error| error.to_string())?;
         render_native_frame_to_buffer(frame, params, &mut buffer, width, height, frame_index);
+        if let Some((from, mix)) = crossfade {
+            self.transition_buffer
+                .resize(width as usize * height as usize, rgb_u32(3, 4, 5));
+            render_native_frame_to_buffer(
+                frame,
+                from,
+                &mut self.transition_buffer,
+                width,
+                height,
+                frame_index,
+            );
+            blend_native_buffers(&self.transition_buffer, &mut buffer, mix);
+        }
         buffer.present().map_err(|error| error.to_string())
     }
 }
@@ -3172,6 +3445,7 @@ fn run_render_loop(
     window: Window,
     source: NativeOutputSource,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let binaries = media_binaries_for_app(&app);
@@ -3217,7 +3491,8 @@ fn run_render_loop(
     let mut next_frame_at = Instant::now();
 
     while !stop.load(Ordering::Relaxed) {
-        let current_params = params_snapshot(&params);
+        let current_sample = render_sample(&params, &transition);
+        let current_params = current_sample.params;
         let interval = Duration::from_secs_f64(1.0 / source_fps.max(1.0));
         let now = Instant::now();
         if now < next_frame_at {
@@ -3237,6 +3512,7 @@ fn run_render_loop(
                         &binaries,
                         &NativeOutputSource {
                             start_seconds: None,
+                            captured_at_unix_ms: None,
                             ..source.clone()
                         },
                         sample_width,
@@ -3258,7 +3534,13 @@ fn run_render_loop(
         };
 
         if let Some(presenter) = gpu_presenter.as_mut() {
-            match presenter.render_frame(&window, frame, &current_params, frame_index) {
+            match presenter.render_frame(
+                &window,
+                frame,
+                &current_params,
+                frame_index,
+                current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
+            ) {
                 Ok(()) => {
                     invalidate_native_output_view(&window);
                     frame_index = frame_index.wrapping_add(1);
@@ -3279,7 +3561,13 @@ fn run_render_loop(
         softbuffer_presenter
             .as_mut()
             .expect("softbuffer presenter initialized")
-            .render_frame(&window, frame, &current_params, frame_index)?;
+            .render_frame(
+                &window,
+                frame,
+                &current_params,
+                frame_index,
+                current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
+            )?;
         invalidate_native_output_view(&window);
         frame_index = frame_index.wrapping_add(1);
     }
@@ -3445,10 +3733,13 @@ fn spawn_camera_render_thread(
     window: Window,
     source: NativeCameraSource,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
-        if let Err(error) = run_camera_render_loop(app, window, source, params, stop.clone()) {
+        if let Err(error) =
+            run_camera_render_loop(app, window, source, params, transition, stop.clone())
+        {
             eprintln!("[NativeOutputCamera] {error}");
             stop.store(true, Ordering::Relaxed);
         }
@@ -3461,6 +3752,7 @@ fn run_camera_render_loop(
     window: Window,
     source: NativeCameraSource,
     params: Arc<Mutex<NativeRenderParams>>,
+    transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let binaries = media_binaries_for_app(&app);
@@ -3479,7 +3771,8 @@ fn run_camera_render_loop(
     let mut next_frame_at = Instant::now();
 
     while !stop.load(Ordering::Relaxed) {
-        let current_params = params_snapshot(&params);
+        let current_sample = render_sample(&params, &transition);
+        let current_params = current_sample.params;
         let interval = Duration::from_secs_f64(1.0 / source_fps.max(1.0));
         let now = Instant::now();
         if now < next_frame_at {
@@ -3501,7 +3794,13 @@ fn run_camera_render_loop(
         };
 
         if let Some(presenter) = gpu_presenter.as_mut() {
-            match presenter.render_frame(&window, frame, &current_params, frame_index) {
+            match presenter.render_frame(
+                &window,
+                frame,
+                &current_params,
+                frame_index,
+                current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
+            ) {
                 Ok(()) => {
                     invalidate_native_output_view(&window);
                     frame_index = frame_index.wrapping_add(1);
@@ -3522,7 +3821,13 @@ fn run_camera_render_loop(
         softbuffer_presenter
             .as_mut()
             .expect("softbuffer presenter initialized")
-            .render_frame(&window, frame, &current_params, frame_index)?;
+            .render_frame(
+                &window,
+                frame,
+                &current_params,
+                frame_index,
+                current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
+            )?;
         invalidate_native_output_view(&window);
         frame_index = frame_index.wrapping_add(1);
     }
@@ -3807,12 +4112,23 @@ fn open_native_reader(
 ) -> Result<FfmpegRgbFrameReader, String> {
     let decode =
         DecodeConfig::new(width, height, MAX_READER_FRAMES).map_err(|error| error.to_string())?;
+    let start_seconds = compensated_source_start_seconds(source, unix_time_ms());
     let options = RgbReaderOptions {
-        start_seconds: source.start_seconds,
+        start_seconds,
         output_fps: Some(fps),
     };
     spawn_rgb_reader_with_options(binaries, &source.path, &decode, &options)
         .map_err(|error| error.to_string())
+}
+
+fn compensated_source_start_seconds(source: &NativeOutputSource, now_unix_ms: f64) -> Option<f64> {
+    source.start_seconds.map(|start| {
+        let elapsed = source
+            .captured_at_unix_ms
+            .map(|captured| ((now_unix_ms - captured) / 1000.0).max(0.0))
+            .unwrap_or(0.0);
+        (start + elapsed * source.playback_rate).max(0.0)
+    })
 }
 
 fn open_camera_frame_reader(
@@ -3912,6 +4228,7 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     ..Default::default()
                 },
                 media_state: None,
+                transition: None,
             })
         })
 }
@@ -4025,6 +4342,25 @@ fn render_native_frame_to_buffer(
                 }
             }
         }
+    }
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn blend_native_buffers(from: &[u32], to: &mut [u32], mix: f64) {
+    let mix = mix.clamp(0.0, 1.0);
+    let inverse = 1.0 - mix;
+    for (old, next) in from.iter().copied().zip(to.iter_mut()) {
+        let old_r = ((old >> 16) & 255) as f64;
+        let old_g = ((old >> 8) & 255) as f64;
+        let old_b = (old & 255) as f64;
+        let next_r = ((*next >> 16) & 255) as f64;
+        let next_g = ((*next >> 8) & 255) as f64;
+        let next_b = (*next & 255) as f64;
+        *next = rgb_u32(
+            (old_r * inverse + next_r * mix).round() as u8,
+            (old_g * inverse + next_g * mix).round() as u8,
+            (old_b * inverse + next_b * mix).round() as u8,
+        );
     }
 }
 
@@ -4394,11 +4730,82 @@ mod tests {
                 ..Default::default()
             },
             media_state: None,
+            transition: None,
         }
     }
 
     fn params() -> NativeRenderParams {
         NativeRenderParams::from_payload(&base_payload())
+    }
+
+    #[test]
+    fn native_tween_uses_the_client_easing_and_discrete_midpoint() {
+        let mut from = params();
+        from.brightness = 0.0;
+        from.glyph_mode = false;
+        let mut to = from.clone();
+        to.brightness = 2.0;
+        to.glyph_mode = true;
+        let start = Instant::now();
+        let transition = NativeRenderTransition {
+            kind: NativeTransitionKind::Tween,
+            from,
+            to,
+            start_at: start,
+            duration: Duration::from_secs(1),
+        };
+
+        let first = transition.sample(start + Duration::from_millis(250));
+        assert!((first.params.brightness - 0.25).abs() < 0.000_001);
+        assert!(!first.params.glyph_mode);
+        assert!(first.transition_active);
+        assert!(first.crossfade.is_none());
+
+        let second = transition.sample(start + Duration::from_millis(750));
+        assert!((second.params.brightness - 1.75).abs() < 0.000_001);
+        assert!(second.params.glyph_mode);
+    }
+
+    #[test]
+    fn native_crossfade_uses_the_client_outgoing_opacity_curve() {
+        let from = params();
+        let mut to = from.clone();
+        to.glyph_mode = !from.glyph_mode;
+        let start = Instant::now();
+        let transition = NativeRenderTransition {
+            kind: NativeTransitionKind::Crossfade,
+            from: from.clone(),
+            to: to.clone(),
+            start_at: start,
+            duration: Duration::from_secs(1),
+        };
+
+        let sample = transition.sample(start + Duration::from_millis(500));
+        let (sampled_from, mix) = sample.crossfade.expect("crossfade sample");
+        assert_eq!(sampled_from.glyph_mode, from.glyph_mode);
+        assert_eq!(sample.params.glyph_mode, to.glyph_mode);
+        assert!((mix - (1.0 - 0.5_f64.powf(1.45))).abs() < 0.000_001);
+    }
+
+    #[test]
+    fn native_media_start_compensates_for_handoff_elapsed_time() {
+        let source = NativeOutputSource {
+            path: PathBuf::from("media/test.mp4"),
+            source_key: "test".to_string(),
+            media_type: "video".to_string(),
+            start_seconds: Some(4.0),
+            captured_at_unix_ms: Some(10_000.0),
+            playback_rate: 1.25,
+        };
+        assert_eq!(compensated_source_start_seconds(&source, 10_400.0), Some(4.5));
+    }
+
+    #[test]
+    fn native_crossfade_buffer_blends_old_and_new_output() {
+        let from = [rgb_u32(255, 0, 0)];
+        let mut to = [rgb_u32(0, 0, 255)];
+        blend_native_buffers(&from, &mut to, 0.25);
+        assert_eq!(to, [rgb_u32(191, 0, 64)]);
     }
 
     #[test]

@@ -31,6 +31,14 @@
 
 ### Fixed
 
+- Synchronized primary-view and native Pop Out transitions on one timestamped
+  clock. Numeric transitions now use the same easing progress on both surfaces,
+  renderer-family changes use the same crossfade curve, and native presentation
+  uses minimum swapchain buffering instead of trailing by queued parameter
+  round trips.
+- Timestamped the primary video playback handoff so the native decoder advances
+  its initial seek by the time spent opening the output window and starting the
+  decoder, removing avoidable Pop Out playback lag.
 - Prevented release-mode Windows app and FFmpeg/ffprobe child processes from
   opening visible console windows. Debug builds retain normal diagnostic
   console behavior.

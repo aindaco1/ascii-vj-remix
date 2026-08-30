@@ -397,6 +397,15 @@ old renderer stays visible
 
 This avoids black frames during preset transitions.
 
+When native Pop Out is active, the controller arms one transition contract
+containing the old and new canonical params, transition kind, duration, and a
+shared Unix-clock start time. The primary view and native display link then
+derive progress independently from that same timestamp. Numeric transitions
+use the shared easing function; structural renderer-family transitions render
+both native states and composite them with the same outgoing-opacity curve as
+the layered primary view. Animation-frame IPC updates are suppressed until the
+contract completes, then one final canonical state is sent.
+
 For a non-structural numeric tween, only controls whose values are changing are
 synchronized during animation frames. Source lists, camera-device options,
 visibility, meters, persistence, and the complete control surface are reconciled

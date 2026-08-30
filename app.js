@@ -301,6 +301,7 @@ const DEFAULT_PARAMS = {
 const RESPONSIVE_FRAME_MS = 1000 / 60;
 const AUDIO_REACTIVE_FRAME_MS = 1000 / 60;
 const NATIVE_OUTPUT_REACTIVE_SYNC_MS = 1000 / 60;
+const NATIVE_OUTPUT_TRANSITION_LEAD_MS = 64;
 const CANVAS_STATIC_SAMPLE_MAX_DIMENSION = 960;
 const WTF_MIN_SMOOTH_FPS = 24;
 const WTF_MAX_SMOOTH_FPS = 60;
@@ -2481,7 +2482,8 @@ function captureVideoPlaybackState(source, params, nextParams = params) {
         muted: video.muted,
         loop: video.loop,
         volume: video.volume,
-        capturedAt: performance.now()
+        capturedAt: performance.now(),
+        capturedAtUnixMs: Date.now()
     };
 }
 
@@ -5510,6 +5512,11 @@ class RendererLabApp {
         this.nativeOutputSyncOkCount = 0;
         this.nativeOutputSyncFailedCount = 0;
         this.nativeOutputLastSyncElapsedMs = 0;
+        this.nativeOutputTransition = null;
+        this.nativeOutputTransitionArming = false;
+        this.nativeOutputTransitionArmAttemptCount = 0;
+        this.nativeOutputTransitionArmOkCount = 0;
+        this.nativeOutputTransitionArmFailedCount = 0;
         this.uiPerfSmokeActive = false;
         this.outputDisplay = parseStoredJson(OUTPUT_DISPLAY_KEY, 'auto');
         this.outputDisplays = [];
@@ -6818,12 +6825,16 @@ class RendererLabApp {
         const ditherMode = String(payload.ditherMode || DEFAULT_PARAMS.ditherMode);
         const charset = String(payload.charset || DEFAULT_PARAMS.charset);
         const soak = payload.soak === true;
+        const structuralTransitions = payload.structuralTransitions === true;
         const sourceName = sourceNameFromUrl(mediaUrl) || 'UI Perf Demo';
         const startedAt = performance.now();
         const syncStart = {
             attempts: this.nativeOutputSyncAttemptCount,
             ok: this.nativeOutputSyncOkCount,
-            failed: this.nativeOutputSyncFailedCount
+            failed: this.nativeOutputSyncFailedCount,
+            transitionAttempts: this.nativeOutputTransitionArmAttemptCount,
+            transitionOk: this.nativeOutputTransitionArmOkCount,
+            transitionFailed: this.nativeOutputTransitionArmFailedCount
         };
         let sampledRenderer = null;
         let rendererChanges = 0;
@@ -6851,7 +6862,10 @@ class RendererLabApp {
                 nativeAttempts: this.nativeOutputSyncAttemptCount - syncStart.attempts,
                 nativeOk: this.nativeOutputSyncOkCount - syncStart.ok,
                 nativeFailed: this.nativeOutputSyncFailedCount - syncStart.failed,
-                nativeLastSyncMs: this.nativeOutputLastSyncElapsedMs
+                nativeLastSyncMs: this.nativeOutputLastSyncElapsedMs,
+                nativeTransitionAttempts: this.nativeOutputTransitionArmAttemptCount - syncStart.transitionAttempts,
+                nativeTransitionOk: this.nativeOutputTransitionArmOkCount - syncStart.transitionOk,
+                nativeTransitionFailed: this.nativeOutputTransitionArmFailedCount - syncStart.transitionFailed
             };
         };
 
@@ -6867,6 +6881,7 @@ class RendererLabApp {
             ditherMode,
             charset,
             soak,
+            structuralTransitions,
             samples: [],
             phases: {},
             mainAvgFps: 0,
@@ -6879,6 +6894,8 @@ class RendererLabApp {
             nativeSyncHz: 0,
             nativeOkHz: 0,
             nativeFailed: 0,
+            nativeTransitionArmed: 0,
+            nativeTransitionFailed: 0,
             outputDisplayCount: 0,
             rendererChanges: 0,
             frameResetCount: 0,
@@ -7045,6 +7062,10 @@ class RendererLabApp {
                     sampleY: 0.38
                 }
             ];
+            if (structuralTransitions) {
+                Object.assign(transitionTargets[0], { glyphMode: false, solidMode: true });
+                Object.assign(transitionTargets[1], { glyphMode: true, solidMode: false });
+            }
             if (soak) {
                 await this.openPopout();
                 await wait(1000);
@@ -7090,6 +7111,8 @@ class RendererLabApp {
             report.nativeSyncHz = overall.nativeSyncHz;
             report.nativeOkHz = overall.nativeOkHz;
             report.nativeFailed = Math.max(0, this.nativeOutputSyncFailedCount - syncStart.failed);
+            report.nativeTransitionArmed = Math.max(0, this.nativeOutputTransitionArmOkCount - syncStart.transitionOk);
+            report.nativeTransitionFailed = Math.max(0, this.nativeOutputTransitionArmFailedCount - syncStart.transitionFailed);
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
@@ -7109,9 +7132,10 @@ class RendererLabApp {
                     report.phases.main.mainAvgFps >= 30 &&
                     report.phases.popout.mainAvgFps >= 24 &&
                     report.phases.transition.mainAvgFps >= 24 &&
-                    (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
+                    (!hasSecondaryOutput || report.nativeTransitionArmed > 0 || report.phases.transition.nativeOkHz >= 30) &&
                     report.hasVisibleSignal &&
-                    report.nativeFailed === 0
+                    report.nativeFailed === 0 &&
+                    report.nativeTransitionFailed === 0
                 );
         } catch (error) {
             report.error = diagnosticErrorLabel(error);
@@ -7140,9 +7164,12 @@ class RendererLabApp {
                 ditherMode: report.ditherMode,
                 charset: report.charset,
                 soak: report.soak,
+                structuralTransitions: report.structuralTransitions,
                 phases: compactPhases,
                 actualBackends: report.actualBackends,
                 nativeFailed: report.nativeFailed,
+                nativeTransitionArmed: report.nativeTransitionArmed,
+                nativeTransitionFailed: report.nativeTransitionFailed,
                 outputDisplayCount: report.outputDisplayCount,
                 rendererChanges: report.rendererChanges,
                 frameResetCount: report.frameResetCount,
@@ -8021,14 +8048,52 @@ button:hover{background:#202a35}
         };
     }
 
-    _nativeOutputPayload(params = this.renderParams()) {
-        const cameraMeta = this._nativeCameraOutputMeta(this.params);
+    _nativeOutputParams(params, cameraMeta = this._nativeCameraOutputMeta(this.params)) {
         const effective = effectiveGridParams(
             params,
             cameraMeta?.captureWidth || this.gpu?.source?.width || 1920,
             cameraMeta?.captureHeight || this.gpu?.source?.height || 1080,
             'webgpu'
         );
+        return {
+            ...effective,
+            paletteColors: paletteById(params.paletteId)?.colors || [],
+            glyphMode: this._nativeOutputGlyphMode(params),
+            charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
+            sourceMode: this.params.sourceMode,
+            mediaUrl: this.params.mediaUrl,
+            mediaType: this.params.mediaType,
+            sourceName: this.params.sourceName,
+            loop: this.params.loop,
+            muted: this.params.muted,
+            volume: this.params.volume,
+            cameraDeviceLabel: cameraMeta?.deviceLabel || '',
+            cameraSelectedDeviceLabels: cameraMeta?.selectedLabels || [],
+            cameraResolution: this.params.cameraResolution,
+            cameraCaptureWidth: cameraMeta?.captureWidth || null,
+            cameraCaptureHeight: cameraMeta?.captureHeight || null,
+            cameraFps: this.params.cameraFps,
+            cameraMirror: cameraMeta ? this.params.cameraMirror : null,
+            mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
+            // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
+            nativeWtfActive: false,
+            audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
+            audioReactiveSource: this.audioReactive.source,
+            audioReactivePreset: this.audioReactive.preset,
+            audioReactiveSensitivity: this.audioReactive.sensitivity,
+            audioReactiveBeatAmount: this.audioReactive.beatAmount,
+            audioReactiveBassAmount: this.audioReactive.bassAmount,
+            audioReactiveMidAmount: this.audioReactive.midAmount,
+            audioReactiveTrebleAmount: this.audioReactive.trebleAmount,
+            audioReactiveFluxAmount: this.audioReactive.fluxAmount,
+            audioReactivePresenceAmount: this.audioReactive.presenceAmount,
+            audioReactiveDensityDampening: this.audioReactive.densityDampening,
+            audioReactiveNoiseFloor: this.audioReactive.noiseFloor
+        };
+    }
+
+    _nativeOutputPayload(params = this.renderParams(), transition = null) {
+        const cameraMeta = this._nativeCameraOutputMeta(this.params);
         const outputMode = cameraMeta
             ? 'native-camera'
             : this._canUseNativeRenderOutputWindow(this.params)
@@ -8038,42 +8103,14 @@ button:hover{background:#202a35}
             outputMode,
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
-            params: {
-                ...effective,
-                paletteColors: paletteById(params.paletteId)?.colors || [],
-                glyphMode: this._nativeOutputGlyphMode(params),
-                charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
-                sourceMode: this.params.sourceMode,
-                mediaUrl: this.params.mediaUrl,
-                mediaType: this.params.mediaType,
-                sourceName: this.params.sourceName,
-                loop: this.params.loop,
-                muted: this.params.muted,
-                volume: this.params.volume,
-                cameraDeviceLabel: cameraMeta?.deviceLabel || '',
-                cameraSelectedDeviceLabels: cameraMeta?.selectedLabels || [],
-                cameraResolution: this.params.cameraResolution,
-                cameraCaptureWidth: cameraMeta?.captureWidth || null,
-                cameraCaptureHeight: cameraMeta?.captureHeight || null,
-                cameraFps: this.params.cameraFps,
-                cameraMirror: cameraMeta ? this.params.cameraMirror : null,
-                mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
-                // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
-                nativeWtfActive: false,
-                audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
-                audioReactiveSource: this.audioReactive.source,
-                audioReactivePreset: this.audioReactive.preset,
-                audioReactiveSensitivity: this.audioReactive.sensitivity,
-                audioReactiveBeatAmount: this.audioReactive.beatAmount,
-                audioReactiveBassAmount: this.audioReactive.bassAmount,
-                audioReactiveMidAmount: this.audioReactive.midAmount,
-                audioReactiveTrebleAmount: this.audioReactive.trebleAmount,
-                audioReactiveFluxAmount: this.audioReactive.fluxAmount,
-                audioReactivePresenceAmount: this.audioReactive.presenceAmount,
-                audioReactiveDensityDampening: this.audioReactive.densityDampening,
-                audioReactiveNoiseFloor: this.audioReactive.noiseFloor
-            },
-            mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null
+            params: this._nativeOutputParams(params, cameraMeta),
+            mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null,
+            transition: transition ? {
+                kind: transition.kind,
+                startAtUnixMs: transition.startAtUnixMs,
+                durationMs: transition.durationMs,
+                fromParams: this._nativeOutputParams(transition.fromParams, cameraMeta)
+            } : null
         };
     }
 
@@ -8122,8 +8159,9 @@ button:hover{background:#202a35}
         return false;
     }
 
-    _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0) {
+    _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0, options = {}) {
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) return;
+        if (!options.force && (this.nativeOutputTransitionArming || this.nativeOutputTransition)) return;
         const payload = this._nativeOutputPayload(params);
         this.nativeOutputPendingPayload = payload;
         this.nativeOutputPendingMinInterval = Math.max(0, Number(minIntervalMs) || 0);
@@ -8186,6 +8224,77 @@ button:hover{background:#202a35}
         this.nativeOutputPendingPayload = null;
         this.nativeOutputPendingMinInterval = 0;
         this.nativeOutputSyncInFlight = false;
+        this.nativeOutputTransition = null;
+        this.nativeOutputTransitionArming = false;
+    }
+
+    async _armNativeOutputTransition(from, to, durationMs, kind, token) {
+        if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        this.nativeOutputTransitionArming = true;
+        const waitDeadline = performance.now() + 750;
+        while (this.nativeOutputSyncInFlight && performance.now() < waitDeadline) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1));
+        }
+        if (token !== this.transitionToken || this.nativeOutputSyncInFlight) {
+            this.nativeOutputTransitionArming = false;
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        if (this.nativeOutputSyncTimer) {
+            window.clearTimeout(this.nativeOutputSyncTimer);
+            this.nativeOutputSyncTimer = null;
+        }
+        this.nativeOutputPendingPayload = null;
+        this.nativeOutputPendingMinInterval = 0;
+
+        const startAtUnixMs = Date.now() + NATIVE_OUTPUT_TRANSITION_LEAD_MS;
+        const payload = this._nativeOutputPayload(to, {
+            kind,
+            startAtUnixMs,
+            durationMs,
+            fromParams: from
+        });
+        const syncStartedAt = performance.now();
+        this.nativeOutputSyncInFlight = true;
+        this.nativeOutputSyncAttemptCount++;
+        this.nativeOutputTransitionArmAttemptCount++;
+        let ok = false;
+        try {
+            ok = await sendTauriOutputState(payload);
+            if (ok) {
+                this.nativeOutputSyncOkCount++;
+                this.nativeOutputTransitionArmOkCount++;
+                this.nativeOutputLastSyncElapsedMs = performance.now() - syncStartedAt;
+            } else {
+                this.nativeOutputSyncFailedCount++;
+                this.nativeOutputTransitionArmFailedCount++;
+                this.nativeOutputActive = false;
+            }
+        } finally {
+            this.nativeOutputSyncInFlight = false;
+            this.nativeOutputTransitionArming = false;
+        }
+
+        if (!ok || token !== this.transitionToken) {
+            if (!ok) {
+                this._stopNativeOutputMirror();
+                this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputLost');
+                this._updatePopoutButton();
+            }
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        this.nativeOutputTransition = { token, kind, startAtUnixMs, durationMs };
+        return { armed: true, startAtUnixMs };
+    }
+
+    _finishNativeOutputTransition(token, params = this.renderParams()) {
+        if (this.nativeOutputTransition?.token !== token) return;
+        this.nativeOutputTransition = null;
+        this._syncNativeOutputWindow(params, 0, { force: true });
     }
 
     _syncNativeOutputMode(outputMode = this._nativeOutputPayload().outputMode) {
@@ -9325,17 +9434,30 @@ button:hover{background:#202a35}
         return frame;
     }
 
-    _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
+    async _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
         this.transitioning = true;
+        const duration = Math.max(1, seconds * 1000);
+        const nativeTransition = await this._armNativeOutputTransition(
+            from,
+            to,
+            duration,
+            'tween',
+            token
+        );
+        if (token !== this.transitionToken) {
+            this._finishNativeOutputTransition(token, this.renderParams());
+            if (!options.keepTransitioning) this.transitioning = false;
+            return false;
+        }
         return new Promise((resolve) => {
-            const start = performance.now();
-            const duration = Math.max(1, seconds * 1000);
+            const start = performance.now() + Math.max(0, nativeTransition.startAtUnixMs - Date.now());
             const changedKeys = Object.keys(to).filter((key) => to[key] !== from[key]);
             const tweenInputKeys = changedKeys.filter((key) => CLIENT_TWEEN_KEYS.has(key));
             const discreteInputKeys = changedKeys.filter((key) => !CLIENT_TWEEN_KEYS.has(key));
             const updatesBackground = changedKeys.includes('bgBlend');
             let discreteInputsSynced = false;
             const cancel = () => {
+                this._finishNativeOutputTransition(token, this.renderParams());
                 if (!options.keepTransitioning) this.transitioning = false;
                 resolve(false);
             };
@@ -9369,6 +9491,7 @@ button:hover{background:#202a35}
                     this._persist();
                     this._applyVisualState();
                     this._applyEffectiveRendererParams(this.renderParams(), 'transition');
+                    this._finishNativeOutputTransition(token, this.renderParams());
                     if (!options.keepTransitioning) this.transitioning = false;
                     resolve(true);
                 }
@@ -9503,6 +9626,7 @@ button:hover{background:#202a35}
             const cancel = () => {
                 if (finished) return;
                 finished = true;
+                this._finishNativeOutputTransition(token, this.renderParams());
                 runtime.cancelCrossfadeRenderer(prepared);
                 if (active()) this.transitioning = false;
                 resolve(false);
@@ -9512,10 +9636,12 @@ button:hover{background:#202a35}
                 if (finished) return;
                 finished = true;
                 if (!active()) {
+                    this._finishNativeOutputTransition(token, this.renderParams());
                     runtime.cancelCrossfadeRenderer(prepared);
                     resolve(false);
                     return;
                 }
+                this._finishNativeOutputTransition(token, target);
                 runtime.finishCrossfadeRenderer(prepared);
                 this.transitioning = false;
                 resolve(true);
@@ -9548,7 +9674,8 @@ button:hover{background:#202a35}
 
                 await this._ensureStaticVideoPlayback();
                 this.setConnection(this._staticConnectionLabel());
-                this._applyEffectiveRendererParams(this.renderParams(), 'transition');
+                this._applyMainPreviewRendererParams(this.renderParams(), 'transition');
+                this._updatePopoutRendererParams(this.renderParams());
                 this.updateMeters();
                 if (this.popout && !this.popout.closed) {
                     this._restartPopoutOutput().catch((error) => console.warn('[Popout] Restart failed:', error));
@@ -9556,7 +9683,18 @@ button:hover{background:#202a35}
 
                 await this._paintCurrentFrame(3, 1);
 
-                const start = performance.now();
+                const nativeTransition = await this._armNativeOutputTransition(
+                    from,
+                    target,
+                    duration,
+                    'crossfade',
+                    token
+                );
+                if (!active()) {
+                    cancel();
+                    return;
+                }
+                const start = performance.now() + Math.max(0, nativeTransition.startAtUnixMs - Date.now());
                 const step = (now) => {
                     if (!active()) {
                         cancel();
@@ -9575,6 +9713,7 @@ button:hover{background:#202a35}
 
             run().catch((error) => {
                 runtime.cancelCrossfadeRenderer(prepared);
+                this._finishNativeOutputTransition(token, from);
                 if (active()) {
                     this.params = from;
                     this._syncInputs();
