@@ -153,6 +153,9 @@ Security requirements:
   a report.
 - Submission uses the Rust command surface only. The output window must not have
   crash-report permissions.
+- Submission additionally requires both a release-mode binary and the exact
+  production bundle identifier. Optimized Dev/QA packages retain their separate
+  identity and local queue but cannot submit reports.
 - GitHub credentials must not be present in the desktop app, repository config,
   or client-visible bundle.
 

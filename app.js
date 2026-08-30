@@ -16,6 +16,7 @@ import {
     processGpuCellColor,
     shaderHash
 } from './renderers/shared/render-math.js?v=20260804-ascii-today';
+import { safeCanvasImageData } from './renderers/shared/canvas-readback.js?v=20260830-crash-readback';
 import {
     ASCII_TODAY_CHARACTER_SETS,
     CHARACTER_SET_IDS,
@@ -101,7 +102,10 @@ import {
     connectTauriMidi,
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
-import { crashReportUiState } from './renderers/desktop/crash-report-ui.js?v=20260826-reports';
+import {
+    crashReportSourceLabel,
+    crashReportUiState
+} from './renderers/desktop/crash-report-ui.js?v=20260830-crash-context';
 import {
     RendererDiagnosticLog,
     rendererFailureKey,
@@ -2203,8 +2207,11 @@ function errorCrashContext(error) {
 
 function crashReportPreview(state) {
     const reports = Array.isArray(state?.reports) ? state.reports : [];
-    if (!reports.length) return 'No pending diagnostic reports.';
-    return reports.map((report, index) => {
+    const localOnlyNotice = state?.production === false
+        ? 'Development build: reports stay on this device and cannot be submitted.\n\n'
+        : '';
+    if (!reports.length) return `${localOnlyNotice}No pending diagnostic reports.`;
+    return localOnlyNotice + reports.map((report, index) => {
         const context = report.context ? JSON.stringify(report.context, null, 2) : '{}';
         return [
             `#${index + 1} ${report.kind || 'crash'} / ${report.surface || 'unknown'}`,
@@ -3860,10 +3867,12 @@ class CanvasStaticRenderer {
         this.paletteLut = null;
         this.glyphRamp = '';
         this.colorCssCache = new Map();
+        this.readbackBlocked = false;
     }
 
     async start(params, options = {}) {
         this.requestedParams = { ...params };
+        this.readbackBlocked = false;
         this.ownsSource = options.ownsSource !== false;
         this.source = options.source || await loadMediaSource(params.mediaUrl, {
             type: forcedMediaType(params),
@@ -3983,6 +3992,7 @@ class CanvasStaticRenderer {
     }
 
     renderFrame() {
+        if (this.readbackBlocked) return;
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
         const cols = this.params.cols;
@@ -4002,7 +4012,18 @@ class CanvasStaticRenderer {
         } catch {
             return;
         }
-        const img = this.offctx.getImageData(0, 0, sampleWidth, sampleHeight);
+        const img = safeCanvasImageData(
+            this.offctx,
+            0,
+            0,
+            sampleWidth,
+            sampleHeight,
+            (error) => {
+                this.readbackBlocked = true;
+                console.info('[CanvasRenderer] Source pixel readback unavailable:', error);
+            }
+        );
+        if (!img) return;
         const data = img.data;
         const ctx = this.ctx;
         const time = this.frameCount / Math.max(1, this.params.fps || DEFAULT_PARAMS.fps);
@@ -5613,12 +5634,9 @@ class RendererLabApp {
                 message: event.message || errorMessage(event.error),
                 stack: errorStack(event.error),
                 context: {
-                    filename: event.filename || '',
+                    source: crashReportSourceLabel(event.filename),
                     lineno: event.lineno || 0,
                     colno: event.colno || 0,
-                    backend: this.params.backend,
-                    sourceMode: this.params.sourceMode,
-                    nativeOutputActive: this.nativeOutputActive,
                     ...errorCrashContext(event.error)
                 }
             }).catch((error) => console.warn('[CrashReporter] Window error capture failed:', error));
@@ -5629,18 +5647,28 @@ class RendererLabApp {
                 surface: 'frontend',
                 message: errorMessage(event.reason),
                 stack: errorStack(event.reason),
-                context: {
-                    backend: this.params.backend,
-                    sourceMode: this.params.sourceMode,
-                    nativeOutputActive: this.nativeOutputActive,
-                    ...errorCrashContext(event.reason)
-                }
+                context: errorCrashContext(event.reason)
             }).catch((error) => console.warn('[CrashReporter] Rejection capture failed:', error));
         });
         await this._refreshCrashReportState();
-        if (this.crashReportState?.preference === 'always' && this.crashReportState?.pendingCount > 0) {
+        if (this.crashReportState?.production
+            && this.crashReportState?.preference === 'always'
+            && this.crashReportState?.pendingCount > 0) {
             await this._sendCrashReports({ automatic: true });
         }
+    }
+
+    _crashReportContext() {
+        const stats = this.staticRuntime?.getStats?.() || {};
+        return {
+            backend: this.params.backend,
+            requestedBackend: this.params.backend,
+            actualBackend: stats.backend || '',
+            presetId: this.activePresetId || '',
+            sourceMode: this.params.sourceMode,
+            mediaType: this.params.mediaType,
+            nativeOutputActive: this.nativeOutputActive
+        };
     }
 
     async _captureCrashReport(report) {
@@ -5648,15 +5676,12 @@ class RendererLabApp {
         const state = await captureTauriCrashReport({
             ...report,
             context: {
-                backend: this.params.backend,
-                sourceMode: this.params.sourceMode,
-                mediaType: this.params.mediaType,
-                nativeOutputActive: this.nativeOutputActive,
+                ...this._crashReportContext(),
                 ...(report.context || {})
             }
         });
         this._setCrashReportState(state);
-        if (state?.preference === 'always' && state?.pendingCount > 0) {
+        if (state?.production && state?.preference === 'always' && state?.pendingCount > 0) {
             await this._sendCrashReports({ automatic: true });
         }
     }
@@ -5763,7 +5788,9 @@ class RendererLabApp {
         if (!isTauriRuntime()) return;
         try {
             this._setCrashReportState(await setTauriCrashReportPreference(value));
-            if (value === 'always' && this.crashReportState?.pendingCount > 0) {
+            if (value === 'always'
+                && this.crashReportState?.production
+                && this.crashReportState?.pendingCount > 0) {
                 await this._sendCrashReports({ automatic: true });
             }
         } catch (error) {
@@ -5773,6 +5800,7 @@ class RendererLabApp {
 
     async _sendCrashReports(options = {}) {
         if (!isTauriRuntime() || this.crashReportBusy) return;
+        if (!this.crashReportState?.production) return;
         if (this.crashReportState?.preference === 'off') return;
         this.crashReportBusy = true;
         this._syncCrashReportUi();

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import {
+  crashReportSourceLabel,
   crashReportUiState,
   isCrashReportControlLabel,
   pendingCrashReportCount
@@ -14,9 +15,12 @@ assert.equal(isCrashReportControlLabel('Reports'), true);
 assert.equal(isCrashReportControlLabel('Reports 2'), true);
 assert.equal(isCrashReportControlLabel('Reports 0'), false);
 assert.equal(isCrashReportControlLabel('Crash 2'), false);
+assert.equal(crashReportSourceLabel('tauri://localhost/app.js?v=123#frame'), 'app.js');
+assert.equal(crashReportSourceLabel('/Users/alice/private/app.js'), 'app.js');
+assert.equal(crashReportSourceLabel('C:\\Users\\alice\\app bundle.js'), 'app_bundle.js');
 
 assert.deepEqual(
-  crashReportUiState({ tauri: false, state: { available: true, pendingCount: 0, preference: 'ask' } }),
+  crashReportUiState({ tauri: false, state: { available: true, production: false, pendingCount: 0, preference: 'ask' } }),
   {
     hidden: true,
     pending: false,
@@ -29,7 +33,7 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  crashReportUiState({ tauri: true, state: { available: true, pendingCount: 0, preference: 'ask' } }),
+  crashReportUiState({ tauri: true, state: { available: true, production: true, pendingCount: 0, preference: 'ask' } }),
   {
     hidden: false,
     pending: false,
@@ -42,7 +46,7 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  crashReportUiState({ tauri: true, state: { available: true, pendingCount: 2, preference: 'ask' } }),
+  crashReportUiState({ tauri: true, state: { available: true, production: true, pendingCount: 2, preference: 'ask' } }),
   {
     hidden: false,
     pending: true,
@@ -56,13 +60,21 @@ assert.deepEqual(
 
 const disabled = crashReportUiState({
   tauri: true,
-  state: { available: true, pendingCount: 1, preference: 'off' },
+  state: { available: true, production: true, pendingCount: 1, preference: 'off' },
   busy: true
 });
 assert.equal(disabled.hidden, false);
 assert.equal(disabled.label, 'Reports 1');
 assert.equal(disabled.sendDisabled, true);
 assert.equal(disabled.discardDisabled, true);
+
+const localOnly = crashReportUiState({
+  tauri: true,
+  state: { available: true, production: false, pendingCount: 1, preference: 'ask' }
+});
+assert.equal(localOnly.title, '1 pending local-only diagnostic report');
+assert.equal(localOnly.sendDisabled, true);
+assert.equal(localOnly.discardDisabled, false);
 
 assert.equal(
   isReportableTauriCommandFailure(

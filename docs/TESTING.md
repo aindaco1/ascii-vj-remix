@@ -27,6 +27,7 @@ npm run test:frame-prep          # Rust/JS frame-prep parity
 npm run test:decode-resize       # Decode/resize parity checks
 npm run check:media              # Media pipeline checks
 npm run test:render-math         # Shared renderer math vectors
+npm run test:canvas-readback     # Contained success and blocked Canvas2D readback
 npm run test:renderer-fallback   # GPU-to-Canvas fallback and bounded diagnostics
 npm run test:audio-reactive      # Audio-reactive controls, clamps, dense-mix damping
 npm run test:midi                # UC-33e map, scaling, pickup, actions, coalescing

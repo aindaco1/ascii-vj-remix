@@ -5,6 +5,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 const CRASH_RELAY_ENDPOINT: &str = "https://crash.dustwave.xyz/v1/reports";
 const APP_IDENTIFIER: &str = "com.asciline.remix";
@@ -138,7 +139,7 @@ pub async fn submit_crash_reports<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<CrashReportState, String> {
     import_panic_reports(&app)?;
-    let production = production_submission_enabled();
+    let production = production_submission_enabled(&app);
     let mut queue = read_queue(&app)?;
     if !production {
         return state(
@@ -228,8 +229,12 @@ pub async fn submit_crash_reports<R: Runtime>(
     )
 }
 
-fn production_submission_enabled() -> bool {
-    !cfg!(debug_assertions)
+fn production_submission_enabled_for(identifier: &str, debug_assertions: bool) -> bool {
+    !debug_assertions && identifier == APP_IDENTIFIER
+}
+
+fn production_submission_enabled<R: Runtime>(app: &AppHandle<R>) -> bool {
+    production_submission_enabled_for(&app.config().identifier, cfg!(debug_assertions))
 }
 
 fn state<R: Runtime>(
@@ -239,7 +244,7 @@ fn state<R: Runtime>(
     let reports = read_queue(app)?;
     Ok(CrashReportState {
         available: true,
-        production: production_submission_enabled(),
+        production: production_submission_enabled(app),
         endpoint: CRASH_RELAY_ENDPOINT.to_string(),
         preference: read_preference(app)?.mode,
         pending_count: reports.len(),
@@ -249,17 +254,13 @@ fn state<R: Runtime>(
 }
 
 fn relay_app<R: Runtime>(app: &AppHandle<R>) -> RelayApp {
+    let production = production_submission_enabled(app);
     RelayApp {
         name: app.package_info().name.to_string(),
         version: app.package_info().version.to_string(),
-        identifier: APP_IDENTIFIER.to_string(),
-        channel: "production".to_string(),
-        build_profile: if production_submission_enabled() {
-            "release"
-        } else {
-            "debug"
-        }
-        .to_string(),
+        identifier: app.config().identifier.clone(),
+        channel: if production { "production" } else { "development" }.to_string(),
+        build_profile: if cfg!(debug_assertions) { "debug" } else { "release" }.to_string(),
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
     }
@@ -375,7 +376,23 @@ fn sensitive_part(part: &str) -> bool {
         || lower.contains("/private/")
         || lower.contains("/tmp/")
         || lower.contains("\\users\\")
-        || lower.contains('@')
+        || contains_email_address(part)
+}
+
+fn contains_email_address(part: &str) -> bool {
+    let trimmed = part.trim_matches(|ch: char| {
+        matches!(ch, '<' | '>' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';' | ':' | '"' | '\'')
+    });
+    let Some((local, domain)) = trimmed.rsplit_once('@') else {
+        return false;
+    };
+    let Some(tld) = domain.rsplit('.').next() else {
+        return false;
+    };
+    !local.is_empty()
+        && domain.contains('.')
+        && tld.len() >= 2
+        && tld.chars().all(|ch| ch.is_ascii_alphabetic())
 }
 
 fn sanitize_value(value: Value, depth: usize) -> Value {
@@ -535,12 +552,17 @@ fn now_millis() -> u128 {
 }
 
 fn now_isoish() -> String {
-    format!("{}ms", now_millis())
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_else(|_| format!("{}ms", now_millis()))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{sanitize_report, sanitize_text, CrashReportInput};
+    use super::{
+        production_submission_enabled_for, sanitize_report, sanitize_text, CrashReportInput,
+        APP_IDENTIFIER,
+    };
     use serde_json::json;
 
     #[test]
@@ -562,11 +584,30 @@ mod tests {
         assert!(report.stack.contains("[redacted]"));
         assert_eq!(report.context["token"], "[redacted]");
         assert_eq!(report.context["mediaUrl"], "[redacted]");
+        assert!(report.captured_at.contains('T'));
+        assert!(report.captured_at.ends_with('Z'));
     }
 
     #[test]
     fn sanitizer_bounds_long_text() {
         let sanitized = sanitize_text(&"a".repeat(2000), 100);
         assert!(sanitized.ends_with("[truncated]"));
+    }
+
+    #[test]
+    fn sanitizer_preserves_native_javascript_frames_but_redacts_emails() {
+        let sanitized = sanitize_text(
+            "global code@[native code] contact alice@example.com",
+            200,
+        );
+        assert!(sanitized.contains("global code@[native code]"));
+        assert!(sanitized.ends_with("[redacted]"));
+    }
+
+    #[test]
+    fn submission_requires_release_mode_and_the_production_identifier() {
+        assert!(production_submission_enabled_for(APP_IDENTIFIER, false));
+        assert!(!production_submission_enabled_for(APP_IDENTIFIER, true));
+        assert!(!production_submission_enabled_for("com.asciline.remix.dev", false));
     }
 }

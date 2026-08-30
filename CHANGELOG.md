@@ -31,6 +31,14 @@
 
 ### Fixed
 
+- Bound remote crash submission to both the production bundle identifier and a
+  release build. Optimized `ASCII VJ Remix Dev` QA packages now keep reports
+  local, label that state in the Reports UI, and cannot submit as production.
+- Added real RFC 3339 capture timestamps plus safe script/line/column and
+  requested/resolved renderer context to diagnostic issues without exposing
+  local paths. Native WebKit stack frames are no longer mistaken for emails.
+- Contained blocked Canvas2D pixel readback, including WebKit `SecurityError`
+  code 18, inside the renderer instead of escalating it as a global app error.
 - Added Linux-owned 1000x680 startup geometry with a 900x600 minimum instead of
   inheriting the larger macOS/Windows window, while deriving the development
   window title from its product identity rather than duplicating geometry.

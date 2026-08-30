@@ -209,6 +209,8 @@ and requires a manually captured and verified hardware profile.
 - The Reports control remains visible when no crash reports are pending so the
   `ask`, `always`, and `off` preference is always reachable. A pending count and
   warning state appear only after a bounded, sanitized report is captured.
+  Development bundles retain reports locally for review and keep Send disabled;
+  only a release-mode build with the production bundle identifier may submit.
 - Public 0.10.0 macOS artifacts are Developer ID signed, notarized, stapled, and
   Gatekeeper-validated. Public 0.10.0 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`

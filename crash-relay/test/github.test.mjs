@@ -22,6 +22,9 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
       context: {
         phase: 'preset-transition',
         presetId: 'palette-signal-court',
+        source: 'app.js',
+        lineno: 4021,
+        colno: 33,
         backend: 'webgpu',
         requestedBackend: 'webgpu',
         actualBackend: 'canvas2d',
@@ -57,6 +60,9 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
   assert.match(body, /basis: `error-code`/);
   assert.match(body, /macos\/aarch64: 2/);
   assert.match(body, /presetId: `palette-signal-court`/);
+  assert.match(body, /source: `app\.js`/);
+  assert.match(body, /lineno: `4021`/);
+  assert.match(body, /colno: `33`/);
   assert.match(body, /## Renderer Diagnostics/);
   assert.match(body, /"event": "fallback-active"/);
   assert.equal(parseState(body, 'abc123').count, 2);
