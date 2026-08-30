@@ -31,12 +31,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            curl \
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             libasound2-dev \
             librsvg2-dev \
+            nasm \
             patchelf \
-            libssl-dev
+            libssl-dev \
+            xz-utils \
+            yasm
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -52,6 +58,36 @@ jobs:
 
       - name: Verify desktop build
         run: npm run check:desktop
+
+      - name: Install Windows FFmpeg build prerequisites
+        if: runner.os == 'Windows' && github.event_name == 'pull_request'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: >-
+            base-devel
+            diffutils
+            curl
+            tar
+            xz
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-nasm
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-yasm
+
+      - name: Build verified Windows FFmpeg sidecars
+        if: runner.os == 'Windows' && github.event_name == 'pull_request'
+        shell: msys2 {0}
+        env:
+          ASCILINE_FFMPEG_BUILD_DIR: /tmp/asciline-ffmpeg
+        run: npm run ffmpeg:build-sidecar
+
+      - name: Build verified Linux FFmpeg sidecars
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        shell: bash
+        run: npm run ffmpeg:build-sidecar
 
       - name: Build unsigned Windows test installer
         if: runner.os == 'Windows' && github.event_name == 'pull_request'

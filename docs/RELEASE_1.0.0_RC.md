@@ -32,9 +32,9 @@ acceptance, and public release state.
 | Release runtime gate | Pass | Pinned FFmpeg 8.1.2 Apple Silicon resources are staged and `npm run check:release` passes. |
 | Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources. |
 | Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, zero failures. |
-| Windows CI installer | Pending | Draft-PR Windows gate must build the unsigned release-profile development EXE/MSI and pass the GUI-subsystem check. |
+| Windows CI installer | Pending | Draft-PR Windows gate must build the pinned FFmpeg resources, unsigned release-profile development EXE/MSI, and pass the GUI-subsystem check. |
 | Windows physical QA | Pending | Install and exercise the development artifact on the Windows 11 Pro / RTX 2070 machine. |
-| Linux CI packages | Pending | Draft-PR Ubuntu 24.04 gate must build the development AppImage/deb/rpm artifact. |
+| Linux CI packages | Pending | Draft-PR Ubuntu 24.04 gate must build the pinned FFmpeg resources and development AppImage/deb/rpm artifact. |
 | Linux VM QA | Pending | Create Ubuntu 24.04 and Fedora 44 Hyper-V guests and execute [Linux VM QA](LINUX_VM_QA.md). |
 | Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
 
