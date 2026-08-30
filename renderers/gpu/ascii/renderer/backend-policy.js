@@ -1,21 +1,10 @@
 /**
  * Keep renderer backend selection deterministic and outside the frame loop.
  *
- * Apple WebKit and Windows WebView2 can expose browser GPU APIs while still
- * producing an empty primary glyph-atlas surface. The primary runtime uses the
- * policy below to choose its bounded Canvas2D glyph path.
+ * Windows WebView2 can expose browser GPU APIs while still producing an empty
+ * primary glyph surface. The primary runtime uses the policy below to choose
+ * its bounded Canvas2D glyph path until that host is physically revalidated.
  */
-
-function isAppleWebKitUserAgent(userAgent = '') {
-    return /AppleWebKit\//.test(userAgent) &&
-        !/(?:Chrome|Chromium|CriOS|Edg|OPR)\//.test(userAgent);
-}
-
-function needsWebKitCanvasGlyphPreview(options = {}, userAgent = '') {
-    return isAppleWebKitUserAgent(userAgent) &&
-        options.glyphMode !== false &&
-        options.solidMode !== true;
-}
 
 function isWindowsWebViewUserAgent(userAgent = '') {
     return /Windows NT/.test(userAgent) &&
@@ -26,7 +15,6 @@ function isWindowsWebViewUserAgent(userAgent = '') {
 function glyphPreviewCompatibilityReason(options = {}, userAgent = '', tauriRuntime = false) {
     const usesGlyphAtlas = options.glyphMode !== false && options.solidMode !== true;
     if (!usesGlyphAtlas) return '';
-    if (isAppleWebKitUserAgent(userAgent)) return 'apple-webkit-glyph';
     if (tauriRuntime && isWindowsWebViewUserAgent(userAgent)) return 'windows-webview2-glyph';
     return '';
 }
@@ -48,9 +36,7 @@ function selectRendererBackend(capabilities, options = {}) {
 
 export {
     glyphPreviewCompatibilityReason,
-    isAppleWebKitUserAgent,
     isWindowsWebViewUserAgent,
     needsCompatibilityCanvasGlyphPreview,
-    needsWebKitCanvasGlyphPreview,
     selectRendererBackend
 };

@@ -257,12 +257,11 @@ active backend are hidden or disabled.
 
 Backend choice is resolved once per renderer construction in
 `renderers/gpu/ascii/renderer/backend-policy.js`; it is not evaluated in the
-frame loop. The macOS Apple WebKit primary view uses the bounded Canvas2D path
-for glyph mode even when a browser GPU backend is available or manually
-requested, because both browser GPU glyph-atlas paths can expose a live
-renderer while presenting an empty canvas there. Solid/pixel primary presets
-can still use WebGPU, and glyph mode retains browser GPU rendering on compatible
-runtimes. Native Pop Out backend selection is separate and unchanged.
+frame loop. The macOS Apple WebKit primary view uses WebGPU for
+acceleration-eligible glyph presets. Windows WebView2 retains the bounded
+Canvas2D glyph policy because its browser GPU paths can expose a live renderer
+while presenting an empty canvas. Native Pop Out backend selection is separate
+and unchanged.
 
 ## WebGPU Renderer
 
@@ -307,10 +306,14 @@ external texture and creates its source-dependent compute binding per frame;
 that resource is frame-scoped by WebGPU. Grid/source rebuilds create a new
 renderer and therefore a new complete resource set.
 
-The glyph renderer uses Unicode scalar ids in a 96-entry storage buffer and a
-16-layer R8 texture array. Atlas pages are generated offline, locally bundled,
-and loaded on demand. Live audio/transition updates compare a compact glyph
-input key before resolving ramps or touching atlas resources.
+The glyph renderer decodes only atlas pages needed by the active ramp, then
+packs up to 96 Unicode-scalar masks and their five max-coverage levels into a
+two-row 768x62 RGBA texture. Keeping the compact width below 1024 pixels avoids
+the Apple WebKit wide-upload boundary while retaining constant-time texture
+lookup in the fragment pass. Atlas pages are generated offline, locally
+bundled, and loaded through their asset URLs. Live audio/transition updates
+compare a compact glyph input key before resolving ramps or touching atlas
+resources.
 
 ## WebGL2 Renderer
 
@@ -327,15 +330,14 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
   queried again during each frame.
 
 WebGL2 is the most important browser GPU fallback because it is widely available
-on machines that do not expose WebGPU. The macOS Apple WebKit primary glyph
-view currently uses Canvas2D instead of either browser GPU atlas path.
+on machines that do not expose WebGPU.
 
 The clean-profile visual default and renderer preference have separate owners:
 Classic Camera ASCII supplies the initial visual parameters, while the global
 backend remains Auto. A built-in preset inherits Auto unless it explicitly
 declares a compatibility backend. This keeps solid/pixel presets on WebGPU or
-WebGL2 without changing the intentional Canvas2D routing for affected packaged
-glyph surfaces.
+WebGL2 while preserving intentional Canvas2D ownership for traditional text
+presets and Paper Shredder.
 
 `StaticRuntime` treats GPU construction as a recoverable operation. If the
 requested WebGPU/WebGL2 renderer cannot initialize, it creates the equivalent

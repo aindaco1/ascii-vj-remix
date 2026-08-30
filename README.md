@@ -72,6 +72,10 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU renderer is the primary quality target on capable desktop runtimes.
 - WebGL2 renderer is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas paths remain compatibility fallbacks.
+- The packaged macOS view renders acceleration-eligible glyph presets through
+  WebGPU; presets with an explicit compatibility backend retain Canvas2D.
+  Windows WebView2 keeps its bounded glyph-to-Canvas policy pending another
+  physical Windows renderer validation.
 - Native Tauri output window uses a `wgpu` presenter where available:
   - Metal on macOS.
   - D3D12 on Windows.

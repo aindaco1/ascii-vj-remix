@@ -34,8 +34,17 @@
 - Decoupled the clean-profile Classic Camera ASCII look from the global
   renderer preference. Built-ins that do not explicitly request a compatibility
   backend now start from Auto and resolve to WebGPU/WebGL2 when available,
-  while the bounded Apple WebKit and Windows WebView2 glyph fallback remains in
-  place.
+  while the bounded Windows WebView2 glyph fallback remains in place.
+- Restored real WebGPU glyph rendering in the packaged macOS Apple WebKit view.
+  Glyph pages now decode through the bundled asset URL and compact the active
+  maximum-96-scalar ramp plus its coverage mips into a two-row RGBA texture
+  below WebKit's problematic wide-texture boundary. The installed preset sweep
+  resolves 41 built-ins to WebGPU and 28 intentional compatibility presets to
+  Canvas2D, with all 69 visible; Paper Shredder explicitly retains Canvas2D to
+  preserve the look it predates glyph-atlas parity with.
+- Increased the packaged preset sweep's primary-canvas sample resolution so
+  sparse Braille, kana, Hangul, and box-drawing strokes are evaluated before
+  thumbnail downsampling can average them away.
 - Synchronized primary-view and native Pop Out transitions on one timestamped
   clock. Numeric transitions now use the same easing progress on both surfaces,
   renderer-family changes use the same crossfade curve, and native presentation

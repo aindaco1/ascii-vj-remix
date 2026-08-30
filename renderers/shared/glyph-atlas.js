@@ -9,6 +9,11 @@ const GLYPH_ATLAS_PAGE_GLYPHS = GLYPH_ATLAS_PAGE_COLUMNS * GLYPH_ATLAS_PAGE_COLU
 const GLYPH_ATLAS_PAGE_COUNT = 16;
 const GLYPH_ATLAS_CACHE_LIMIT = 4;
 const GLYPH_RAMP_LIMIT = 96;
+const GLYPH_RAMP_TEXTURE_LEVEL_Y = Object.freeze([0, 16, 24, 28, 30]);
+const GLYPH_RAMP_TEXTURE_COLUMNS = 48;
+const GLYPH_RAMP_TEXTURE_ROW_HEIGHT = GLYPH_ATLAS_TILE_SIZE * 2 - 1;
+const GLYPH_RAMP_TEXTURE_WIDTH = GLYPH_ATLAS_TILE_SIZE * GLYPH_RAMP_TEXTURE_COLUMNS;
+const GLYPH_RAMP_TEXTURE_HEIGHT = GLYPH_RAMP_TEXTURE_ROW_HEIGHT * Math.ceil(GLYPH_RAMP_LIMIT / GLYPH_RAMP_TEXTURE_COLUMNS);
 const glyphPageCache = new Map();
 const glyphMipCache = new WeakMap();
 
@@ -53,28 +58,14 @@ function glyphAtlasPageUrl(page, ownerDocument = globalThis.document) {
 
 async function decodeGlyphPage(page, ownerDocument) {
     const url = glyphAtlasPageUrl(page, ownerDocument);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`glyph atlas page ${page} failed: HTTP ${response.status}`);
-    const blob = await response.blob();
     const ownerWindow = ownerDocument?.defaultView || globalThis;
-    let image;
-    if (typeof ownerWindow.createImageBitmap === 'function') {
-        image = await ownerWindow.createImageBitmap(blob);
-    } else {
-        image = await new Promise((resolve, reject) => {
-            const element = new ownerWindow.Image();
-            const objectUrl = ownerWindow.URL.createObjectURL(blob);
-            element.onload = () => {
-                ownerWindow.URL.revokeObjectURL(objectUrl);
-                resolve(element);
-            };
-            element.onerror = () => {
-                ownerWindow.URL.revokeObjectURL(objectUrl);
-                reject(new Error(`glyph atlas page ${page} could not be decoded`));
-            };
-            element.src = objectUrl;
-        });
-    }
+    const image = await new Promise((resolve, reject) => {
+        const element = new ownerWindow.Image();
+        element.decoding = 'async';
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error(`glyph atlas page ${page} could not be decoded`));
+        element.src = url;
+    });
     if (image.width !== GLYPH_ATLAS_PAGE_SIZE || image.height !== GLYPH_ATLAS_PAGE_SIZE) {
         image.close?.();
         throw new Error(`glyph atlas page ${page} has unexpected dimensions`);
@@ -93,6 +84,46 @@ async function decodeGlyphPage(page, ownerDocument) {
         alpha[target] = rgba[source];
     }
     return alpha;
+}
+
+function buildGlyphRampTexture(ramp, pagePixels) {
+    const texture = new Uint8Array(GLYPH_RAMP_TEXTURE_WIDTH * GLYPH_RAMP_TEXTURE_HEIGHT * 4);
+    const codePoints = Array.from(ramp || []).slice(0, GLYPH_RAMP_LIMIT);
+    const pageMips = new Map();
+    for (const page of glyphAtlasPagesForRamp(codePoints)) {
+        const pixels = pagePixels?.get?.(page);
+        if (pixels) pageMips.set(page, glyphAtlasMipLevels(pixels));
+    }
+
+    for (const [rampIndex, codePoint] of codePoints.entries()) {
+        const page = Math.floor(Number(codePoint) / GLYPH_ATLAS_PAGE_GLYPHS);
+        const levels = pageMips.get(page);
+        if (!levels) continue;
+        const slot = Number(codePoint) % GLYPH_ATLAS_PAGE_GLYPHS;
+        const slotX = slot % GLYPH_ATLAS_PAGE_COLUMNS;
+        const slotY = Math.floor(slot / GLYPH_ATLAS_PAGE_COLUMNS);
+        const targetX = (rampIndex % GLYPH_RAMP_TEXTURE_COLUMNS) * GLYPH_ATLAS_TILE_SIZE;
+        const targetRowY = Math.floor(rampIndex / GLYPH_RAMP_TEXTURE_COLUMNS) * GLYPH_RAMP_TEXTURE_ROW_HEIGHT;
+
+        for (let level = 0; level < GLYPH_ATLAS_MIP_LEVEL_COUNT; level++) {
+            const tileSize = GLYPH_ATLAS_TILE_SIZE >> level;
+            const pageSize = GLYPH_ATLAS_PAGE_SIZE >> level;
+            const sourceX = slotX * tileSize;
+            const sourceY = slotY * tileSize;
+            const targetY = targetRowY + GLYPH_RAMP_TEXTURE_LEVEL_Y[level];
+            for (let y = 0; y < tileSize; y++) {
+                for (let x = 0; x < tileSize; x++) {
+                    const value = levels[level][(sourceY + y) * pageSize + sourceX + x];
+                    const target = ((targetY + y) * GLYPH_RAMP_TEXTURE_WIDTH + targetX + x) * 4;
+                    texture[target] = value;
+                    texture[target + 1] = value;
+                    texture[target + 2] = value;
+                    texture[target + 3] = 255;
+                }
+            }
+        }
+    }
+    return texture;
 }
 
 function loadGlyphAtlasPage(page, ownerDocument = globalThis.document) {
@@ -161,6 +192,12 @@ export {
     GLYPH_ATLAS_STYLE,
     GLYPH_ATLAS_TILE_SIZE,
     GLYPH_RAMP_LIMIT,
+    GLYPH_RAMP_TEXTURE_COLUMNS,
+    GLYPH_RAMP_TEXTURE_HEIGHT,
+    GLYPH_RAMP_TEXTURE_LEVEL_Y,
+    GLYPH_RAMP_TEXTURE_ROW_HEIGHT,
+    GLYPH_RAMP_TEXTURE_WIDTH,
+    buildGlyphRampTexture,
     glyphAtlasPageUrl,
     glyphAtlasMipLevels,
     glyphAtlasPagesForRamp,

@@ -141,7 +141,9 @@ npm run smoke:ui-perf
 
 For primary preset changes, `npm run smoke:primary-presets` is the installed
 Apple WebKit acceptance gate. The Chromium `smoke:static` matrix remains useful
-but does not substitute for this desktop sweep.
+but does not substitute for this desktop sweep. The signal sampler retains a
+960x540 ceiling so sparse one-pixel Unicode masks are evaluated before a small
+thumbnail can average them into the background.
 
 Native log analysis reports both source upload and upload-skip rates. A healthy
 24 FPS source on a 60 Hz display uploads near source rate and skips
@@ -219,7 +221,7 @@ The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
 separately requires GPU-eligible presets to remain accelerated while validating
-the Apple WebKit or Windows WebView2 Canvas glyph policy.
+Apple WebKit WebGPU output and the Windows WebView2 Canvas glyph policy.
 
 ### FFmpeg and Media Engine
 

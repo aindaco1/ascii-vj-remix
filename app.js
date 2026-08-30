@@ -861,6 +861,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.7,
         params: {
+            backend: 'canvas2d',
             cols: 240,
             cellWidth: 8,
             cellHeight: 12,
@@ -2719,8 +2720,8 @@ function canvasVisualSignal(canvas) {
     const empty = { visible: false, maxLuma: 0, avgLuma: 0, visibleRatio: 0 };
     if (!canvas?.width || !canvas?.height) return empty;
     const sample = document.createElement('canvas');
-    sample.width = Math.min(120, canvas.width);
-    sample.height = Math.min(90, canvas.height);
+    sample.width = Math.min(960, canvas.width);
+    sample.height = Math.min(540, canvas.height);
     const ctx = sample.getContext('2d', { willReadFrequently: true });
     if (!ctx) return empty;
 
