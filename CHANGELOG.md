@@ -34,10 +34,11 @@
 - Added Linux-owned 1000x680 startup geometry with a 900x600 minimum instead of
   inheriting the larger macOS/Windows window, while deriving the development
   window title from its product identity rather than duplicating geometry.
-- Re-encoded the built-in Demo Video as VP8/WebM so clean Ubuntu and Fedora
-  webviews do not depend on optional H.264 GStreamer codecs. User-selected
-  videos now retry through the bundled FFmpeg decoder if the platform decoder
-  rejects them.
+- Added platform-owned built-in Demo Video formats: H.264/MP4 for macOS and
+  Windows webviews, and VP8/WebM for clean Ubuntu and Fedora installations that
+  lack optional H.264 GStreamer codecs. Existing saved Demo Video selections
+  migrate to the correct platform asset, while user-selected videos retry
+  through bundled FFmpeg if the platform decoder rejects them.
 - Treat unavailable or disconnected microphone devices as an expected hardware
   condition. The app can attempt its browser fallback and no longer queues a
   crash report merely because a VM has no usable microphone.

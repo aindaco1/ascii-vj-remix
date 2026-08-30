@@ -55,7 +55,8 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 ### Sources
 
 - Built-in Demo Image, used as the default startup source.
-- Built-in VP8/WebM Demo Video for clean-install Linux webview compatibility.
+- Built-in H.264/MP4 Demo Video on macOS and Windows, with a matching VP8/WebM
+  asset selected on clean Linux installations.
 - User-selected local image and video files.
 - MKV selection support in the desktop file picker. If the platform webview
   cannot decode a selected video, the desktop app retries it through the

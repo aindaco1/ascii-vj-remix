@@ -51,8 +51,10 @@ chooses the best backend for the active source and environment.
 The visible built-ins are:
 
 - Demo Image: `media/demo.svg`.
-- Demo Video: `media/demo-video-2.webm` (VP8, chosen so clean Linux webviews do
-  not require an optional H.264 GStreamer plugin).
+- Demo Video: `media/demo-video-2.mp4` (H.264) on macOS and Windows, and
+  `media/demo-video-2.webm` (VP8) on Linux so clean Linux webviews do not
+  require an optional H.264 GStreamer plugin. Both URLs represent the same
+  logical built-in source; saved selections normalize to the current platform.
 
 Additional bundled media files remain hidden development fixtures for parity
 tests and performance smoke tests.

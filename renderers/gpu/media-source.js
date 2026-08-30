@@ -9,6 +9,21 @@ const MEDIA_EXTENSIONS = {
 };
 
 const TIFF_EXTENSIONS = ['.tif', '.tiff'];
+const BUNDLED_DEMO_VIDEO_URLS = Object.freeze({
+    mp4: 'media/demo-video-2.mp4',
+    webm: 'media/demo-video-2.webm'
+});
+
+function bundledDemoVideoUrl(userAgent = globalThis.navigator?.userAgent || '') {
+    const normalized = String(userAgent || '');
+    const linuxDesktop = /\bLinux\b/i.test(normalized) && !/Android|CrOS/i.test(normalized);
+    return linuxDesktop ? BUNDLED_DEMO_VIDEO_URLS.webm : BUNDLED_DEMO_VIDEO_URLS.mp4;
+}
+
+function isBundledDemoVideoUrl(url) {
+    const normalized = String(url || '');
+    return Object.values(BUNDLED_DEMO_VIDEO_URLS).includes(normalized);
+}
 
 function detectMediaType(url) {
     const lower = url.toLowerCase();
@@ -268,4 +283,11 @@ function makeImageResult(img, canvas, width, height) {
     };
 }
 
-export { loadMediaSource, detectMediaType, MEDIA_EXTENSIONS };
+export {
+    BUNDLED_DEMO_VIDEO_URLS,
+    bundledDemoVideoUrl,
+    isBundledDemoVideoUrl,
+    loadMediaSource,
+    detectMediaType,
+    MEDIA_EXTENSIONS
+};

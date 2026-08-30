@@ -601,6 +601,32 @@ async function runSmoke() {
         );
       }
     }
+    const demoVideoPolicy = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      const linuxDesktop = /\bLinux\b/i.test(navigator.userAgent) && !/Android|CrOS/i.test(navigator.userAgent);
+      const expected = linuxDesktop ? 'media/demo-video-2.webm' : 'media/demo-video-2.mp4';
+      const alternate = linuxDesktop ? 'media/demo-video-2.mp4' : 'media/demo-video-2.webm';
+      const selected = app?.params?.mediaUrl || '';
+      await app?._switchStaticSource?.({
+        sourceMode: 'static',
+        mediaUrl: alternate,
+        mediaType: 'video',
+        sourceName: 'Demo Video'
+      });
+      return {
+        expected,
+        selected,
+        migrated: app?.params?.mediaUrl || '',
+        active: document.querySelector('#source-list [data-source-id="demo-video"]')?.getAttribute('aria-selected')
+      };
+    });
+    if (
+      demoVideoPolicy.selected !== demoVideoPolicy.expected ||
+      demoVideoPolicy.migrated !== demoVideoPolicy.expected ||
+      demoVideoPolicy.active !== 'true'
+    ) {
+      throw new Error(`Demo Video should select and migrate to the platform media asset: ${JSON.stringify(demoVideoPolicy)}`);
+    }
     const liveFamilyTransition = await page.evaluate(async () => {
       const app = window.ascilineRemix;
       const source = app?._staticMediaSource?.();

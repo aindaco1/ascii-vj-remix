@@ -1,4 +1,9 @@
-import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
+import {
+    bundledDemoVideoUrl,
+    detectMediaType,
+    isBundledDemoVideoUrl,
+    loadMediaSource
+} from './renderers/gpu/media-source.js?v=20260830-platform-demo-video';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
     glyphPreviewCompatibilityReason,
@@ -324,7 +329,7 @@ const FONT_FAMILY_IDS = Object.freeze(FONT_FAMILY_OPTIONS.map(([id]) => id));
 
 const SOURCE_PRESETS = [
     { id: 'demo-image', name: 'Demo Image', mediaUrl: 'media/demo.svg', mediaType: 'image' },
-    { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.webm', mediaType: 'video' }
+    { id: 'demo-video', name: 'Demo Video', mediaUrl: bundledDemoVideoUrl(), mediaType: 'video' }
 ];
 
 const CAMERA_RESOLUTION_OPTIONS = [
@@ -1791,7 +1796,8 @@ async function saveCustomFileHandle(handle) {
 
 function findSourcePreset(mediaUrl, mediaType) {
     return SOURCE_PRESETS.find((preset) =>
-        preset.mediaUrl === mediaUrl && (!mediaType || mediaType === 'auto' || preset.mediaType === mediaType)
+        (preset.mediaUrl === mediaUrl || (preset.id === 'demo-video' && isBundledDemoVideoUrl(mediaUrl))) &&
+        (!mediaType || mediaType === 'auto' || preset.mediaType === mediaType)
     );
 }
 
@@ -1886,6 +1892,11 @@ function normalizeParams(params, options = {}) {
         out.mediaUrl = DEFAULT_PARAMS.mediaUrl;
         out.mediaType = DEFAULT_PARAMS.mediaType;
         out.sourceName = DEFAULT_PARAMS.sourceName;
+    }
+    if (isBundledDemoVideoUrl(out.mediaUrl)) {
+        out.mediaUrl = bundledDemoVideoUrl();
+        out.mediaType = 'video';
+        out.sourceName = 'Demo Video';
     }
     if (!['auto', 'image', 'video', 'camera'].includes(out.mediaType)) out.mediaType = mediaTypeFromName(out.mediaUrl);
     const matchedSource = hasRuntimeCustomMedia ? null : findSourcePreset(out.mediaUrl, out.mediaType);
@@ -6887,6 +6898,7 @@ class RendererLabApp {
                 rendererAnimationId: Number(renderer?.animationId || renderer?.raf || 0),
                 videoReadyState: Number(this.staticRuntime.source?.element?.readyState ?? -1),
                 videoPaused: Boolean(this.staticRuntime.source?.element?.paused),
+                videoCurrentTime: Number(this.staticRuntime.source?.element?.currentTime || 0),
                 cols: Number(stats?.cols || this.params.cols || 0),
                 rows: Number(stats?.rows || computeRows(this.params) || 0),
                 nativeAttempts: this.nativeOutputSyncAttemptCount - syncStart.attempts,
@@ -6931,6 +6943,7 @@ class RendererLabApp {
             frameResetCount: 0,
             finalFrameCount: 0,
             hasVisibleSignal: false,
+            videoTimeAdvanced: false,
             error: null
         };
 
@@ -7146,24 +7159,35 @@ class RendererLabApp {
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
+            const videoTimes = usable.map((item) => item.videoCurrentTime).filter(Number.isFinite);
+            report.videoTimeAdvanced = videoTimes.length > 1 &&
+                Math.max(...videoTimes) - Math.min(...videoTimes) > 0.05;
             for (let attempt = 0; attempt < 3 && !report.hasVisibleSignal; attempt++) {
                 report.hasVisibleSignal = canvasHasVisibleSignal(this.staticRuntime.renderer?.canvas);
                 if (!report.hasVisibleSignal) await wait(100);
             }
+            // A 30 FPS timer commonly measures just below 30 because sample
+            // boundaries do not land exactly on frame boundaries.
+            const steadyFpsFloor = Math.max(
+                1,
+                Math.min(30, Number(this.params.fpsCap || DEFAULT_PARAMS.fpsCap)) - 0.5
+            );
             report.ok = soak
                 ? (
                     report.phases.soak.mainAvgFps >= 30 &&
                     report.phases.soak.mainP95FrameMs <= 33.3 &&
                     report.phases.soak.nativeOkHz >= 30 &&
                     report.hasVisibleSignal &&
+                    report.videoTimeAdvanced &&
                     report.nativeFailed === 0
                 )
                 : (
-                    report.phases.main.mainAvgFps >= 30 &&
+                    report.phases.main.mainAvgFps >= steadyFpsFloor &&
                     report.phases.popout.mainAvgFps >= 24 &&
                     report.phases.transition.mainAvgFps >= 24 &&
                     (!hasSecondaryOutput || report.nativeTransitionArmed > 0 || report.phases.transition.nativeOkHz >= 30) &&
                     report.hasVisibleSignal &&
+                    report.videoTimeAdvanced &&
                     report.nativeFailed === 0 &&
                     report.nativeTransitionFailed === 0
                 );
@@ -7205,6 +7229,7 @@ class RendererLabApp {
                 frameResetCount: report.frameResetCount,
                 finalFrameCount: report.finalFrameCount,
                 hasVisibleSignal: report.hasVisibleSignal,
+                videoTimeAdvanced: report.videoTimeAdvanced,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (

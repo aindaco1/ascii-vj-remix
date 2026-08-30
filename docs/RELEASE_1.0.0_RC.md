@@ -23,9 +23,10 @@ acceptance, and public release state.
   processes do not create visible consoles.
 - Linux CI is pinned to Ubuntu 24.04; the virtual acceptance matrix exercises
   Ubuntu 26.04.1 and Fedora 44 while retaining AppImage, deb, and rpm coverage.
-- Linux opens at a platform-owned 1000x680 size, the bundled demo uses VP8/WebM,
-  selected videos can fall back to bundled FFmpeg, and WebGL2 is accepted when
-  a Hyper-V guest does not expose WebGPU.
+- Linux opens at a platform-owned 1000x680 size, the bundled demo selects
+  VP8/WebM on Linux while macOS and Windows retain H.264/MP4, selected videos
+  can fall back to bundled FFmpeg, and WebGL2 is accepted when a Hyper-V guest
+  does not expose WebGPU.
 - Experimental MIDI remains explicitly labeled and its physical validation
   claims remain limited to the documented macOS UC-33e/mioXC path.
 

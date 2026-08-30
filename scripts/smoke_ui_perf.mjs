@@ -126,6 +126,7 @@ console.log([
   `nativeTransitionFailed=${report.nativeTransitionFailed || 0}`,
   `displays=${report.outputDisplayCount || 0}`,
   `visible=${report.hasVisibleSignal ? 'yes' : 'no'}`,
+  `video=${report.videoTimeAdvanced ? 'advancing' : 'stalled'}`,
   `backend=${report.actualBackends?.join(',') || report.backend || 'unknown'}`,
   `palette=${report.paletteId || 'none'}`,
   `dither=${report.ditherMode || 'none'}`,
