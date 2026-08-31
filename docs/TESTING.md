@@ -29,6 +29,7 @@ npm run check:media              # Media pipeline checks
 npm run test:render-math         # Shared renderer math vectors
 npm run test:canvas-readback     # Contained success and blocked Canvas2D readback
 npm run test:renderer-fallback   # GPU-to-Canvas fallback and bounded diagnostics
+npm run test:preset-playlists    # Playlist schema, bounds, reorder, loop selection
 npm run test:audio-reactive      # Audio-reactive controls, clamps, dense-mix damping
 npm run test:midi                # UC-33e map, scaling, pickup, actions, coalescing
 npm run midi:probe -- --connect  # Physical mioXC input/output open test
@@ -62,11 +63,12 @@ git diff --check
 | Area | Current Checks |
 | --- | --- |
 | Offline runtime | `npm run check:offline`, `scripts/check_offline_bundle.mjs` |
-| Static UI harness | `npm run smoke:static`, including activation, clean-profile default, live preset search, independent alphabetical sections, overflow-menu focus, aligned select geometry, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
+| Static UI harness | `npm run smoke:static`, including activation, clean-profile default, live preset search, playlist edit/save/reorder/loop controls, accessible native-only screenshot UI, aligned select geometry, visible output, WebGL errors, glyph-page completion, and aspect checks for every built-in Demo Image preset |
 | Tauri policy | `npm run check:tauri-policy` |
 | App icons | `npm run check:icons` |
 | Unicode glyph atlas | `npm run check:glyph-atlas`, complete-block assertions in renderer math/Rust tests |
 | Output display logic | `npm run test:output-display` |
+| Preset playlists | `npm run test:preset-playlists`, plus rendered control-token alignment, no-prompt creation, active-preset avoidance, modal dismissal, truthful transition status, shared transition routing, and start/stop coverage in `npm run smoke:static` |
 | Desktop updater behavior | `npm run test:desktop-updater` |
 | Updater manifests | `npm run test:updater-manifest` |
 | macOS app identity | `npm run test:macos-identity`, release artifact inspection on macOS |
@@ -154,6 +156,13 @@ and a mixed typed ramp in main/Pop Out checks. Confirm atlas pages load only for
 the active ramp, unsupported scalars are reported, and Character Set/Font
 Family changes do not hide the Glyph controls.
 
+For Camera Pop Out, verify the resolved output mode as well as visible motion.
+macOS should select `native-camera`; Windows and Linux should select `mirror`.
+On physical Windows, confirm the camera image advances in both the main and Pop
+Out windows, close/reopen Pop Out, and capture a manual report from the existing
+Reports dialog after any failure. A local policy simulation does not replace
+this device/camera acceptance.
+
 For color-output changes, compare palette, brightness, contrast, background,
 and neutral grayscale states between main and Pop Out. The Rust unit suite
 requires the native surface selector to prefer non-sRGB unorm formats even when
@@ -216,6 +225,12 @@ visible with an empty queue, local media diagnostics are never submitted, and
 renderer reports contain only the bounded structured event summary. Windows
 WebView2 GPU output still requires physical Windows acceptance in addition to
 these cross-platform contract checks.
+
+Manual report acceptance should begin with an empty queue: enter a short note,
+capture current state, confirm the preview contains a `manual-diagnostic`
+report and bounded renderer/output context, then confirm a development build
+keeps Send disabled. Separately verify production submission without attaching
+media, screenshots, file paths, URLs, or arbitrary process logs.
 
 The 2026-08-29 Windows 11 test established that Signal Court and Midnight Scan
 CJK could initialize blank under both WebGPU and WebGL2, while Neon

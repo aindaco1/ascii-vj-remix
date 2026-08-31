@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.0.1] - 2026-08-31
+
+### Added
+
+- Added an accessible camera-icon screenshot control that captures the current
+  primary renderer surface without the HTML Stats Overlay and saves a uniquely
+  named PNG directly to Desktop without opening a save dialog. The main window
+  receives one narrow Rust command that validates PNG input, caps it at 48 MB,
+  writes atomically, and returns only the filename.
+- Added multiple named preset playlists with stable preset-id entries, explicit
+  save/delete controls, accessible up/down reordering, a shared 1–3600 second
+  hold interval, and random or in-order looping. Playlist playback reuses the
+  existing preset transition path.
+- Added manual diagnostic snapshots to the existing Reports workflow. A user
+  can include an optional problem description and capture bounded renderer,
+  source-class, playlist, camera, and native-output state through the same
+  sanitized queue and preference/submission pipeline used by automatic reports.
+
+### Changed
+
+- Normalized playlist typography, button sizing, spacing, and control heights
+  against the app's shared compact-control tokens instead of dialog-only sizes.
+- Playlist playback now uses the same transition engine and 1–5 second
+  automated-transition range as WTF mode. Its duration comes from the existing
+  Default Transition control, so there is no duplicate playlist setting.
+- Starting or restarting a playlist now returns directly to the unobscured
+  preview, reports `Transitioning to` until the shared transition completes,
+  and avoids selecting the active preset when another playlist item is
+  available.
+- Added an explicit native-output capability contract. macOS retains its native
+  AVFoundation camera output, while Windows and Linux select the existing
+  bounded mirror-frame output instead of attempting a platform implementation
+  they do not have.
+- Native media, camera, and mirror worker failures now queue bounded
+  `native-output-error` reports through the existing crash reporter instead of
+  existing only as process stderr. User media, frames, screenshots, arbitrary
+  logs, URLs, and paths remain excluded.
+
+### Fixed
+
+- Fixed New Playlist doing nothing in packaged macOS builds. Playlist creation
+  now uses the existing inline name editor instead of a JavaScript prompt that
+  the app webview could suppress.
+- Fixed Camera Pop Out opening blank on Windows. The app previously reported a
+  successful native-output open before a background worker reached the
+  macOS-only camera implementation and exited; Windows camera output now uses
+  the cross-platform current-frame mirror path.
+- Fixed the empty Reports workflow being unable to create a support artifact on
+  demand. Reports remain visible with an empty queue and can now capture the
+  current bounded diagnostic state for review and submission.
+
 ## [1.0.0] - 2026-08-31
 
 ### Added

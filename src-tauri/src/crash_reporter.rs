@@ -117,15 +117,22 @@ pub fn capture_crash_report<R: Runtime>(
     app: AppHandle<R>,
     report: CrashReportInput,
 ) -> Result<CrashReportState, String> {
-    import_panic_reports(&app)?;
+    capture_internal_report(&app, report)
+}
+
+pub fn capture_internal_report<R: Runtime>(
+    app: &AppHandle<R>,
+    report: CrashReportInput,
+) -> Result<CrashReportState, String> {
+    import_panic_reports(app)?;
     let stored = sanitize_report(report);
-    let mut queue = read_queue(&app)?;
+    let mut queue = read_queue(app)?;
     if !queue.iter().any(|item| item.id == stored.id) {
         queue.push(stored);
     }
     queue = bounded_queue(queue);
-    write_queue(&app, &queue)?;
-    state(&app, None)
+    write_queue(app, &queue)?;
+    state(app, None)
 }
 
 #[tauri::command]
@@ -314,6 +321,7 @@ fn normalize_kind(value: &str) -> String {
         "rust-panic" => "rust-panic",
         "renderer-error" => "renderer-error",
         "native-output-error" => "native-output-error",
+        "manual-diagnostic" => "manual-diagnostic",
         _ => "frontend-error",
     }
     .to_string()
@@ -327,6 +335,7 @@ fn normalize_surface(value: &str) -> String {
         "native-output" => "native-output",
         "startup" => "startup",
         "panic-hook" => "panic-hook",
+        "manual" => "manual",
         _ => "unknown",
     }
     .to_string()
@@ -606,6 +615,21 @@ mod tests {
     fn sanitizer_bounds_long_text() {
         let sanitized = sanitize_text(&"a".repeat(2000), 100);
         assert!(sanitized.ends_with("[truncated]"));
+    }
+
+    #[test]
+    fn manual_diagnostics_keep_the_reviewed_kind_and_surface() {
+        let report = sanitize_report(CrashReportInput {
+            kind: Some("manual-diagnostic".to_string()),
+            surface: Some("manual".to_string()),
+            message: Some("Camera Pop Out stayed blank".to_string()),
+            stack: None,
+            context: Some(json!({ "component": "mirror-presenter" })),
+        });
+
+        assert_eq!(report.kind, "manual-diagnostic");
+        assert_eq!(report.surface, "manual");
+        assert_eq!(report.context["component"], "mirror-presenter");
     }
 
     #[test]

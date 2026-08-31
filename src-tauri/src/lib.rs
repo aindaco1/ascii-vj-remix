@@ -6,6 +6,7 @@ pub mod media_engine;
 pub mod media_permissions;
 pub mod midi;
 pub mod native_output;
+pub mod screenshot;
 pub mod system_audio;
 
 use tauri::Manager;
@@ -54,6 +55,8 @@ pub fn run() {
             desktop_bridge::stop_raw_video_session,
             media_permissions::request_media_permission,
             media_permissions::record_media_diagnostic,
+            screenshot::save_screenshot_to_desktop,
+            native_output::get_native_output_capabilities,
             native_output::open_native_output_window,
             native_output::update_native_output_window,
             native_output::update_native_output_frame,

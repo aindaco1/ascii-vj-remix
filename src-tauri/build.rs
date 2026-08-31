@@ -32,6 +32,8 @@ fn main() {
             "list_media_sessions",
             "request_media_permission",
             "record_media_diagnostic",
+            "save_screenshot_to_desktop",
+            "get_native_output_capabilities",
             "start_system_audio_capture",
             "read_system_audio_features",
             "stop_system_audio_capture",

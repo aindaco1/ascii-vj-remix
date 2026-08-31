@@ -79,12 +79,18 @@ function browserScreenPlacement(screen) {
     };
 }
 
+function nativeCameraOutputMode(params, capabilities = {}, tauri = false) {
+    if (!tauri || params?.sourceMode !== 'static' || params?.mediaType !== 'camera') return null;
+    return capabilities?.nativeCamera === true ? 'native-camera' : 'mirror';
+}
+
 export {
     browserScreenPlacement,
     displayPreferenceIndex,
     monitorId,
     monitorLabel,
     monitorLogicalRect,
+    nativeCameraOutputMode,
     outputDisplaysFromMonitors,
     selectBrowserScreen,
     selectMonitor

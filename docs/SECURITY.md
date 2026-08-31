@@ -37,6 +37,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
 | Presets/settings | Local browser storage, IndexedDB, imported/exported JSON | Low to Medium | User-authored data. Validate imports before applying. |
+| Screenshots | Main-window-only Rust Desktop writer | Medium | Accepts only bounded PNG bytes, creates a unique file, and returns no path. No broad filesystem scope or save dialog. |
 | Output window | Tauri output window with minimal permissions | Medium | Must not expose media selection, filesystem, updater, or broad command APIs. |
 | Tauri commands | `src-tauri/src/lib.rs` plus capability files | High | Treat every command as a security boundary. Validate inputs in Rust. |
 | Asset protocol | Empty by default, expanded only for selected media/session needs | High | Avoid persistent broad paths. |
@@ -108,7 +109,7 @@ The production runtime is intentionally narrow:
 - Capabilities in `src-tauri/capabilities/` split main-window privileges from
   output-window privileges.
 - The main window owns media selection, output management, audio providers, and
-  updater/crash-report work.
+  screenshot, updater, and crash-report work.
 - The output window only listens for render/output messages and exposes
   the minimum close/fullscreen behavior it needs.
 
@@ -136,6 +137,10 @@ The crash reporter can capture:
 - Rust panic-hook reports imported on the next launch.
 - renderer fallback/failure reports containing only bounded preset/backend,
   source-class, error-summary, and recent renderer-event fields.
+- native media/camera/mirror worker failures with a bounded component label and
+  sanitized error summary.
+- explicit manual current-state snapshots with an optional bounded user note
+  and the same structured renderer/output context.
 
 Security requirements:
 
@@ -330,6 +335,9 @@ Import rules:
 - Do not let imported presets disable Stats Overlay unless the user imported
   that choice intentionally and the UI makes it clear.
 - Do not include private absolute media paths in exported packs by default.
+- Preset playlists store only a bounded name, timing/mode metadata, and stable
+  preset ids. They do not duplicate visual settings or retain source/media
+  fields.
 
 ### MIDI and SysEx Rules
 
