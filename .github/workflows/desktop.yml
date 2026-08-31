@@ -59,6 +59,10 @@ jobs:
       - name: Verify desktop build
         run: npm run check:desktop
 
+      - name: Verify Windows preset renderer matrix
+        if: runner.os == 'Windows'
+        run: node scripts/smoke_static_pages.mjs
+
       - name: Install Windows FFmpeg build prerequisites
         if: runner.os == 'Windows' && github.event_name == 'pull_request'
         uses: msys2/setup-msys2@v2

@@ -73,10 +73,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU renderer is the primary quality target on capable desktop runtimes.
 - WebGL2 renderer is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas paths remain compatibility fallbacks.
-- The packaged macOS view renders acceleration-eligible glyph presets through
-  WebGPU; presets with an explicit compatibility backend retain Canvas2D.
-  Windows WebView2 keeps its bounded glyph-to-Canvas policy pending another
-  physical Windows renderer validation.
+- Packaged desktop views attempt WebGPU for every acceleration-eligible preset,
+  then WebGL2 and Canvas2D as bounded fallbacks. Presets with an explicit
+  compatibility backend retain Canvas2D on every platform.
 - Native Tauri output window uses a `wgpu` presenter where available:
   - Metal on macOS.
   - D3D12 on Windows.
@@ -505,13 +504,14 @@ Audio Tap capture is not implemented in the current release.
 
 The app automatically retries failed WebGPU/WebGL2 renderer creation with the
 Canvas compatibility renderer, including during live preset changes. Because
-Windows WebView2 can accept GPU glyph initialization while producing a blank
-surface, the packaged Windows app resolves glyph presets directly to Canvas2D;
-solid/pixel presets can remain GPU-accelerated. Open Stats Overlay to see the
-resolved backend. If a preset still fails, open the persistent Reports control
-to review and send the bounded renderer diagnostic; it contains preset/backend
-state and recent renderer events, never selected media or an unrestricted log
-file.
+Windows WebView2 previously forced every glyph preset to Canvas2D, an Auto
+preset should now resolve to WebGPU when available or WebGL2 when WebGPU cannot
+initialize. Open Stats Overlay to see the resolved backend. If only a small
+subset of presets is accelerated, or a GPU preset is blank, open the persistent
+Reports control to review and send the bounded renderer diagnostic; it contains
+preset/backend state and recent renderer events, never selected media or an
+unrestricted log file. Canvas2D can still be selected manually while the GPU
+path is diagnosed.
 
 ### Pop Out is slow
 

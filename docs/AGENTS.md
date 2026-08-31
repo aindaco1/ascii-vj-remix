@@ -99,16 +99,19 @@ Rendering:
 - WebGPU is the primary quality target.
 - WebGL2 is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas remain compatibility fallbacks.
-- Packaged Apple WebKit uses WebGPU for acceleration-eligible glyph previews.
-  Windows WebView2 glyph previews retain the bounded Canvas2D compatibility
-  policy until that host is physically revalidated; solid/pixel GPU paths
-  remain available.
+- Packaged desktop views attempt WebGPU for every acceleration-eligible preset,
+  then WebGL2 and Canvas2D through the shared bounded fallback. Do not use host
+  platform or user-agent identity to preemptively reassign preset ownership.
 - Native Pop Out output uses `wgpu` where available, with Metal on macOS and
   corresponding GPU backends on Windows/Linux.
 - The active renderer is controlled by one canonical parameter model.
 - Classic Camera ASCII owns the clean-profile visual state, not the global
   renderer preference. Keep the default backend on Auto; built-ins inherit it
   unless they explicitly declare a compatibility backend.
+- Keep the 69/41/28 built-in backend contract centralized in
+  `renderers/shared/preset-backend-contract.js`: 69 total, 41 accelerated, and
+  28 explicit Canvas presets. Any intentional ownership change must update the
+  contract and its visible preset-matrix evidence together.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets.
 - Sixteen project-native palettes, nearest/luminance mapping, and Bayer

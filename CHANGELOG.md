@@ -55,8 +55,8 @@
   with other project checkouts.
 - Decoupled the clean-profile Classic Camera ASCII look from the global
   renderer preference. Built-ins that do not explicitly request a compatibility
-  backend now start from Auto and resolve to WebGPU/WebGL2 when available,
-  while the bounded Windows WebView2 glyph fallback remains in place.
+  backend now start from Auto and resolve to WebGPU/WebGL2 when available on
+  every packaged desktop host.
 - Restored real WebGPU glyph rendering in the packaged macOS Apple WebKit view.
   Glyph pages now decode through the bundled asset URL and compact the active
   maximum-96-scalar ramp plus its coverage mips into a two-row RGBA texture
@@ -78,6 +78,12 @@
 - Prevented release-mode Windows app and FFmpeg/ffprobe child processes from
   opening visible console windows. Debug builds retain normal diagnostic
   console behavior.
+- Retired the blanket Windows WebView2 glyph-to-Canvas policy now that the
+  compact active-ramp glyph texture is shared by the repaired WebGPU path.
+  Auto presets again attempt WebGPU on Windows, with WebGL2 and Canvas2D kept as
+  real construction fallbacks. A centralized 69 total / 41 accelerated / 28
+  explicit Canvas contract, a collapsed-seven unit regression, the visible
+  preset sweep, and the Windows CI matrix guard this ownership boundary.
 - Made the preset overflow menu focus its first action, close with Escape, and
   restore focus to its trigger.
 - Made the local signing bootstrap import its temporary PKCS#12 identity with a

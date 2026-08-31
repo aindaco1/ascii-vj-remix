@@ -263,11 +263,11 @@ active backend are hidden or disabled.
 
 Backend choice is resolved once per renderer construction in
 `renderers/gpu/ascii/renderer/backend-policy.js`; it is not evaluated in the
-frame loop. The macOS Apple WebKit primary view uses WebGPU for
-acceleration-eligible glyph presets. Windows WebView2 retains the bounded
-Canvas2D glyph policy because its browser GPU paths can expose a live renderer
-while presenting an empty canvas. Native Pop Out backend selection is separate
-and unchanged.
+frame loop. Only an explicitly selected Canvas backend bypasses GPU
+construction. Platform identity and user agent do not change preset ownership:
+packaged macOS, Windows, and Linux views all attempt the same WebGPU, WebGL2,
+then Canvas fallback order. Native Pop Out backend selection is separate and
+unchanged.
 
 ## WebGPU Renderer
 
@@ -352,10 +352,13 @@ Canvas fallback leaves the previous transition surface active.
 
 Physical Windows 11 WebView2 acceptance found a narrower failure mode: GPU
 construction and frame counters succeeded, but glyph-atlas output stayed
-blank, while solid/pixel output remained visible. The packaged Windows Tauri
-runtime therefore routes glyph previews through Canvas2D before construction.
-This compatibility rule does not affect normal Chromium browser use or
-solid/pixel GPU presets.
+blank, while solid/pixel output remained visible. The earlier response routed
+all Windows glyph previews through Canvas2D, collapsing the accelerated set to
+roughly seven presets. The compact active-ramp glyph texture has since replaced
+the problematic glyph upload path, so the 1.0 candidate retires that blanket
+route and requires the Windows preset matrix to preserve 41 accelerated and 28
+explicit Canvas presets. A real renderer-construction failure still falls back
+to Canvas2D.
 
 ## Canvas Renderers
 

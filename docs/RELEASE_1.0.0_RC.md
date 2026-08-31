@@ -11,6 +11,9 @@ acceptance, and public release state.
   compatibility backend resolve to WebGPU/WebGL2 when available.
 - The packaged macOS glyph path uses a compact active-ramp WebGPU texture;
   Paper Shredder explicitly retains Canvas2D to preserve its established look.
+- Windows no longer preemptively routes glyph presets to Canvas2D. The same
+  69 total / 41 accelerated / 28 explicit Canvas ownership contract applies to
+  every packaged desktop host.
 - Point & Click Default is displayed as Dense Color ASCII while retaining its
   stable preset id.
 - Built-in and My Presets are separate, independently alphabetized, and
@@ -42,7 +45,7 @@ acceptance, and public release state.
 | Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, 41/41 GPU-eligible presets on WebGPU, 28 explicit Canvas2D compatibility presets, zero failures. |
 | Native Pop Out | Pass | 30-second structural packaged smoke reports 60.0 FPS average native presentation, 16 synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. |
 | Windows CI installer | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and unsigned development EXE/MSI and passed the GUI-subsystem check. |
-| Windows physical QA | Pass | User-verified development artifact on the Windows 11 Pro / RTX 2070 machine. |
+| Windows physical QA | Retest required | The earlier development artifact was verified on the Windows 11 Pro / RTX 2070 machine, but it still contained the blanket glyph-to-Canvas policy. The replacement artifact must prove the 41 accelerated presets are visible on WebGPU. |
 | Linux CI packages | Pass | [Desktop run 33330609894](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33330609894) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
 | Linux VM QA | Retest required | Ubuntu 26.04.1 and Fedora 44 both rendered cleanly through WebGL2 but rejected WebGPU and the H.264 demo; Ubuntu also exposed an unusable virtual microphone. The scoped fixes require a refreshed package pass. |
 | Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
@@ -61,9 +64,10 @@ resolved renderer.
    Color ASCII, and aligned sidebar selects at 1024x720 and 1440x920.
 4. Exercise Demo Image, Demo Video, one custom MP4, camera permission/input,
    microphone input, Stats Overlay, Reports, WTF, and Pop Out.
-5. Confirm the packaged Windows glyph presets remain visible through the
-   bounded Canvas2D compatibility path and solid/pixel presets can remain GPU
-   accelerated.
+5. Run the primary preset sweep and confirm 69/69 visible, 41/41 accelerated
+   presets resolved to WebGPU, 28 explicit Canvas presets, and zero failures.
+   Spot-check Classic Camera ASCII, Signal Court, Midnight Scan CJK, Forest
+   Kiln Hangul, Neon Sledgehammer, and Paper Shredder in Stats Overlay.
 6. Uninstall and confirm the production app, if present, remains unchanged.
 
 ## Publication hold

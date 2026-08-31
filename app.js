@@ -6,8 +6,7 @@ import {
 } from './renderers/gpu/media-source.js?v=20260830-platform-demo-video';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
-    glyphPreviewCompatibilityReason,
-    needsCompatibilityCanvasGlyphPreview
+    explicitCanvasRendererDecision
 } from './renderers/gpu/ascii/renderer/backend-policy.js';
 import { createRendererWithFallback } from './renderers/gpu/ascii/renderer/fallback.js';
 import {
@@ -17,6 +16,7 @@ import {
     shaderHash
 } from './renderers/shared/render-math.js?v=20260804-ascii-today';
 import { safeCanvasImageData } from './renderers/shared/canvas-readback.js?v=20260830-crash-readback';
+import { validateBuiltInPresetBackendContract } from './renderers/shared/preset-backend-contract.js';
 import {
     ASCII_TODAY_CHARACTER_SETS,
     CHARACTER_SET_IDS,
@@ -4106,19 +4106,7 @@ class StaticRuntime {
     }
 
     _canvasRendererDecision(params) {
-        const explicitCanvas = params.backend === 'canvas2d' || params.backend === 'pixel-canvas';
-        const compatibilityReason = explicitCanvas
-            ? ''
-            : glyphPreviewCompatibilityReason(
-                params,
-                navigator.userAgent || '',
-                isTauriRuntime()
-            );
-        if (!explicitCanvas && !compatibilityReason) return null;
-        return {
-            params: params.backend === 'pixel-canvas' ? params : { ...params, backend: 'canvas2d' },
-            compatibilityReason
-        };
+        return explicitCanvasRendererDecision(params);
     }
 
     _ensureCurrentRendererLayer() {
@@ -6787,6 +6775,7 @@ class RendererLabApp {
             glyphBackends: {},
             acceleratedEligible: 0,
             acceleratedPassed: 0,
+            canvasEligible: 0,
             source: 'media/demo.svg'
         };
 
@@ -6833,12 +6822,7 @@ class RendererLabApp {
                         Math.max(1, Number(renderer?.canvas?.height || 0));
                     const ratioError = sourceRatio > 0 ? Math.abs(canvasRatio - sourceRatio) / sourceRatio : 1;
                     const expectsCanvas = preset.params.backend === 'canvas2d' ||
-                        preset.params.backend === 'pixel-canvas' ||
-                        needsCompatibilityCanvasGlyphPreview(
-                            target,
-                            navigator.userAgent || '',
-                            isTauriRuntime()
-                        );
+                        preset.params.backend === 'pixel-canvas';
                     const expectsAcceleration = !expectsCanvas && STATIC_GPU_BACKENDS.has(target.backend);
                     const usesCanvas = backend === 'canvas2d' || backend === 'pixel-canvas';
                     const usesAcceleration = backend === 'webgpu' || backend === 'webgl2';
@@ -6852,6 +6836,7 @@ class RendererLabApp {
                     if (glError) reasons.push(`gl:${glError}`);
 
                     report.backends[backend] = (report.backends[backend] || 0) + 1;
+                    if (expectsCanvas) report.canvasEligible += 1;
                     if (expectsAcceleration) {
                         report.acceleratedEligible += 1;
                         if (usesAcceleration) report.acceleratedPassed += 1;
@@ -6867,6 +6852,13 @@ class RendererLabApp {
                 } catch (error) {
                     report.failures.push({ id: preset.id, reasons: [diagnosticErrorLabel(error)] });
                 }
+            }
+            report.backendContract = validateBuiltInPresetBackendContract(report);
+            if (!report.backendContract.ok) {
+                report.failures.push({
+                    id: '__preset-backend-contract__',
+                    reasons: report.backendContract.mismatches
+                });
             }
             report.ok = report.passed === report.presetCount && report.failures.length === 0;
         } finally {

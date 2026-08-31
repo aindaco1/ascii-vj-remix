@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -16,19 +17,63 @@ function findChromiumExecutable() {
     return process.env.CHROMIUM_EXECUTABLE;
   }
 
-  const cacheDir = path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright');
+  const candidates = [];
+  const addCandidate = (...parts) => {
+    if (parts.every(Boolean)) candidates.push(path.join(...parts));
+  };
+  if (process.platform === 'darwin') {
+    addCandidate('/Applications', 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
+    addCandidate('/Applications', 'Microsoft Edge.app', 'Contents', 'MacOS', 'Microsoft Edge');
+  } else if (process.platform === 'win32') {
+    addCandidate(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
+    addCandidate(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe');
+  } else {
+    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+  }
+
+  const cacheDir = process.platform === 'darwin'
+    ? path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright')
+    : process.platform === 'win32'
+      ? path.join(process.env.LOCALAPPDATA || '', 'ms-playwright')
+      : path.join(process.env.HOME || '', '.cache', 'ms-playwright');
   if (existsSync(cacheDir)) {
-    const candidates = readdirSync(cacheDir)
+    const cacheCandidates = readdirSync(cacheDir)
       .filter((entry) => entry.startsWith('chromium_headless_shell-'))
       .sort()
       .reverse()
-      .map((entry) => path.join(cacheDir, entry, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'));
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate;
-    }
+      .flatMap((entry) => {
+        const entryRoot = path.join(cacheDir, entry);
+        return [
+          path.join(entryRoot, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'),
+          path.join(entryRoot, 'chrome-headless-shell-mac-x64', 'chrome-headless-shell'),
+          path.join(entryRoot, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe'),
+          path.join(entryRoot, 'chrome-headless-shell-linux64', 'chrome-headless-shell')
+        ];
+      });
+    candidates.unshift(...cacheCandidates);
   }
 
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
   return null;
+}
+
+function assertPresetBackendContract(presetMatrix) {
+  const contract = validateBuiltInPresetBackendContract({
+    presetCount: presetMatrix.length,
+    acceleratedEligible: presetMatrix.filter((preset) => preset.requestedBackend === 'auto').length,
+    canvasEligible: presetMatrix.filter((preset) =>
+      preset.requestedBackend === 'canvas2d' || preset.requestedBackend === 'pixel-canvas'
+    ).length
+  });
+  if (!contract.ok) {
+    throw new Error(`Built-in preset backend ownership changed: ${JSON.stringify(contract)}`);
+  }
+  return contract;
 }
 
 function waitForServer(url, timeoutMs = 12000) {
@@ -1224,6 +1269,7 @@ async function runSmoke() {
     if (presetFailures.length) {
       throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
     }
+    assertPresetBackendContract(presetMatrix);
     const acceleratedPresetResults = presetMatrix.filter((preset) => preset.requestedBackend === 'auto');
     const acceleratedPresetFailures = acceleratedPresetResults.filter((preset) =>
       preset.resolvedBackend !== 'webgpu' && preset.resolvedBackend !== 'webgl2'

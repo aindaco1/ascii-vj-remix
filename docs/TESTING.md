@@ -209,20 +209,24 @@ not submit, release builds use only `https://crash.dustwave.xyz/v1/reports`, and
 the output window has no crash-report permissions. The Reports control stays
 visible with an empty queue, local media diagnostics are never submitted, and
 renderer reports contain only the bounded structured event summary. Windows
-WebView2 fallback still requires physical Windows acceptance in addition to
+WebView2 GPU output still requires physical Windows acceptance in addition to
 these cross-platform contract checks.
 
 The 2026-08-29 Windows 11 test established that Signal Court and Midnight Scan
 CJK could initialize blank under both WebGPU and WebGL2, while Neon
 Sledgehammer's solid/pixel path remained visible and Camera opened without a
-spurious media-diagnostics report. Recheck the Windows Tauri glyph-to-Canvas
-compatibility policy on the replacement installer before merging.
+spurious media-diagnostics report. The blanket Windows glyph-to-Canvas rule has
+now been retired after the compact glyph-texture repair. Recheck representative
+ASCII, Braille, CJK, Hangul, solid, and pixel presets on the replacement
+installer before merging.
 
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires GPU-eligible presets to remain accelerated while validating
-Apple WebKit WebGPU output and the Windows WebView2 Canvas glyph policy.
+separately requires the centralized 69 total / 41 accelerated / 28 explicit
+Canvas ownership contract. The Windows CI lane runs the full visible matrix;
+physical Windows acceptance must additionally confirm the 41 accelerated
+presets resolve to WebGPU on the target RTX machine and remain visible.
 
 ### FFmpeg and Media Engine
 

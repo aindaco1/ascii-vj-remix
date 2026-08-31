@@ -51,9 +51,6 @@ import {
   glyphRampCodePoints
 } from '../renderers/shared/glyph-atlas.js';
 import {
-  glyphPreviewCompatibilityReason,
-  isWindowsWebViewUserAgent,
-  needsCompatibilityCanvasGlyphPreview,
   selectRendererBackend
 } from '../renderers/gpu/ascii/renderer/backend-policy.js';
 
@@ -162,15 +159,7 @@ assert.deepEqual(
   [0x20, 0x41, 0x3042, 0xd55c]
 );
 
-const safariUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/620.1 Safari/620.1';
-const windowsWebViewUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0';
 const acceleratedCapabilities = { webgpu: true, webgl2: true, cpu: true };
-assert.equal(glyphPreviewCompatibilityReason({ glyphMode: true }, safariUserAgent, true), '');
-assert.equal(isWindowsWebViewUserAgent(windowsWebViewUserAgent), true);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: true }, windowsWebViewUserAgent, false), false);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: true }, windowsWebViewUserAgent, true), true);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: false, solidMode: true }, windowsWebViewUserAgent, true), false);
-assert.equal(glyphPreviewCompatibilityReason({ glyphMode: true }, windowsWebViewUserAgent, true), 'windows-webview2-glyph');
 assert.equal(selectRendererBackend(acceleratedCapabilities, { glyphMode: true }), 'webgpu');
 assert.equal(selectRendererBackend(acceleratedCapabilities, {
   preferredBackend: 'webgpu', glyphMode: true
