@@ -61,6 +61,14 @@ import {
     sanitizeMidiBindings
 } from './renderers/shared/midi-mapping.js?v=20260711-midi-control';
 import {
+    DEFAULT_HOLD_SECONDS,
+    movePlaylistItem,
+    nextPlaylistName,
+    nextPlaylistIndex,
+    sanitizePresetPlaylist,
+    sanitizePresetPlaylists
+} from './renderers/shared/preset-playlists.js';
+import {
     clearTauriBrowsingData,
     captureTauriCrashReport,
     checkTauriUpdate,
@@ -75,6 +83,7 @@ import {
     listenTauriEvent,
     listTauriMidiPorts,
     listTauriOutputDisplays,
+    getTauriNativeOutputCapabilities,
     openTauriMediaFile,
     openTauriOutputWindow,
     probeTauriMediaFile,
@@ -85,6 +94,7 @@ import {
     readTauriSystemAudioFeatures,
     recordTauriMediaDiagnostic,
     requestTauriMediaPermission,
+    saveTauriScreenshot,
     sendTauriOutputFrame,
     sendTauriOutputPixels,
     sendTauriOutputState,
@@ -115,6 +125,7 @@ import {
 import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
+    nativeCameraOutputMode,
     selectBrowserScreen
 } from './renderers/desktop/output-display.js';
 
@@ -160,8 +171,11 @@ const els = {
     presetOverflowMenu: $('preset-overflow-menu'),
     exportPresets: $('export-presets'),
     importPresets: $('import-presets'),
+    managePlaylists: $('manage-playlists'),
     reloadSource: $('reload-source'),
     popoutWindow: $('popout-window'),
+    takeScreenshot: $('take-screenshot'),
+    screenshotStatus: $('screenshot-status'),
     outputDisplay: $('output-display'),
     wtfButton: $('wtf-randomize'),
     sourceList: $('source-list'),
@@ -198,12 +212,32 @@ const els = {
     crashReportClose: $('crash-report-close'),
     crashReportPreview: $('crash-report-preview'),
     crashReportPreference: $('crash-report-preference'),
+    crashReportNote: $('crash-report-note'),
+    crashReportCreate: $('crash-report-create'),
+    crashReportCreateStatus: $('crash-report-create-status'),
     crashReportDiscard: $('crash-report-discard'),
-    crashReportSend: $('crash-report-send')
+    crashReportSend: $('crash-report-send'),
+    playlistDialog: $('playlist-dialog'),
+    playlistClose: $('playlist-close'),
+    playlistSelect: $('playlist-select'),
+    playlistNew: $('playlist-new'),
+    playlistDelete: $('playlist-delete'),
+    playlistEditor: $('playlist-editor'),
+    playlistName: $('playlist-name'),
+    playlistHold: $('playlist-hold'),
+    playlistMode: $('playlist-mode'),
+    playlistAddPreset: $('playlist-add-preset'),
+    playlistAdd: $('playlist-add'),
+    playlistItems: $('playlist-items'),
+    playlistStatus: $('playlist-status'),
+    playlistStop: $('playlist-stop'),
+    playlistSave: $('playlist-save'),
+    playlistPlay: $('playlist-play')
 };
 
 const STORAGE_KEY = 'asciline-remix-state-v1';
 const PRESET_KEY = 'asciline-remix-user-presets-v1';
+const PLAYLIST_KEY = 'asciline-remix-preset-playlists-v1';
 const CUSTOM_SOURCE_KEY = 'asciline-remix-custom-source-v1';
 const OUTPUT_DISPLAY_KEY = 'asciline-remix-output-display-v1';
 const FPS_DEFAULT_MIGRATION_KEY = 'asciline-remix-fps-default-migrated-v1';
@@ -318,6 +352,8 @@ const AUDIO_REACTIVE_FRAME_MS = 1000 / 60;
 const NATIVE_OUTPUT_REACTIVE_SYNC_MS = 1000 / 60;
 const NATIVE_OUTPUT_TRANSITION_LEAD_MS = 64;
 const CANVAS_STATIC_SAMPLE_MAX_DIMENSION = 960;
+const AUTOMATED_TRANSITION_MIN_SECONDS = 1;
+const AUTOMATED_TRANSITION_MAX_SECONDS = 5;
 const WTF_MIN_SMOOTH_FPS = 24;
 const WTF_MAX_SMOOTH_FPS = 60;
 const TAURI_RAW_VIDEO_MAX_DIMENSION = 960;
@@ -1746,6 +1782,30 @@ function saveJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
 }
 
+function renderSurfaceDimensions(source) {
+    return {
+        width: Number(source?.videoWidth || source?.naturalWidth || source?.width || 0),
+        height: Number(source?.videoHeight || source?.naturalHeight || source?.height || 0)
+    };
+}
+
+async function renderSurfacePng(source) {
+    const { width, height } = renderSurfaceDimensions(source);
+    if (!source || width < 1 || height < 1) throw new Error('The renderer does not have a frame to capture yet');
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('Could not create the screenshot canvas');
+    context.fillStyle = '#030405';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(source, 0, 0, width, height);
+    const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not encode the screenshot')), 'image/png');
+    });
+    return new Uint8Array(await blob.arrayBuffer());
+}
+
 function openCustomHandleDb(mode = 'readonly') {
     return new Promise((resolve, reject) => {
         if (!window.indexedDB) {
@@ -1819,11 +1879,8 @@ function isCameraParams(params) {
     return params?.sourceMode === 'static' && params?.mediaType === 'camera';
 }
 
-function shouldMirrorNativeCameraOutput(params) {
-    if (!isCameraParams(params)) return false;
-    // Live camera mirror transport requires canvas readback plus IPC every frame.
-    // Keep camera presets on native capture unless a future path can preserve parity without readback.
-    return false;
+function shouldMirrorNativeCameraOutput(params, capabilities = {}) {
+    return nativeCameraOutputMode(params, capabilities, isTauriRuntime()) === 'mirror';
 }
 
 function nativeOutputGlyphMode(params) {
@@ -5501,6 +5558,19 @@ class RendererLabApp {
         this.midiRuntime = new MidiControllerRuntime(this);
         this._midiTargetDescriptors = null;
         this.userPresets = parseStoredJson(PRESET_KEY, []);
+        const validPlaylistPresetIds = new Set([
+            ...BUILTIN_PRESETS_DISPLAY,
+            ...this.userPresets
+        ].map((preset) => preset?.id).filter(Boolean));
+        this.playlists = sanitizePresetPlaylists(
+            parseStoredJson(PLAYLIST_KEY, { playlists: [] }),
+            { validPresetIds: validPlaylistPresetIds }
+        ).playlists;
+        this.activePlaylistId = this.playlists[0]?.id || '';
+        this.playlistDraft = null;
+        this.playlistTimer = null;
+        this.playlistPlayback = null;
+        this.playlistPlaybackToken = 0;
         this.activePresetId = hasStoredParams ? null : DEFAULT_PRESET_ID;
         this.presetSearchQuery = '';
         this.transitionToken = 0;
@@ -5522,6 +5592,7 @@ class RendererLabApp {
         this.popoutRaf = null;
         this.popoutRenderer = null;
         this.nativeOutputActive = false;
+        this.nativeOutputCapabilities = { nativeCamera: false, mirror: false };
         this.nativeOutputLastSync = 0;
         this.nativeOutputSyncInFlight = false;
         this.nativeOutputPendingPayload = null;
@@ -5544,6 +5615,8 @@ class RendererLabApp {
         this.nativeOutputTransitionArmAttemptCount = 0;
         this.nativeOutputTransitionArmOkCount = 0;
         this.nativeOutputTransitionArmFailedCount = 0;
+        this.screenshotBusy = false;
+        this.screenshotStatusTimer = null;
         this.uiPerfSmokeActive = false;
         this.outputDisplay = parseStoredJson(OUTPUT_DISPLAY_KEY, 'auto');
         this.outputDisplays = [];
@@ -5582,7 +5655,16 @@ class RendererLabApp {
         this.desktopUpdater.setAvailable(await isTauriUpdaterAvailable());
         void this.desktopUpdater.checkOnLaunch();
         await this._initCrashReporter();
+        if (isTauriRuntime()) {
+            try {
+                this.nativeOutputCapabilities = await getTauriNativeOutputCapabilities();
+            } catch (error) {
+                console.warn('[TauriOutput] Native output capabilities unavailable; using mirror fallback:', error);
+                this.nativeOutputCapabilities = { nativeCamera: false, mirror: true };
+            }
+        }
         await this._restoreCustomSource();
+        if (els.takeScreenshot) els.takeScreenshot.hidden = !isTauriRuntime();
         this._buildControls();
         this._buildAudioReactiveControls();
         this._bindEvents();
@@ -5752,6 +5834,9 @@ class RendererLabApp {
         if (els.crashReportSend) {
             els.crashReportSend.disabled = ui.sendDisabled;
         }
+        if (els.crashReportCreate) {
+            els.crashReportCreate.disabled = this.crashReportBusy || !isTauriRuntime();
+        }
         if (els.crashReportDiscard) {
             els.crashReportDiscard.disabled = ui.discardDisabled;
         }
@@ -5771,6 +5856,63 @@ class RendererLabApp {
         els.crashReportDialog.hidden = true;
         els.crashReportStatus?.setAttribute('aria-expanded', 'false');
         els.crashReportStatus?.focus();
+    }
+
+    _manualDiagnosticContext() {
+        const rendererStats = this.staticRuntime?.getStats?.() || {};
+        return {
+            ...this._crashReportContext(),
+            activePlaylistId: this.playlistPlayback?.playlistId || '',
+            cameraStatus: this.cameraStatus,
+            running: this.running,
+            transitioning: this.transitioning,
+            nativeOutputCapabilities: this.nativeOutputCapabilities,
+            nativeOutputSync: {
+                attempts: this.nativeOutputSyncAttemptCount,
+                succeeded: this.nativeOutputSyncOkCount,
+                failed: this.nativeOutputSyncFailedCount,
+                lastElapsedMs: this.nativeOutputLastSyncElapsedMs
+            },
+            renderer: {
+                backend: rendererStats.backend || '',
+                fps: Number(rendererStats.fps || 0),
+                cols: Number(rendererStats.cols || this.params.cols || 0),
+                rows: Number(rendererStats.rows || this.params.rows || 0)
+            },
+            recentRendererEvents: this.rendererDiagnostics.snapshot()
+        };
+    }
+
+    async _createDiagnosticReport() {
+        if (!isTauriRuntime() || this.crashReportBusy) return;
+        let shouldSendAutomatically = false;
+        this.crashReportBusy = true;
+        if (els.crashReportCreateStatus) els.crashReportCreateStatus.textContent = 'Capturing…';
+        this._syncCrashReportUi();
+        try {
+            const note = String(els.crashReportNote?.value || '').trim().slice(0, 500);
+            await this._captureCrashReport({
+                kind: 'manual-diagnostic',
+                surface: 'manual',
+                message: note || 'Manual diagnostic snapshot',
+                stack: '',
+                context: this._manualDiagnosticContext()
+            });
+            shouldSendAutomatically = Boolean(
+                this.crashReportState?.production
+                && this.crashReportState?.preference === 'always'
+                && this.crashReportState?.pendingCount > 0
+            );
+            if (els.crashReportNote) els.crashReportNote.value = '';
+            if (els.crashReportCreateStatus) els.crashReportCreateStatus.textContent = 'Current state captured';
+        } catch (error) {
+            console.warn('[CrashReporter] Manual capture failed:', error);
+            if (els.crashReportCreateStatus) els.crashReportCreateStatus.textContent = 'Capture failed';
+        } finally {
+            this.crashReportBusy = false;
+            this._syncCrashReportUi();
+        }
+        if (shouldSendAutomatically) await this._sendCrashReports({ automatic: true });
     }
 
     async _setCrashReportPreference(value) {
@@ -6607,6 +6749,7 @@ class RendererLabApp {
         });
         els.crashReportStatus?.addEventListener('click', () => this._openCrashReportDialog());
         els.crashReportClose?.addEventListener('click', () => this._closeCrashReportDialog());
+        els.crashReportCreate?.addEventListener('click', () => this._createDiagnosticReport());
         els.crashReportSend?.addEventListener('click', () => this._sendCrashReports());
         els.crashReportDiscard?.addEventListener('click', () => this._discardCrashReports());
         els.crashReportPreference?.addEventListener('change', () => this._setCrashReportPreference(els.crashReportPreference.value));
@@ -6636,6 +6779,7 @@ class RendererLabApp {
             this._togglePresetOverflow();
         });
         els.presetOverflowMenu.addEventListener('click', (event) => event.stopPropagation());
+        els.managePlaylists?.addEventListener('click', () => this._openPlaylistDialog());
         els.exportPresets.addEventListener('click', () => {
             this._closePresetOverflow({ restoreFocus: true });
             this._exportPresets();
@@ -6645,6 +6789,26 @@ class RendererLabApp {
             this._importPresets();
         });
         els.popoutWindow.addEventListener('click', () => this.openPopout());
+        els.takeScreenshot?.addEventListener('click', () => this._takeScreenshot());
+        els.playlistClose?.addEventListener('click', () => this._closePlaylistDialog());
+        els.playlistDialog?.addEventListener('click', (event) => {
+            if (event.target === els.playlistDialog) this._closePlaylistDialog();
+        });
+        els.playlistSelect?.addEventListener('change', () => this._loadPlaylistDraft(els.playlistSelect.value));
+        els.playlistNew?.addEventListener('click', () => this._newPlaylist());
+        els.playlistDelete?.addEventListener('click', () => this._deletePlaylist());
+        els.playlistAdd?.addEventListener('click', () => this._addPlaylistDraftItem());
+        els.playlistSave?.addEventListener('click', () => this._savePlaylistDraft());
+        els.playlistPlay?.addEventListener('click', () => {
+            this._startPlaylistPlayback().catch((error) => {
+                console.warn('[Playlist] Start failed:', error);
+                this._setPlaylistStatus('Playlist failed');
+            });
+        });
+        els.playlistStop?.addEventListener('click', () => this._stopPlaylistPlayback());
+        for (const input of [els.playlistName, els.playlistHold, els.playlistMode]) {
+            input?.addEventListener('input', () => this._setPlaylistStatus('Unsaved changes'));
+        }
         els.outputDisplay?.addEventListener('change', () => {
             this.outputDisplay = els.outputDisplay.value || 'auto';
             saveJson(OUTPUT_DISPLAY_KEY, this.outputDisplay);
@@ -6703,11 +6867,14 @@ class RendererLabApp {
             if (event.key === 'Escape') {
                 this._closePresetOverflow({ restoreFocus: true });
                 this._closeCrashReportDialog();
+                this._closePlaylistDialog();
             }
         });
         window.addEventListener('resize', () => this._applyVisualState());
         window.addEventListener('beforeunload', () => {
             if (this.meterTimer) window.clearInterval(this.meterTimer);
+            if (this.screenshotStatusTimer) window.clearTimeout(this.screenshotStatusTimer);
+            this._stopPlaylistPlayback();
             this._stopWtf();
             this.audioReactiveRuntime.stop();
             this._clearLocalObjectUrl();
@@ -8101,12 +8268,12 @@ button:hover{background:#202a35}
     _canUseNativeCameraOutputWindow(params = this.params) {
         if (!this._canUseNativeOutputWindow()) return false;
         if (!isCameraParams(params)) return false;
-        if (shouldMirrorNativeCameraOutput(params)) return false;
+        if (this._shouldMirrorNativeCameraOutput(params)) return false;
         return selectedCameraCount(params) === 1;
     }
 
     _shouldMirrorNativeCameraOutput(params = this.params) {
-        return shouldMirrorNativeCameraOutput(params);
+        return shouldMirrorNativeCameraOutput(params, this.nativeOutputCapabilities);
     }
 
     _nativeOutputGlyphMode(params = this.renderParams()) {
@@ -8809,6 +8976,43 @@ button:hover{background:#202a35}
         return source?.canvas || source?.element || null;
     }
 
+    _setScreenshotStatus(message, timeoutMs = 4200) {
+        if (!els.screenshotStatus) return;
+        els.screenshotStatus.textContent = message;
+        if (this.screenshotStatusTimer) window.clearTimeout(this.screenshotStatusTimer);
+        this.screenshotStatusTimer = message && timeoutMs > 0
+            ? window.setTimeout(() => {
+                els.screenshotStatus.textContent = '';
+                this.screenshotStatusTimer = null;
+            }, timeoutMs)
+            : null;
+    }
+
+    async _takeScreenshot() {
+        if (!isTauriRuntime() || this.screenshotBusy) return;
+        this.screenshotBusy = true;
+        if (els.takeScreenshot) els.takeScreenshot.disabled = true;
+        this._setScreenshotStatus('Saving…', 0);
+        try {
+            const pngBytes = await renderSurfacePng(this._activeRenderSurface());
+            const result = await saveTauriScreenshot(pngBytes);
+            this._setScreenshotStatus(`Saved ${result?.fileName || 'to Desktop'}`);
+        } catch (error) {
+            console.warn('[Screenshot] Capture failed:', error);
+            this._setScreenshotStatus('Screenshot failed');
+            this._captureCrashReport({
+                kind: 'frontend-error',
+                surface: 'renderer',
+                message: errorMessage(error),
+                stack: errorStack(error),
+                context: { phase: 'screenshot' }
+            }).catch(() => {});
+        } finally {
+            this.screenshotBusy = false;
+            if (els.takeScreenshot) els.takeScreenshot.disabled = false;
+        }
+    }
+
     _staticMediaSource() {
         return this.staticRuntime.source || this.staticRuntime.renderer?.source || null;
     }
@@ -9112,8 +9316,7 @@ button:hover{background:#202a35}
     _openPresetOverflow() {
         els.presetOverflowMenu.hidden = false;
         els.morePresets.setAttribute('aria-expanded', 'true');
-        const firstAction = els.exportPresets.disabled ? els.importPresets : els.exportPresets;
-        firstAction?.focus();
+        els.managePlaylists?.focus();
     }
 
     _closePresetOverflow(options = {}) {
@@ -9121,6 +9324,326 @@ button:hover{background:#202a35}
         els.presetOverflowMenu.hidden = true;
         els.morePresets.setAttribute('aria-expanded', 'false');
         if (options.restoreFocus) els.morePresets.focus();
+    }
+
+    _validPlaylistPresetIds() {
+        return new Set(this._allPresets().map((preset) => preset.id));
+    }
+
+    _persistPlaylists() {
+        const state = sanitizePresetPlaylists(
+            { playlists: this.playlists },
+            { validPresetIds: this._validPlaylistPresetIds() }
+        );
+        this.playlists = state.playlists;
+        if (!this.playlists.some((playlist) => playlist.id === this.activePlaylistId)) {
+            this.activePlaylistId = this.playlists[0]?.id || '';
+        }
+        saveJson(PLAYLIST_KEY, state);
+        this._syncPlaylistPlaybackUi();
+    }
+
+    _playlistById(id = this.activePlaylistId) {
+        return this.playlists.find((playlist) => playlist.id === id) || null;
+    }
+
+    _playlistPresetName(id) {
+        return this._allPresets().find((preset) => preset.id === id)?.name || 'Missing preset';
+    }
+
+    _setPlaylistStatus(message) {
+        if (els.playlistStatus) els.playlistStatus.textContent = message || '';
+    }
+
+    _renderPlaylistSelect() {
+        if (!els.playlistSelect) return;
+        els.playlistSelect.innerHTML = '';
+        if (!this.playlists.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No playlists saved';
+            els.playlistSelect.appendChild(option);
+        } else {
+            for (const playlist of this.playlists) {
+                const option = document.createElement('option');
+                option.value = playlist.id;
+                option.textContent = playlist.name;
+                els.playlistSelect.appendChild(option);
+            }
+        }
+        els.playlistSelect.value = this.activePlaylistId;
+    }
+
+    _renderPlaylistPresetOptions() {
+        if (!els.playlistAddPreset) return;
+        const selected = els.playlistAddPreset.value;
+        els.playlistAddPreset.innerHTML = '';
+        for (const preset of this._alphabeticalPresets()) {
+            const option = document.createElement('option');
+            option.value = preset.id;
+            option.textContent = preset.name;
+            els.playlistAddPreset.appendChild(option);
+        }
+        if ([...els.playlistAddPreset.options].some((option) => option.value === selected)) {
+            els.playlistAddPreset.value = selected;
+        }
+    }
+
+    _loadPlaylistDraft(id = this.activePlaylistId) {
+        const playlist = this._playlistById(id);
+        this.activePlaylistId = playlist?.id || '';
+        this.playlistDraft = playlist ? clone(playlist) : null;
+        this._renderPlaylistEditor();
+    }
+
+    _renderPlaylistEditor() {
+        const draft = this.playlistDraft;
+        const enabled = Boolean(draft);
+        this._renderPlaylistSelect();
+        this._renderPlaylistPresetOptions();
+        els.playlistEditor?.classList.toggle('is-empty', !enabled);
+        for (const control of [
+            els.playlistName,
+            els.playlistHold,
+            els.playlistMode,
+            els.playlistAddPreset,
+            els.playlistAdd,
+            els.playlistSave,
+            els.playlistPlay
+        ]) {
+            if (control) control.disabled = !enabled;
+        }
+        if (els.playlistDelete) els.playlistDelete.disabled = !enabled;
+        if (els.playlistName) els.playlistName.value = draft?.name || '';
+        if (els.playlistHold) els.playlistHold.value = String(draft?.holdSeconds ?? DEFAULT_HOLD_SECONDS);
+        if (els.playlistMode) els.playlistMode.value = draft?.playbackMode || 'sequential';
+        if (!els.playlistItems) return;
+        els.playlistItems.innerHTML = '';
+        if (!draft?.presetIds?.length) {
+            const empty = document.createElement('li');
+            empty.className = 'playlist-empty';
+            empty.textContent = enabled ? 'Add presets to build this playlist' : 'Create a playlist to begin';
+            els.playlistItems.appendChild(empty);
+        } else {
+            draft.presetIds.forEach((presetId, index) => {
+                const item = document.createElement('li');
+                item.className = 'playlist-item';
+
+                const number = document.createElement('span');
+                number.className = 'playlist-item-number';
+                number.textContent = String(index + 1);
+
+                const name = document.createElement('span');
+                name.className = 'playlist-item-name';
+                name.textContent = this._playlistPresetName(presetId);
+
+                const up = document.createElement('button');
+                up.type = 'button';
+                up.textContent = '↑';
+                up.title = `Move ${name.textContent} up`;
+                up.setAttribute('aria-label', up.title);
+                up.disabled = index === 0;
+                up.addEventListener('click', () => this._movePlaylistDraftItem(index, index - 1));
+
+                const down = document.createElement('button');
+                down.type = 'button';
+                down.textContent = '↓';
+                down.title = `Move ${name.textContent} down`;
+                down.setAttribute('aria-label', down.title);
+                down.disabled = index === draft.presetIds.length - 1;
+                down.addEventListener('click', () => this._movePlaylistDraftItem(index, index + 1));
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.textContent = '×';
+                remove.title = `Remove ${name.textContent}`;
+                remove.setAttribute('aria-label', remove.title);
+                remove.addEventListener('click', () => this._removePlaylistDraftItem(index));
+
+                item.append(number, name, up, down, remove);
+                els.playlistItems.appendChild(item);
+            });
+        }
+        this._syncPlaylistPlaybackUi();
+    }
+
+    _updatePlaylistDraftFromInputs() {
+        if (!this.playlistDraft) return null;
+        this.playlistDraft = sanitizePresetPlaylist({
+            ...this.playlistDraft,
+            name: els.playlistName?.value,
+            holdSeconds: els.playlistHold?.value,
+            playbackMode: els.playlistMode?.value
+        }, 0, { validPresetIds: this._validPlaylistPresetIds() });
+        return this.playlistDraft;
+    }
+
+    _openPlaylistDialog() {
+        if (!els.playlistDialog) return;
+        this._closePresetOverflow();
+        this._loadPlaylistDraft();
+        els.playlistDialog.hidden = false;
+        els.managePlaylists?.setAttribute('aria-expanded', 'true');
+        if (!this.playlistPlayback) this._setPlaylistStatus('');
+        else if (!els.playlistStatus?.textContent) this._setPlaylistStatus('Playlist loop is running');
+        els.playlistSelect?.focus();
+    }
+
+    _closePlaylistDialog(options = {}) {
+        if (!els.playlistDialog || els.playlistDialog.hidden) return;
+        els.playlistDialog.hidden = true;
+        els.managePlaylists?.setAttribute('aria-expanded', 'false');
+        if (options.restoreFocus !== false) els.morePresets?.focus();
+    }
+
+    _newPlaylist() {
+        const playlist = sanitizePresetPlaylist({
+            id: `playlist-${Date.now()}`,
+            name: nextPlaylistName(this.playlists),
+            holdSeconds: DEFAULT_HOLD_SECONDS,
+            playbackMode: 'sequential',
+            presetIds: []
+        }, this.playlists.length, { validPresetIds: this._validPlaylistPresetIds() });
+        this.playlists.push(playlist);
+        this.activePlaylistId = playlist.id;
+        this._persistPlaylists();
+        this._loadPlaylistDraft(playlist.id);
+        this._setPlaylistStatus('Playlist created');
+        els.playlistName?.focus();
+        els.playlistName?.select();
+    }
+
+    _deletePlaylist() {
+        const playlist = this._playlistById();
+        if (!playlist || !confirm(`Delete playlist "${playlist.name}"?`)) return;
+        if (this.playlistPlayback?.playlistId === playlist.id) this._stopPlaylistPlayback();
+        this.playlists = this.playlists.filter((item) => item.id !== playlist.id);
+        this.activePlaylistId = this.playlists[0]?.id || '';
+        this._persistPlaylists();
+        this._loadPlaylistDraft();
+        this._setPlaylistStatus('Playlist deleted');
+    }
+
+    _savePlaylistDraft() {
+        const draft = this._updatePlaylistDraftFromInputs();
+        if (!draft) return false;
+        const index = this.playlists.findIndex((playlist) => playlist.id === draft.id);
+        if (index < 0) this.playlists.push(draft);
+        else this.playlists[index] = draft;
+        this.activePlaylistId = draft.id;
+        this._persistPlaylists();
+        this._loadPlaylistDraft(draft.id);
+        this._setPlaylistStatus('Playlist saved');
+        return true;
+    }
+
+    _addPlaylistDraftItem() {
+        const draft = this._updatePlaylistDraftFromInputs();
+        if (!draft || !els.playlistAddPreset?.value) return;
+        draft.presetIds.push(els.playlistAddPreset.value);
+        this._renderPlaylistEditor();
+        this._setPlaylistStatus('Unsaved changes');
+    }
+
+    _movePlaylistDraftItem(fromIndex, toIndex) {
+        const draft = this._updatePlaylistDraftFromInputs();
+        if (!draft) return;
+        draft.presetIds = movePlaylistItem(draft.presetIds, fromIndex, toIndex);
+        this._renderPlaylistEditor();
+        this._setPlaylistStatus('Unsaved changes');
+    }
+
+    _removePlaylistDraftItem(index) {
+        const draft = this._updatePlaylistDraftFromInputs();
+        if (!draft) return;
+        draft.presetIds.splice(index, 1);
+        this._renderPlaylistEditor();
+        this._setPlaylistStatus('Unsaved changes');
+    }
+
+    _syncPlaylistPlaybackUi() {
+        const playing = Boolean(this.playlistPlayback);
+        if (els.playlistStop) els.playlistStop.disabled = !playing;
+        if (els.playlistPlay) els.playlistPlay.textContent = playing ? 'Restart Loop' : 'Play Loop';
+        if (els.managePlaylists) {
+            els.managePlaylists.textContent = playing ? 'Playlists · Playing' : 'Playlists';
+            els.managePlaylists.setAttribute('aria-haspopup', 'dialog');
+        }
+    }
+
+    async _startPlaylistPlayback() {
+        if (!this._savePlaylistDraft()) return;
+        const playlist = this._playlistById();
+        if (!playlist?.presetIds.length) {
+            this._setPlaylistStatus('Add at least one preset');
+            return;
+        }
+        this._stopPlaylistPlayback({ announce: false });
+        const token = ++this.playlistPlaybackToken;
+        const activeIndex = playlist.presetIds.findIndex((presetId) => presetId === this.activePresetId);
+        this.playlistPlayback = { playlistId: playlist.id, index: activeIndex, token };
+        this._syncPlaylistPlaybackUi();
+        this._closePlaylistDialog();
+        await this._advancePlaylistPlayback(token);
+    }
+
+    async _advancePlaylistPlayback(token) {
+        const playback = this.playlistPlayback;
+        if (!playback || playback.token !== token) return;
+        const playlist = this._playlistById(playback.playlistId);
+        if (!playlist?.presetIds.length) {
+            this._stopPlaylistPlayback();
+            return;
+        }
+        const excludedIndices = playlist.presetIds
+            .map((presetId, index) => presetId === this.activePresetId ? index : -1)
+            .filter((index) => index >= 0);
+        let index = nextPlaylistIndex({
+            length: playlist.presetIds.length,
+            currentIndex: playback.index,
+            mode: playlist.playbackMode,
+            excludedIndices
+        });
+        if (index < 0) index = playback.index >= 0 ? playback.index : 0;
+        playback.index = index;
+        const presetId = playlist.presetIds[index];
+        const presetName = this._playlistPresetName(presetId);
+        const requestedTransitionSeconds = Number(this.params.transitionSeconds);
+        const transitionSeconds = clamp(
+            Number.isFinite(requestedTransitionSeconds)
+                ? requestedTransitionSeconds
+                : DEFAULT_PARAMS.transitionSeconds,
+            AUTOMATED_TRANSITION_MIN_SECONDS,
+            AUTOMATED_TRANSITION_MAX_SECONDS
+        );
+        if (presetId !== this.activePresetId) {
+            this._setPlaylistStatus(`Transitioning to ${index + 1}/${playlist.presetIds.length} · ${presetName}`);
+            await this.applyPreset(presetId, { source: 'playlist', transitionSeconds });
+        }
+        if (!this.playlistPlayback || this.playlistPlayback.token !== token) return;
+        if (this.activePresetId !== presetId) {
+            this._stopPlaylistPlayback({ announce: false });
+            this._setPlaylistStatus(`Playlist stopped · Could not play ${presetName}`);
+            return;
+        }
+        this._setPlaylistStatus(`Playing ${index + 1}/${playlist.presetIds.length} · ${presetName}`);
+        this.playlistTimer = window.setTimeout(
+            () => this._advancePlaylistPlayback(token).catch((error) => {
+                console.warn('[Playlist] Playback failed:', error);
+                this._stopPlaylistPlayback();
+            }),
+            Math.max(1, Number(playlist.holdSeconds) || DEFAULT_HOLD_SECONDS) * 1000
+        );
+    }
+
+    _stopPlaylistPlayback(options = {}) {
+        if (this.playlistTimer) window.clearTimeout(this.playlistTimer);
+        this.playlistTimer = null;
+        const wasPlaying = Boolean(this.playlistPlayback);
+        this.playlistPlayback = null;
+        this.playlistPlaybackToken += 1;
+        this._syncPlaylistPlaybackUi();
+        if (wasPlaying && options.announce !== false) this._setPlaylistStatus('Playlist stopped');
     }
 
     _savedUserPresetParams(preset) {
@@ -9168,6 +9691,7 @@ button:hover{background:#202a35}
 
     _startWtf() {
         if (this.wtfActive) return;
+        this._stopPlaylistPlayback({ announce: false });
         this.wtfActive = true;
         this.wtfToken++;
         this.activePresetId = null;
@@ -9200,7 +9724,10 @@ button:hover{background:#202a35}
                 continue;
             }
 
-            const seconds = randomBetween(1, 5);
+            const seconds = randomBetween(
+                AUTOMATED_TRANSITION_MIN_SECONDS,
+                AUTOMATED_TRANSITION_MAX_SECONDS
+            );
             const target = this._makeWtfTarget(seconds);
             try {
                 const completed = await this._transitionTo(target, seconds);
@@ -9429,7 +9956,8 @@ button:hover{background:#202a35}
         });
     }
 
-    async applyPreset(id) {
+    async applyPreset(id, options = {}) {
+        if (options.source !== 'playlist') this._stopPlaylistPlayback({ announce: false });
         const preset = this._allPresets().find((p) => p.id === id);
         if (this.wtfActive) this._stopWtf();
         if (!preset) return;
@@ -9445,7 +9973,10 @@ button:hover{background:#202a35}
             { preserveBlob: true }
         );
         target.statsOverlay = this.params.statsOverlay;
-        const transitionSeconds = preset.transitionSeconds ?? this.params.transitionSeconds;
+        const transitionOverride = Number(options.transitionSeconds);
+        const transitionSeconds = Number.isFinite(transitionOverride)
+            ? transitionOverride
+            : (preset.transitionSeconds ?? this.params.transitionSeconds);
         target.transitionSeconds = this.params.transitionSeconds;
         const targetChanged = Object.keys(target).some((key) => target[key] !== this.params[key]);
         if (preset.id === this.activePresetId && !targetChanged) {
@@ -9455,7 +9986,8 @@ button:hover{background:#202a35}
         try {
             await this._transitionTo(target, transitionSeconds, {
                 phase: 'preset-transition',
-                presetId: preset.id
+                presetId: preset.id,
+                source: options.source || 'direct'
             });
             if (!preset.readonly) {
                 preset.params = presetParams;
@@ -10332,6 +10864,7 @@ button:hover{background:#202a35}
     _persistPresets() {
         this.userPresets = this._sanitizedUserPresets();
         saveJson(PRESET_KEY, this.userPresets);
+        this._persistPlaylists();
     }
 }
 

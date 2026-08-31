@@ -58,6 +58,13 @@
                         <span id="source-label">Demo Image</span>
                     </div>
                     <div class="preview-toolbar-right">
+                        <button id="take-screenshot" class="icon-button" type="button" title="Save screenshot to Desktop" aria-label="Save screenshot to Desktop">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3v11H4z"></path>
+                                <circle cx="12" cy="13" r="3.4"></circle>
+                            </svg>
+                        </button>
+                        <span id="screenshot-status" class="screenshot-status" role="status" aria-live="polite" aria-atomic="true"></span>
                         <button id="popout-window" type="button">Pop Out</button>
                         <label class="field compact output-display-field">
                             <span>Output</span>
@@ -123,6 +130,7 @@
                         <div class="preset-overflow">
                             <button id="more-presets" type="button" title="More preset actions" aria-label="More preset actions" aria-haspopup="menu" aria-expanded="false" aria-controls="preset-overflow-menu">...</button>
                             <div id="preset-overflow-menu" class="preset-overflow-menu" role="menu" hidden>
+                                <button id="manage-playlists" type="button" role="menuitem" title="Manage preset playlists" aria-label="Manage preset playlists">Playlists</button>
                                 <button id="export-presets" type="button" role="menuitem" title="Export user presets" aria-label="Export user presets">Export</button>
                                 <button id="import-presets" type="button" role="menuitem" title="Import user presets" aria-label="Import user presets">Import</button>
                             </div>
@@ -220,7 +228,15 @@
                 <h2 id="crash-report-title">Diagnostic Reports</h2>
                 <button id="crash-report-close" type="button" aria-label="Close diagnostic reports">Close</button>
             </div>
-            <textarea id="crash-report-preview" readonly spellcheck="false"></textarea>
+            <div class="crash-report-capture">
+                <label for="crash-report-note">Describe what happened <span>(optional)</span></label>
+                <textarea id="crash-report-note" maxlength="500" spellcheck="true" placeholder="For example: Camera Pop Out opened but stayed blank."></textarea>
+                <div>
+                    <span id="crash-report-create-status" role="status" aria-live="polite" aria-atomic="true"></span>
+                    <button id="crash-report-create" type="button">Capture Current State</button>
+                </div>
+            </div>
+            <textarea id="crash-report-preview" class="crash-report-preview" readonly spellcheck="false"></textarea>
             <div class="crash-report-actions">
                 <label class="field compact">
                     <span>Reports</span>
@@ -232,6 +248,56 @@
                 </label>
                 <button id="crash-report-discard" type="button">Discard</button>
                 <button id="crash-report-send" class="primary-btn" type="button">Send</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="playlist-dialog" class="playlist-dialog" role="dialog" aria-modal="true" aria-labelledby="playlist-title" hidden>
+        <section class="playlist-panel">
+            <div class="panel-heading">
+                <h2 id="playlist-title">Preset Playlists</h2>
+                <button id="playlist-close" type="button" aria-label="Close preset playlists">Close</button>
+            </div>
+            <div class="playlist-picker-row">
+                <label class="field compact" for="playlist-select">
+                    <span>Playlist</span>
+                    <select id="playlist-select"></select>
+                </label>
+                <button id="playlist-new" type="button">New</button>
+                <button id="playlist-delete" type="button">Delete</button>
+            </div>
+            <div id="playlist-editor" class="playlist-editor">
+                <div class="playlist-settings">
+                    <label class="field">
+                        <span>Name</span>
+                        <input id="playlist-name" type="text" maxlength="60" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>Hold</span>
+                        <input id="playlist-hold" type="number" min="1" max="3600" step="1" inputmode="numeric">
+                    </label>
+                    <label class="field">
+                        <span>Loop</span>
+                        <select id="playlist-mode">
+                            <option value="sequential">In order</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="playlist-add-row">
+                    <label class="field compact" for="playlist-add-preset">
+                        <span>Add preset</span>
+                        <select id="playlist-add-preset"></select>
+                    </label>
+                    <button id="playlist-add" type="button">Add</button>
+                </div>
+                <ol id="playlist-items" class="playlist-items" aria-label="Playlist presets"></ol>
+            </div>
+            <div class="playlist-actions">
+                <span id="playlist-status" role="status" aria-live="polite" aria-atomic="true"></span>
+                <button id="playlist-stop" type="button">Stop</button>
+                <button id="playlist-save" type="button">Save</button>
+                <button id="playlist-play" class="primary-btn" type="button">Play Loop</button>
             </div>
         </section>
     </div>

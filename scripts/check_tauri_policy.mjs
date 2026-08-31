@@ -309,6 +309,8 @@ if (!mainCapability) {
     'allow-list-media-sessions',
     'allow-request-media-permission',
     'allow-record-media-diagnostic',
+    'allow-save-screenshot-to-desktop',
+    'allow-get-native-output-capabilities',
     'allow-open-native-output-window',
     'allow-update-native-output-window',
     'allow-update-native-output-frame',

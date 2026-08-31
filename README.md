@@ -8,8 +8,9 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.0.0, which is also the stable public
-release. Release history is recorded in the
+The current source/package version is 1.0.1. The latest confirmed public
+release is 1.0.0 while 1.0.1 completes cross-platform acceptance. Release
+history is recorded in the
 [Changelog](CHANGELOG.md); prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 
@@ -24,6 +25,7 @@ release. Release history is recorded in the
 - [Performance guide](docs/PERFORMANCE.md)
 - [Testing guide](docs/TESTING.md)
 - [1.0.0 release readiness and acceptance](docs/RELEASE_1.0.0_RC.md)
+- [1.0.1 release readiness and acceptance](docs/RELEASE_1.0.1.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -130,6 +132,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   incorporated into existing presets.
 - User presets can be saved, duplicated, updated, deleted, imported, and
   exported.
+- Multiple named preset playlists can be saved with reordered stable preset
+  entries, one shared hold interval, and random or in-order looping. Playlist
+  playback keeps each preset's existing transition duration authoritative.
 - Preset transitions crossfade instead of fading to black.
 - Transition time is configurable.
 - Presets preserve the active media source unless the user explicitly changes
@@ -164,6 +169,12 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - The desktop output window is native, not a second heavyweight duplicated UI
   surface.
 - Output display selection is persisted when Tauri can enumerate displays.
+- macOS camera output uses its native AVFoundation path. Windows and Linux
+  camera output use the bounded current-frame mirror path because native camera
+  capture is not implemented on those platforms.
+- The camera-icon control saves the current primary renderer surface as a PNG
+  directly to Desktop. The HTML Stats Overlay is outside that captured surface,
+  and no save dialog is opened.
 
 ### Experimental MIDI Control
 
@@ -207,6 +218,9 @@ and requires a manually captured and verified hardware profile.
 - The Reports control remains visible when no crash reports are pending so the
   `ask`, `always`, and `off` preference is always reachable. A pending count and
   warning state appear only after a bounded, sanitized report is captured.
+  The same dialog can capture a manual current-state diagnostic with an optional
+  problem description; it uses the existing bounded report schema and queue,
+  not arbitrary application logs.
   Development bundles retain reports locally for review and keep Send disabled;
   only a release-mode build with the production bundle identifier may submit.
   Legacy unavailable-microphone reports are removed from the queue because a

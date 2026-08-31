@@ -388,6 +388,16 @@ async function listTauriOutputDisplays() {
     return outputDisplaysFromMonitors(monitors);
 }
 
+async function getTauriNativeOutputCapabilities() {
+    if (!isTauriRuntime()) return { nativeCamera: false, mirror: false };
+    return invokeTauri('get_native_output_capabilities');
+}
+
+async function saveTauriScreenshot(pngBytes) {
+    if (!isTauriRuntime()) throw new Error('Desktop screenshot saving is unavailable in the browser preview');
+    return invokeTauri('save_screenshot_to_desktop', { pngBytes: Array.from(pngBytes || []) });
+}
+
 async function checkTauriUpdate(options = {}) {
     if (!isTauriRuntime()) return null;
     return checkForTauriUpdate(options);
@@ -607,6 +617,7 @@ export {
     finishTauriMidiSysexCapture,
     getTauriCrashReportState,
     getTauriMidiState,
+    getTauriNativeOutputCapabilities,
     installTauriUpdate,
     isTauriRuntime,
     isTauriUpdaterAvailable,
@@ -625,6 +636,7 @@ export {
     readTauriSystemAudioFeatures,
     recordTauriMediaDiagnostic,
     requestTauriMediaPermission,
+    saveTauriScreenshot,
     sendTauriOutputFrame,
     sendTauriOutputPixels,
     sendTauriOutputState,

@@ -1,5 +1,6 @@
 use crate::bundled_media::{is_safe_bundled_media_path, resolve_bundled_media_path};
 use crate::desktop_bridge::{media_binaries_for_app, MediaRegistry};
+use crate::crash_reporter::{capture_internal_report, CrashReportInput};
 use crate::media_engine::ffmpeg::{
     probe_video, spawn_macos_camera_rgb_reader, spawn_rgb_reader_with_options, CameraReaderOptions,
     DecodeConfig, DecodedRgbFrame, FfmpegBinaries, FfmpegRgbFrameReader, RgbReaderOptions,
@@ -43,6 +44,34 @@ const MAX_NATIVE_SOURCE_FPS: f64 = 60.0;
 const DEFAULT_NATIVE_SOURCE_FPS: f64 = 24.0;
 const MIRROR_SOURCE_KEY: &str = "mirror";
 const NATIVE_CAMERA_SOURCE_KEY: &str = "native-camera";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeOutputCapabilities {
+    pub native_camera: bool,
+    pub mirror: bool,
+}
+
+#[tauri::command]
+pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
+    NativeOutputCapabilities {
+        native_camera: cfg!(target_os = "macos"),
+        mirror: true,
+    }
+}
+
+fn capture_native_output_failure(app: &AppHandle, component: &str, error: &str) {
+    let _ = capture_internal_report(
+        app,
+        CrashReportInput {
+            kind: Some("native-output-error".to_string()),
+            surface: Some("native-output".to_string()),
+            message: Some(error.to_string()),
+            stack: None,
+            context: Some(serde_json::json!({ "component": component })),
+        },
+    );
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1506,7 +1535,7 @@ async fn start_or_update_native_mirror_output(
     let mirror_slot = Arc::new(NativeMirrorFrameSlot::default());
 
     install_close_watcher(app, state, &window, generation, stop.clone());
-    spawn_mirror_render_thread(window.clone(), mirror_slot.clone(), stop.clone());
+    spawn_mirror_render_thread(app.clone(), window.clone(), mirror_slot.clone(), stop.clone());
 
     let mut inner = state
         .inner
@@ -3230,9 +3259,13 @@ fn spawn_render_producer_thread(
     frame_slot: Arc<NativeRenderFrameSlot>,
 ) {
     std::thread::spawn(move || {
+        let report_app = app.clone();
         if let Err(error) = run_render_producer_loop(app, source, params, stop.clone(), frame_slot)
         {
             eprintln!("[NativeOutputProducer] {error}");
+            if !stop.load(Ordering::Relaxed) {
+                capture_native_output_failure(&report_app, "media-producer", &error);
+            }
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -3341,8 +3374,12 @@ fn spawn_render_thread(
     stop: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
+        let report_app = app.clone();
         if let Err(error) = run_render_loop(app, window, source, params, transition, stop.clone()) {
             eprintln!("[NativeOutput] {error}");
+            if !stop.load(Ordering::Relaxed) {
+                capture_native_output_failure(&report_app, "media-presenter", &error);
+            }
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -3655,10 +3692,14 @@ fn spawn_camera_frame_producer_thread(
     frame_slot: Arc<NativeRenderFrameSlot>,
 ) {
     std::thread::spawn(move || {
+        let report_app = app.clone();
         if let Err(error) =
             run_camera_frame_producer_loop(app, source, params, stop.clone(), frame_slot)
         {
             eprintln!("[NativeOutputCameraProducer] {error}");
+            if !stop.load(Ordering::Relaxed) {
+                capture_native_output_failure(&report_app, "camera-producer", &error);
+            }
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -3708,10 +3749,14 @@ fn spawn_camera_render_thread(
     stop: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
+        let report_app = app.clone();
         if let Err(error) =
             run_camera_render_loop(app, window, source, params, transition, stop.clone())
         {
             eprintln!("[NativeOutputCamera] {error}");
+            if !stop.load(Ordering::Relaxed) {
+                capture_native_output_failure(&report_app, "camera-presenter", &error);
+            }
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -3807,6 +3852,7 @@ fn run_camera_render_loop(
 }
 
 fn spawn_mirror_render_thread(
+    app: AppHandle,
     window: Window,
     slot: Arc<NativeMirrorFrameSlot>,
     stop: Arc<AtomicBool>,
@@ -3814,6 +3860,9 @@ fn spawn_mirror_render_thread(
     std::thread::spawn(move || {
         if let Err(error) = run_mirror_render_loop(window, slot, stop.clone()) {
             eprintln!("[NativeOutputMirror] {error}");
+            if !stop.load(Ordering::Relaxed) {
+                capture_native_output_failure(&app, "mirror-presenter", &error);
+            }
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -4640,6 +4689,13 @@ fn fract(value: f64) -> f64 {
 mod tests {
     use super::*;
     use serde::Deserialize;
+
+    #[test]
+    fn native_output_capabilities_match_platform_ownership() {
+        let capabilities = get_native_output_capabilities();
+        assert_eq!(capabilities.native_camera, cfg!(target_os = "macos"));
+        assert!(capabilities.mirror);
+    }
 
     fn base_payload() -> NativeOutputPayload {
         NativeOutputPayload {

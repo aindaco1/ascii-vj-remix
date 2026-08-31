@@ -5,6 +5,7 @@ import {
   monitorId,
   monitorLabel,
   monitorLogicalRect,
+  nativeCameraOutputMode,
   outputDisplaysFromMonitors,
   selectBrowserScreen,
   selectMonitor
@@ -107,5 +108,12 @@ assert.deepEqual(browserScreenPlacement(browserVertical), {
   width: 1600,
   height: 1200
 });
+
+const cameraParams = { sourceMode: 'static', mediaType: 'camera' };
+assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: true }, true), 'native-camera');
+assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: false, mirror: true }, true), 'mirror');
+assert.equal(nativeCameraOutputMode(cameraParams, {}, true), 'mirror');
+assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: true }, false), null);
+assert.equal(nativeCameraOutputMode({ sourceMode: 'static', mediaType: 'video' }, { nativeCamera: true }, true), null);
 
 console.log('Output display placement simulation passed.');

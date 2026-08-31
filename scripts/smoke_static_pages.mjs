@@ -232,6 +232,17 @@ async function runSmoke() {
         disabled: Boolean(document.querySelector('#output-display')?.disabled),
         options: [...document.querySelectorAll('#output-display option')].map((option) => option.textContent.trim())
       },
+      screenshot: {
+        hidden: Boolean(document.querySelector('#take-screenshot')?.hidden),
+        ariaLabel: document.querySelector('#take-screenshot')?.getAttribute('aria-label') || '',
+        hasCameraIcon: Boolean(document.querySelector('#take-screenshot svg circle')),
+        statsOutsideSurface: !document.querySelector('#ascii-canvas #stats-overlay') && !document.querySelector('#gpu-stage #stats-overlay')
+      },
+      manualDiagnostics: {
+        integratedInReportsDialog: document.querySelector('#crash-report-create')?.closest('#crash-report-dialog')?.id === 'crash-report-dialog',
+        noteLimit: Number(document.querySelector('#crash-report-note')?.maxLength || 0),
+        contextKeys: Object.keys(window.ascilineRemix?._manualDiagnosticContext?.() || {}).sort()
+      },
       audioReactive: {
         source: document.querySelector('#audio-reactive-source')?.value || '',
         status: document.querySelector('#audio-reactive-status')?.textContent || '',
@@ -282,6 +293,16 @@ async function runSmoke() {
     }
     if (!main.backendStatusAbsent) {
       throw new Error('The duplicate top-bar backend status should be absent.');
+    }
+    if (!main.screenshot.hidden || main.screenshot.ariaLabel !== 'Save screenshot to Desktop' || !main.screenshot.hasCameraIcon || !main.screenshot.statsOutsideSurface) {
+      throw new Error(`Screenshot control should be accessible, native-only, and separate from the stats overlay: ${JSON.stringify(main.screenshot)}`);
+    }
+    if (
+      !main.manualDiagnostics.integratedInReportsDialog ||
+      main.manualDiagnostics.noteLimit !== 500 ||
+      !['nativeOutputCapabilities', 'nativeOutputSync', 'recentRendererEvents', 'renderer'].every((key) => main.manualDiagnostics.contextKeys.includes(key))
+    ) {
+      throw new Error(`Manual diagnostics should extend the existing bounded Reports workflow: ${JSON.stringify(main.manualDiagnostics)}`);
     }
     if (
       main.brandMark.tagName !== 'IMG' ||
@@ -412,9 +433,174 @@ async function runSmoke() {
       expanded: document.querySelector('#more-presets')?.getAttribute('aria-expanded') || '',
       activeElement: document.activeElement?.id || ''
     }));
-    if (overflowOpened.expanded !== 'true' || overflowOpened.activeElement !== 'import-presets') {
+    if (overflowOpened.expanded !== 'true' || overflowOpened.activeElement !== 'manage-playlists') {
       throw new Error(`Preset overflow should focus its first enabled action: ${JSON.stringify(overflowOpened)}`);
     }
+
+    await page.locator('#manage-playlists').click();
+    const playlistControlMetrics = await page.evaluate(() => {
+      const metric = (id) => {
+        const element = document.querySelector(`#${id}`);
+        const style = getComputedStyle(element);
+        return {
+          height: Math.round(element.getBoundingClientRect().height),
+          fontSize: Number.parseFloat(style.fontSize)
+        };
+      };
+      return Object.fromEntries([
+        'playlist-new',
+        'playlist-delete',
+        'playlist-name',
+        'playlist-hold',
+        'playlist-mode',
+        'playlist-add',
+        'playlist-stop',
+        'playlist-save',
+        'playlist-play'
+      ].map((id) => [id, metric(id)]));
+    });
+    if (Object.values(playlistControlMetrics).some((metric) => metric.height !== 30 || metric.fontSize !== 12)) {
+      throw new Error(`Playlist fields and actions should share the regular control tokens: ${JSON.stringify(playlistControlMetrics)}`);
+    }
+    await page.evaluate(() => {
+      window.__playlistPromptCalls = 0;
+      window.__playlistOriginalPrompt = window.prompt;
+      window.prompt = () => {
+        window.__playlistPromptCalls += 1;
+        return null;
+      };
+    });
+    await page.locator('#playlist-new').click();
+    await page.locator('#playlist-name').fill('Smoke Playlist');
+    await page.selectOption('#playlist-add-preset', 'ascii-today-broadway-kb');
+    await page.locator('#playlist-add').click();
+    await page.selectOption('#playlist-add-preset', 'point-click-default');
+    await page.locator('#playlist-add').click();
+    await page.locator('#playlist-items .playlist-item').first().locator('button').nth(1).click();
+    await page.locator('#playlist-hold').fill('2');
+    await page.selectOption('#playlist-mode', 'random');
+    await page.locator('#playlist-save').click();
+    const playlistSaved = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const saved = app?._playlistById?.();
+      const persisted = JSON.parse(localStorage.getItem('asciline-remix-preset-playlists-v1') || '{}');
+      const promptCalls = window.__playlistPromptCalls;
+      window.prompt = window.__playlistOriginalPrompt;
+      delete window.__playlistPromptCalls;
+      delete window.__playlistOriginalPrompt;
+      return {
+        dialogVisible: !document.querySelector('#playlist-dialog')?.hidden,
+        promptCalls,
+        saved,
+        persisted: persisted.playlists?.[0],
+        rows: [...document.querySelectorAll('#playlist-items .playlist-item-name')].map((node) => node.textContent.trim()),
+        rowTypography: [...document.querySelectorAll('#playlist-items .playlist-item-name')].map((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
+        rowActionSizes: [...document.querySelectorAll('#playlist-items .playlist-item button')].map((node) => ({
+          height: Math.round(node.getBoundingClientRect().height),
+          fontSize: Number.parseFloat(getComputedStyle(node).fontSize)
+        }))
+      };
+    });
+    if (
+      !playlistSaved.dialogVisible ||
+      playlistSaved.promptCalls !== 0 ||
+      playlistSaved.saved?.name !== 'Smoke Playlist' ||
+      playlistSaved.saved?.holdSeconds !== 2 ||
+      playlistSaved.saved?.playbackMode !== 'random' ||
+      JSON.stringify(playlistSaved.saved?.presetIds) !== JSON.stringify(['point-click-default', 'ascii-today-broadway-kb']) ||
+      JSON.stringify(playlistSaved.persisted) !== JSON.stringify(playlistSaved.saved) ||
+      JSON.stringify(playlistSaved.rows) !== JSON.stringify(['Dense Color ASCII', 'Broadway KB']) ||
+      playlistSaved.rowTypography.some((fontSize) => fontSize !== 12) ||
+      playlistSaved.rowActionSizes.some((metric) => metric.height !== 26 || metric.fontSize !== 11)
+    ) {
+      throw new Error(`Playlist editor should save reordered stable preset IDs and loop settings: ${JSON.stringify(playlistSaved)}`);
+    }
+    await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      app.__playlistOriginalTransitionTo = app._transitionTo;
+      app.__playlistOriginalTransitionSeconds = app.params.transitionSeconds;
+      app.__playlistOriginalActivePresetId = app.activePresetId;
+      app.__playlistTransitionCalls = [];
+      app.activePresetId = 'point-click-default';
+      app.params.transitionSeconds = 0;
+      app._transitionTo = (target, seconds, context) => {
+        app.__playlistTransitionCalls.push({ seconds, context, targetPresetId: context?.presetId || '' });
+        return new Promise((resolve) => {
+          app.__playlistResolveTransition = () => resolve(true);
+        });
+      };
+    });
+    await page.locator('#playlist-play').click();
+    await page.waitForFunction(
+      () => Boolean(window.ascilineRemix?.playlistPlayback && window.ascilineRemix?.__playlistTransitionCalls?.length),
+      null,
+      { timeout: 5000 }
+    );
+    const playlistTransitioning = await page.evaluate(() => ({
+      dialogHidden: Boolean(document.querySelector('#playlist-dialog')?.hidden),
+      activeElement: document.activeElement?.id || '',
+      status: document.querySelector('#playlist-status')?.textContent.trim() || '',
+      transitionCalls: window.ascilineRemix?.__playlistTransitionCalls || []
+    }));
+    if (
+      !playlistTransitioning.dialogHidden ||
+      playlistTransitioning.activeElement !== 'more-presets' ||
+      !/^Transitioning to 2\/2 · Broadway KB$/i.test(playlistTransitioning.status) ||
+      playlistTransitioning.transitionCalls?.[0]?.targetPresetId !== 'ascii-today-broadway-kb' ||
+      playlistTransitioning.transitionCalls?.[0]?.seconds !== 1 ||
+      playlistTransitioning.transitionCalls?.[0]?.context?.source !== 'playlist'
+    ) {
+      throw new Error(`Playlist playback should reveal and describe the shared transition: ${JSON.stringify(playlistTransitioning)}`);
+    }
+    await page.evaluate(() => window.ascilineRemix?.__playlistResolveTransition?.());
+    await page.waitForFunction(
+      () => /^Playing 2\/2 · Broadway KB$/i.test(document.querySelector('#playlist-status')?.textContent.trim() || ''),
+      null,
+      { timeout: 5000 }
+    );
+    await page.locator('#more-presets').click();
+    await page.locator('#manage-playlists').click();
+    const reopenedPlaylistStatus = await page.locator('#playlist-status').textContent();
+    if (!/^Playing 2\/2 · Broadway KB$/i.test(reopenedPlaylistStatus?.trim() || '')) {
+      throw new Error(`Reopened playlist editor should preserve current playback status: ${reopenedPlaylistStatus}`);
+    }
+    await page.locator('#playlist-stop').click();
+    const playlistStopped = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const result = {
+        stopped: !app?.playlistPlayback,
+        stopDisabled: Boolean(document.querySelector('#playlist-stop')?.disabled),
+        status: document.querySelector('#playlist-status')?.textContent.trim() || '',
+        transitionCalls: app.__playlistTransitionCalls
+      };
+      app._transitionTo = app.__playlistOriginalTransitionTo;
+      app.params.transitionSeconds = app.__playlistOriginalTransitionSeconds;
+      app.activePresetId = app.__playlistOriginalActivePresetId;
+      app._renderPresets();
+      delete app.__playlistOriginalTransitionTo;
+      delete app.__playlistOriginalTransitionSeconds;
+      delete app.__playlistOriginalActivePresetId;
+      delete app.__playlistTransitionCalls;
+      delete app.__playlistResolveTransition;
+      return result;
+    });
+    if (
+      !playlistStopped.stopped ||
+      !playlistStopped.stopDisabled ||
+      !/stopped/i.test(playlistStopped.status) ||
+      playlistStopped.transitionCalls?.length !== 1
+    ) {
+      throw new Error(`Playlist loop should stop cleanly: ${JSON.stringify(playlistStopped)}`);
+    }
+    await page.locator('#playlist-close').click();
+    await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      app.playlists = [];
+      app.activePlaylistId = '';
+      app.playlistDraft = null;
+      app._persistPlaylists();
+    });
+    await page.locator('#more-presets').click();
     await page.keyboard.press('Escape');
     const overflowClosed = await page.evaluate(() => ({
       expanded: document.querySelector('#more-presets')?.getAttribute('aria-expanded') || '',
