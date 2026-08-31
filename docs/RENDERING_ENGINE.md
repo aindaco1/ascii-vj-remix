@@ -357,7 +357,7 @@ construction and frame counters succeeded, but glyph-atlas output stayed
 blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
-the problematic glyph upload path, so the 1.0 candidate retires that blanket
+the problematic glyph upload path, so the 1.0 release retires that blanket
 route and requires the Windows preset matrix to preserve 41 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.

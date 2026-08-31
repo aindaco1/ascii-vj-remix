@@ -1,8 +1,9 @@
-# 1.0.0 Release Candidate QA
+# 1.0.0 Release Readiness and Acceptance
 
-This document tracks the pre-publication 1.0.0 candidate. It separates local
+This document records the 1.0.0 release-readiness decision. It separates local
 verification, CI artifacts, virtual-machine acceptance, physical hardware
-acceptance, and public release state.
+acceptance, and public release state so later publication evidence cannot be
+confused with pre-release testing.
 
 ## Candidate scope
 
@@ -47,14 +48,14 @@ acceptance, and public release state.
 | Release runtime gate | Pass | Pinned FFmpeg 8.1.2 Apple Silicon resources are staged and `npm run check:release` passes. |
 | Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources, and advancing bundled Demo Video. |
 | Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, 41/41 GPU-eligible presets on WebGPU, 28 explicit Canvas2D compatibility presets, zero failures. |
-| Native Pop Out | Pass | Current optimized structural packaged smoke with Demo Video reports 60.1 FPS average native presentation, eight synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. Deterministic unorm selection is covered separately; visual Linux color comparison still requires the VM. |
-| Windows CI installer | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and unsigned development EXE/MSI and passed the GUI-subsystem check. |
-| Windows physical QA | Retest required | The earlier development artifact was verified on the Windows 11 Pro / RTX 2070 machine, but it still contained the blanket glyph-to-Canvas policy. The replacement artifact must prove the 41 accelerated presets are visible on WebGPU. |
-| Linux CI packages | Pass | [Desktop run 33330609894](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33330609894) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
-| Linux VM QA | Retest required | Ubuntu 26.04.1 and Fedora 44 both rendered cleanly through WebGL2 but lacked WebGPU and could not play the demo in the webview. Fedora exposed an unavailable virtual microphone and Pop Out color parity was uncertain. The native demo fallback, legacy-report pruning, and deterministic Pop Out surface format require a refreshed package pass. |
-| Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
+| Native Pop Out | Pass | Current optimized structural packaged smoke with Demo Video reports 60.1 FPS average native presentation, eight synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. Deterministic unorm selection is covered separately; the release owner accepted the Ubuntu/Fedora color-parity path for publication. |
+| Windows CI installer | Pass | [Desktop run 33355966122](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33355966122) built the pinned FFmpeg resources and unsigned development EXE/MSI, passed the GUI-subsystem check, and enforced the shared preset-backend matrix. |
+| Windows physical QA | Accepted | The release owner approved publication after testing on Windows 11 Pro with the NVIDIA RTX 2070-class machine and reviewing the final WebGPU ownership, Demo Video, Pop Out, and console-window fixes. |
+| Linux CI packages | Pass | [Desktop run 33355966122](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33355966122) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
+| Linux VM QA | Accepted with WebGL2 fallback | The release owner approved publication after the Ubuntu 26.04.1 and Fedora 44 Hyper-V pass. WebGPU was unavailable in both guests; visible, responsive WebGL2 is the accepted virtual-GPU fallback. The final package contains the native demo fallback, unavailable-microphone report pruning, and deterministic Pop Out surface selection. This does not claim physical Linux camera, microphone, or GPU coverage. |
+| Public release | Approved | The release owner authorized merge and publication on 2026-08-30. The tag, public assets, updater manifest, and post-publication install/updater smoke remain deployment evidence rather than pre-release evidence. |
 
-## Physical Windows checklist
+## Retained physical Windows regression checklist
 
 Use only the exact `ascii-vj-remix-windows-test-<commit>` artifact retained by
 the draft PR. Record the Windows build, GPU/driver, artifact commit, and
@@ -74,9 +75,12 @@ resolved renderer.
    Kiln Hangul, Neon Sledgehammer, and Paper Shredder in Stats Overlay.
 6. Uninstall and confirm the production app, if present, remains unchanged.
 
-## Publication hold
+## Publication authorization
 
-Do not merge the version bump to `main`, create `v1.0.0`, dispatch the release
-workflow, or publish updater metadata until the Windows and Linux acceptance
-rows above are recorded. The Windows packages remain explicitly unsigned
-previews for 1.0 unless a separately approved Authenticode rollout completes.
+The release owner authorized merging the version bump to `main` and publishing
+`v1.0.0` after the Windows and Linux acceptance rows above were recorded. The
+exact tagged main commit must still pass the required `Desktop` main-push run;
+the release workflow must then validate public assets, updater metadata,
+notarization, Gatekeeper, installation, and the previous-version updater hop.
+Windows packages remain explicitly unsigned previews for 1.0 unless a
+separately approved Authenticode rollout completes.

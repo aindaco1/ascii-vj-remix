@@ -1,7 +1,7 @@
 # Linux VM QA
 
-The release-candidate Linux matrix uses two x86_64 Hyper-V guests on the
-Windows 11 Pro test machine:
+The maintained Linux release-acceptance matrix uses two x86_64 Hyper-V guests
+on the Windows 11 Pro test machine:
 
 - Ubuntu 26.04.1 for AppImage and deb acceptance.
 - Fedora 44 Workstation for AppImage and rpm acceptance.

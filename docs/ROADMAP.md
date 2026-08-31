@@ -151,18 +151,3 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
   coalescing and rate limits.
 - Stream mode requires a complete user workflow before it can return to the
   normal Source panel.
-
-## 1.0 Direction
-
-- Installable, documented packages for macOS, Windows, and Linux.
-- Offline desktop operation except for deliberate update checks and reviewed,
-  opt-in crash reporting.
-- Reliable Demo Image, Demo Video, custom-file, Camera, preset, WTF, audio, and
-  Pop Out workflows from first launch.
-- Stable MIDI behavior on the documented UC-33e/mioXC rig.
-- Stream mode either productized and tested or absent from normal-user UI.
-- Public macOS artifacts retain Developer ID signing, notarization, stapling,
-  Gatekeeper acceptance, and updater identity.
-- Windows artifacts use a clearly documented distribution posture, with signed
-  installers preferred once the signing path is operational.
-- Current-state docs and release notes match the shipped product.

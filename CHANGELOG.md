@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0] - 2026-08-30
 
 ### Added
 
@@ -18,8 +18,8 @@
 
 ### Changed
 
-- Bumped the source/package version to the 1.0.0 release candidate while
-  leaving 0.10.0 as the latest verified public release until publication.
+- Promoted the synchronized source/package metadata to the stable 1.0.0
+  release.
 - Made Classic Camera ASCII the default visual state for a clean profile while
   preserving persisted profiles, and renamed the Point & Click Default display
   label to Dense Color ASCII without changing its stable preset id.
@@ -95,6 +95,13 @@
 - Made the local signing bootstrap import its temporary PKCS#12 identity with a
   Keychain-compatible password, and made the local launcher refuse to delete a
   bundle when its source and install paths are the same.
+
+Version 1.0.0 completes the first stable desktop release with a polished preset
+workflow, cross-platform packaged media handling, synchronized native Pop Out
+transitions and color, and one explicit 69 total / 41 accelerated / 28 Canvas
+built-in renderer contract. macOS artifacts remain Developer ID signed,
+notarized, stapled, and Gatekeeper-validated; Windows artifacts remain clearly
+documented unsigned previews.
 
 ## [0.10.0] - 2026-08-29
 
