@@ -1,8 +1,13 @@
-import { detectMediaType, loadMediaSource } from './renderers/gpu/media-source.js?v=20260620-startup-permissions';
+import {
+    bundledDemoVideoUrl,
+    detectMediaType,
+    isBundledDemoVideoUrl,
+    loadMediaSource,
+    nativeVideoFallbackSource
+} from './renderers/gpu/media-source.js?v=20260830-native-demo-fallback';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
-    glyphPreviewCompatibilityReason,
-    needsCompatibilityCanvasGlyphPreview
+    explicitCanvasRendererDecision
 } from './renderers/gpu/ascii/renderer/backend-policy.js';
 import { createRendererWithFallback } from './renderers/gpu/ascii/renderer/fallback.js';
 import {
@@ -11,6 +16,8 @@ import {
     processGpuCellColor,
     shaderHash
 } from './renderers/shared/render-math.js?v=20260804-ascii-today';
+import { safeCanvasImageData } from './renderers/shared/canvas-readback.js?v=20260830-crash-readback';
+import { validateBuiltInPresetBackendContract } from './renderers/shared/preset-backend-contract.js';
 import {
     ASCII_TODAY_CHARACTER_SETS,
     CHARACTER_SET_IDS,
@@ -96,7 +103,10 @@ import {
     connectTauriMidi,
     submitTauriCrashReports
 } from './renderers/desktop/tauri-adapter.js';
-import { crashReportUiState } from './renderers/desktop/crash-report-ui.js?v=20260826-reports';
+import {
+    crashReportSourceLabel,
+    crashReportUiState
+} from './renderers/desktop/crash-report-ui.js?v=20260830-crash-context';
 import {
     RendererDiagnosticLog,
     rendererFailureKey,
@@ -140,6 +150,8 @@ const els = {
     statsOverlay: $('stats-overlay'),
     audio: $('ascii-audio'),
     presetList: $('preset-list'),
+    presetSearch: $('preset-search'),
+    presetSearchStatus: $('preset-search-status'),
     savePreset: $('save-preset'),
     duplicatePreset: $('duplicate-preset'),
     updatePreset: $('update-preset'),
@@ -201,6 +213,8 @@ const MIDI_SETTINGS_KEY = 'ascii-vj-remix-midi-settings-v1';
 const MIDI_CUSTOM_BINDINGS_KEY = 'ascii-vj-remix-midi-custom-bindings-v1';
 const MIDI_SYSEX_PROFILE_KEY = 'ascii-vj-remix-uc33e-sysex-v1';
 const MIDI_PRESET_SLOTS_KEY = 'ascii-vj-remix-midi-preset-slots-v1';
+const DEFAULT_PRESET_ID = 'classic-camera-ascii';
+const DEFAULT_RENDERER_BACKEND = 'auto';
 const CUSTOM_HANDLE_DB = 'asciline-remix-custom-source-db';
 const CUSTOM_HANDLE_STORE = 'handles';
 const CUSTOM_HANDLE_ID = 'custom-media';
@@ -221,9 +235,34 @@ const CUSTOM_MEDIA_PICKER_OPTIONS = {
     }]
 };
 
+const CLASSIC_CAMERA_ASCII_PARAMS = Object.freeze({
+    backend: 'canvas2d',
+    cols: 170,
+    autoRows: true,
+    cellWidth: 6,
+    cellHeight: 9,
+    saturationBoost: 0,
+    contrastBoost: 1.75,
+    brightness: 1.08,
+    gamma: 1,
+    bgBlend: 0.04,
+    quantizeBits: 0,
+    jitterAmount: 0.32,
+    jitterSpeed: 0.85,
+    sampleX: 0.5,
+    sampleY: 0.5,
+    smoothing: false,
+    solidMode: false,
+    glyphMode: true,
+    charset: 'classic-camera',
+    fontFamily: 'Courier New',
+    mode: 1,
+    pixel: false,
+    codecQuality: 'balanced'
+});
+
 const DEFAULT_PARAMS = {
     sourceMode: 'static',
-    backend: 'auto',
     mediaUrl: 'media/demo.svg',
     mediaType: 'image',
     sourceName: 'Demo Image',
@@ -238,17 +277,14 @@ const DEFAULT_PARAMS = {
     loop: true,
     muted: true,
     volume: 1,
-    cols: 480,
+    ...CLASSIC_CAMERA_ASCII_PARAMS,
+    // The clean-profile look is Classic Camera ASCII, but renderer selection
+    // remains a global capability decision. Individual presets can still opt
+    // into a specific compatibility backend.
+    backend: DEFAULT_RENDERER_BACKEND,
     rows: 0,
-    autoRows: true,
     fps: 60,
     fpsCap: 30,
-    saturationBoost: 1.4,
-    contrastBoost: 1.2,
-    brightness: 1,
-    gamma: 1,
-    bgBlend: 0.3,
-    quantizeBits: 0,
     paletteId: 'none',
     paletteMapping: 'nearest',
     ditherMode: 'none',
@@ -256,26 +292,13 @@ const DEFAULT_PARAMS = {
     ditherScale: 1,
     ditherBias: 0,
     ditherInvert: false,
-    mode: 5,
-    pixel: false,
-    cellWidth: 2,
-    cellHeight: 3,
     aspectCorrection: 1,
-    jitterAmount: 0.6,
-    jitterSpeed: 1,
-    sampleX: 0.5,
-    sampleY: 0.5,
-    smoothing: true,
     codec: 'adaptive',
-    codecQuality: 'lossless',
     codecTolerance: 0,
     bufferSize: 4,
     maxBufferMultiplier: 5,
     lateDropThreshold: 0.1,
     futureWaitThreshold: 0.05,
-    glyphMode: true,
-    solidMode: false,
-    charset: 'point-click',
     customGlyphRamp: '',
     glyphDepth: 96,
     glyphOffset: 0,
@@ -284,7 +307,6 @@ const DEFAULT_PARAMS = {
     glyphColor: '#ffffff',
     backgroundColor: '#030405',
     atlasStyle: 'neutral',
-    fontFamily: 'Courier New',
     minGlyphIntensity: 180,
     advancedDensity: false,
     statsOverlay: true,
@@ -294,6 +316,7 @@ const DEFAULT_PARAMS = {
 const RESPONSIVE_FRAME_MS = 1000 / 60;
 const AUDIO_REACTIVE_FRAME_MS = 1000 / 60;
 const NATIVE_OUTPUT_REACTIVE_SYNC_MS = 1000 / 60;
+const NATIVE_OUTPUT_TRANSITION_LEAD_MS = 64;
 const CANVAS_STATIC_SAMPLE_MAX_DIMENSION = 960;
 const WTF_MIN_SMOOTH_FPS = 24;
 const WTF_MAX_SMOOTH_FPS = 60;
@@ -311,7 +334,7 @@ const FONT_FAMILY_IDS = Object.freeze(FONT_FAMILY_OPTIONS.map(([id]) => id));
 
 const SOURCE_PRESETS = [
     { id: 'demo-image', name: 'Demo Image', mediaUrl: 'media/demo.svg', mediaType: 'image' },
-    { id: 'demo-video', name: 'Demo Video', mediaUrl: 'media/demo-video-2.mp4', mediaType: 'video' }
+    { id: 'demo-video', name: 'Demo Video', mediaUrl: bundledDemoVideoUrl(), mediaType: 'video' }
 ];
 
 const CAMERA_RESOLUTION_OPTIONS = [
@@ -432,7 +455,7 @@ const PALETTE_PRESET_IDS = Object.freeze(PALETTE_PRESETS.map((preset) => preset.
 const BUILTIN_PRESETS = [
     {
         id: 'point-click-default',
-        name: 'Point & Click Default',
+        name: 'Dense Color ASCII',
         readonly: true,
         transitionSeconds: 1.5,
         params: {
@@ -456,31 +479,7 @@ const BUILTIN_PRESETS = [
         name: 'Classic Camera ASCII',
         readonly: true,
         transitionSeconds: 1.1,
-        params: {
-            backend: 'canvas2d',
-            cols: 170,
-            autoRows: true,
-            cellWidth: 6,
-            cellHeight: 9,
-            saturationBoost: 0,
-            contrastBoost: 1.75,
-            brightness: 1.08,
-            gamma: 1,
-            bgBlend: 0.04,
-            quantizeBits: 0,
-            jitterAmount: 0.32,
-            jitterSpeed: 0.85,
-            sampleX: 0.5,
-            sampleY: 0.5,
-            smoothing: false,
-            solidMode: false,
-            glyphMode: true,
-            charset: 'classic-camera',
-            fontFamily: 'Courier New',
-            mode: 1,
-            pixel: false,
-            codecQuality: 'balanced'
-        }
+        params: CLASSIC_CAMERA_ASCII_PARAMS
     },
     {
         id: 'ansi-newsprint',
@@ -872,6 +871,7 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.7,
         params: {
+            backend: 'canvas2d',
             cols: 240,
             cellWidth: 8,
             cellHeight: 12,
@@ -1367,6 +1367,17 @@ const BUILTIN_PRESETS_DISPLAY = [
     ...BUILTIN_PRESET_DISPLAY_ORDER.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean),
     ...BUILTIN_PRESETS.filter((preset) => !BUILTIN_PRESET_DISPLAY_ORDER.includes(preset.id))
 ];
+const PRESET_NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+
+function sortPresetsByName(presets) {
+    return [...presets].sort((left, right) => (
+        PRESET_NAME_COLLATOR.compare(left.name, right.name) || String(left.id).localeCompare(String(right.id))
+    ));
+}
+
+function normalizePresetSearch(value) {
+    return String(value || '').trim().toLocaleLowerCase('en-US');
+}
 const ASCII_WTF_PRESETS = ASCII_WTF_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 const WTF_ANCHOR_PRESETS = WTF_ANCHOR_PRESET_IDS.map((id) => BUILTIN_PRESET_BY_ID.get(id)).filter(Boolean);
 const CANVAS_ASCII_JITTER_MIGRATIONS = ASCII_WTF_PRESETS.map((preset) => ({
@@ -1405,7 +1416,7 @@ const CONTROL_GROUPS = [
         title: 'Grid',
         controls: [
             { key: 'cols', label: 'Columns', type: 'range', min: 80, max: ADVANCED_MAX_COLUMNS, step: 1 },
-            { key: 'advancedDensity', label: 'Advanced density', type: 'checkbox' },
+            { key: 'advancedDensity', label: 'Advanced density', description: 'Up to 900 columns · no 30 FPS guarantee', type: 'checkbox' },
             { key: 'autoRows', label: 'Auto rows', type: 'checkbox' },
             { key: 'rows', label: 'Rows', type: 'range', min: 20, max: 360, step: 1 },
             { key: 'cellWidth', label: 'Cell width', type: 'range', min: 1, max: 12, step: 1, unit: 'px' },
@@ -1422,7 +1433,7 @@ const CONTROL_GROUPS = [
             { key: 'gamma', label: 'Gamma', type: 'range', min: 0.2, max: 3, step: 0.01 },
             { key: 'bgBlend', label: 'Background blend', type: 'range', min: 0, max: 1, step: 0.01 },
             { key: 'quantizeBits', label: 'Quantize bits', type: 'range', min: 0, max: 6, step: 1 },
-            { key: 'paletteId', label: 'Palette', type: 'select', compactSelect: true, options: PALETTE_OPTIONS },
+            { key: 'paletteId', label: 'Palette', type: 'select', options: PALETTE_OPTIONS },
             { key: 'paletteMapping', label: 'Palette mapping', type: 'select', options: [['nearest', 'Nearest color'], ['luminance', 'Luminance ramp']] },
             { key: 'mode', label: 'Stream mode', type: 'select', options: [['1', '1 B&W'], ['2', '2 512c'], ['3', '3 32K'], ['4', '4 262K'], ['5', '5 16M']] },
             { key: 'pixel', label: 'Pixel stream', type: 'checkbox' }
@@ -1479,8 +1490,7 @@ const CONTROL_GROUPS = [
         controls: [
             { key: 'glyphMode', label: 'Glyph mode', type: 'checkbox' },
             { key: 'solidMode', label: 'Solid mode', type: 'checkbox' },
-            { key: 'atlasStyle', label: 'Atlas style', type: 'select', options: [['neutral', 'Neutral']] },
-            { key: 'charset', label: 'Glyph set', type: 'select', compactSelect: true, options: CHARACTER_SET_OPTIONS },
+            { key: 'charset', label: 'Glyph set', type: 'select', options: CHARACTER_SET_OPTIONS },
             { key: 'customGlyphRamp', label: 'Custom ramp', type: 'text', maxScalars: 96, placeholder: 'Type up to 96 glyphs' },
             { key: 'glyphDepth', label: 'Glyph depth', type: 'range', min: 1, max: 96, step: 1 },
             { key: 'glyphOffset', label: 'Glyph offset', type: 'range', min: 0, max: 95, step: 1 },
@@ -1488,7 +1498,7 @@ const CONTROL_GROUPS = [
             { key: 'glyphColorMode', label: 'Glyph color', type: 'select', options: [['source', 'Source color'], ['fixed', 'Fixed color'], ['palette', 'Palette color']] },
             { key: 'glyphColor', label: 'Fixed glyph color', type: 'color' },
             { key: 'backgroundColor', label: 'Background color', type: 'color' },
-            { key: 'fontFamily', label: 'Font family', type: 'select', compactSelect: true, options: FONT_FAMILY_OPTIONS },
+            { key: 'fontFamily', label: 'Font family', type: 'select', options: FONT_FAMILY_OPTIONS },
             { key: 'minGlyphIntensity', label: 'Min glyph intensity', type: 'range', min: 0, max: 255, step: 1 }
         ]
     }
@@ -1791,7 +1801,8 @@ async function saveCustomFileHandle(handle) {
 
 function findSourcePreset(mediaUrl, mediaType) {
     return SOURCE_PRESETS.find((preset) =>
-        preset.mediaUrl === mediaUrl && (!mediaType || mediaType === 'auto' || preset.mediaType === mediaType)
+        (preset.mediaUrl === mediaUrl || (preset.id === 'demo-video' && isBundledDemoVideoUrl(mediaUrl))) &&
+        (!mediaType || mediaType === 'auto' || preset.mediaType === mediaType)
     );
 }
 
@@ -1887,6 +1898,11 @@ function normalizeParams(params, options = {}) {
         out.mediaType = DEFAULT_PARAMS.mediaType;
         out.sourceName = DEFAULT_PARAMS.sourceName;
     }
+    if (isBundledDemoVideoUrl(out.mediaUrl)) {
+        out.mediaUrl = bundledDemoVideoUrl();
+        out.mediaType = 'video';
+        out.sourceName = 'Demo Video';
+    }
     if (!['auto', 'image', 'video', 'camera'].includes(out.mediaType)) out.mediaType = mediaTypeFromName(out.mediaUrl);
     const matchedSource = hasRuntimeCustomMedia ? null : findSourcePreset(out.mediaUrl, out.mediaType);
     if (matchedSource && out.mediaType === 'auto') out.mediaType = matchedSource.mediaType;
@@ -1931,6 +1947,7 @@ function normalizeParams(params, options = {}) {
             out[key] = sanitizeHexColor(out[key], DEFAULT_PARAMS[key]);
         }
     }
+    if (out.atlasStyle !== 'neutral') out.atlasStyle = 'neutral';
     out.customGlyphRamp = sanitizeGlyphRamp(out.customGlyphRamp);
     out.glyphColor = sanitizeHexColor(out.glyphColor, DEFAULT_PARAMS.glyphColor);
     out.backgroundColor = sanitizeHexColor(out.backgroundColor, DEFAULT_PARAMS.backgroundColor);
@@ -2191,8 +2208,11 @@ function errorCrashContext(error) {
 
 function crashReportPreview(state) {
     const reports = Array.isArray(state?.reports) ? state.reports : [];
-    if (!reports.length) return 'No pending diagnostic reports.';
-    return reports.map((report, index) => {
+    const localOnlyNotice = state?.production === false
+        ? 'Development build: reports stay on this device and cannot be submitted.\n\n'
+        : '';
+    if (!reports.length) return `${localOnlyNotice}No pending diagnostic reports.`;
+    return localOnlyNotice + reports.map((report, index) => {
         const context = report.context ? JSON.stringify(report.context, null, 2) : '{}';
         return [
             `#${index + 1} ${report.kind || 'crash'} / ${report.surface || 'unknown'}`,
@@ -2487,7 +2507,8 @@ function captureVideoPlaybackState(source, params, nextParams = params) {
         muted: video.muted,
         loop: video.loop,
         volume: video.volume,
-        capturedAt: performance.now()
+        capturedAt: performance.now(),
+        capturedAtUnixMs: Date.now()
     };
 }
 
@@ -2718,8 +2739,8 @@ function canvasVisualSignal(canvas) {
     const empty = { visible: false, maxLuma: 0, avgLuma: 0, visibleRatio: 0 };
     if (!canvas?.width || !canvas?.height) return empty;
     const sample = document.createElement('canvas');
-    sample.width = Math.min(120, canvas.width);
-    sample.height = Math.min(90, canvas.height);
+    sample.width = Math.min(960, canvas.width);
+    sample.height = Math.min(540, canvas.height);
     const ctx = sample.getContext('2d', { willReadFrequently: true });
     if (!ctx) return empty;
 
@@ -3847,10 +3868,12 @@ class CanvasStaticRenderer {
         this.paletteLut = null;
         this.glyphRamp = '';
         this.colorCssCache = new Map();
+        this.readbackBlocked = false;
     }
 
     async start(params, options = {}) {
         this.requestedParams = { ...params };
+        this.readbackBlocked = false;
         this.ownsSource = options.ownsSource !== false;
         this.source = options.source || await loadMediaSource(params.mediaUrl, {
             type: forcedMediaType(params),
@@ -3970,6 +3993,7 @@ class CanvasStaticRenderer {
     }
 
     renderFrame() {
+        if (this.readbackBlocked) return;
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
         const cols = this.params.cols;
@@ -3989,7 +4013,18 @@ class CanvasStaticRenderer {
         } catch {
             return;
         }
-        const img = this.offctx.getImageData(0, 0, sampleWidth, sampleHeight);
+        const img = safeCanvasImageData(
+            this.offctx,
+            0,
+            0,
+            sampleWidth,
+            sampleHeight,
+            (error) => {
+                this.readbackBlocked = true;
+                console.info('[CanvasRenderer] Source pixel readback unavailable:', error);
+            }
+        );
+        if (!img) return;
         const data = img.data;
         const ctx = this.ctx;
         const time = this.frameCount / Math.max(1, this.params.fps || DEFAULT_PARAMS.fps);
@@ -4072,19 +4107,7 @@ class StaticRuntime {
     }
 
     _canvasRendererDecision(params) {
-        const explicitCanvas = params.backend === 'canvas2d' || params.backend === 'pixel-canvas';
-        const compatibilityReason = explicitCanvas
-            ? ''
-            : glyphPreviewCompatibilityReason(
-                params,
-                navigator.userAgent || '',
-                isTauriRuntime()
-            );
-        if (!explicitCanvas && !compatibilityReason) return null;
-        return {
-            params: params.backend === 'pixel-canvas' ? params : { ...params, backend: 'canvas2d' },
-            compatibilityReason
-        };
+        return explicitCanvasRendererDecision(params);
     }
 
     _ensureCurrentRendererLayer() {
@@ -5465,6 +5488,7 @@ class MidiControllerRuntime {
 
 class RendererLabApp {
     constructor() {
+        const hasStoredParams = localStorage.getItem(STORAGE_KEY) !== null;
         this.params = startupSafeParams(migrateStoredParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS)));
         this.effectiveParams = null;
         this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS };
@@ -5477,7 +5501,8 @@ class RendererLabApp {
         this.midiRuntime = new MidiControllerRuntime(this);
         this._midiTargetDescriptors = null;
         this.userPresets = parseStoredJson(PRESET_KEY, []);
-        this.activePresetId = 'point-click-default';
+        this.activePresetId = hasStoredParams ? null : DEFAULT_PRESET_ID;
+        this.presetSearchQuery = '';
         this.transitionToken = 0;
         this.staticRuntime = new StaticRuntime(this);
         this.streamRuntime = new StreamRuntime(this);
@@ -5514,6 +5539,11 @@ class RendererLabApp {
         this.nativeOutputSyncOkCount = 0;
         this.nativeOutputSyncFailedCount = 0;
         this.nativeOutputLastSyncElapsedMs = 0;
+        this.nativeOutputTransition = null;
+        this.nativeOutputTransitionArming = false;
+        this.nativeOutputTransitionArmAttemptCount = 0;
+        this.nativeOutputTransitionArmOkCount = 0;
+        this.nativeOutputTransitionArmFailedCount = 0;
         this.uiPerfSmokeActive = false;
         this.outputDisplay = parseStoredJson(OUTPUT_DISPLAY_KEY, 'auto');
         this.outputDisplays = [];
@@ -5593,12 +5623,9 @@ class RendererLabApp {
                 message: event.message || errorMessage(event.error),
                 stack: errorStack(event.error),
                 context: {
-                    filename: event.filename || '',
+                    source: crashReportSourceLabel(event.filename),
                     lineno: event.lineno || 0,
                     colno: event.colno || 0,
-                    backend: this.params.backend,
-                    sourceMode: this.params.sourceMode,
-                    nativeOutputActive: this.nativeOutputActive,
                     ...errorCrashContext(event.error)
                 }
             }).catch((error) => console.warn('[CrashReporter] Window error capture failed:', error));
@@ -5609,18 +5636,28 @@ class RendererLabApp {
                 surface: 'frontend',
                 message: errorMessage(event.reason),
                 stack: errorStack(event.reason),
-                context: {
-                    backend: this.params.backend,
-                    sourceMode: this.params.sourceMode,
-                    nativeOutputActive: this.nativeOutputActive,
-                    ...errorCrashContext(event.reason)
-                }
+                context: errorCrashContext(event.reason)
             }).catch((error) => console.warn('[CrashReporter] Rejection capture failed:', error));
         });
         await this._refreshCrashReportState();
-        if (this.crashReportState?.preference === 'always' && this.crashReportState?.pendingCount > 0) {
+        if (this.crashReportState?.production
+            && this.crashReportState?.preference === 'always'
+            && this.crashReportState?.pendingCount > 0) {
             await this._sendCrashReports({ automatic: true });
         }
+    }
+
+    _crashReportContext() {
+        const stats = this.staticRuntime?.getStats?.() || {};
+        return {
+            backend: this.params.backend,
+            requestedBackend: this.params.backend,
+            actualBackend: stats.backend || '',
+            presetId: this.activePresetId || '',
+            sourceMode: this.params.sourceMode,
+            mediaType: this.params.mediaType,
+            nativeOutputActive: this.nativeOutputActive
+        };
     }
 
     async _captureCrashReport(report) {
@@ -5628,15 +5665,12 @@ class RendererLabApp {
         const state = await captureTauriCrashReport({
             ...report,
             context: {
-                backend: this.params.backend,
-                sourceMode: this.params.sourceMode,
-                mediaType: this.params.mediaType,
-                nativeOutputActive: this.nativeOutputActive,
+                ...this._crashReportContext(),
                 ...(report.context || {})
             }
         });
         this._setCrashReportState(state);
-        if (state?.preference === 'always' && state?.pendingCount > 0) {
+        if (state?.production && state?.preference === 'always' && state?.pendingCount > 0) {
             await this._sendCrashReports({ automatic: true });
         }
     }
@@ -5743,7 +5777,9 @@ class RendererLabApp {
         if (!isTauriRuntime()) return;
         try {
             this._setCrashReportState(await setTauriCrashReportPreference(value));
-            if (value === 'always' && this.crashReportState?.pendingCount > 0) {
+            if (value === 'always'
+                && this.crashReportState?.production
+                && this.crashReportState?.pendingCount > 0) {
                 await this._sendCrashReports({ automatic: true });
             }
         } catch (error) {
@@ -5753,6 +5789,7 @@ class RendererLabApp {
 
     async _sendCrashReports(options = {}) {
         if (!isTauriRuntime() || this.crashReportBusy) return;
+        if (!this.crashReportState?.production) return;
         if (this.crashReportState?.preference === 'off') return;
         this.crashReportBusy = true;
         this._syncCrashReportUi();
@@ -6260,10 +6297,26 @@ class RendererLabApp {
         }
     }
 
-    _shouldUseTauriRawVideoSource(params) {
+    _canUseTauriRawVideoSource(params) {
         if (!isTauriRuntime() || params.mediaType !== 'video') return false;
-        if (!this.customTauriFile?.id || params.mediaUrl !== this.customTauriFile.url) return false;
-        return isMkvName(this.customTauriFile.name || params.mediaUrl);
+        return Boolean(this._tauriRawVideoFile(params));
+    }
+
+    _tauriRawVideoFile(params) {
+        return nativeVideoFallbackSource(params, this.customTauriFile);
+    }
+
+    _shouldUseTauriRawVideoSource(params) {
+        if (!isTauriRuntime()) return false;
+        const file = this._tauriRawVideoFile(params);
+        return Boolean(file && isMkvName(file.name || params.mediaUrl));
+    }
+
+    async _loadTauriRawVideoSource(params, options) {
+        const file = this._tauriRawVideoFile(params);
+        if (!file) throw new Error('Native video source is unavailable');
+        const source = new TauriRawVideoSource(file, params, options);
+        return source.start();
     }
 
     async loadStaticSource(params, options = {}) {
@@ -6279,14 +6332,19 @@ class RendererLabApp {
 
         this._stopCameraStream();
         if (this._shouldUseTauriRawVideoSource(params)) {
-            const source = new TauriRawVideoSource(this.customTauriFile, params, options);
-            return source.start();
+            return this._loadTauriRawVideoSource(params, options);
         }
-        return loadMediaSource(params.mediaUrl, {
-            type: forcedMediaType(params),
-            loop: params.loop,
-            muted: params.muted
-        });
+        try {
+            return await loadMediaSource(params.mediaUrl, {
+                type: forcedMediaType(params),
+                loop: params.loop,
+                muted: params.muted
+            });
+        } catch (error) {
+            if (!this._canUseTauriRawVideoSource(params)) throw error;
+            console.warn('[Source] Platform video decoder failed; retrying with bundled FFmpeg:', error);
+            return this._loadTauriRawVideoSource(params, options);
+        }
     }
 
     _cameraSourceEntry() {
@@ -6420,16 +6478,26 @@ class RendererLabApp {
             for (const config of group.controls) {
                 const row = document.createElement('div');
                 row.className = 'control-row';
-                if (config.compactSelect) row.classList.add('compact-select');
                 row.dataset.controlKey = config.key;
+                row.dataset.controlType = config.type;
                 const label = document.createElement('label');
                 label.className = 'control-label';
                 label.htmlFor = `control-${config.key}`;
-                label.innerHTML = `<span>${config.label}</span><small>${config.key}</small>`;
+                const labelText = document.createElement('span');
+                labelText.textContent = config.label;
+                label.appendChild(labelText);
+                if (config.description) {
+                    const description = document.createElement('small');
+                    description.id = `description-${config.key}`;
+                    description.textContent = config.description;
+                    label.appendChild(description);
+                }
                 const input = this._makeControl(config);
+                if (config.description) input.setAttribute('aria-describedby', `description-${config.key}`);
                 const value = document.createElement('output');
                 value.className = 'control-value';
                 value.id = `value-${config.key}`;
+                if (config.type === 'select') value.hidden = true;
                 row.append(label, input, value);
                 section.appendChild(row);
                 this.controlInputs.set(config.key, { input, value, config, row, section });
@@ -6551,17 +6619,29 @@ class RendererLabApp {
         els.duplicatePreset.addEventListener('click', () => this._duplicatePreset());
         els.updatePreset.addEventListener('click', () => this._updatePreset());
         els.deletePreset.addEventListener('click', () => this._deletePreset());
+        els.presetSearch?.addEventListener('input', () => {
+            this.presetSearchQuery = normalizePresetSearch(els.presetSearch.value);
+            this._renderPresets();
+        });
+        els.presetSearch?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !els.presetSearch.value) return;
+            event.preventDefault();
+            event.stopPropagation();
+            els.presetSearch.value = '';
+            this.presetSearchQuery = '';
+            this._renderPresets();
+        });
         els.morePresets.addEventListener('click', (event) => {
             event.stopPropagation();
             this._togglePresetOverflow();
         });
         els.presetOverflowMenu.addEventListener('click', (event) => event.stopPropagation());
         els.exportPresets.addEventListener('click', () => {
-            this._closePresetOverflow();
+            this._closePresetOverflow({ restoreFocus: true });
             this._exportPresets();
         });
         els.importPresets.addEventListener('click', () => {
-            this._closePresetOverflow();
+            this._closePresetOverflow({ restoreFocus: true });
             this._importPresets();
         });
         els.popoutWindow.addEventListener('click', () => this.openPopout());
@@ -6621,7 +6701,7 @@ class RendererLabApp {
         document.addEventListener('click', () => this._closePresetOverflow());
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
-                this._closePresetOverflow();
+                this._closePresetOverflow({ restoreFocus: true });
                 this._closeCrashReportDialog();
             }
         });
@@ -6700,6 +6780,9 @@ class RendererLabApp {
             failures: [],
             backends: {},
             glyphBackends: {},
+            acceleratedEligible: 0,
+            acceleratedPassed: 0,
+            canvasEligible: 0,
             source: 'media/demo.svg'
         };
 
@@ -6746,13 +6829,11 @@ class RendererLabApp {
                         Math.max(1, Number(renderer?.canvas?.height || 0));
                     const ratioError = sourceRatio > 0 ? Math.abs(canvasRatio - sourceRatio) / sourceRatio : 1;
                     const expectsCanvas = preset.params.backend === 'canvas2d' ||
-                        preset.params.backend === 'pixel-canvas' ||
-                        needsCompatibilityCanvasGlyphPreview(
-                            target,
-                            navigator.userAgent || '',
-                            isTauriRuntime()
-                        );
-                    const backendOk = !expectsCanvas || backend === 'canvas2d' || backend === 'pixel-canvas';
+                        preset.params.backend === 'pixel-canvas';
+                    const expectsAcceleration = !expectsCanvas && STATIC_GPU_BACKENDS.has(target.backend);
+                    const usesCanvas = backend === 'canvas2d' || backend === 'pixel-canvas';
+                    const usesAcceleration = backend === 'webgpu' || backend === 'webgl2';
+                    const backendOk = expectsCanvas ? usesCanvas : !expectsAcceleration || usesAcceleration;
                     const glError = Number(renderer?.gl?.getError?.() || 0);
                     const reasons = [];
                     if (!signal.visible) reasons.push('blank');
@@ -6762,6 +6843,11 @@ class RendererLabApp {
                     if (glError) reasons.push(`gl:${glError}`);
 
                     report.backends[backend] = (report.backends[backend] || 0) + 1;
+                    if (expectsCanvas) report.canvasEligible += 1;
+                    if (expectsAcceleration) {
+                        report.acceleratedEligible += 1;
+                        if (usesAcceleration) report.acceleratedPassed += 1;
+                    }
                     if (target.glyphMode && !target.solidMode) {
                         report.glyphBackends[backend] = (report.glyphBackends[backend] || 0) + 1;
                     }
@@ -6773,6 +6859,13 @@ class RendererLabApp {
                 } catch (error) {
                     report.failures.push({ id: preset.id, reasons: [diagnosticErrorLabel(error)] });
                 }
+            }
+            report.backendContract = validateBuiltInPresetBackendContract(report);
+            if (!report.backendContract.ok) {
+                report.failures.push({
+                    id: '__preset-backend-contract__',
+                    reasons: report.backendContract.mismatches
+                });
             }
             report.ok = report.passed === report.presetCount && report.failures.length === 0;
         } finally {
@@ -6800,12 +6893,16 @@ class RendererLabApp {
         const ditherMode = String(payload.ditherMode || DEFAULT_PARAMS.ditherMode);
         const charset = String(payload.charset || DEFAULT_PARAMS.charset);
         const soak = payload.soak === true;
+        const structuralTransitions = payload.structuralTransitions === true;
         const sourceName = sourceNameFromUrl(mediaUrl) || 'UI Perf Demo';
         const startedAt = performance.now();
         const syncStart = {
             attempts: this.nativeOutputSyncAttemptCount,
             ok: this.nativeOutputSyncOkCount,
-            failed: this.nativeOutputSyncFailedCount
+            failed: this.nativeOutputSyncFailedCount,
+            transitionAttempts: this.nativeOutputTransitionArmAttemptCount,
+            transitionOk: this.nativeOutputTransitionArmOkCount,
+            transitionFailed: this.nativeOutputTransitionArmFailedCount
         };
         let sampledRenderer = null;
         let rendererChanges = 0;
@@ -6828,12 +6925,16 @@ class RendererLabApp {
                 rendererAnimationId: Number(renderer?.animationId || renderer?.raf || 0),
                 videoReadyState: Number(this.staticRuntime.source?.element?.readyState ?? -1),
                 videoPaused: Boolean(this.staticRuntime.source?.element?.paused),
+                videoCurrentTime: Number(this.staticRuntime.source?.element?.currentTime || 0),
                 cols: Number(stats?.cols || this.params.cols || 0),
                 rows: Number(stats?.rows || computeRows(this.params) || 0),
                 nativeAttempts: this.nativeOutputSyncAttemptCount - syncStart.attempts,
                 nativeOk: this.nativeOutputSyncOkCount - syncStart.ok,
                 nativeFailed: this.nativeOutputSyncFailedCount - syncStart.failed,
-                nativeLastSyncMs: this.nativeOutputLastSyncElapsedMs
+                nativeLastSyncMs: this.nativeOutputLastSyncElapsedMs,
+                nativeTransitionAttempts: this.nativeOutputTransitionArmAttemptCount - syncStart.transitionAttempts,
+                nativeTransitionOk: this.nativeOutputTransitionArmOkCount - syncStart.transitionOk,
+                nativeTransitionFailed: this.nativeOutputTransitionArmFailedCount - syncStart.transitionFailed
             };
         };
 
@@ -6849,6 +6950,7 @@ class RendererLabApp {
             ditherMode,
             charset,
             soak,
+            structuralTransitions,
             samples: [],
             phases: {},
             mainAvgFps: 0,
@@ -6861,11 +6963,14 @@ class RendererLabApp {
             nativeSyncHz: 0,
             nativeOkHz: 0,
             nativeFailed: 0,
+            nativeTransitionArmed: 0,
+            nativeTransitionFailed: 0,
             outputDisplayCount: 0,
             rendererChanges: 0,
             frameResetCount: 0,
             finalFrameCount: 0,
             hasVisibleSignal: false,
+            videoTimeAdvanced: false,
             error: null
         };
 
@@ -7027,6 +7132,10 @@ class RendererLabApp {
                     sampleY: 0.38
                 }
             ];
+            if (structuralTransitions) {
+                Object.assign(transitionTargets[0], { glyphMode: false, solidMode: true });
+                Object.assign(transitionTargets[1], { glyphMode: true, solidMode: false });
+            }
             if (soak) {
                 await this.openPopout();
                 await wait(1000);
@@ -7072,28 +7181,42 @@ class RendererLabApp {
             report.nativeSyncHz = overall.nativeSyncHz;
             report.nativeOkHz = overall.nativeOkHz;
             report.nativeFailed = Math.max(0, this.nativeOutputSyncFailedCount - syncStart.failed);
+            report.nativeTransitionArmed = Math.max(0, this.nativeOutputTransitionArmOkCount - syncStart.transitionOk);
+            report.nativeTransitionFailed = Math.max(0, this.nativeOutputTransitionArmFailedCount - syncStart.transitionFailed);
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
+            const videoTimes = usable.map((item) => item.videoCurrentTime).filter(Number.isFinite);
+            report.videoTimeAdvanced = videoTimes.length > 1 &&
+                Math.max(...videoTimes) - Math.min(...videoTimes) > 0.05;
             for (let attempt = 0; attempt < 3 && !report.hasVisibleSignal; attempt++) {
                 report.hasVisibleSignal = canvasHasVisibleSignal(this.staticRuntime.renderer?.canvas);
                 if (!report.hasVisibleSignal) await wait(100);
             }
+            // A 30 FPS timer commonly measures just below 30 because sample
+            // boundaries do not land exactly on frame boundaries.
+            const steadyFpsFloor = Math.max(
+                1,
+                Math.min(30, Number(this.params.fpsCap || DEFAULT_PARAMS.fpsCap)) - 0.5
+            );
             report.ok = soak
                 ? (
                     report.phases.soak.mainAvgFps >= 30 &&
                     report.phases.soak.mainP95FrameMs <= 33.3 &&
                     report.phases.soak.nativeOkHz >= 30 &&
                     report.hasVisibleSignal &&
+                    report.videoTimeAdvanced &&
                     report.nativeFailed === 0
                 )
                 : (
-                    report.phases.main.mainAvgFps >= 30 &&
+                    report.phases.main.mainAvgFps >= steadyFpsFloor &&
                     report.phases.popout.mainAvgFps >= 24 &&
                     report.phases.transition.mainAvgFps >= 24 &&
-                    (!hasSecondaryOutput || report.phases.transition.nativeOkHz >= 30) &&
+                    (!hasSecondaryOutput || report.nativeTransitionArmed > 0 || report.phases.transition.nativeOkHz >= 30) &&
                     report.hasVisibleSignal &&
-                    report.nativeFailed === 0
+                    report.videoTimeAdvanced &&
+                    report.nativeFailed === 0 &&
+                    report.nativeTransitionFailed === 0
                 );
         } catch (error) {
             report.error = diagnosticErrorLabel(error);
@@ -7122,14 +7245,18 @@ class RendererLabApp {
                 ditherMode: report.ditherMode,
                 charset: report.charset,
                 soak: report.soak,
+                structuralTransitions: report.structuralTransitions,
                 phases: compactPhases,
                 actualBackends: report.actualBackends,
                 nativeFailed: report.nativeFailed,
+                nativeTransitionArmed: report.nativeTransitionArmed,
+                nativeTransitionFailed: report.nativeTransitionFailed,
                 outputDisplayCount: report.outputDisplayCount,
                 rendererChanges: report.rendererChanges,
                 frameResetCount: report.frameResetCount,
                 finalFrameCount: report.finalFrameCount,
                 hasVisibleSignal: report.hasVisibleSignal,
+                videoTimeAdvanced: report.videoTimeAdvanced,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (
@@ -8003,14 +8130,52 @@ button:hover{background:#202a35}
         };
     }
 
-    _nativeOutputPayload(params = this.renderParams()) {
-        const cameraMeta = this._nativeCameraOutputMeta(this.params);
+    _nativeOutputParams(params, cameraMeta = this._nativeCameraOutputMeta(this.params)) {
         const effective = effectiveGridParams(
             params,
             cameraMeta?.captureWidth || this.gpu?.source?.width || 1920,
             cameraMeta?.captureHeight || this.gpu?.source?.height || 1080,
             'webgpu'
         );
+        return {
+            ...effective,
+            paletteColors: paletteById(params.paletteId)?.colors || [],
+            glyphMode: this._nativeOutputGlyphMode(params),
+            charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
+            sourceMode: this.params.sourceMode,
+            mediaUrl: this.params.mediaUrl,
+            mediaType: this.params.mediaType,
+            sourceName: this.params.sourceName,
+            loop: this.params.loop,
+            muted: this.params.muted,
+            volume: this.params.volume,
+            cameraDeviceLabel: cameraMeta?.deviceLabel || '',
+            cameraSelectedDeviceLabels: cameraMeta?.selectedLabels || [],
+            cameraResolution: this.params.cameraResolution,
+            cameraCaptureWidth: cameraMeta?.captureWidth || null,
+            cameraCaptureHeight: cameraMeta?.captureHeight || null,
+            cameraFps: this.params.cameraFps,
+            cameraMirror: cameraMeta ? this.params.cameraMirror : null,
+            mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
+            // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
+            nativeWtfActive: false,
+            audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
+            audioReactiveSource: this.audioReactive.source,
+            audioReactivePreset: this.audioReactive.preset,
+            audioReactiveSensitivity: this.audioReactive.sensitivity,
+            audioReactiveBeatAmount: this.audioReactive.beatAmount,
+            audioReactiveBassAmount: this.audioReactive.bassAmount,
+            audioReactiveMidAmount: this.audioReactive.midAmount,
+            audioReactiveTrebleAmount: this.audioReactive.trebleAmount,
+            audioReactiveFluxAmount: this.audioReactive.fluxAmount,
+            audioReactivePresenceAmount: this.audioReactive.presenceAmount,
+            audioReactiveDensityDampening: this.audioReactive.densityDampening,
+            audioReactiveNoiseFloor: this.audioReactive.noiseFloor
+        };
+    }
+
+    _nativeOutputPayload(params = this.renderParams(), transition = null) {
+        const cameraMeta = this._nativeCameraOutputMeta(this.params);
         const outputMode = cameraMeta
             ? 'native-camera'
             : this._canUseNativeRenderOutputWindow(this.params)
@@ -8020,42 +8185,14 @@ button:hover{background:#202a35}
             outputMode,
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
-            params: {
-                ...effective,
-                paletteColors: paletteById(params.paletteId)?.colors || [],
-                glyphMode: this._nativeOutputGlyphMode(params),
-                charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
-                sourceMode: this.params.sourceMode,
-                mediaUrl: this.params.mediaUrl,
-                mediaType: this.params.mediaType,
-                sourceName: this.params.sourceName,
-                loop: this.params.loop,
-                muted: this.params.muted,
-                volume: this.params.volume,
-                cameraDeviceLabel: cameraMeta?.deviceLabel || '',
-                cameraSelectedDeviceLabels: cameraMeta?.selectedLabels || [],
-                cameraResolution: this.params.cameraResolution,
-                cameraCaptureWidth: cameraMeta?.captureWidth || null,
-                cameraCaptureHeight: cameraMeta?.captureHeight || null,
-                cameraFps: this.params.cameraFps,
-                cameraMirror: cameraMeta ? this.params.cameraMirror : null,
-                mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
-                // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
-                nativeWtfActive: false,
-                audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
-                audioReactiveSource: this.audioReactive.source,
-                audioReactivePreset: this.audioReactive.preset,
-                audioReactiveSensitivity: this.audioReactive.sensitivity,
-                audioReactiveBeatAmount: this.audioReactive.beatAmount,
-                audioReactiveBassAmount: this.audioReactive.bassAmount,
-                audioReactiveMidAmount: this.audioReactive.midAmount,
-                audioReactiveTrebleAmount: this.audioReactive.trebleAmount,
-                audioReactiveFluxAmount: this.audioReactive.fluxAmount,
-                audioReactivePresenceAmount: this.audioReactive.presenceAmount,
-                audioReactiveDensityDampening: this.audioReactive.densityDampening,
-                audioReactiveNoiseFloor: this.audioReactive.noiseFloor
-            },
-            mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null
+            params: this._nativeOutputParams(params, cameraMeta),
+            mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null,
+            transition: transition ? {
+                kind: transition.kind,
+                startAtUnixMs: transition.startAtUnixMs,
+                durationMs: transition.durationMs,
+                fromParams: this._nativeOutputParams(transition.fromParams, cameraMeta)
+            } : null
         };
     }
 
@@ -8104,8 +8241,9 @@ button:hover{background:#202a35}
         return false;
     }
 
-    _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0) {
+    _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0, options = {}) {
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) return;
+        if (!options.force && (this.nativeOutputTransitionArming || this.nativeOutputTransition)) return;
         const payload = this._nativeOutputPayload(params);
         this.nativeOutputPendingPayload = payload;
         this.nativeOutputPendingMinInterval = Math.max(0, Number(minIntervalMs) || 0);
@@ -8168,6 +8306,77 @@ button:hover{background:#202a35}
         this.nativeOutputPendingPayload = null;
         this.nativeOutputPendingMinInterval = 0;
         this.nativeOutputSyncInFlight = false;
+        this.nativeOutputTransition = null;
+        this.nativeOutputTransitionArming = false;
+    }
+
+    async _armNativeOutputTransition(from, to, durationMs, kind, token) {
+        if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        this.nativeOutputTransitionArming = true;
+        const waitDeadline = performance.now() + 750;
+        while (this.nativeOutputSyncInFlight && performance.now() < waitDeadline) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1));
+        }
+        if (token !== this.transitionToken || this.nativeOutputSyncInFlight) {
+            this.nativeOutputTransitionArming = false;
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        if (this.nativeOutputSyncTimer) {
+            window.clearTimeout(this.nativeOutputSyncTimer);
+            this.nativeOutputSyncTimer = null;
+        }
+        this.nativeOutputPendingPayload = null;
+        this.nativeOutputPendingMinInterval = 0;
+
+        const startAtUnixMs = Date.now() + NATIVE_OUTPUT_TRANSITION_LEAD_MS;
+        const payload = this._nativeOutputPayload(to, {
+            kind,
+            startAtUnixMs,
+            durationMs,
+            fromParams: from
+        });
+        const syncStartedAt = performance.now();
+        this.nativeOutputSyncInFlight = true;
+        this.nativeOutputSyncAttemptCount++;
+        this.nativeOutputTransitionArmAttemptCount++;
+        let ok = false;
+        try {
+            ok = await sendTauriOutputState(payload);
+            if (ok) {
+                this.nativeOutputSyncOkCount++;
+                this.nativeOutputTransitionArmOkCount++;
+                this.nativeOutputLastSyncElapsedMs = performance.now() - syncStartedAt;
+            } else {
+                this.nativeOutputSyncFailedCount++;
+                this.nativeOutputTransitionArmFailedCount++;
+                this.nativeOutputActive = false;
+            }
+        } finally {
+            this.nativeOutputSyncInFlight = false;
+            this.nativeOutputTransitionArming = false;
+        }
+
+        if (!ok || token !== this.transitionToken) {
+            if (!ok) {
+                this._stopNativeOutputMirror();
+                this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputLost');
+                this._updatePopoutButton();
+            }
+            return { armed: false, startAtUnixMs: Date.now() };
+        }
+
+        this.nativeOutputTransition = { token, kind, startAtUnixMs, durationMs };
+        return { armed: true, startAtUnixMs };
+    }
+
+    _finishNativeOutputTransition(token, params = this.renderParams()) {
+        if (this.nativeOutputTransition?.token !== token) return;
+        this.nativeOutputTransition = null;
+        this._syncNativeOutputWindow(params, 0, { force: true });
     }
 
     _syncNativeOutputMode(outputMode = this._nativeOutputPayload().outputMode) {
@@ -8793,6 +9002,13 @@ button:hover{background:#202a35}
         return [...BUILTIN_PRESETS_DISPLAY, ...this.userPresets];
     }
 
+    _alphabeticalPresets() {
+        return [
+            ...sortPresetsByName(BUILTIN_PRESETS_DISPLAY),
+            ...sortPresetsByName(this.userPresets)
+        ];
+    }
+
     _currentPresetName() {
         if (this.wtfActive) return 'WTF';
         const active = this._allPresets().find((p) => p.id === this.activePresetId);
@@ -8801,29 +9017,81 @@ button:hover{background:#202a35}
 
     _renderPresets() {
         els.presetList.innerHTML = '';
-        for (const preset of this._allPresets()) {
-            const transitionSeconds = Number(preset.transitionSeconds ?? this.params.transitionSeconds);
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'preset-item';
-            if (preset.id === this.activePresetId) button.classList.add('active');
-            if (preset.readonly) button.classList.add('readonly');
-            button.title = `${preset.name} - ${transitionSeconds.toFixed(1)}s transition${preset.readonly ? ' - built-in' : ''}`;
+        const query = normalizePresetSearch(this.presetSearchQuery || els.presetSearch?.value);
+        const matchesQuery = (preset) => !query || normalizePresetSearch(preset.name).includes(query);
+        const sections = [
+            {
+                id: 'builtin',
+                label: 'Built-in',
+                presets: sortPresetsByName(BUILTIN_PRESETS_DISPLAY).filter(matchesQuery),
+                empty: 'No built-in matches'
+            },
+            {
+                id: 'user',
+                label: 'My Presets',
+                presets: sortPresetsByName(this.userPresets).filter(matchesQuery),
+                empty: query ? 'No saved matches' : 'No saved presets'
+            }
+        ];
+        let visibleCount = 0;
 
-            const name = document.createElement('span');
-            name.className = 'preset-name';
-            name.textContent = preset.name;
+        for (const section of sections) {
+            const group = document.createElement('section');
+            group.className = 'preset-section';
+            group.setAttribute('aria-labelledby', `preset-section-${section.id}`);
 
-            const meta = document.createElement('span');
-            meta.className = 'preset-meta';
-            meta.textContent = `${transitionSeconds.toFixed(1)}s`;
+            const heading = document.createElement('h3');
+            heading.id = `preset-section-${section.id}`;
+            heading.textContent = section.label;
+            group.appendChild(heading);
 
-            button.append(name, meta);
-            button.addEventListener('click', () => this.applyPreset(preset.id));
-            els.presetList.appendChild(button);
+            const items = document.createElement('div');
+            items.className = 'preset-section-items';
+            if (!section.presets.length) {
+                const empty = document.createElement('p');
+                empty.className = 'preset-empty';
+                empty.textContent = section.empty;
+                items.appendChild(empty);
+            }
+
+            for (const preset of section.presets) {
+                visibleCount += 1;
+                items.appendChild(this._presetButton(preset));
+            }
+            group.appendChild(items);
+            els.presetList.appendChild(group);
+        }
+
+        if (els.presetSearchStatus) {
+            const total = BUILTIN_PRESETS_DISPLAY.length + this.userPresets.length;
+            els.presetSearchStatus.textContent = query
+                ? `${visibleCount} of ${total} presets`
+                : `${BUILTIN_PRESETS_DISPLAY.length} built-in · ${this.userPresets.length} saved`;
         }
         els.activePresetLabel.textContent = this._currentPresetName();
         this._syncPresetToolbar();
+    }
+
+    _presetButton(preset) {
+        const transitionSeconds = Number(preset.transitionSeconds ?? this.params.transitionSeconds);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'preset-item';
+        if (preset.id === this.activePresetId) button.classList.add('active');
+        if (preset.readonly) button.classList.add('readonly');
+        button.title = `${preset.name} - ${transitionSeconds.toFixed(1)}s transition${preset.readonly ? ' - built-in' : ''}`;
+
+        const name = document.createElement('span');
+        name.className = 'preset-name';
+        name.textContent = preset.name;
+
+        const meta = document.createElement('span');
+        meta.className = 'preset-meta';
+        meta.textContent = `${transitionSeconds.toFixed(1)}s`;
+
+        button.append(name, meta);
+        button.addEventListener('click', () => this.applyPreset(preset.id));
+        return button;
     }
 
     _syncPresetToolbar() {
@@ -8844,12 +9112,15 @@ button:hover{background:#202a35}
     _openPresetOverflow() {
         els.presetOverflowMenu.hidden = false;
         els.morePresets.setAttribute('aria-expanded', 'true');
+        const firstAction = els.exportPresets.disabled ? els.importPresets : els.exportPresets;
+        firstAction?.focus();
     }
 
-    _closePresetOverflow() {
+    _closePresetOverflow(options = {}) {
         if (!els.presetOverflowMenu || els.presetOverflowMenu.hidden) return;
         els.presetOverflowMenu.hidden = true;
         els.morePresets.setAttribute('aria-expanded', 'false');
+        if (options.restoreFocus) els.morePresets.focus();
     }
 
     _savedUserPresetParams(preset) {
@@ -9245,17 +9516,30 @@ button:hover{background:#202a35}
         return frame;
     }
 
-    _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
+    async _tweenParams(from, to, seconds, options = {}, token = this.transitionToken) {
         this.transitioning = true;
+        const duration = Math.max(1, seconds * 1000);
+        const nativeTransition = await this._armNativeOutputTransition(
+            from,
+            to,
+            duration,
+            'tween',
+            token
+        );
+        if (token !== this.transitionToken) {
+            this._finishNativeOutputTransition(token, this.renderParams());
+            if (!options.keepTransitioning) this.transitioning = false;
+            return false;
+        }
         return new Promise((resolve) => {
-            const start = performance.now();
-            const duration = Math.max(1, seconds * 1000);
+            const start = performance.now() + Math.max(0, nativeTransition.startAtUnixMs - Date.now());
             const changedKeys = Object.keys(to).filter((key) => to[key] !== from[key]);
             const tweenInputKeys = changedKeys.filter((key) => CLIENT_TWEEN_KEYS.has(key));
             const discreteInputKeys = changedKeys.filter((key) => !CLIENT_TWEEN_KEYS.has(key));
             const updatesBackground = changedKeys.includes('bgBlend');
             let discreteInputsSynced = false;
             const cancel = () => {
+                this._finishNativeOutputTransition(token, this.renderParams());
                 if (!options.keepTransitioning) this.transitioning = false;
                 resolve(false);
             };
@@ -9289,6 +9573,7 @@ button:hover{background:#202a35}
                     this._persist();
                     this._applyVisualState();
                     this._applyEffectiveRendererParams(this.renderParams(), 'transition');
+                    this._finishNativeOutputTransition(token, this.renderParams());
                     if (!options.keepTransitioning) this.transitioning = false;
                     resolve(true);
                 }
@@ -9423,6 +9708,7 @@ button:hover{background:#202a35}
             const cancel = () => {
                 if (finished) return;
                 finished = true;
+                this._finishNativeOutputTransition(token, this.renderParams());
                 runtime.cancelCrossfadeRenderer(prepared);
                 if (active()) this.transitioning = false;
                 resolve(false);
@@ -9432,10 +9718,12 @@ button:hover{background:#202a35}
                 if (finished) return;
                 finished = true;
                 if (!active()) {
+                    this._finishNativeOutputTransition(token, this.renderParams());
                     runtime.cancelCrossfadeRenderer(prepared);
                     resolve(false);
                     return;
                 }
+                this._finishNativeOutputTransition(token, target);
                 runtime.finishCrossfadeRenderer(prepared);
                 this.transitioning = false;
                 resolve(true);
@@ -9468,7 +9756,8 @@ button:hover{background:#202a35}
 
                 await this._ensureStaticVideoPlayback();
                 this.setConnection(this._staticConnectionLabel());
-                this._applyEffectiveRendererParams(this.renderParams(), 'transition');
+                this._applyMainPreviewRendererParams(this.renderParams(), 'transition');
+                this._updatePopoutRendererParams(this.renderParams());
                 this.updateMeters();
                 if (this.popout && !this.popout.closed) {
                     this._restartPopoutOutput().catch((error) => console.warn('[Popout] Restart failed:', error));
@@ -9476,7 +9765,18 @@ button:hover{background:#202a35}
 
                 await this._paintCurrentFrame(3, 1);
 
-                const start = performance.now();
+                const nativeTransition = await this._armNativeOutputTransition(
+                    from,
+                    target,
+                    duration,
+                    'crossfade',
+                    token
+                );
+                if (!active()) {
+                    cancel();
+                    return;
+                }
+                const start = performance.now() + Math.max(0, nativeTransition.startAtUnixMs - Date.now());
                 const step = (now) => {
                     if (!active()) {
                         cancel();
@@ -9495,6 +9795,7 @@ button:hover{background:#202a35}
 
             run().catch((error) => {
                 runtime.cancelCrossfadeRenderer(prepared);
+                this._finishNativeOutputTransition(token, from);
                 if (active()) {
                     this.params = from;
                     this._syncInputs();
@@ -9684,7 +9985,7 @@ button:hover{background:#202a35}
         if (!preset) return;
         if (!confirm(`Delete preset "${preset.name}"?`)) return;
         this.userPresets = this.userPresets.filter((p) => p.id !== preset.id);
-        this.activePresetId = 'point-click-default';
+        this.activePresetId = DEFAULT_PRESET_ID;
         this._persistPresets();
         const fallback = BUILTIN_PRESETS.find((item) => item.id === this.activePresetId);
         if (fallback) {
@@ -9744,7 +10045,7 @@ button:hover{background:#202a35}
                 { strict: true, usedIds }
             ));
             if (!this._allPresets().some((preset) => preset.id === this.activePresetId)) {
-                this.activePresetId = 'point-click-default';
+                this.activePresetId = DEFAULT_PRESET_ID;
             }
             this._persistPresets();
             this._renderPresets();
@@ -9897,7 +10198,7 @@ button:hover{background:#202a35}
     }
 
     _cycleMidiPreset(direction) {
-        const presets = this._allPresets();
+        const presets = this._alphabeticalPresets();
         if (!presets.length) return false;
         const current = Math.max(0, presets.findIndex((preset) => preset.id === this.activePresetId));
         const index = (current + direction + presets.length) % presets.length;

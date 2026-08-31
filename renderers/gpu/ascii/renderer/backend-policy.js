@@ -1,38 +1,21 @@
 /**
  * Keep renderer backend selection deterministic and outside the frame loop.
- *
- * Apple WebKit and Windows WebView2 can expose browser GPU APIs while still
- * producing an empty primary glyph-atlas surface. The primary runtime uses the
- * policy below to choose its bounded Canvas2D glyph path.
+ * Platform identity is deliberately not an ownership signal: only an explicit
+ * Canvas backend may bypass GPU construction. Auto/GPU requests still retain
+ * the normal bounded Canvas fallback when renderer construction fails.
  */
 
-function isAppleWebKitUserAgent(userAgent = '') {
-    return /AppleWebKit\//.test(userAgent) &&
-        !/(?:Chrome|Chromium|CriOS|Edg|OPR)\//.test(userAgent);
-}
-
-function needsWebKitCanvasGlyphPreview(options = {}, userAgent = '') {
-    return isAppleWebKitUserAgent(userAgent) &&
-        options.glyphMode !== false &&
-        options.solidMode !== true;
-}
-
-function isWindowsWebViewUserAgent(userAgent = '') {
-    return /Windows NT/.test(userAgent) &&
-        /AppleWebKit\//.test(userAgent) &&
-        /(?:Chrome|Chromium|Edg)\//.test(userAgent);
-}
-
-function glyphPreviewCompatibilityReason(options = {}, userAgent = '', tauriRuntime = false) {
-    const usesGlyphAtlas = options.glyphMode !== false && options.solidMode !== true;
-    if (!usesGlyphAtlas) return '';
-    if (isAppleWebKitUserAgent(userAgent)) return 'apple-webkit-glyph';
-    if (tauriRuntime && isWindowsWebViewUserAgent(userAgent)) return 'windows-webview2-glyph';
-    return '';
-}
-
-function needsCompatibilityCanvasGlyphPreview(options = {}, userAgent = '', tauriRuntime = false) {
-    return Boolean(glyphPreviewCompatibilityReason(options, userAgent, tauriRuntime));
+function explicitCanvasRendererDecision(options = {}) {
+    if (options.backend === 'pixel-canvas') {
+        return { params: options, compatibilityReason: '' };
+    }
+    if (options.backend === 'canvas2d') {
+        return {
+            params: { ...options, backend: 'canvas2d' },
+            compatibilityReason: ''
+        };
+    }
+    return null;
 }
 
 function selectRendererBackend(capabilities, options = {}) {
@@ -47,10 +30,6 @@ function selectRendererBackend(capabilities, options = {}) {
 }
 
 export {
-    glyphPreviewCompatibilityReason,
-    isAppleWebKitUserAgent,
-    isWindowsWebViewUserAgent,
-    needsCompatibilityCanvasGlyphPreview,
-    needsWebKitCanvasGlyphPreview,
+    explicitCanvasRendererDecision,
     selectRendererBackend
 };

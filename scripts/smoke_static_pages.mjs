@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -16,19 +17,63 @@ function findChromiumExecutable() {
     return process.env.CHROMIUM_EXECUTABLE;
   }
 
-  const cacheDir = path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright');
+  const candidates = [];
+  const addCandidate = (...parts) => {
+    if (parts.every(Boolean)) candidates.push(path.join(...parts));
+  };
+  if (process.platform === 'darwin') {
+    addCandidate('/Applications', 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
+    addCandidate('/Applications', 'Microsoft Edge.app', 'Contents', 'MacOS', 'Microsoft Edge');
+  } else if (process.platform === 'win32') {
+    addCandidate(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    addCandidate(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
+    addCandidate(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe');
+  } else {
+    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+  }
+
+  const cacheDir = process.platform === 'darwin'
+    ? path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright')
+    : process.platform === 'win32'
+      ? path.join(process.env.LOCALAPPDATA || '', 'ms-playwright')
+      : path.join(process.env.HOME || '', '.cache', 'ms-playwright');
   if (existsSync(cacheDir)) {
-    const candidates = readdirSync(cacheDir)
+    const cacheCandidates = readdirSync(cacheDir)
       .filter((entry) => entry.startsWith('chromium_headless_shell-'))
       .sort()
       .reverse()
-      .map((entry) => path.join(cacheDir, entry, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'));
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate;
-    }
+      .flatMap((entry) => {
+        const entryRoot = path.join(cacheDir, entry);
+        return [
+          path.join(entryRoot, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'),
+          path.join(entryRoot, 'chrome-headless-shell-mac-x64', 'chrome-headless-shell'),
+          path.join(entryRoot, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe'),
+          path.join(entryRoot, 'chrome-headless-shell-linux64', 'chrome-headless-shell')
+        ];
+      });
+    candidates.unshift(...cacheCandidates);
   }
 
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
   return null;
+}
+
+function assertPresetBackendContract(presetMatrix) {
+  const contract = validateBuiltInPresetBackendContract({
+    presetCount: presetMatrix.length,
+    acceleratedEligible: presetMatrix.filter((preset) => preset.requestedBackend === 'auto').length,
+    canvasEligible: presetMatrix.filter((preset) =>
+      preset.requestedBackend === 'canvas2d' || preset.requestedBackend === 'pixel-canvas'
+    ).length
+  });
+  if (!contract.ok) {
+    throw new Error(`Built-in preset backend ownership changed: ${JSON.stringify(contract)}`);
+  }
+  return contract;
 }
 
 function waitForServer(url, timeoutMs = 12000) {
@@ -175,6 +220,13 @@ async function runSmoke() {
         active: document.querySelector('#source-list .source-option.active')?.dataset?.sourceId || '',
         label: document.querySelector('#source-label')?.textContent || ''
       },
+      defaultPreset: {
+        id: window.ascilineRemix?.activePresetId || '',
+        label: document.querySelector('#active-preset-label')?.textContent || '',
+        backend: window.ascilineRemix?.params?.backend || '',
+        charset: window.ascilineRemix?.params?.charset || '',
+        glyphMode: Boolean(window.ascilineRemix?.params?.glyphMode)
+      },
       outputDisplay: {
         value: document.querySelector('#output-display')?.value || '',
         disabled: Boolean(document.querySelector('#output-display')?.disabled),
@@ -196,10 +248,27 @@ async function runSmoke() {
         groupHidden: document.querySelector('.control-group[data-group="Glyph / Cell"]')?.classList.contains('control-hidden') ?? true,
         charsetHidden: document.querySelector('[data-control-key="charset"]')?.classList.contains('control-hidden') ?? true,
         fontFamilyHidden: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('control-hidden') ?? true,
-        charsetCompact: document.querySelector('[data-control-key="charset"]')?.classList.contains('compact-select') ?? false,
-        fontFamilyCompact: document.querySelector('[data-control-key="fontFamily"]')?.classList.contains('compact-select') ?? false,
+        atlasControlAbsent: !document.querySelector('[data-control-key="atlasStyle"]'),
         charsetOptions: [...document.querySelectorAll('[data-control-key="charset"] option')].map((option) => option.textContent.trim())
       },
+      controlSurface: {
+        internalLabels: [...document.querySelectorAll('.control-row')]
+          .filter((row) => {
+            const key = row.dataset.controlKey || '';
+            return [...row.querySelectorAll('.control-label small')].some((node) => node.textContent.trim() === key);
+          })
+          .map((row) => row.dataset.controlKey),
+        advancedDescription: document.querySelector('#description-advancedDensity')?.textContent.trim() || '',
+        advancedDescribedBy: document.querySelector('[data-control-key="advancedDensity"] input')?.getAttribute('aria-describedby') || '',
+        selectRects: [...document.querySelectorAll('.control-row:not(.control-hidden)[data-control-type="select"] select')]
+          .filter((select) => select.getClientRects().length > 0)
+          .map((select) => {
+            const rect = select.getBoundingClientRect();
+            return { key: select.closest('.control-row')?.dataset.controlKey || '', x: rect.x, width: rect.width, height: rect.height };
+          })
+      },
+      presetSections: [...document.querySelectorAll('#preset-list .preset-section h3')].map((node) => node.textContent.trim()),
+      presetStatus: document.querySelector('#preset-search-status')?.textContent.trim() || '',
       presetNames: [...document.querySelectorAll('#preset-list .preset-name')].map((node) => node.textContent.trim()),
       sources: [...document.querySelectorAll('#source-list [role=option]')].map((el) => el.textContent.trim())
     }));
@@ -235,6 +304,15 @@ async function runSmoke() {
     ) {
       throw new Error(`Demo Image should be the default source: ${JSON.stringify(main.defaultSource)}`);
     }
+    if (
+      main.defaultPreset.id !== 'classic-camera-ascii' ||
+      main.defaultPreset.label !== 'Classic Camera ASCII' ||
+      main.defaultPreset.backend !== 'auto' ||
+      main.defaultPreset.charset !== 'classic-camera' ||
+      !main.defaultPreset.glyphMode
+    ) {
+      throw new Error(`Classic Camera ASCII should be the clean-profile default: ${JSON.stringify(main.defaultPreset)}`);
+    }
     if (main.sources.some((source) => /Demo Video 1|Demo Video 2/.test(source)) || !main.sources.some((source) => source.includes('Demo Video'))) {
       throw new Error(`Source list should expose Demo Image, Demo Video, and Camera only: ${JSON.stringify(main.sources)}`);
     }
@@ -245,10 +323,36 @@ async function runSmoke() {
       main.glyphControls.groupHidden ||
       main.glyphControls.charsetHidden ||
       main.glyphControls.fontFamilyHidden ||
-      !main.glyphControls.charsetCompact ||
-      !main.glyphControls.fontFamilyCompact
+      !main.glyphControls.atlasControlAbsent
     ) {
-      throw new Error(`Glyph controls should stay visible and compact for static output: ${JSON.stringify(main.glyphControls)}`);
+      throw new Error(`Glyph controls should stay visible without a one-option Atlas Style control: ${JSON.stringify(main.glyphControls)}`);
+    }
+    const selectWidths = main.controlSurface.selectRects.map((rect) => Math.round(rect.width));
+    const selectXs = main.controlSurface.selectRects.map((rect) => Math.round(rect.x));
+    if (
+      main.controlSurface.internalLabels.length ||
+      !/no 30 FPS guarantee/i.test(main.controlSurface.advancedDescription) ||
+      main.controlSurface.advancedDescribedBy !== 'description-advancedDensity' ||
+      !main.controlSurface.selectRects.length ||
+      main.controlSurface.selectRects.some((rect) => Math.round(rect.height) !== 30) ||
+      new Set(selectWidths).size !== 1 ||
+      new Set(selectXs).size !== 1
+    ) {
+      throw new Error(`Control rows should share one select geometry and user-facing labels: ${JSON.stringify(main.controlSurface)}`);
+    }
+    const sortedPresetNames = [...main.presetNames].sort((left, right) => left.localeCompare(right, 'en', { sensitivity: 'base', numeric: true }));
+    if (
+      JSON.stringify(main.presetSections) !== JSON.stringify(['Built-in', 'My Presets']) ||
+      JSON.stringify(main.presetNames) !== JSON.stringify(sortedPresetNames) ||
+      !main.presetNames.includes('Dense Color ASCII') ||
+      main.presetNames.includes('Point & Click Default') ||
+      !/^69 built-in · 0 saved$/i.test(main.presetStatus)
+    ) {
+      throw new Error(`Preset sections should be separate, renamed, and alphabetical: ${JSON.stringify({
+        sections: main.presetSections,
+        names: main.presetNames,
+        status: main.presetStatus
+      })}`);
     }
     const asciiTodayNames = ['Broadway KB', 'Computer', 'Doh'];
     if (
@@ -260,6 +364,93 @@ async function runSmoke() {
         presetNames: main.presetNames
       })}`);
     }
+
+    await page.locator('#preset-search').fill('terminal');
+    const filteredPresets = await page.evaluate(() => ({
+      names: [...document.querySelectorAll('#preset-list .preset-name')].map((node) => node.textContent.trim()),
+      status: document.querySelector('#preset-search-status')?.textContent.trim() || '',
+      activeElement: document.activeElement?.id || ''
+    }));
+    if (
+      !filteredPresets.names.length ||
+      filteredPresets.names.some((name) => !name.toLocaleLowerCase('en-US').includes('terminal')) ||
+      !new RegExp(`^${filteredPresets.names.length} of 69 presets$`, 'i').test(filteredPresets.status) ||
+      filteredPresets.activeElement !== 'preset-search'
+    ) {
+      throw new Error(`Preset search should filter live by display name: ${JSON.stringify(filteredPresets)}`);
+    }
+    await page.keyboard.press('Escape');
+    const clearedPresetSearch = await page.evaluate(() => ({
+      value: document.querySelector('#preset-search')?.value || '',
+      count: document.querySelectorAll('#preset-list .preset-name').length,
+      activeElement: document.activeElement?.id || ''
+    }));
+    if (clearedPresetSearch.value || clearedPresetSearch.count !== 69 || clearedPresetSearch.activeElement !== 'preset-search') {
+      throw new Error(`Escape should clear preset search and preserve focus: ${JSON.stringify(clearedPresetSearch)}`);
+    }
+
+    const userPresetSections = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const previous = app.userPresets;
+      app.userPresets = [
+        { id: 'user-zebra', name: 'Zebra User', readonly: false, transitionSeconds: 1, params: {} },
+        { id: 'user-amber', name: 'Amber User', readonly: false, transitionSeconds: 1, params: {} }
+      ];
+      app._renderPresets();
+      const names = [...document.querySelectorAll('#preset-section-user + .preset-section-items .preset-name')]
+        .map((node) => node.textContent.trim());
+      app.userPresets = previous;
+      app._renderPresets();
+      return names;
+    });
+    if (JSON.stringify(userPresetSections) !== JSON.stringify(['Amber User', 'Zebra User'])) {
+      throw new Error(`My Presets should sort independently: ${JSON.stringify(userPresetSections)}`);
+    }
+
+    await page.locator('#more-presets').click();
+    const overflowOpened = await page.evaluate(() => ({
+      expanded: document.querySelector('#more-presets')?.getAttribute('aria-expanded') || '',
+      activeElement: document.activeElement?.id || ''
+    }));
+    if (overflowOpened.expanded !== 'true' || overflowOpened.activeElement !== 'import-presets') {
+      throw new Error(`Preset overflow should focus its first enabled action: ${JSON.stringify(overflowOpened)}`);
+    }
+    await page.keyboard.press('Escape');
+    const overflowClosed = await page.evaluate(() => ({
+      expanded: document.querySelector('#more-presets')?.getAttribute('aria-expanded') || '',
+      hidden: Boolean(document.querySelector('#preset-overflow-menu')?.hidden),
+      activeElement: document.activeElement?.id || ''
+    }));
+    if (overflowClosed.expanded !== 'false' || !overflowClosed.hidden || overflowClosed.activeElement !== 'more-presets') {
+      throw new Error(`Escape should close preset overflow and restore trigger focus: ${JSON.stringify(overflowClosed)}`);
+    }
+
+    await page.setViewportSize({ width: 1024, height: 720 });
+    const minimumWindowLayout = await page.evaluate(() => {
+      const inspector = document.querySelector('.inspector');
+      const selectRects = [...document.querySelectorAll('.control-row:not(.control-hidden)[data-control-type="select"] select')]
+        .filter((select) => select.getClientRects().length > 0)
+        .map((select) => {
+          const rect = select.getBoundingClientRect();
+          return { x: Math.round(rect.x), width: Math.round(rect.width), height: Math.round(rect.height) };
+        });
+      return {
+        inspectorOverflow: inspector ? inspector.scrollWidth - inspector.clientWidth : 1,
+        selectXs: [...new Set(selectRects.map((rect) => rect.x))],
+        selectWidths: [...new Set(selectRects.map((rect) => rect.width))],
+        selectHeights: [...new Set(selectRects.map((rect) => rect.height))]
+      };
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    if (
+      minimumWindowLayout.inspectorOverflow > 0 ||
+      minimumWindowLayout.selectXs.length !== 1 ||
+      minimumWindowLayout.selectWidths.length !== 1 ||
+      JSON.stringify(minimumWindowLayout.selectHeights) !== JSON.stringify([30])
+    ) {
+      throw new Error(`Minimum desktop window should preserve aligned controls without horizontal overflow: ${JSON.stringify(minimumWindowLayout)}`);
+    }
+
     if (
       main.audioReactive.source !== 'input' ||
       !main.audioReactive.active ||
@@ -455,6 +646,32 @@ async function runSmoke() {
         );
       }
     }
+    const demoVideoPolicy = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      const linuxDesktop = /\bLinux\b/i.test(navigator.userAgent) && !/Android|CrOS/i.test(navigator.userAgent);
+      const expected = linuxDesktop ? 'media/demo-video-2.webm' : 'media/demo-video-2.mp4';
+      const alternate = linuxDesktop ? 'media/demo-video-2.mp4' : 'media/demo-video-2.webm';
+      const selected = app?.params?.mediaUrl || '';
+      await app?._switchStaticSource?.({
+        sourceMode: 'static',
+        mediaUrl: alternate,
+        mediaType: 'video',
+        sourceName: 'Demo Video'
+      });
+      return {
+        expected,
+        selected,
+        migrated: app?.params?.mediaUrl || '',
+        active: document.querySelector('#source-list [data-source-id="demo-video"]')?.getAttribute('aria-selected')
+      };
+    });
+    if (
+      demoVideoPolicy.selected !== demoVideoPolicy.expected ||
+      demoVideoPolicy.migrated !== demoVideoPolicy.expected ||
+      demoVideoPolicy.active !== 'true'
+    ) {
+      throw new Error(`Demo Video should select and migrate to the platform media asset: ${JSON.stringify(demoVideoPolicy)}`);
+    }
     const liveFamilyTransition = await page.evaluate(async () => {
       const app = window.ascilineRemix;
       const source = app?._staticMediaSource?.();
@@ -551,6 +768,42 @@ async function runSmoke() {
       !liveFamilyTransition.outputFrameSummary?.sawGlyph
     ) {
       throw new Error(`Solid-to-glyph static transitions should keep video playback live: ${JSON.stringify(liveFamilyTransition)}`);
+    }
+    const nativeTransitionContract = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const from = { ...app.params, brightness: 0.7, glyphMode: false, solidMode: true };
+      const to = { ...app.params, brightness: 1.3, glyphMode: true, solidMode: false };
+      const startAtUnixMs = Date.now() + 80;
+      const payload = app._nativeOutputPayload(to, {
+        kind: 'crossfade',
+        startAtUnixMs,
+        durationMs: 650,
+        fromParams: from
+      });
+      return {
+        kind: payload.transition?.kind,
+        startDeltaMs: Number(payload.transition?.startAtUnixMs || 0) - Date.now(),
+        durationMs: payload.transition?.durationMs,
+        fromBrightness: payload.transition?.fromParams?.brightness,
+        fromGlyphMode: payload.transition?.fromParams?.glyphMode,
+        targetBrightness: payload.params?.brightness,
+        targetGlyphMode: payload.params?.glyphMode,
+        capturedAtUnixMs: payload.mediaState?.capturedAtUnixMs
+      };
+    });
+    if (
+      nativeTransitionContract.kind !== 'crossfade' ||
+      nativeTransitionContract.startDeltaMs < 0 ||
+      nativeTransitionContract.startDeltaMs > 100 ||
+      nativeTransitionContract.durationMs !== 650 ||
+      nativeTransitionContract.fromBrightness !== 0.7 ||
+      nativeTransitionContract.fromGlyphMode ||
+      nativeTransitionContract.targetBrightness !== 1.3 ||
+      !nativeTransitionContract.targetGlyphMode ||
+      (nativeTransitionContract.capturedAtUnixMs !== undefined &&
+        !Number.isFinite(nativeTransitionContract.capturedAtUnixMs))
+    ) {
+      throw new Error(`Native transition payload should preserve one shared clock and both parameter endpoints: ${JSON.stringify(nativeTransitionContract)}`);
     }
     await page.click('#source-list [data-source-id="camera"]');
     await page.waitForFunction(
@@ -992,6 +1245,8 @@ async function runSmoke() {
           results.push({
             id: preset.id,
             active: app.activePresetId === preset.id,
+            requestedBackend: app.params.backend,
+            resolvedBackend: app.staticRuntime?.getStats?.()?.backend || '',
             hasSignal: nonBackground >= 5,
             aspectError: canvasRatio ? Math.abs(canvasRatio / sourceRatio - 1) : 1,
             glError,
@@ -1013,6 +1268,17 @@ async function runSmoke() {
     );
     if (presetFailures.length) {
       throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
+    }
+    assertPresetBackendContract(presetMatrix);
+    const acceleratedPresetResults = presetMatrix.filter((preset) => preset.requestedBackend === 'auto');
+    const acceleratedPresetFailures = acceleratedPresetResults.filter((preset) =>
+      preset.resolvedBackend !== 'webgpu' && preset.resolvedBackend !== 'webgl2'
+    );
+    if (!acceleratedPresetResults.length || acceleratedPresetFailures.length) {
+      throw new Error(`Auto built-in presets should resolve to WebGPU or WebGL2 in the capable Chromium smoke runtime: ${JSON.stringify({
+        eligible: acceleratedPresetResults.length,
+        failures: acceleratedPresetFailures
+      })}`);
     }
 
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });

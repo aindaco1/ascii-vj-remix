@@ -349,13 +349,35 @@ fn start_platform_input_audio_capture(
         drop(previous);
     }
 
-    let session = input::InputAudioSession::start(request.and_then(|item| item.device_label))?;
+    let session = match input::InputAudioSession::start(request.and_then(|item| item.device_label)) {
+        Ok(session) => session,
+        Err(error) if is_expected_input_device_unavailable(&error) => {
+            return Ok(SystemAudioStartResponse {
+                available: false,
+                active: false,
+                source_label: "Native microphone".to_string(),
+                display_id: None,
+                message: Some(error),
+            });
+        }
+        Err(error) => return Err(error),
+    };
     let response = session.response();
     *state
         .session
         .lock()
         .map_err(|_| "Input audio state lock poisoned".to_string())? = Some(session);
     Ok(response)
+}
+
+pub(crate) fn is_expected_input_device_unavailable(message: &str) -> bool {
+    let normalized = message.to_lowercase();
+    normalized.contains("no default microphone input device")
+        || normalized.contains("requested audio device is not available")
+        || normalized.contains("audio device is unavailable")
+        || normalized.contains("devicenotavailable")
+        || normalized.contains("device disconnected")
+        || normalized.contains("device has been disconnected")
 }
 
 fn read_platform_input_audio_features(
@@ -943,5 +965,30 @@ mod macos {
                 (sum / frame.len().max(1) as f32).clamp(-1.0, 1.0)
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_expected_input_device_unavailable;
+
+    #[test]
+    fn expected_input_hardware_errors_are_not_crashes() {
+        assert!(is_expected_input_device_unavailable(
+            "No default microphone input device found"
+        ));
+        assert!(is_expected_input_device_unavailable(
+            "Could not build microphone input stream: The requested audio device is not available. It may have been disconnected."
+        ));
+    }
+
+    #[test]
+    fn unexpected_input_errors_remain_reportable() {
+        assert!(!is_expected_input_device_unavailable(
+            "Could not build microphone input stream: invalid sample format"
+        ));
+        assert!(!is_expected_input_device_unavailable(
+            "Input audio state lock poisoned"
+        ));
     }
 }

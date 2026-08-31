@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const configPath = path.join(root, 'src-tauri', 'tauri.conf.json');
 const devConfigPath = path.join(root, 'src-tauri', 'tauri.dev.conf.json');
+const linuxConfigPath = path.join(root, 'src-tauri', 'tauri.linux.conf.json');
 const notarizedConfigPath = path.join(root, 'src-tauri', 'tauri.notarized.conf.json');
 const windowsSignedConfigPath = path.join(root, 'src-tauri', 'tauri.windows-signed.conf.json');
 const capabilitiesDir = path.join(root, 'src-tauri', 'capabilities');
@@ -48,6 +49,7 @@ function checkNoOnlineUrls(label, value, allowedPrefixes = allowedRemoteDevPrefi
 
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const devConfig = JSON.parse(await readFile(devConfigPath, 'utf8'));
+const linuxConfig = JSON.parse(await readFile(linuxConfigPath, 'utf8'));
 const notarizedConfig = JSON.parse(await readFile(notarizedConfigPath, 'utf8'));
 const windowsSignedConfig = JSON.parse(await readFile(windowsSignedConfigPath, 'utf8'));
 const packageConfig = JSON.parse(await readFile(packagePath, 'utf8'));
@@ -77,6 +79,16 @@ if (devConfig?.bundle?.createUpdaterArtifacts !== false) {
 }
 if (!Array.isArray(devConfig?.plugins?.updater?.endpoints) || devConfig.plugins.updater.endpoints.length !== 0) {
   issues.push('tauri.dev.conf.json must disable production updater endpoints');
+}
+if (devConfig?.app?.windows) {
+  issues.push('tauri.dev.conf.json must not duplicate platform window geometry');
+}
+
+const linuxWindow = linuxConfig?.app?.windows?.find((window) => window?.label === 'main');
+if (!linuxWindow
+    || linuxWindow.width !== 1000 || linuxWindow.height !== 680
+    || linuxWindow.minWidth !== 900 || linuxWindow.minHeight !== 600) {
+  issues.push('tauri.linux.conf.json must keep the reviewed 1000x680 Linux geometry and 900x600 minimum');
 }
 
 for (const scriptName of ['tauri:dev', 'tauri:build:dev']) {

@@ -1,3 +1,4 @@
+use crate::bundled_media::resolve_bundled_source_id;
 use crate::media_engine::ffmpeg::{
     probe_video, spawn_rgb_reader, spawn_rgb_reader_with_options, DecodeConfig, FfmpegBinaries,
     FfmpegRgbFrameReader, RgbReaderOptions, VideoProbe,
@@ -624,7 +625,7 @@ pub async fn probe_registered_media(
     app: AppHandle,
     registry: State<'_, MediaRegistry>,
 ) -> Result<VideoProbe, String> {
-    let path = registry.path_for(&id)?;
+    let path = raw_video_source_path(&app, &registry, &id)?;
     let binaries = media_binaries_for_app(&app);
     tauri::async_runtime::spawn_blocking(move || probe_video(&binaries, &path))
         .await
@@ -748,7 +749,7 @@ pub async fn start_raw_video_session(
     sessions: State<'_, RawVideoSessions>,
 ) -> Result<RawVideoSessionInit, String> {
     validate_raw_video_request(&request)?;
-    let path = registry.path_for(&id)?;
+    let path = raw_video_source_path(&app, &registry, &id)?;
     let binaries = media_binaries_for_app(&app);
     let probe = probe_video(&binaries, &path).map_err(|error| error.to_string())?;
     let fps = request
@@ -775,6 +776,18 @@ pub async fn start_raw_video_session(
         height: request.height,
         probe,
     })
+}
+
+fn raw_video_source_path(
+    app: &AppHandle,
+    registry: &MediaRegistry,
+    source_id: &str,
+) -> Result<PathBuf, String> {
+    if source_id.starts_with(crate::bundled_media::BUNDLED_MEDIA_SOURCE_PREFIX) {
+        return resolve_bundled_source_id(app, source_id)
+            .ok_or_else(|| "bundled media source is unavailable".to_string());
+    }
+    registry.path_for(source_id)
 }
 
 #[tauri::command]

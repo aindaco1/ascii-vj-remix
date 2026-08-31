@@ -51,7 +51,12 @@ chooses the best backend for the active source and environment.
 The visible built-ins are:
 
 - Demo Image: `media/demo.svg`.
-- Demo Video: `media/demo-video-2.mp4`.
+- Demo Video: `media/demo-video-2.mp4` (H.264) on macOS and Windows, and
+  `media/demo-video-2.webm` (VP8) on Linux so clean Linux webviews do not
+  require an optional H.264 GStreamer plugin. Both URLs represent the same
+  logical built-in source; saved selections normalize to the current platform.
+  If the webview cannot decode either asset, the same bundled FFmpeg raw-frame
+  source used for selected videos takes over locally.
 
 Additional bundled media files remain hidden development fixtures for parity
 tests and performance smoke tests.
@@ -61,6 +66,9 @@ tests and performance smoke tests.
 Browser mode uses browser file APIs and blob URLs. Tauri mode uses a native
 dialog command and registers the selected file under a session-local media id.
 That media id is exposed to the webview through Tauri's asset protocol.
+MKV files use the bundled FFmpeg raw-frame path immediately. Other selected
+videos try the platform decoder first and retry through bundled FFmpeg if that
+decoder rejects the file.
 
 The important security boundary is that the renderer receives a playable media
 URL or registered id. It does not gain broad filesystem access.
@@ -257,12 +265,11 @@ active backend are hidden or disabled.
 
 Backend choice is resolved once per renderer construction in
 `renderers/gpu/ascii/renderer/backend-policy.js`; it is not evaluated in the
-frame loop. The macOS Apple WebKit primary view uses the bounded Canvas2D path
-for glyph mode even when a browser GPU backend is available or manually
-requested, because both browser GPU glyph-atlas paths can expose a live
-renderer while presenting an empty canvas there. Solid/pixel primary presets
-can still use WebGPU, and glyph mode retains browser GPU rendering on compatible
-runtimes. Native Pop Out backend selection is separate and unchanged.
+frame loop. Only an explicitly selected Canvas backend bypasses GPU
+construction. Platform identity and user agent do not change preset ownership:
+packaged macOS, Windows, and Linux views all attempt the same WebGPU, WebGL2,
+then Canvas fallback order. Native Pop Out backend selection is separate and
+unchanged.
 
 ## WebGPU Renderer
 
@@ -307,10 +314,14 @@ external texture and creates its source-dependent compute binding per frame;
 that resource is frame-scoped by WebGPU. Grid/source rebuilds create a new
 renderer and therefore a new complete resource set.
 
-The glyph renderer uses Unicode scalar ids in a 96-entry storage buffer and a
-16-layer R8 texture array. Atlas pages are generated offline, locally bundled,
-and loaded on demand. Live audio/transition updates compare a compact glyph
-input key before resolving ramps or touching atlas resources.
+The glyph renderer decodes only atlas pages needed by the active ramp, then
+packs up to 96 Unicode-scalar masks and their five max-coverage levels into a
+two-row 768x62 RGBA texture. Keeping the compact width below 1024 pixels avoids
+the Apple WebKit wide-upload boundary while retaining constant-time texture
+lookup in the fragment pass. Atlas pages are generated offline, locally
+bundled, and loaded through their asset URLs. Live audio/transition updates
+compare a compact glyph input key before resolving ramps or touching atlas
+resources.
 
 ## WebGL2 Renderer
 
@@ -327,8 +338,14 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
   queried again during each frame.
 
 WebGL2 is the most important browser GPU fallback because it is widely available
-on machines that do not expose WebGPU. The macOS Apple WebKit primary glyph
-view currently uses Canvas2D instead of either browser GPU atlas path.
+on machines that do not expose WebGPU.
+
+The clean-profile visual default and renderer preference have separate owners:
+Classic Camera ASCII supplies the initial visual parameters, while the global
+backend remains Auto. A built-in preset inherits Auto unless it explicitly
+declares a compatibility backend. This keeps solid/pixel presets on WebGPU or
+WebGL2 while preserving intentional Canvas2D ownership for traditional text
+presets and Paper Shredder.
 
 `StaticRuntime` treats GPU construction as a recoverable operation. If the
 requested WebGPU/WebGL2 renderer cannot initialize, it creates the equivalent
@@ -337,10 +354,13 @@ Canvas fallback leaves the previous transition surface active.
 
 Physical Windows 11 WebView2 acceptance found a narrower failure mode: GPU
 construction and frame counters succeeded, but glyph-atlas output stayed
-blank, while solid/pixel output remained visible. The packaged Windows Tauri
-runtime therefore routes glyph previews through Canvas2D before construction.
-This compatibility rule does not affect normal Chromium browser use or
-solid/pixel GPU presets.
+blank, while solid/pixel output remained visible. The earlier response routed
+all Windows glyph previews through Canvas2D, collapsing the accelerated set to
+roughly seven presets. The compact active-ramp glyph texture has since replaced
+the problematic glyph upload path, so the 1.0 release retires that blanket
+route and requires the Windows preset matrix to preserve 41 accelerated and 28
+explicit Canvas presets. A real renderer-construction failure still falls back
+to Canvas2D.
 
 ## Canvas Renderers
 
@@ -397,6 +417,15 @@ old renderer stays visible
 
 This avoids black frames during preset transitions.
 
+When native Pop Out is active, the controller arms one transition contract
+containing the old and new canonical params, transition kind, duration, and a
+shared Unix-clock start time. The primary view and native display link then
+derive progress independently from that same timestamp. Numeric transitions
+use the shared easing function; structural renderer-family transitions render
+both native states and composite them with the same outgoing-opacity curve as
+the layered primary view. Animation-frame IPC updates are suppressed until the
+contract completes, then one final canonical state is sent.
+
 For a non-structural numeric tween, only controls whose values are changing are
 synchronized during animation frames. Source lists, camera-device options,
 visibility, meters, persistence, and the complete control surface are reconciled
@@ -452,8 +481,8 @@ desktop-packaged local engine.
 Current shape:
 
 ```text
-Tauri selected media
-  -> Rust registry id
+Tauri selected or vetted bundled media
+  -> Rust registry id or exact bundled source id
   -> ffprobe metadata
   -> ffmpeg RGB frame reader
   -> frame preparation
@@ -480,7 +509,8 @@ Frame preparation modes:
 
 The Rust path complements rather than replaces the WebGPU/WebGL static renderer.
 It provides packaged stream-style media preparation and native decoder
-integration.
+integration. Bundled source ids resolve only the shipped MP4 and WebM demo
+assets; they do not expand the asset protocol or expose arbitrary paths.
 
 ## Native Output Renderer
 
@@ -501,6 +531,10 @@ main UI params/source state
 For file-backed images/videos, Rust resolves bundled resources or registered
 media ids, decodes frames, uploads the latest frame to the GPU, applies cell
 color math, and presents through the native swapchain.
+
+The native GPU surface prefers non-sRGB `Bgra8Unorm` or `Rgba8Unorm`, matching
+the browser canvas encoding expected by the shared color math. Platform-reported
+sRGB formats remain a last-resort fallback when no unorm surface is available.
 
 On the macOS display-link path, the decoded source-frame version is passed to
 the presenter. When that version and the frame dimensions have not changed, the

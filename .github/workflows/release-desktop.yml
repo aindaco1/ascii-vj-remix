@@ -50,7 +50,7 @@ jobs:
             exit 1
           fi
           echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo 'matrix={"include":[{"os":"macos-26","platform":"macos-aarch64","binary":"ascii-vj-remix"},{"os":"windows-latest","platform":"windows-x86_64","binary":"ascii-vj-remix.exe"},{"os":"ubuntu-latest","platform":"linux-x86_64","binary":"ascii-vj-remix"}]}' >> "$GITHUB_OUTPUT"
+          echo 'matrix={"include":[{"os":"macos-26","platform":"macos-aarch64","binary":"ascii-vj-remix"},{"os":"windows-latest","platform":"windows-x86_64","binary":"ascii-vj-remix.exe"},{"os":"ubuntu-24.04","platform":"linux-x86_64","binary":"ascii-vj-remix"}]}' >> "$GITHUB_OUTPUT"
 
   source-acceptance:
     name: Require exact Desktop CI success
@@ -473,6 +473,10 @@ jobs:
       - name: Verify desktop bundle contents
         run: npm run check:bundle:release
 
+      - name: Verify Windows GUI subsystem
+        if: runner.os == 'Windows'
+        run: npm run check:windows-gui
+
       - name: Verify macOS notarization
         if: runner.os == 'macOS'
         shell: bash
@@ -558,7 +562,7 @@ jobs:
         os:
           - macos-26
           - windows-latest
-          - ubuntu-latest
+          - ubuntu-24.04
 
     steps:
       - name: Checkout

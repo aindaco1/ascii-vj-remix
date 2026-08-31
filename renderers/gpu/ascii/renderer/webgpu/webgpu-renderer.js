@@ -13,11 +13,12 @@ import {
     paletteById
 } from '../../../../shared/palettes.js';
 import {
-    GLYPH_ATLAS_MIP_LEVEL_COUNT,
-    GLYPH_ATLAS_PAGE_COUNT,
-    GLYPH_ATLAS_PAGE_SIZE,
     GLYPH_RAMP_LIMIT,
-    glyphAtlasMipLevels,
+    GLYPH_RAMP_TEXTURE_COLUMNS,
+    GLYPH_RAMP_TEXTURE_HEIGHT,
+    GLYPH_RAMP_TEXTURE_ROW_HEIGHT,
+    GLYPH_RAMP_TEXTURE_WIDTH,
+    buildGlyphRampTexture,
     glyphAtlasPagesForRamp,
     glyphRampCodePoints,
     glyphResourceInputKey,
@@ -284,8 +285,7 @@ struct RenderParams {
 
 @group(0) @binding(0) var cellColorTex: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: RenderParams;
-@group(0) @binding(2) var glyphAtlasTex: texture_2d_array<f32>;
-@group(0) @binding(3) var<storage, read> glyphRamp: array<u32>;
+@group(0) @binding(2) var glyphAtlasTex: texture_2d<f32>;
 
 fn unpackColor(value: u32) -> vec3<f32> {
     return vec3<f32>(
@@ -321,12 +321,15 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(glyphTileSize)), glyphTileSize - 1u);
     let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(glyphTileSize)), glyphTileSize - 1u);
     let rampIndex = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
-    let glyphId = glyphRamp[rampIndex];
-    let glyphPage = glyphId / 4096u;
-    let glyphSlot = glyphId % 4096u;
-    let atlasX = (glyphSlot % 64u) * glyphTileSize + glyphX;
-    let atlasY = (glyphSlot / 64u) * glyphTileSize + glyphY;
-    let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), i32(glyphPage), i32(glyphMip)).r;
+    let rampColumn = rampIndex % ${GLYPH_RAMP_TEXTURE_COLUMNS}u;
+    let rampRow = rampIndex / ${GLYPH_RAMP_TEXTURE_COLUMNS}u;
+    var atlasY = rampRow * ${GLYPH_RAMP_TEXTURE_ROW_HEIGHT}u + glyphY;
+    if (glyphMip == 1u) { atlasY += 16u; }
+    if (glyphMip == 2u) { atlasY += 24u; }
+    if (glyphMip == 3u) { atlasY += 28u; }
+    if (glyphMip == 4u) { atlasY += 30u; }
+    let atlasX = rampColumn * 16u + glyphX;
+    let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), 0).r;
     if (alpha <= 0.5) {
         return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
     }
@@ -419,10 +422,8 @@ export class WebGPURenderer {
         this.glyphResourceKey = '';
         this.glyphRampLength = 0;
         this.loadedGlyphPages = new Set();
-        this.pendingGlyphPages = new Map();
         this.glyphAtlasTexture = null;
         this.glyphAtlasView = null;
-        this.glyphRampBuffer = null;
 
         // Image-specific: static source texture (uploaded once)
         this.imageSourceTexture = null;
@@ -506,18 +507,13 @@ export class WebGPURenderer {
         });
 
         this.glyphAtlasTexture = this.device.createTexture({
-            size: [GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_SIZE, GLYPH_ATLAS_PAGE_COUNT],
-            mipLevelCount: GLYPH_ATLAS_MIP_LEVEL_COUNT,
-            format: 'r8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+            size: [GLYPH_RAMP_TEXTURE_WIDTH, GLYPH_RAMP_TEXTURE_HEIGHT, 1],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         });
-        this.glyphAtlasView = this.glyphAtlasTexture.createView({ dimension: '2d-array' });
-        this.glyphRampBuffer = this.device.createBuffer({
-            size: GLYPH_RAMP_LIMIT * Uint32Array.BYTES_PER_ELEMENT,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-        });
+        this.glyphAtlasView = this.glyphAtlasTexture.createView();
 
-        this.syncFeatureResources(true);
+        this.syncFeatureResources(true, false);
         await this.syncGlyphResources(true);
 
         this._createStableBindGroups();
@@ -598,8 +594,7 @@ export class WebGPURenderer {
             entries: [
                 { binding: 0, resource: this.cellColorView },
                 { binding: 1, resource: { buffer: this.renderParamsBuffer } },
-                { binding: 2, resource: this.glyphAtlasView },
-                { binding: 3, resource: { buffer: this.glyphRampBuffer } }
+                { binding: 2, resource: this.glyphAtlasView }
             ]
         });
         if (!this.usesExternalVideoTexture && this.imageComputePipeline && this.imageSourceView) {
@@ -616,11 +611,11 @@ export class WebGPURenderer {
         }
     }
 
-    syncFeatureResources(force = false) {
+    syncFeatureResources(force = false, syncGlyphs = true) {
         if (!this.device || !this.paletteLutBuffer || !this.featureBuffer) return;
         const key = `${this.paletteId}:${this.paletteMapping}:${this.ditherMode}`;
         if (!force && key === this.featureResourceKey) {
-            void this.syncGlyphResources();
+            if (syncGlyphs) void this.syncGlyphResources();
             return;
         }
         this.featureResourceKey = key;
@@ -653,11 +648,11 @@ export class WebGPURenderer {
         this.device.queue.writeBuffer(this.featureBuffer, 0, featureData);
         this.imageComputeBindGroup = null;
         this._createStableBindGroups();
-        void this.syncGlyphResources(force);
+        if (syncGlyphs) void this.syncGlyphResources(force);
     }
 
     async syncGlyphResources(force = false) {
-        if (!this.device || !this.glyphAtlasTexture || !this.glyphRampBuffer) return;
+        if (!this.device || !this.glyphAtlasTexture) return;
         const inputKey = glyphResourceInputKey(this);
         if (!force && inputKey === this.glyphInputKey) return;
         this.glyphInputKey = inputKey;
@@ -668,36 +663,34 @@ export class WebGPURenderer {
         if (!force && key === this.glyphResourceKey) return;
         this.glyphResourceKey = key;
 
-        const paddedRamp = new Uint32Array(GLYPH_RAMP_LIMIT);
-        paddedRamp.set(ramp.subarray(0, GLYPH_RAMP_LIMIT));
-        this.device.queue.writeBuffer(this.glyphRampBuffer, 0, paddedRamp);
-        if (!enabled) return;
+        if (!enabled) {
+            this.loadedGlyphPages.clear();
+            return;
+        }
 
-        const tasks = glyphAtlasPagesForRamp(ramp).map((page) => {
-            if (this.loadedGlyphPages.has(page)) return Promise.resolve();
-            let pending = this.pendingGlyphPages.get(page);
-            if (!pending) {
-                pending = loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
-                    .then((pixels) => {
-                        if (!this.glyphAtlasTexture) return;
-                        for (const [mipLevel, levelPixels] of glyphAtlasMipLevels(pixels).entries()) {
-                            const size = GLYPH_ATLAS_PAGE_SIZE >> mipLevel;
-                            this.device.queue.writeTexture(
-                                { texture: this.glyphAtlasTexture, mipLevel, origin: [0, 0, page] },
-                                levelPixels,
-                                { bytesPerRow: size, rowsPerImage: size },
-                                [size, size, 1]
-                            );
-                        }
-                        this.loadedGlyphPages.add(page);
-                    })
-                    .catch((error) => console.warn(`[WebGPU] Glyph atlas page ${page} unavailable:`, error))
-                    .finally(() => this.pendingGlyphPages.delete(page));
-                this.pendingGlyphPages.set(page, pending);
-            }
-            return pending;
-        });
-        await Promise.all(tasks);
+        const pages = glyphAtlasPagesForRamp(ramp);
+        let entries;
+        try {
+            entries = await Promise.all(pages.map(async (page) => [
+                page,
+                await loadGlyphAtlasPage(page, this.targetElement.ownerDocument || document)
+            ]));
+        } catch (error) {
+            console.warn('[WebGPU] Glyph ramp texture unavailable:', error);
+            return;
+        }
+        if (!this.glyphAtlasTexture || this.glyphResourceKey !== key) return;
+        const pixels = buildGlyphRampTexture(ramp, new Map(entries));
+        this.device.queue.writeTexture(
+            { texture: this.glyphAtlasTexture },
+            pixels,
+            {
+                bytesPerRow: GLYPH_RAMP_TEXTURE_WIDTH * 4,
+                rowsPerImage: GLYPH_RAMP_TEXTURE_HEIGHT
+            },
+            [GLYPH_RAMP_TEXTURE_WIDTH, GLYPH_RAMP_TEXTURE_HEIGHT, 1]
+        );
+        if (this.glyphResourceKey === key) this.loadedGlyphPages = new Set(pages);
     }
 
     _renderFrame() {
@@ -883,14 +876,12 @@ export class WebGPURenderer {
         if (this.paletteLutBuffer) this.paletteLutBuffer.destroy();
         if (this.featureBuffer) this.featureBuffer.destroy();
         if (this.glyphAtlasTexture) this.glyphAtlasTexture.destroy();
-        if (this.glyphRampBuffer) this.glyphRampBuffer.destroy();
         this.cellColorView = null;
         this.imageSourceView = null;
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
         this.glyphAtlasTexture = null;
         this.glyphAtlasView = null;
-        this.glyphRampBuffer = null;
         this.initialized = false;
     }
 

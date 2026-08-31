@@ -41,16 +41,16 @@ import {
   GLYPH_ATLAS_MIP_LEVEL_COUNT,
   GLYPH_ATLAS_PAGE_GLYPHS,
   GLYPH_ATLAS_PAGE_SIZE,
+  GLYPH_RAMP_TEXTURE_COLUMNS,
+  GLYPH_RAMP_TEXTURE_HEIGHT,
+  GLYPH_RAMP_TEXTURE_ROW_HEIGHT,
+  GLYPH_RAMP_TEXTURE_WIDTH,
+  buildGlyphRampTexture,
   glyphAtlasMipLevels,
   glyphAtlasPagesForRamp,
   glyphRampCodePoints
 } from '../renderers/shared/glyph-atlas.js';
 import {
-  glyphPreviewCompatibilityReason,
-  isAppleWebKitUserAgent,
-  isWindowsWebViewUserAgent,
-  needsCompatibilityCanvasGlyphPreview,
-  needsWebKitCanvasGlyphPreview,
   selectRendererBackend
 } from '../renderers/gpu/ascii/renderer/backend-policy.js';
 
@@ -140,25 +140,26 @@ assert.equal(glyphMips.length, GLYPH_ATLAS_MIP_LEVEL_COUNT);
 assert.equal(glyphMips[1].length, (GLYPH_ATLAS_PAGE_SIZE / 2) ** 2);
 assert.equal(glyphMips[1][1 * (GLYPH_ATLAS_PAGE_SIZE / 2) + 1], 255);
 assert.equal(glyphMips[2][0], 255);
+const glyphRampTexture = buildGlyphRampTexture(Uint32Array.from([0]), new Map([[0, glyphPage]]));
+const glyphRampTextureRed = (x, y) => glyphRampTexture[(y * GLYPH_RAMP_TEXTURE_WIDTH + x) * 4];
+assert.equal(glyphRampTexture.byteLength, GLYPH_RAMP_TEXTURE_WIDTH * GLYPH_RAMP_TEXTURE_HEIGHT * 4);
+assert.equal(glyphRampTextureRed(3, 2), 255);
+assert.equal(glyphRampTextureRed(1, 16 + 1), 255);
+assert.equal(glyphRampTextureRed(0, 24), 255);
+const twoRowRampTexture = buildGlyphRampTexture(
+  new Uint32Array(GLYPH_RAMP_TEXTURE_COLUMNS + 1),
+  new Map([[0, glyphPage]])
+);
+assert.equal(
+  twoRowRampTexture[((GLYPH_RAMP_TEXTURE_ROW_HEIGHT + 2) * GLYPH_RAMP_TEXTURE_WIDTH + 3) * 4],
+  255
+);
 assert.deepEqual(
   Array.from(glyphRampCodePoints({ charset: 'custom', customGlyphRamp: ' Aあ한' })),
   [0x20, 0x41, 0x3042, 0xd55c]
 );
 
-const safariUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/620.1 Safari/620.1';
-const chromeUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36';
-const windowsWebViewUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0';
 const acceleratedCapabilities = { webgpu: true, webgl2: true, cpu: true };
-assert.equal(isAppleWebKitUserAgent(safariUserAgent), true);
-assert.equal(isAppleWebKitUserAgent(chromeUserAgent), false);
-assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: true, solidMode: false }, safariUserAgent), true);
-assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: false, solidMode: true }, safariUserAgent), false);
-assert.equal(needsWebKitCanvasGlyphPreview({ glyphMode: true }, chromeUserAgent), false);
-assert.equal(isWindowsWebViewUserAgent(windowsWebViewUserAgent), true);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: true }, windowsWebViewUserAgent, false), false);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: true }, windowsWebViewUserAgent, true), true);
-assert.equal(needsCompatibilityCanvasGlyphPreview({ glyphMode: false, solidMode: true }, windowsWebViewUserAgent, true), false);
-assert.equal(glyphPreviewCompatibilityReason({ glyphMode: true }, windowsWebViewUserAgent, true), 'windows-webview2-glyph');
 assert.equal(selectRendererBackend(acceleratedCapabilities, { glyphMode: true }), 'webgpu');
 assert.equal(selectRendererBackend(acceleratedCapabilities, {
   preferredBackend: 'webgpu', glyphMode: true

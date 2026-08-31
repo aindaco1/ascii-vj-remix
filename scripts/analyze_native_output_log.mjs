@@ -74,6 +74,7 @@ for (let index = 1; index < samples.length; index += 1) {
     sourceUploadSkipFps: rate(next, previous, 'sourceUploadSkips'),
     paramFps: rate(next, previous, 'paramVersion'),
     modulatedFps: rate(next, previous, 'modulated'),
+    transitionedFps: rate(next, previous, 'transitioned'),
     fpsSkips: rate(next, previous, 'fpsSkips'),
     pendingSkips: Number(next.pendingSkips || 0) - Number(previous.pendingSkips || 0),
     gpuFailures: Number(next.gpuFailures || 0) - Number(previous.gpuFailures || 0),
@@ -98,9 +99,10 @@ const summary = {
   sourceUploadSkipFpsAvg: average(recent.map((window) => window.sourceUploadSkipFps)),
   paramFpsAvg: average(recent.map((window) => window.paramFps)),
   modulatedFpsAvg: average(recent.map((window) => window.modulatedFps)),
+  transitionedFpsAvg: average(recent.map((window) => window.transitionedFps)),
   reactiveFpsAvg: average(
     recent
-      .map((window) => Math.max(window.paramFps, window.modulatedFps))
+      .map((window) => Math.max(window.paramFps, window.modulatedFps, window.transitionedFps))
       .filter((value) => value >= 10)
   ),
   pendingSkipsTotal: recent.reduce((sum, window) => sum + window.pendingSkips, 0),
@@ -118,6 +120,7 @@ for (const window of recent) {
     `uploadSkips=${window.sourceUploadSkipFps.toFixed(1)}fps`,
     `params=${window.paramFps.toFixed(1)}fps`,
     `modulated=${window.modulatedFps.toFixed(1)}fps`,
+    `transitioned=${window.transitionedFps.toFixed(1)}fps`,
     `target=${window.presentFpsTarget.toFixed(1)}fps`,
     `pendingSkips=${window.pendingSkips}`,
     `gpuFailures=${window.gpuFailures}`,
@@ -133,6 +136,7 @@ console.log([
   `uploadSkipAvg=${summary.sourceUploadSkipFpsAvg.toFixed(1)}fps`,
   `paramsAvg=${summary.paramFpsAvg.toFixed(1)}fps`,
   `modulatedAvg=${summary.modulatedFpsAvg.toFixed(1)}fps`,
+  `transitionedAvg=${summary.transitionedFpsAvg.toFixed(1)}fps`,
   `reactiveAvg=${summary.reactiveFpsAvg.toFixed(1)}fps`,
   `surface=${summary.surface}`
 ].join(' '));

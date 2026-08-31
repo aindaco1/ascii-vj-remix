@@ -56,6 +56,7 @@ ensure_host_port_available
 ensure_podman_ready
 
 if ! podman image exists "$IMAGE"; then
+  printf 'podman: image %s is missing; building it now (the first run downloads FFmpeg and Python dependencies).\n' "$IMAGE" >&2
   "$ROOT/scripts/podman_build.sh"
 fi
 

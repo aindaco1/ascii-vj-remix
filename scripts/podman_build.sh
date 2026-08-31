@@ -9,5 +9,6 @@ source "$ROOT/scripts/podman_env.sh"
 
 cd "$ROOT"
 ensure_podman_ready
+printf 'podman: building %s with Node %s; first-time dependency downloads can take several minutes.\n' "$IMAGE" "$NODE_MAJOR" >&2
 podman build --build-arg "NODE_MAJOR=$NODE_MAJOR" -t "$IMAGE" -f Containerfile .
 echo "built $IMAGE with Node $NODE_MAJOR"

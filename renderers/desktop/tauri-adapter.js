@@ -121,11 +121,23 @@ function isExpectedMidiHardwareFailure(command, error) {
         raw.includes('disconnected');
 }
 
+function isExpectedAudioHardwareFailure(command, error) {
+    if (String(command || '') !== 'start_input_audio_capture') return false;
+    const raw = tauriErrorText(error);
+    return raw.includes('no default microphone input device') ||
+        raw.includes('requested audio device is not available') ||
+        raw.includes('audio device is unavailable') ||
+        raw.includes('devicenotavailable') ||
+        raw.includes('device disconnected') ||
+        raw.includes('device has been disconnected');
+}
+
 function isReportableTauriCommandFailure(command, error) {
     const normalizedCommand = String(command || '');
     if (!normalizedCommand || normalizedCommand.includes('crash_report')) return false;
     if (NON_FATAL_DIAGNOSTIC_COMMANDS.has(normalizedCommand)) return false;
     if (isExpectedPermissionCommandFailure(normalizedCommand, error)) return false;
+    if (isExpectedAudioHardwareFailure(normalizedCommand, error)) return false;
     if (isExpectedMidiHardwareFailure(normalizedCommand, error)) return false;
     return true;
 }

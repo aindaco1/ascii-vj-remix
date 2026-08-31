@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+ASCILINE_PODMAN_MACHINE="${ASCILINE_PODMAN_MACHINE:-podman-machine-default}"
+
 prefer_podman_path() {
   local candidate=""
   for candidate in \
@@ -34,7 +36,7 @@ detect_os_family() {
 }
 
 detect_podman_socket() {
-  podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
+  podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' "$ASCILINE_PODMAN_MACHINE" 2>/dev/null || true
 }
 
 configure_podman_connection() {
@@ -54,7 +56,7 @@ podman_machine_log_path() {
   local socket_path=""
   socket_path="$(detect_podman_socket)"
   if [ -n "$socket_path" ]; then
-    echo "$(dirname "$socket_path")/podman-machine-default.log"
+    echo "$(dirname "$socket_path")/${ASCILINE_PODMAN_MACHINE}.log"
   fi
 }
 
@@ -71,6 +73,7 @@ ensure_podman_ready() {
   local run_smoke="${1:-false}"
   local os_family=""
   local machine_state=""
+  local configured_machine="false"
   local log_path=""
   local rootless=""
 
@@ -87,32 +90,39 @@ ensure_podman_ready() {
   fi
 
   if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
-    if ! podman machine inspect >/dev/null 2>&1; then
-      podman_env_fail "No Podman machine found. Run: podman machine init --now"
-    fi
-
-    machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
-    if [ "$machine_state" != "running" ]; then
-      podman_env_warn "Podman machine is not running; starting podman-machine-default."
-      podman machine start podman-machine-default >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
-      machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
-      if [ "$machine_state" != "running" ]; then
-        log_path="$(podman_machine_log_path)"
-        [ -f /tmp/ascii-vj-remix-podman-start.log ] && printf 'podman: start log: /tmp/ascii-vj-remix-podman-start.log\n' >&2
-        [ -n "$log_path" ] && [ -f "$log_path" ] && printf 'podman: machine log: %s\n' "$log_path" >&2
-        podman_env_fail "Podman machine did not stay running after startup."
+    # A healthy default connection may point at a machine owned by another
+    # checkout. Reuse it before trying to start this repo's fallback machine;
+    # macOS providers allow only one VM to run at a time.
+    if ! podman info >/dev/null 2>&1; then
+      if ! podman machine inspect "$ASCILINE_PODMAN_MACHINE" >/dev/null 2>&1; then
+        podman_env_fail "No reachable Podman engine and machine '$ASCILINE_PODMAN_MACHINE' was not found. Run: podman machine init --now"
       fi
-    fi
 
-    configure_podman_connection
+      machine_state="$(podman machine inspect --format '{{.State}}' "$ASCILINE_PODMAN_MACHINE" 2>/dev/null || true)"
+      if [ "$machine_state" != "running" ]; then
+        podman_env_warn "Podman engine is not reachable; starting $ASCILINE_PODMAN_MACHINE."
+        podman machine start "$ASCILINE_PODMAN_MACHINE" >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
+        machine_state="$(podman machine inspect --format '{{.State}}' "$ASCILINE_PODMAN_MACHINE" 2>/dev/null || true)"
+        if [ "$machine_state" != "running" ]; then
+          log_path="$(podman_machine_log_path)"
+          [ -f /tmp/ascii-vj-remix-podman-start.log ] && printf 'podman: start log: /tmp/ascii-vj-remix-podman-start.log\n' >&2
+          [ -n "$log_path" ] && [ -f "$log_path" ] && printf 'podman: machine log: %s\n' "$log_path" >&2
+          podman_env_fail "Podman machine did not stay running after startup."
+        fi
+      fi
+
+      configure_podman_connection
+      configured_machine="true"
+    fi
   fi
 
   if ! podman info >/dev/null 2>&1; then
     if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
-      podman_env_warn "Podman API is stale; restarting podman-machine-default once."
-      podman machine stop podman-machine-default >/tmp/ascii-vj-remix-podman-stop.log 2>&1 || true
-      podman machine start podman-machine-default >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
+      podman_env_warn "Podman API is stale; restarting $ASCILINE_PODMAN_MACHINE once."
+      podman machine stop "$ASCILINE_PODMAN_MACHINE" >/tmp/ascii-vj-remix-podman-stop.log 2>&1 || true
+      podman machine start "$ASCILINE_PODMAN_MACHINE" >/tmp/ascii-vj-remix-podman-start.log 2>&1 || true
       configure_podman_connection
+      configured_machine="true"
     fi
   fi
 
@@ -122,7 +132,9 @@ ensure_podman_ready() {
 
   if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
     for _ in 1 2 3; do
-      configure_podman_connection
+      if [ "$configured_machine" = "true" ]; then
+        configure_podman_connection
+      fi
       if ! podman info >/dev/null 2>&1; then
         log_path="$(podman_machine_log_path)"
         [ -n "$log_path" ] && [ -f "$log_path" ] && printf 'podman: machine log: %s\n' "$log_path" >&2

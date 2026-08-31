@@ -8,9 +8,10 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version and latest verified public release are
-0.10.0. Release history is recorded in the [Changelog](CHANGELOG.md);
-prospective work belongs in the [Roadmap](docs/ROADMAP.md).
+The current source/package version is 1.0.0, which is also the stable public
+release. Release history is recorded in the
+[Changelog](CHANGELOG.md); prospective work belongs in the
+[Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
 
@@ -22,6 +23,7 @@ prospective work belongs in the [Roadmap](docs/ROADMAP.md).
 - [Security guide](docs/SECURITY.md)
 - [Performance guide](docs/PERFORMANCE.md)
 - [Testing guide](docs/TESTING.md)
+- [1.0.0 release readiness and acceptance](docs/RELEASE_1.0.0_RC.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -52,11 +54,12 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 ### Sources
 
 - Built-in Demo Image, used as the default startup source.
-- Built-in Demo Video.
+- Built-in H.264/MP4 Demo Video on macOS and Windows, with a matching VP8/WebM
+  asset selected on clean Linux installations.
 - User-selected local image and video files.
-- MKV selection support in the desktop file picker. Playback depends on the
-  active platform decoder path; MP4/H.264 is the most consistently supported
-  format.
+- MKV selection support in the desktop file picker. If the platform webview
+  cannot decode the built-in demo or a selected video, the desktop app retries
+  it through the bundled FFmpeg path.
 - Local webcam/camera input.
 - Multiple simultaneous cameras when the operating system and desktop runtime
   allow it.
@@ -69,6 +72,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU renderer is the primary quality target on capable desktop runtimes.
 - WebGL2 renderer is the main embedded GPU fallback.
 - Canvas2D and pixel Canvas paths remain compatibility fallbacks.
+- Packaged desktop views attempt WebGPU for every acceleration-eligible preset,
+  then WebGL2 and Canvas2D as bounded fallbacks. Presets with an explicit
+  compatibility backend retain Canvas2D on every platform.
 - Native Tauri output window uses a `wgpu` presenter where available:
   - Metal on macOS.
   - D3D12 on Windows.
@@ -102,12 +108,21 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
 - Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
   Newsprint, Terminal Mono, and Dense Typewriter.
+- Classic Camera ASCII is the default for a clean profile. Existing persisted
+  profiles keep their visual settings instead of being silently reset. The
+  clean-profile visual choice does not override the global Auto renderer
+  preference; presets without an explicit compatibility backend use
+  WebGPU/WebGL2 when the runtime supports them.
 - Twenty-three read-only character presets adapted from
   [ascii.today](https://ascii.today/), including Broadway KB, Computer, Doom,
   Ghost, Modular, Standard, Univers, and Doh. The complete credited pack is in
   [ascii.today Character Presets](docs/ASCII_TODAY_PRESETS.md).
-- Character Set and Font Family controls stay compact so traditional ASCII
-  tuning does not crowd the dense live-control surface.
+- Built-in and My Presets are shown as separate, independently alphabetized
+  sections with a live name search. The prior Point & Click Default display
+  name is now the more descriptive Dense Color ASCII; its stable preset id is
+  unchanged.
+- Character Set, Font Family, Palette, and other selects share the same control
+  geometry so traditional ASCII tuning stays aligned in the dense sidebar.
 - Palette, mapping, ordered-dither, glyph-ramp, and glyph-color controls are
   independently tunable and saved through the existing visual-preset schema.
 - Ten built-in palette/glyph variants include Braille, box drawing, CJK marks,
@@ -192,8 +207,12 @@ and requires a manually captured and verified hardware profile.
 - The Reports control remains visible when no crash reports are pending so the
   `ask`, `always`, and `off` preference is always reachable. A pending count and
   warning state appear only after a bounded, sanitized report is captured.
-- Public 0.10.0 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 0.10.0 Windows artifacts are unsigned previews.
+  Development bundles retain reports locally for review and keep Send disabled;
+  only a release-mode build with the production bundle identifier may submit.
+  Legacy unavailable-microphone reports are removed from the queue because a
+  disconnected or absent input device is a normal hardware state.
+- Public 1.0.0 macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Public 1.0.0 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
   app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
   replace or inherit privacy grants from the production app.
@@ -233,7 +252,7 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Public 0.10.0 release builds are Developer ID signed, notarized, stapled, and
+- Public 1.0.0 release builds are Developer ID signed, notarized, stapled, and
   accepted by Gatekeeper. Local or test builds may require the normal macOS
   right-click Open or Open Anyway flow.
 
@@ -257,7 +276,7 @@ Notes:
 | Level | Requirement |
 | --- | --- |
 | Minimum | Modern x86_64 Linux distribution, WebKitGTK 4.1 runtime, Mesa or vendor GPU drivers with WebGL2, 8 GB RAM, 2 GB free disk space. |
-| Optimal | Ubuntu 24.04, Fedora 40, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU. |
+| Optimal | Ubuntu 24.04, Fedora 44, Arch, or comparable current distro; Wayland or well-configured X11; recent Mesa/NVIDIA drivers; Vulkan-capable GPU. |
 
 Notes:
 
@@ -302,7 +321,7 @@ Download the latest desktop build from:
 
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
-The 0.10.0 release contains a notarized Apple Silicon macOS DMG, Windows
+The 1.0.0 release contains a notarized Apple Silicon macOS DMG, Windows
 EXE/MSI installers, Linux AppImage/deb/rpm packages, and signed updater
 metadata. The Windows installers are unsigned previews.
 
@@ -312,7 +331,7 @@ metadata. The Windows installers are unsigned previews.
    artifact, not the primary manual installer.
 2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
 3. Eject the DMG, then open the installed app from `/Applications` in Finder.
-4. The public 0.10.0 macOS release is Developer ID signed, notarized, stapled,
+4. The public 1.0.0 macOS release is Developer ID signed, notarized, stapled,
    and accepted by Gatekeeper. Local or test builds may still require the
    normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
@@ -322,7 +341,7 @@ metadata. The Windows installers are unsigned previews.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 0.10.0 artifacts are unsigned previews. Windows may show Unknown
+3. Windows 1.0.0 artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.
@@ -349,8 +368,9 @@ portal packages are installed for your distribution.
 ## First Run
 
 1. Launch the app.
-2. The renderer starts automatically on Demo Image.
-3. Choose a built-in preset from the Presets panel.
+2. A clean profile starts on Demo Image with Classic Camera ASCII.
+3. Search or choose a preset from the alphabetized Built-in section. Presets
+   you save appear alphabetically under My Presets.
 4. Use Source to switch to Demo Video, Camera, or a custom local file.
 5. Tune Palette, Dither, and Glyph controls independently, or choose one of the
    built-in palette/glyph presets.
@@ -485,13 +505,14 @@ Audio Tap capture is not implemented in the current release.
 
 The app automatically retries failed WebGPU/WebGL2 renderer creation with the
 Canvas compatibility renderer, including during live preset changes. Because
-Windows WebView2 can accept GPU glyph initialization while producing a blank
-surface, the packaged Windows app resolves glyph presets directly to Canvas2D;
-solid/pixel presets can remain GPU-accelerated. Open Stats Overlay to see the
-resolved backend. If a preset still fails, open the persistent Reports control
-to review and send the bounded renderer diagnostic; it contains preset/backend
-state and recent renderer events, never selected media or an unrestricted log
-file.
+Windows WebView2 previously forced every glyph preset to Canvas2D, an Auto
+preset should now resolve to WebGPU when available or WebGL2 when WebGPU cannot
+initialize. Open Stats Overlay to see the resolved backend. If only a small
+subset of presets is accelerated, or a GPU preset is blank, open the persistent
+Reports control to review and send the bounded renderer diagnostic; it contains
+preset/backend state and recent renderer events, never selected media or an
+unrestricted log file. Canvas2D can still be selected manually while the GPU
+path is diagnosed.
 
 ### Pop Out is slow
 
@@ -502,9 +523,10 @@ file.
 
 ### Video format does not play
 
-Try MP4/H.264 first. MKV support depends on the active decode path and platform;
-an MKV accepted by the file picker may still be unsupported by the active
-decoder.
+The desktop app retries the bundled demo and selected videos through its local
+FFmpeg decoder when the platform webview rejects them. If a file still does not
+play, verify it with a common MP4/H.264 or VP8/WebM encoding; corrupt or unusual
+container/codec combinations can remain unsupported.
 
 ## Development
 

@@ -177,37 +177,41 @@ background, so WebKit throttled requestAnimationFrame and native IPC to roughly
 visible-window 640-column figures above remain the local FPS evidence; physical
 reference-floor and Windows performance acceptance remain separate.
 
-The base Unicode atlas is a fixed 16 MB R8 allocation divided into sixteen
-1024px pages. Browser GPU renderers add four max-coverage mip levels so thin
-strokes remain visible in small cells without adding per-frame texture reads;
-the bounded browser allocation is 21.25 MB. Only pages required by the active
-maximum-96-scalar ramp are decoded/uploaded, and the shared decoded browser
-cache retains at most four base pages plus their generated mips. This avoids
-the multi-second CJK page stalls observed with four 2048px pages while keeping
-package bytes, CPU cache, and GPU allocation bounded. Native Pop Out retains
-the 16 MB base-page allocation.
+The source Unicode atlas is divided into sixteen 1024px grayscale pages. Only
+pages required by the active maximum-96-scalar ramp are decoded, and the shared
+browser cache retains at most four base pages plus generated max-coverage mips.
+WebGPU compacts the active masks and all five coverage levels into one 768x62
+RGBA texture, about 186 KB of GPU storage. WebGL2 retains the bounded 16-layer
+R8 array and its mips, while native Pop Out retains the 16 MB base-page
+allocation. This avoids the multi-second CJK page stalls observed with four
+2048px pages while keeping package bytes, CPU cache, and WebGPU allocation
+bounded.
 
 The original local feature-on measurements selected WebGL2 and remain browser
 GPU regression evidence, not acceptance evidence for the installed Apple
 WebKit glyph preview.
 
-For the primary macOS Apple WebKit view, glyph mode uses the existing Canvas2D
-path and therefore the normal 120-column/6,000-cell software ceiling. This keeps
-the preview inside the 30 FPS floor while the independent native Pop Out stays
-GPU-rendered. Solid and pixel primary presets remain eligible for WebGPU. The
-Canvas selection is made when a renderer is constructed, not in the frame loop.
-An optimized installed-app run of that bounded glyph preview measured 30.0 FPS
-in the main phase, 30.0 FPS with native Pop Out, and 30.1 FPS during numeric
-transitions; the lowest sampled phase value was 29.5 FPS and the worst P95 was
-33.9 ms. Native Pop Out remained near 60 FPS with zero GPU failures. These are
-development-host regression results, not M1/16 GB floor certification.
+For the primary macOS Apple WebKit view, acceleration-eligible glyph presets
+use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
+the normal software density ceiling. The installed all-preset sweep resolves
+41 built-ins to WebGPU and 28 to Canvas2D, keeps all 69 visible, and confirms
+every GPU-eligible preset is accelerated. Native Pop Out remains independently
+GPU-rendered. A 30-second structural run held the primary view at 30.0 FPS,
+native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS
+fixture, and completed 16 synchronized crossfades with zero GPU or transition
+failures. These are M1 Max development-host regression results, not M1/16 GB
+floor certification.
 
 ## Backend Notes
 
 ### WebGPU
 
 WebGPU is the primary visual quality target and the first choice on capable
-Chromium/WebView runtimes.
+Chromium and packaged macOS Apple WebKit runtimes.
+
+The clean-profile preset must not own the global renderer preference. The
+default backend is Auto, and built-ins without an explicit compatibility
+backend are expected to resolve to WebGPU first and WebGL2 second.
 
 Watch for:
 
@@ -253,6 +257,13 @@ Rules:
   small glyph ramp/params, not trigger unbounded font loading or large dynamic
   atlas allocation.
 - Avoid blocking the main UI while the output window presents.
+- Arm preset transitions once with a shared timestamp. Do not serialize one
+  request/response parameter update per animation frame while a native tween or
+  crossfade can advance on the display link.
+- Keep the native surface at minimum supported frame latency so swapchain
+  buffering does not add avoidable main-to-output delay.
+- Prefer a non-sRGB native surface format so the shared byte-space renderer
+  color math is not transformed a second time by the swapchain.
 - Upload source textures on source-frame version changes rather than display
   refresh; unversioned fallback callers must continue to upload.
 - Keep counters/logs available for frame acquisition, presentation, param
@@ -392,6 +403,11 @@ ASCILINE_UI_PERF_SMOKE_DURATION_MS=30000 \
 npm run smoke:ui-perf
 ```
 
+Add `ASCILINE_UI_PERF_SMOKE_STRUCTURAL=1` to alternate glyph and solid renderer
+families during the transition phase. This exercises the native two-pass
+crossfade and reports display-link `transitioned` frame cadence in addition to
+parameter and audio-modulation cadence.
+
 `smoke:primary-presets` separately activates every built-in Demo Image preset
 inside the installed Apple WebKit app. It verifies the final primary canvas for
 each preset so Pop Out output, an intermediate transition snapshot, or a later
@@ -448,6 +464,8 @@ Before shipping renderer, source, output, or audio changes, manually verify:
 - Audio reactivity visibly changes output with Mic/Input selected.
 - Pop Out keeps the main preview responsive.
 - Pop Out reflects WTF and audio-reactive changes while fully visible.
+- Pop Out palette, brightness, contrast, and background colors match the main
+  preview for the same preset.
 - Camera Pop Out does not freeze on the first frame.
 - Stats Overlay reports believable FPS/grid/source/preset data.
 

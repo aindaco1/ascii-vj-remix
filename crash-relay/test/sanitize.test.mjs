@@ -144,6 +144,25 @@ test('ignores expected macOS system audio permission denials', () => {
   assert.equal(isIgnoredCrashReport(report), true);
 });
 
+test('ignores unavailable virtual microphone hardware', () => {
+  const report = sanitizeCrashPayload({
+    app: { identifier: 'com.asciline.remix', version: '1.0.0', os: 'linux', arch: 'x86_64' },
+    report: {
+      kind: 'tauri-command',
+      surface: 'tauri-command',
+      message: 'Could not build microphone input stream: The requested audio device is not available. It may have been disconnected.',
+      context: {
+        command: 'start_input_audio_capture',
+        backend: 'auto',
+        sourceMode: 'static'
+      }
+    }
+  }, env);
+
+  assert.equal(isIgnoredCrashReport(report), true);
+  assert.equal(ignoredCrashReportReason(report), 'expected-hardware-unavailable');
+});
+
 test('keeps unexpected Tauri command failures reportable', () => {
   const report = sanitizeCrashPayload({
     app: { identifier: 'com.asciline.remix', version: '0.9.2' },

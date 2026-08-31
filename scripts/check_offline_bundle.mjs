@@ -6,6 +6,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = path.join(root, 'dist');
 const scannedExtensions = new Set(['.html', '.js', '.css', '.json', '.svg', '.webmanifest']);
 const issues = [];
+const demoVideoWebmPath = path.join(dist, 'media', 'demo-video-2.webm');
+const demoVideoMp4Path = path.join(dist, 'media', 'demo-video-2.mp4');
 
 const forbidden = [
   {
@@ -80,6 +82,25 @@ try {
 }
 
 await walk(dist);
+
+try {
+  const demoVideo = await readFile(demoVideoWebmPath);
+  const webmMagic = [0x1a, 0x45, 0xdf, 0xa3];
+  if (demoVideo.length < webmMagic.length || !webmMagic.every((value, index) => demoVideo[index] === value)) {
+    issues.push('dist/media/demo-video-2.webm is not a WebM/Matroska asset');
+  }
+} catch (error) {
+  issues.push(`dist/media/demo-video-2.webm is missing: ${error?.message || error}`);
+}
+
+try {
+  const demoVideo = await readFile(demoVideoMp4Path);
+  if (demoVideo.length < 12 || demoVideo.subarray(4, 8).toString('ascii') !== 'ftyp') {
+    issues.push('dist/media/demo-video-2.mp4 is not an ISO base media asset');
+  }
+} catch (error) {
+  issues.push(`dist/media/demo-video-2.mp4 is missing: ${error?.message || error}`);
+}
 
 if (issues.length > 0) {
   console.error('Offline bundle check failed. Runtime assets must not reference remote URLs.');

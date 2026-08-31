@@ -43,16 +43,17 @@ EOF
   -out "$TMP_DIR/cert.pem" \
   -config "$TMP_DIR/openssl.cnf"
 
+P12_PASSWORD="$(/usr/bin/openssl rand -hex 24)"
 /usr/bin/openssl pkcs12 \
   -export \
   -inkey "$TMP_DIR/key.pem" \
   -in "$TMP_DIR/cert.pem" \
   -out "$TMP_DIR/cert.p12" \
-  -passout pass:
+  -passout "pass:$P12_PASSWORD"
 
 /usr/bin/security import "$TMP_DIR/cert.p12" \
   -k "$KEYCHAIN" \
-  -P "" \
+  -P "$P12_PASSWORD" \
   -T /usr/bin/codesign
 
 if ! /usr/bin/security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$TMP_DIR/cert.pem"; then

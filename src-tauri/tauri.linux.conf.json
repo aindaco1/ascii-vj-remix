@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ASCII VJ Remix",
+        "width": 1000,
+        "height": 680,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "useHttpsScheme": true,
+        "backgroundThrottling": "disabled",
+        "fullscreen": false,
+        "center": true
+      }
+    ]
+  }
+}

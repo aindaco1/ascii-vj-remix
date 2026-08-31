@@ -286,7 +286,7 @@ struct FfprobeStream {
 }
 
 pub fn probe_video(binaries: &FfmpegBinaries, source: &Path) -> Result<VideoProbe, FfmpegError> {
-    let output = Command::new(&binaries.ffprobe)
+    let output = sidecar_command(&binaries.ffprobe)
         .args(ffprobe_args(source))
         .output()
         .map_err(|source| FfmpegError::Io {
@@ -334,7 +334,7 @@ pub fn spawn_rgb_reader_with_options(
     config: &DecodeConfig,
     options: &RgbReaderOptions,
 ) -> Result<FfmpegRgbFrameReader, FfmpegError> {
-    let mut child = Command::new(&binaries.ffmpeg)
+    let mut child = sidecar_command(&binaries.ffmpeg)
         .args(ffmpeg_decode_args(source, config, options))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -366,7 +366,7 @@ pub fn spawn_macos_camera_rgb_reader(
 ) -> Result<FfmpegRgbFrameReader, FfmpegError> {
     #[cfg(target_os = "macos")]
     {
-        let mut child = Command::new(&binaries.ffmpeg)
+        let mut child = sidecar_command(&binaries.ffmpeg)
             .args(ffmpeg_macos_camera_decode_args(config, options))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -397,6 +397,21 @@ pub fn spawn_macos_camera_rgb_reader(
         Err(FfmpegError::InvalidDecodeConfig(
             "native camera output is currently implemented for macOS only".to_string(),
         ))
+    }
+}
+
+fn sidecar_command(program: &Path) -> Command {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut command = Command::new(program);
+        command.creation_flags(CREATE_NO_WINDOW);
+        command
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new(program)
     }
 }
 
