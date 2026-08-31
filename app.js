@@ -2,8 +2,9 @@ import {
     bundledDemoVideoUrl,
     detectMediaType,
     isBundledDemoVideoUrl,
-    loadMediaSource
-} from './renderers/gpu/media-source.js?v=20260830-platform-demo-video';
+    loadMediaSource,
+    nativeVideoFallbackSource
+} from './renderers/gpu/media-source.js?v=20260830-native-demo-fallback';
 import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
     explicitCanvasRendererDecision
@@ -6298,17 +6299,23 @@ class RendererLabApp {
 
     _canUseTauriRawVideoSource(params) {
         if (!isTauriRuntime() || params.mediaType !== 'video') return false;
-        if (!this.customTauriFile?.id || params.mediaUrl !== this.customTauriFile.url) return false;
-        return true;
+        return Boolean(this._tauriRawVideoFile(params));
+    }
+
+    _tauriRawVideoFile(params) {
+        return nativeVideoFallbackSource(params, this.customTauriFile);
     }
 
     _shouldUseTauriRawVideoSource(params) {
-        if (!this._canUseTauriRawVideoSource(params)) return false;
-        return isMkvName(this.customTauriFile.name || params.mediaUrl);
+        if (!isTauriRuntime()) return false;
+        const file = this._tauriRawVideoFile(params);
+        return Boolean(file && isMkvName(file.name || params.mediaUrl));
     }
 
     async _loadTauriRawVideoSource(params, options) {
-        const source = new TauriRawVideoSource(this.customTauriFile, params, options);
+        const file = this._tauriRawVideoFile(params);
+        if (!file) throw new Error('Native video source is unavailable');
+        const source = new TauriRawVideoSource(file, params, options);
         return source.start();
     }
 

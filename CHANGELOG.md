@@ -45,11 +45,14 @@
 - Added platform-owned built-in Demo Video formats: H.264/MP4 for macOS and
   Windows webviews, and VP8/WebM for clean Ubuntu and Fedora installations that
   lack optional H.264 GStreamer codecs. Existing saved Demo Video selections
-  migrate to the correct platform asset, while user-selected videos retry
-  through bundled FFmpeg if the platform decoder rejects them.
+  migrate to the correct platform asset, while both shipped demo formats and
+  user-selected videos retry through bundled FFmpeg if the platform decoder
+  rejects them. Exact bundled source ids preserve the existing narrow file
+  access boundary.
 - Treat unavailable or disconnected microphone devices as an expected hardware
   condition. The app can attempt its browser fallback and no longer queues a
-  crash report merely because a VM has no usable microphone.
+  crash report merely because a VM has no usable microphone; legacy reports for
+  that exact condition are pruned on the next launch.
 - Made the Podman wrappers reuse an already-healthy default connection before
   starting their fallback VM, avoiding macOS's one-active-machine collision
   with other project checkouts.
@@ -75,6 +78,9 @@
 - Timestamped the primary video playback handoff so the native decoder advances
   its initial seek by the time spent opening the output window and starting the
   decoder, removing avoidable Pop Out playback lag.
+- Pinned native Pop Out to a browser-parity non-sRGB unorm surface format when
+  the platform supports it, preventing platform format order from applying an
+  extra sRGB conversion to the shared renderer colors.
 - Prevented release-mode Windows app and FFmpeg/ffprobe child processes from
   opening visible console windows. Debug builds retain normal diagnostic
   console behavior.

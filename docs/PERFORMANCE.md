@@ -262,6 +262,8 @@ Rules:
   crossfade can advance on the display link.
 - Keep the native surface at minimum supported frame latency so swapchain
   buffering does not add avoidable main-to-output delay.
+- Prefer a non-sRGB native surface format so the shared byte-space renderer
+  color math is not transformed a second time by the swapchain.
 - Upload source textures on source-frame version changes rather than display
   refresh; unversioned fallback callers must continue to upload.
 - Keep counters/logs available for frame acquisition, presentation, param
@@ -462,6 +464,8 @@ Before shipping renderer, source, output, or audio changes, manually verify:
 - Audio reactivity visibly changes output with Mic/Input selected.
 - Pop Out keeps the main preview responsive.
 - Pop Out reflects WTF and audio-reactive changes while fully visible.
+- Pop Out palette, brightness, contrast, and background colors match the main
+  preview for the same preset.
 - Camera Pop Out does not freeze on the first frame.
 - Stats Overlay reports believable FPS/grid/source/preset data.
 

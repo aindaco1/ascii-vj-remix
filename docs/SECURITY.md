@@ -144,6 +144,9 @@ Security requirements:
   passwords, and auth-like context keys.
 - Reports must not include user media files, decoded frames, screenshots, raw
   audio, local storage dumps, environment dumps, or arbitrary logs.
+- Expected unavailable/disconnected microphone reports from older builds are
+  pruned locally using the same narrow hardware-error classifier used at
+  capture time; unexpected microphone errors remain queued.
 - Renderer diagnostics are limited to the eight most recent sanitized
   structured events. They must not become a general local-log upload path.
 - The app stores at most a small local queue and lets the user choose `ask`,
@@ -294,6 +297,8 @@ also an important supply-chain and licensing boundary.
 Rules:
 
 - Do not download FFmpeg, codecs, or media helper binaries at runtime.
+- Native fallback for built-in media accepts only the two exact shipped Demo
+  Video source ids; it does not grant the webview a general filesystem path.
 - Release sidecars are built from pinned official source.
 - Network protocols remain disabled for release FFmpeg builds unless a
   productized streaming feature explicitly requires a reviewed exception.

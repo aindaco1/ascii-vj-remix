@@ -59,8 +59,8 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   asset selected on clean Linux installations.
 - User-selected local image and video files.
 - MKV selection support in the desktop file picker. If the platform webview
-  cannot decode a selected video, the desktop app retries it through the
-  bundled FFmpeg path.
+  cannot decode the built-in demo or a selected video, the desktop app retries
+  it through the bundled FFmpeg path.
 - Local webcam/camera input.
 - Multiple simultaneous cameras when the operating system and desktop runtime
   allow it.
@@ -210,6 +210,8 @@ and requires a manually captured and verified hardware profile.
   warning state appear only after a bounded, sanitized report is captured.
   Development bundles retain reports locally for review and keep Send disabled;
   only a release-mode build with the production bundle identifier may submit.
+  Legacy unavailable-microphone reports are removed from the queue because a
+  disconnected or absent input device is a normal hardware state.
 - Public 0.10.0 macOS artifacts are Developer ID signed, notarized, stapled, and
   Gatekeeper-validated. Public 0.10.0 Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
@@ -522,9 +524,10 @@ path is diagnosed.
 
 ### Video format does not play
 
-Try MP4/H.264 first. MKV support depends on the active decode path and platform;
-an MKV accepted by the file picker may still be unsupported by the active
-decoder.
+The desktop app retries the bundled demo and selected videos through its local
+FFmpeg decoder when the platform webview rejects them. If a file still does not
+play, verify it with a common MP4/H.264 or VP8/WebM encoding; corrupt or unusual
+container/codec combinations can remain unsupported.
 
 ## Development
 

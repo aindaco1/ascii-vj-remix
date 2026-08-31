@@ -25,6 +25,29 @@ function isBundledDemoVideoUrl(url) {
     return Object.values(BUNDLED_DEMO_VIDEO_URLS).includes(normalized);
 }
 
+function bundledDemoVideoNativeSource(url) {
+    if (!isBundledDemoVideoUrl(url)) return null;
+    const mediaUrl = String(url);
+    return {
+        id: `bundled:${mediaUrl}`,
+        provider: 'tauri-bundled',
+        url: mediaUrl,
+        name: mediaUrl.split('/').pop() || 'Demo Video',
+        mediaType: 'video'
+    };
+}
+
+function nativeVideoFallbackSource(params, selectedNativeFile = null) {
+    if (params?.mediaType !== 'video') return null;
+    if (
+        selectedNativeFile?.id &&
+        params.mediaUrl === selectedNativeFile.url
+    ) {
+        return selectedNativeFile;
+    }
+    return bundledDemoVideoNativeSource(params.mediaUrl);
+}
+
 function detectMediaType(url) {
     const lower = url.toLowerCase();
     if (lower.startsWith('camera://')) return 'camera';
@@ -284,9 +307,11 @@ function makeImageResult(img, canvas, width, height) {
 }
 
 export {
+    bundledDemoVideoNativeSource,
     BUNDLED_DEMO_VIDEO_URLS,
     bundledDemoVideoUrl,
     isBundledDemoVideoUrl,
+    nativeVideoFallbackSource,
     loadMediaSource,
     detectMediaType,
     MEDIA_EXTENSIONS

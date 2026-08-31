@@ -27,9 +27,13 @@ acceptance, and public release state.
 - Linux CI is pinned to Ubuntu 24.04; the virtual acceptance matrix exercises
   Ubuntu 26.04.1 and Fedora 44 while retaining AppImage, deb, and rpm coverage.
 - Linux opens at a platform-owned 1000x680 size, the bundled demo selects
-  VP8/WebM on Linux while macOS and Windows retain H.264/MP4, selected videos
-  can fall back to bundled FFmpeg, and WebGL2 is accepted when a Hyper-V guest
-  does not expose WebGPU.
+  VP8/WebM on Linux while macOS and Windows retain H.264/MP4, bundled and
+  selected videos can fall back to bundled FFmpeg, and WebGL2 is accepted when
+  a Hyper-V guest does not expose WebGPU.
+- Legacy absent/disconnected microphone reports are pruned, while the input
+  control preserves its nonfatal unavailable-device status.
+- Native Pop Out selects a browser-parity unorm surface format when available
+  so the shared renderer color math is not converted through sRGB twice.
 - Experimental MIDI remains explicitly labeled and its physical validation
   claims remain limited to the documented macOS UC-33e/mioXC path.
 
@@ -39,15 +43,15 @@ acceptance, and public release state.
 | --- | --- | --- |
 | Source metadata | Pass | Package, npm lock, Cargo package/lock, and Tauri config agree on 1.0.0. |
 | Static UI/renderer | Pass | Clean-profile Auto ownership, accelerated built-in resolution, all 69 built-ins, live search, alphabetical sections, overflow focus, and minimum-window select geometry pass `npm run smoke:static`. |
-| Desktop gate | Pass | `npm run check:desktop` passes, including 53 Rust tests and the native debug build. |
+| Desktop gate | Pass | `npm run check:desktop` passes, including 60 Rust tests and the native debug build. |
 | Release runtime gate | Pass | Pinned FFmpeg 8.1.2 Apple Silicon resources are staged and `npm run check:release` passes. |
-| Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources. |
+| Installed macOS app | Pass | `~/Applications/ASCII VJ Remix Dev.app`, version 1.0.0, development bundle id, stable signature, verified FFmpeg resources, and advancing bundled Demo Video. |
 | Installed Apple WebKit presets | Pass | `npm run smoke:primary-presets`: 69/69 visible, 41/41 GPU-eligible presets on WebGPU, 28 explicit Canvas2D compatibility presets, zero failures. |
-| Native Pop Out | Pass | 30-second structural packaged smoke reports 60.0 FPS average native presentation, 16 synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. |
+| Native Pop Out | Pass | Current optimized structural packaged smoke with Demo Video reports 60.1 FPS average native presentation, eight synchronized transitions, zero transition failures, zero GPU failures, and a visible WebGPU primary surface. Deterministic unorm selection is covered separately; visual Linux color comparison still requires the VM. |
 | Windows CI installer | Pass | [Desktop run 33306914277](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33306914277) built the pinned FFmpeg resources and unsigned development EXE/MSI and passed the GUI-subsystem check. |
 | Windows physical QA | Retest required | The earlier development artifact was verified on the Windows 11 Pro / RTX 2070 machine, but it still contained the blanket glyph-to-Canvas policy. The replacement artifact must prove the 41 accelerated presets are visible on WebGPU. |
 | Linux CI packages | Pass | [Desktop run 33330609894](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33330609894) built the pinned FFmpeg resources and development AppImage/deb/rpm artifact on Ubuntu 24.04. |
-| Linux VM QA | Retest required | Ubuntu 26.04.1 and Fedora 44 both rendered cleanly through WebGL2 but rejected WebGPU and the H.264 demo; Ubuntu also exposed an unusable virtual microphone. The scoped fixes require a refreshed package pass. |
+| Linux VM QA | Retest required | Ubuntu 26.04.1 and Fedora 44 both rendered cleanly through WebGL2 but lacked WebGPU and could not play the demo in the webview. Fedora exposed an unavailable virtual microphone and Pop Out color parity was uncertain. The native demo fallback, legacy-report pruning, and deterministic Pop Out surface format require a refreshed package pass. |
 | Public release | Not started | No tag, GitHub Release, public updater manifest, or deployment is authorized by this candidate pass. |
 
 ## Physical Windows checklist

@@ -453,6 +453,7 @@ fn sanitize_key(key: &str) -> String {
 }
 
 fn bounded_queue(mut queue: Vec<StoredCrashReport>) -> Vec<StoredCrashReport> {
+    queue.retain(|report| !is_legacy_expected_audio_hardware_report(report));
     if queue.len() > MAX_REPORTS {
         queue = queue.split_off(queue.len() - MAX_REPORTS);
     }
@@ -460,6 +461,19 @@ fn bounded_queue(mut queue: Vec<StoredCrashReport>) -> Vec<StoredCrashReport> {
         queue.remove(0);
     }
     queue
+}
+
+fn is_legacy_expected_audio_hardware_report(report: &StoredCrashReport) -> bool {
+    if report.kind != "tauri-command" {
+        return false;
+    }
+    let command = report
+        .context
+        .as_object()
+        .and_then(|context| context.get("command"))
+        .and_then(Value::as_str);
+    command == Some("start_input_audio_capture")
+        && crate::system_audio::is_expected_input_device_unavailable(&report.message)
 }
 
 fn app_report_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -560,8 +574,8 @@ fn now_isoish() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        production_submission_enabled_for, sanitize_report, sanitize_text, CrashReportInput,
-        APP_IDENTIFIER,
+        bounded_queue, production_submission_enabled_for, sanitize_report, sanitize_text,
+        CrashReportInput, StoredCrashReport, APP_IDENTIFIER,
     };
     use serde_json::json;
 
@@ -609,5 +623,34 @@ mod tests {
         assert!(production_submission_enabled_for(APP_IDENTIFIER, false));
         assert!(!production_submission_enabled_for(APP_IDENTIFIER, true));
         assert!(!production_submission_enabled_for("com.asciline.remix.dev", false));
+    }
+
+    #[test]
+    fn queue_prunes_legacy_unavailable_microphone_reports() {
+        let stale = StoredCrashReport {
+            id: "stale-mic".to_string(),
+            kind: "tauri-command".to_string(),
+            surface: "tauri-command".to_string(),
+            message: "Could not build microphone input stream: The requested audio device is not available. It may have been disconnected.".to_string(),
+            stack: String::new(),
+            captured_at: "2026-08-30T00:00:00Z".to_string(),
+            context: json!({ "command": "start_input_audio_capture" }),
+        };
+        let unexpected = StoredCrashReport {
+            id: "unexpected-mic".to_string(),
+            message: "Could not build microphone input stream: invalid sample format".to_string(),
+            ..stale.clone()
+        };
+        let unrelated = StoredCrashReport {
+            id: "unrelated".to_string(),
+            context: json!({ "command": "start_system_audio_capture" }),
+            ..stale.clone()
+        };
+
+        let queue = bounded_queue(vec![stale, unexpected, unrelated]);
+
+        assert_eq!(queue.len(), 2);
+        assert!(queue.iter().any(|report| report.id == "unexpected-mic"));
+        assert!(queue.iter().any(|report| report.id == "unrelated"));
     }
 }

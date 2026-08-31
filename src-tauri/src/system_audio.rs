@@ -370,7 +370,7 @@ fn start_platform_input_audio_capture(
     Ok(response)
 }
 
-fn is_expected_input_device_unavailable(message: &str) -> bool {
+pub(crate) fn is_expected_input_device_unavailable(message: &str) -> bool {
     let normalized = message.to_lowercase();
     normalized.contains("no default microphone input device")
         || normalized.contains("requested audio device is not available")

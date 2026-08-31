@@ -1,3 +1,4 @@
+use crate::bundled_media::{is_safe_bundled_media_path, resolve_bundled_media_path};
 use crate::desktop_bridge::{media_binaries_for_app, MediaRegistry};
 use crate::media_engine::ffmpeg::{
     probe_video, spawn_macos_camera_rgb_reader, spawn_rgb_reader_with_options, CameraReaderOptions,
@@ -12,12 +13,11 @@ use objc2::rc::autoreleasepool;
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
-use std::ffi::OsStr;
 use std::fs;
 #[cfg(target_os = "macos")]
 use std::io::Write;
 use std::num::NonZeroU32;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -3053,35 +3053,6 @@ fn camera_output_dimensions(width: Option<u32>, height: Option<u32>) -> (u32, u3
     )
 }
 
-fn is_safe_bundled_media_path(media_url: &str) -> bool {
-    let path = Path::new(media_url);
-    if path.is_absolute() {
-        return false;
-    }
-    let mut components = path.components();
-    if components.next() != Some(Component::Normal(OsStr::new("media"))) {
-        return false;
-    }
-    components.all(|component| matches!(component, Component::Normal(_)))
-}
-
-fn resolve_bundled_media_path(app: &AppHandle, media_url: &str) -> Option<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join(media_url));
-        candidates.push(resource_dir.join("resources").join(media_url));
-        candidates.push(resource_dir.join("_up_").join(media_url));
-        candidates.push(resource_dir.join("_up_").join("dist").join(media_url));
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        candidates.push(cwd.join(media_url));
-        if let Some(parent) = cwd.parent() {
-            candidates.push(parent.join(media_url));
-        }
-    }
-    candidates.into_iter().find(|candidate| candidate.is_file())
-}
-
 fn media_type_for_path(path: &Path) -> &'static str {
     match path
         .extension()
@@ -4926,14 +4897,6 @@ mod tests {
         };
 
         assert_eq!(native_camera_source_fps(&source), 30.0);
-    }
-
-    #[test]
-    fn bundled_media_paths_reject_traversal() {
-        assert!(is_safe_bundled_media_path("media/demo-video-2.mp4"));
-        assert!(!is_safe_bundled_media_path("../media/demo-video-2.mp4"));
-        assert!(!is_safe_bundled_media_path("media/../secret.mp4"));
-        assert!(!is_safe_bundled_media_path("/tmp/demo.mp4"));
     }
 
     #[test]

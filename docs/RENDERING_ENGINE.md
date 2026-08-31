@@ -55,6 +55,8 @@ The visible built-ins are:
   `media/demo-video-2.webm` (VP8) on Linux so clean Linux webviews do not
   require an optional H.264 GStreamer plugin. Both URLs represent the same
   logical built-in source; saved selections normalize to the current platform.
+  If the webview cannot decode either asset, the same bundled FFmpeg raw-frame
+  source used for selected videos takes over locally.
 
 Additional bundled media files remain hidden development fixtures for parity
 tests and performance smoke tests.
@@ -479,8 +481,8 @@ desktop-packaged local engine.
 Current shape:
 
 ```text
-Tauri selected media
-  -> Rust registry id
+Tauri selected or vetted bundled media
+  -> Rust registry id or exact bundled source id
   -> ffprobe metadata
   -> ffmpeg RGB frame reader
   -> frame preparation
@@ -507,7 +509,8 @@ Frame preparation modes:
 
 The Rust path complements rather than replaces the WebGPU/WebGL static renderer.
 It provides packaged stream-style media preparation and native decoder
-integration.
+integration. Bundled source ids resolve only the shipped MP4 and WebM demo
+assets; they do not expand the asset protocol or expose arbitrary paths.
 
 ## Native Output Renderer
 
@@ -528,6 +531,10 @@ main UI params/source state
 For file-backed images/videos, Rust resolves bundled resources or registered
 media ids, decodes frames, uploads the latest frame to the GPU, applies cell
 color math, and presents through the native swapchain.
+
+The native GPU surface prefers non-sRGB `Bgra8Unorm` or `Rgba8Unorm`, matching
+the browser canvas encoding expected by the shared color math. Platform-reported
+sRGB formats remain a last-resort fallback when no unorm surface is available.
 
 On the macOS display-link path, the decoded source-frame version is passed to
 the presenter. When that version and the frame dimensions have not changed, the

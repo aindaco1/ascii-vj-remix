@@ -83,22 +83,25 @@ For each VM/package combination, record the OS version, desktop session
 3. Preset search filters live; Built-in and My Presets are independently
    alphabetical; Dense Color ASCII is present.
 4. The bundled VP8/WebM Demo Video and a user-selected MP4 play without network
-   access. The selected MP4 may retry through bundled FFmpeg when the webview
-   lacks an H.264 codec.
+   access. Either video may retry through bundled FFmpeg when the webview lacks
+   its codec; confirm that playback advances rather than showing one frame.
 5. The first window opens centered at 1000x680. Palette, Dither, Glyph,
    Advanced Density warning, and all visible select controls remain aligned and
    usable after resizing to 900x600, 1024x720, and 1440x920.
 6. Stats Overlay reports the resolved backend and no persistent blank frame.
    WebGL2 is an accepted Hyper-V fallback when WebGPU is unavailable, provided
    animation remains visible, responsive, and stable.
-7. Pop Out opens, remains responsive, mirrors preset changes, and closes cleanly.
+7. Pop Out opens, remains responsive, mirrors preset changes and the main
+   preview's palette/brightness/background colors, and closes cleanly.
 8. Reports remains reachable and contains no selected-media path or arbitrary
    application log.
 9. The development build does not offer production updater installation.
 
 Starting microphone reactivity without an attached virtual microphone should
-show an unavailable-device status and must not queue a diagnostic report. This
-is error-handling acceptance only; it does not establish microphone capture.
+show an unavailable-device status and must not queue a diagnostic report. If an
+older package queued that known hardware report, the refreshed app removes it
+on launch while retaining unrelated reports. This is error-handling acceptance
+only; it does not establish microphone capture.
 
 Revert to `clean-updated` between package formats. Treat virtual camera,
 microphone, system audio, discrete-GPU performance, and projector behavior as

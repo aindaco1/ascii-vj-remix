@@ -154,6 +154,11 @@ and a mixed typed ramp in main/Pop Out checks. Confirm atlas pages load only for
 the active ramp, unsupported scalars are reported, and Character Set/Font
 Family changes do not hide the Glyph controls.
 
+For color-output changes, compare palette, brightness, contrast, background,
+and neutral grayscale states between main and Pop Out. The Rust unit suite
+requires the native surface selector to prefer non-sRGB unorm formats even when
+the platform reports an sRGB format first.
+
 For the 0.9.11 normal-density contract, run matched feature-off and feature-on
 optimized builds at 640 columns with synthetic audio and native output:
 
@@ -237,6 +242,12 @@ npm run check:media
 npm run test:rust
 ```
 
+`test:media-source-policy` covers both platform Demo Video selection and the
+exact bundled source ids eligible for native FFmpeg fallback. The Rust suite
+rejects traversal and unrecognized bundled ids. Physical Linux acceptance must
+still prove that a webview decode failure reaches the fallback and displays
+advancing frames.
+
 For release sidecars:
 
 ```bash
@@ -304,6 +315,8 @@ Use this after user-facing renderer, source, audio, or output changes:
 4. Switch back to Demo Image and confirm the renderer does not get stuck.
 5. Select Camera and confirm permission prompt/device behavior.
 6. Select Mic/Input and confirm Audio Reactivity starts or requests permission.
+   Without an available input device, confirm the friendly inactive status and
+   that Reports stays empty, including after relaunching over an older queue.
 7. Switch audio devices and confirm capture restarts automatically.
 8. Trigger Display/System Audio where supported and confirm errors are useful
    when the selected source has no audio track.
@@ -318,7 +331,7 @@ Use this after user-facing renderer, source, audio, or output changes:
     traditional ASCII-looking states.
 14. Open Pop Out and confirm the main preview stays responsive.
 15. Confirm Pop Out reflects presets, WTF mode, and audio reactivity while fully
-    visible.
+    visible, and that its colors match the main preview.
 16. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
 17. Close Pop Out and confirm CPU/GPU usage settles.
 

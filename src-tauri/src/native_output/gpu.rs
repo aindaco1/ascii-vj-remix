@@ -21,6 +21,16 @@ const PALETTE_LUT_EDGE: usize = 32;
 const PALETTE_LUT_SIZE: usize = PALETTE_LUT_EDGE * PALETTE_LUT_EDGE * PALETTE_LUT_EDGE;
 const FEATURE_BUFFER_SIZE: usize = 16 * 16 + 64 * std::mem::size_of::<f32>();
 
+fn preferred_surface_format(formats: &[wgpu::TextureFormat]) -> Option<wgpu::TextureFormat> {
+    [
+        wgpu::TextureFormat::Bgra8Unorm,
+        wgpu::TextureFormat::Rgba8Unorm,
+    ]
+    .into_iter()
+    .find(|candidate| formats.contains(candidate))
+    .or_else(|| formats.first().copied())
+}
+
 const CELL_PASS_WGSL: &str = r#"
 struct Params {
     srcW: u32,
@@ -398,6 +408,9 @@ impl NativeGpuPresenter {
         let mut config = surface
             .get_default_config(&adapter, width, height)
             .ok_or_else(|| "native GPU surface is not supported by adapter".to_string())?;
+        let surface_formats = surface.get_capabilities(&adapter).formats;
+        config.format = preferred_surface_format(&surface_formats)
+            .ok_or_else(|| "native GPU surface has no supported color format".to_string())?;
         config.present_mode = present_mode;
         config.desired_maximum_frame_latency = 1;
         surface.configure(&device, &config);
@@ -1177,6 +1190,28 @@ mod tests {
         assert!(!source_frame_needs_upload(Some(1), Some(1)));
         assert!(source_frame_needs_upload(Some(1), Some(2)));
         assert!(source_frame_needs_upload(Some(2), None));
+    }
+
+    #[test]
+    fn surface_format_prefers_browser_canvas_unorm_encoding() {
+        assert_eq!(
+            preferred_surface_format(&[
+                wgpu::TextureFormat::Bgra8UnormSrgb,
+                wgpu::TextureFormat::Bgra8Unorm,
+            ]),
+            Some(wgpu::TextureFormat::Bgra8Unorm)
+        );
+        assert_eq!(
+            preferred_surface_format(&[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ]),
+            Some(wgpu::TextureFormat::Rgba8Unorm)
+        );
+        assert_eq!(
+            preferred_surface_format(&[wgpu::TextureFormat::Bgra8UnormSrgb]),
+            Some(wgpu::TextureFormat::Bgra8UnormSrgb)
+        );
     }
 
     #[test]

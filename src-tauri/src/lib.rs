@@ -1,3 +1,4 @@
+pub mod bundled_media;
 pub mod ci_smoke;
 pub mod crash_reporter;
 pub mod desktop_bridge;
