@@ -237,6 +237,7 @@ struct NativeOutputHandle {
     generation: u64,
     source_key: String,
     stop: Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     param_version: Arc<AtomicU64>,
@@ -1283,7 +1284,7 @@ async fn start_or_update_native_static_output(
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
     let requested_transition = render_transition_from_payload(&request.payload, &params);
-    {
+    let previous_handle = {
         let mut inner = state
             .inner
             .lock()
@@ -1309,10 +1310,11 @@ async fn start_or_update_native_static_output(
                     reason: None,
                 });
             }
-
-            handle.stop.store(true, Ordering::Relaxed);
-            inner.handle = None;
         }
+        inner.handle.take()
+    };
+    if let Some(mut handle) = previous_handle {
+        stop_native_output_worker(&mut handle);
     }
 
     let window = ensure_native_window(app, request)?;
@@ -1347,14 +1349,17 @@ async fn start_or_update_native_static_output(
     };
 
     #[cfg(not(target_os = "macos"))]
-    spawn_render_thread(
+    let worker = Some(spawn_render_thread(
         app.clone(),
         window.clone(),
         source.clone(),
         params_arc.clone(),
         transition.clone(),
         stop.clone(),
-    );
+    ));
+
+    #[cfg(target_os = "macos")]
+    let worker = None;
 
     let mut inner = state
         .inner
@@ -1364,6 +1369,7 @@ async fn start_or_update_native_static_output(
         generation,
         source_key: source.source_key,
         stop,
+        worker,
         params: params_arc,
         transition,
         param_version,
@@ -1389,7 +1395,7 @@ async fn start_or_update_native_camera_output(
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
     let requested_transition = render_transition_from_payload(&request.payload, &params);
-    {
+    let previous_handle = {
         let mut inner = state
             .inner
             .lock()
@@ -1415,10 +1421,11 @@ async fn start_or_update_native_camera_output(
                     reason: None,
                 });
             }
-
-            handle.stop.store(true, Ordering::Relaxed);
-            inner.handle = None;
         }
+        inner.handle.take()
+    };
+    if let Some(mut handle) = previous_handle {
+        stop_native_output_worker(&mut handle);
     }
 
     let window = ensure_native_window(app, request)?;
@@ -1453,14 +1460,17 @@ async fn start_or_update_native_camera_output(
     };
 
     #[cfg(not(target_os = "macos"))]
-    spawn_camera_render_thread(
+    let worker = Some(spawn_camera_render_thread(
         app.clone(),
         window.clone(),
         source.clone(),
         params_arc.clone(),
         transition.clone(),
         stop.clone(),
-    );
+    ));
+
+    #[cfg(target_os = "macos")]
+    let worker = None;
 
     let mut inner = state
         .inner
@@ -1470,6 +1480,7 @@ async fn start_or_update_native_camera_output(
         generation,
         source_key: source.source_key,
         stop,
+        worker,
         params: params_arc,
         transition,
         param_version,
@@ -1494,7 +1505,7 @@ async fn start_or_update_native_mirror_output(
 ) -> Result<NativeOutputWindowResult, String> {
     clear_stopped_native_output(state)?;
     let requested_transition = render_transition_from_payload(&request.payload, &params);
-    {
+    let previous_handle = {
         let mut inner = state
             .inner
             .lock()
@@ -1520,10 +1531,11 @@ async fn start_or_update_native_mirror_output(
                     reason: None,
                 });
             }
-
-            handle.stop.store(true, Ordering::Relaxed);
-            inner.handle = None;
         }
+        inner.handle.take()
+    };
+    if let Some(mut handle) = previous_handle {
+        stop_native_output_worker(&mut handle);
     }
 
     let window = ensure_native_window(app, request)?;
@@ -1535,7 +1547,12 @@ async fn start_or_update_native_mirror_output(
     let mirror_slot = Arc::new(NativeMirrorFrameSlot::default());
 
     install_close_watcher(app, state, &window, generation, stop.clone());
-    spawn_mirror_render_thread(app.clone(), window.clone(), mirror_slot.clone(), stop.clone());
+    let worker = Some(spawn_mirror_render_thread(
+        app.clone(),
+        window.clone(),
+        mirror_slot.clone(),
+        stop.clone(),
+    ));
 
     let mut inner = state
         .inner
@@ -1545,6 +1562,7 @@ async fn start_or_update_native_mirror_output(
         generation,
         source_key: MIRROR_SOURCE_KEY.to_string(),
         stop,
+        worker,
         params: params_arc,
         transition,
         param_version,
@@ -1568,8 +1586,8 @@ impl NativeOutputState {
             .lock()
             .ok()
             .and_then(|mut inner| inner.handle.take());
-        if let Some(handle) = handle {
-            handle.stop.store(true, Ordering::Relaxed);
+        if let Some(mut handle) = handle {
+            stop_native_output_worker(&mut handle);
             let _ = handle.window.destroy();
         }
     }
@@ -1601,6 +1619,7 @@ impl NativeOutputState {
             .handle
             .as_ref()
             .filter(|handle| handle.source_key == MIRROR_SOURCE_KEY)
+            .filter(|handle| !handle.stop.load(Ordering::Relaxed))
             .and_then(|handle| handle.mirror_slot.clone());
 
         let Some(slot) = slot else {
@@ -1619,6 +1638,24 @@ impl NativeOutputState {
             accepted: true,
             reason: None,
         })
+    }
+}
+
+fn stop_native_output_worker(handle: &mut NativeOutputHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        handle._display_link.take();
+    }
+    stop_native_output_thread(&handle.stop, &mut handle.worker);
+}
+
+fn stop_native_output_thread(
+    stop: &Arc<AtomicBool>,
+    worker: &mut Option<std::thread::JoinHandle<()>>,
+) {
+    stop.store(true, Ordering::Relaxed);
+    if let Some(worker) = worker.take() {
+        let _ = worker.join();
     }
 }
 
@@ -1662,7 +1699,8 @@ fn clear_stopped_native_output(state: &NativeOutputState) -> Result<(), String> 
             None
         }
     };
-    if let Some(handle) = handle {
+    if let Some(mut handle) = handle {
+        stop_native_output_worker(&mut handle);
         let _ = handle.window.destroy();
     }
     Ok(())
@@ -2613,11 +2651,14 @@ fn ns_to_ms(ns: u64) -> f64 {
     ns as f64 / 1_000_000.0
 }
 
-#[cfg(target_os = "macos")]
 fn native_output_window_handle_unavailable(error: &str) -> bool {
     error.contains("native Metal host window unavailable")
         || error.contains("underlying handle is not available")
         || error.contains("host window is null")
+}
+
+fn should_capture_native_output_failure(stop_requested: bool, error: &str) -> bool {
+    !stop_requested && !native_output_window_handle_unavailable(error)
 }
 
 #[cfg(target_os = "macos")]
@@ -2764,25 +2805,27 @@ fn install_close_watcher(
 ) {
     let app = app.clone();
     let state_inner = state.inner.clone();
-    window.on_window_event(move |event| {
-        if !matches!(
-            event,
-            WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed
-        ) {
-            return;
+    window.on_window_event(move |event| match event {
+        WindowEvent::CloseRequested { .. } => {
+            stop.store(true, Ordering::Relaxed);
         }
-        stop.store(true, Ordering::Relaxed);
-        if let Ok(mut inner) = state_inner.lock() {
-            let should_clear = inner
-                .handle
-                .as_ref()
-                .map(|handle| handle.generation == generation)
+        WindowEvent::Destroyed => {
+            stop.store(true, Ordering::Relaxed);
+            let active_generation = state_inner
+                .lock()
+                .map(|inner| {
+                    inner
+                        .handle
+                        .as_ref()
+                        .map(|handle| handle.generation == generation)
+                        .unwrap_or(false)
+                })
                 .unwrap_or(false);
-            if should_clear {
-                inner.handle = None;
+            if active_generation {
+                let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
             }
         }
-        let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+        _ => {}
     });
 }
 
@@ -3372,17 +3415,17 @@ fn spawn_render_thread(
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
-) {
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let report_app = app.clone();
         if let Err(error) = run_render_loop(app, window, source, params, transition, stop.clone()) {
             eprintln!("[NativeOutput] {error}");
-            if !stop.load(Ordering::Relaxed) {
+            if should_capture_native_output_failure(stop.load(Ordering::Relaxed), &error) {
                 capture_native_output_failure(&report_app, "media-presenter", &error);
             }
             stop.store(true, Ordering::Relaxed);
         }
-    });
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -3747,19 +3790,19 @@ fn spawn_camera_render_thread(
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
-) {
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let report_app = app.clone();
         if let Err(error) =
             run_camera_render_loop(app, window, source, params, transition, stop.clone())
         {
             eprintln!("[NativeOutputCamera] {error}");
-            if !stop.load(Ordering::Relaxed) {
+            if should_capture_native_output_failure(stop.load(Ordering::Relaxed), &error) {
                 capture_native_output_failure(&report_app, "camera-presenter", &error);
             }
             stop.store(true, Ordering::Relaxed);
         }
-    });
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -3856,16 +3899,16 @@ fn spawn_mirror_render_thread(
     window: Window,
     slot: Arc<NativeMirrorFrameSlot>,
     stop: Arc<AtomicBool>,
-) {
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         if let Err(error) = run_mirror_render_loop(window, slot, stop.clone()) {
             eprintln!("[NativeOutputMirror] {error}");
-            if !stop.load(Ordering::Relaxed) {
+            if should_capture_native_output_failure(stop.load(Ordering::Relaxed), &error) {
                 capture_native_output_failure(&app, "mirror-presenter", &error);
             }
             stop.store(true, Ordering::Relaxed);
         }
-    });
+    })
 }
 
 fn run_mirror_render_loop(
@@ -4695,6 +4738,45 @@ mod tests {
         let capabilities = get_native_output_capabilities();
         assert_eq!(capabilities.native_camera, cfg!(target_os = "macos"));
         assert!(capabilities.mirror);
+    }
+
+    #[test]
+    fn stale_native_window_handles_are_teardown_not_crashes() {
+        for error in [
+            "the underlying handle is not available",
+            "native Metal host window unavailable",
+            "host window is null",
+        ] {
+            assert!(native_output_window_handle_unavailable(error));
+            assert!(!should_capture_native_output_failure(false, error));
+        }
+        assert!(!should_capture_native_output_failure(
+            true,
+            "native media decoder failed"
+        ));
+        assert!(should_capture_native_output_failure(
+            false,
+            "native media decoder failed"
+        ));
+    }
+
+    #[test]
+    fn native_output_worker_handoff_waits_for_the_previous_worker() {
+        let stop = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(AtomicBool::new(false));
+        let worker_stop = Arc::clone(&stop);
+        let worker_completed = Arc::clone(&completed);
+        let mut worker = Some(std::thread::spawn(move || {
+            while !worker_stop.load(Ordering::Relaxed) {
+                std::thread::yield_now();
+            }
+            worker_completed.store(true, Ordering::Relaxed);
+        }));
+
+        stop_native_output_thread(&stop, &mut worker);
+
+        assert!(worker.is_none());
+        assert!(completed.load(Ordering::Relaxed));
     }
 
     fn base_payload() -> NativeOutputPayload {

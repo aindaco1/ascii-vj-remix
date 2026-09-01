@@ -61,9 +61,9 @@ The current release line includes these security hardening rules:
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple certificate values, or keychain
   passwords in job-level workflow environment blocks.
 - Public macOS release CI fails closed when Apple Developer ID signing or
-  notarization is incomplete. Public 1.0.0 macOS artifacts are signed,
-  notarized, stapled, and Gatekeeper-validated; Windows 1.0.0 artifacts are
-  unsigned previews.
+  notarization is incomplete. Public macOS artifacts are signed, notarized,
+  stapled, and Gatekeeper-validated; current Windows artifacts are unsigned
+  previews.
 - Public macOS artifacts must retain Team ID `PWT3Q52LZ2` and the stable
   identifier/team designated requirement. CI validates both the built app and
   the extracted updater archive and rejects ad-hoc or code-hash-only identity.
@@ -152,6 +152,9 @@ Security requirements:
 - Expected unavailable/disconnected microphone reports from older builds are
   pruned locally using the same narrow hardware-error classifier used at
   capture time; unexpected microphone errors remain queued.
+- Native output window-handle loss during normal close or worker replacement is
+  teardown, not a crash. Unexpected media, camera, mirror, or renderer failures
+  remain reportable through the bounded component/error contract.
 - Renderer diagnostics are limited to the eight most recent sanitized
   structured events. They must not become a general local-log upload path.
 - The app stores at most a small local queue and lets the user choose `ask`,
@@ -402,7 +405,7 @@ npm run check:ffmpeg-resources
   deliberately ad-hoc development build still receives build-specific grants.
 - Ad-hoc macOS signing is acceptable for local builds only; public releases are
   Developer ID signed, notarized, stapled, and Gatekeeper-validated.
-- Windows 1.0.0 artifacts are unsigned previews and may trigger Unknown
+- Current Windows artifacts are unsigned previews and may trigger Unknown
   Publisher, SmartScreen, or Defender warnings.
 - Linux media/camera/audio behavior varies by distribution, WebKitGTK, drivers,
   and portal setup.

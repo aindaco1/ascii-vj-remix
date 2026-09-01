@@ -80,9 +80,8 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current source/package version is 1.0.1. The latest confirmed public
-release is 1.0.0 while 1.0.1 completes platform acceptance. The Changelog owns
-release history; the Roadmap is prospective only.
+The current source/package release is 1.0.2. The Changelog owns release
+history; the Roadmap is prospective only.
 
 Sources:
 
@@ -259,8 +258,8 @@ npm run bundle:release
 
 Expected local release-build note:
 
-- Public 1.0.0 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 1.0.0 Windows artifacts are unsigned previews.
+- Public macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Current Windows artifacts are unsigned previews.
   Normal local builds use
   `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
   stable identity before permission testing.
