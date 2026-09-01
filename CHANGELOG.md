@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.2] - 2026-09-01
+
+### Fixed
+
+- Serialized Windows/Linux native Pop Out worker handoffs before reusing the
+  output window, so source and camera-mirror mode changes cannot overlap old
+  and new GPU/softbuffer surfaces.
+- Contained recoverable native `wgpu` surface-configuration validation errors
+  so an invalidated Windows surface falls back instead of reaching the Rust
+  panic hook. Closing-window handle loss is now treated as teardown rather than
+  a crash report, and stopped mirror workers reject additional frames.
+
 ## [1.0.1] - 2026-08-31
 
 ### Added

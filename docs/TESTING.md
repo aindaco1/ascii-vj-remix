@@ -163,6 +163,13 @@ Out windows, close/reopen Pop Out, and capture a manual report from the existing
 Reports dialog after any failure. A local policy simulation does not replace
 this device/camera acceptance.
 
+On Windows and Linux, also keep Pop Out open while switching repeatedly between
+Demo Image, Demo Video, and Camera. Each mode change must finish the previous
+native worker before the shared output window is reused. Close and immediately
+reopen Pop Out after that sequence; the app must not panic on an invalid
+`wgpu` surface or queue an `underlying handle is not available` report during
+normal teardown.
+
 For color-output changes, compare palette, brightness, contrast, background,
 and neutral grayscale states between main and Pop Out. The Rust unit suite
 requires the native surface selector to prefer non-sRGB unorm formats even when

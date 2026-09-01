@@ -568,6 +568,10 @@ Native output design rules:
 - output window does not own broad Tauri permissions.
 - presenter consumes the latest params live.
 - latest-frame semantics are preferred over deep buffering.
+- Windows/Linux source and mirror-mode changes stop and join the previous
+  native worker before reusing the output window. Surface validation or raw
+  handle loss during normal close/replacement is recoverable teardown, not a
+  process panic or crash-report event.
 - primary renderer behavior must not regress when Pop Out is open.
 - browser fallback must remain available.
 

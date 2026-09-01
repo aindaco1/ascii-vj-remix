@@ -8,9 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.0.1. The latest confirmed public
-release is 1.0.0 while 1.0.1 completes cross-platform acceptance. Release
-history is recorded in the
+The current source/package release is 1.0.2. Release history is recorded in the
 [Changelog](CHANGELOG.md); prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 
@@ -26,6 +24,7 @@ history is recorded in the
 - [Testing guide](docs/TESTING.md)
 - [1.0.0 release readiness and acceptance](docs/RELEASE_1.0.0_RC.md)
 - [1.0.1 release readiness and acceptance](docs/RELEASE_1.0.1.md)
+- [1.0.2 release readiness and acceptance](docs/RELEASE_1.0.2.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -225,8 +224,8 @@ and requires a manually captured and verified hardware profile.
   only a release-mode build with the production bundle identifier may submit.
   Legacy unavailable-microphone reports are removed from the queue because a
   disconnected or absent input device is a normal hardware state.
-- Public 1.0.0 macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Public 1.0.0 Windows artifacts are unsigned previews.
+- Public macOS artifacts are Developer ID signed, notarized, stapled, and
+  Gatekeeper-validated. Current Windows artifacts are unsigned previews.
 - Normal development commands use the visibly separate `ASCII VJ Remix Dev`
   app and `com.asciline.remix.dev` bundle identifier. Development builds cannot
   replace or inherit privacy grants from the production app.
@@ -266,7 +265,7 @@ Notes:
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.
-- Public 1.0.0 release builds are Developer ID signed, notarized, stapled, and
+- Public macOS release builds are Developer ID signed, notarized, stapled, and
   accepted by Gatekeeper. Local or test builds may require the normal macOS
   right-click Open or Open Anyway flow.
 
@@ -335,7 +334,7 @@ Download the latest desktop build from:
 
 [https://github.com/aindaco1/ascii-vj-remix/releases](https://github.com/aindaco1/ascii-vj-remix/releases)
 
-The 1.0.0 release contains a notarized Apple Silicon macOS DMG, Windows
+The current release contains a notarized Apple Silicon macOS DMG, Windows
 EXE/MSI installers, Linux AppImage/deb/rpm packages, and signed updater
 metadata. The Windows installers are unsigned previews.
 
@@ -345,7 +344,7 @@ metadata. The Windows installers are unsigned previews.
    artifact, not the primary manual installer.
 2. Open the DMG and drag `ASCII VJ Remix.app` onto its **Applications** shortcut.
 3. Eject the DMG, then open the installed app from `/Applications` in Finder.
-4. The public 1.0.0 macOS release is Developer ID signed, notarized, stapled,
+4. The public macOS release is Developer ID signed, notarized, stapled,
    and accepted by Gatekeeper. Local or test builds may still require the
    normal right-click Open or Open Anyway flow.
 5. Grant Camera, Microphone, Screen & System Audio Recording, or System Audio
@@ -355,7 +354,7 @@ metadata. The Windows installers are unsigned previews.
 
 1. Download the Windows installer from GitHub Releases.
 2. Run the installer.
-3. Windows 1.0.0 artifacts are unsigned previews. Windows may show Unknown
+3. Current Windows artifacts are unsigned previews. Windows may show Unknown
    Publisher, SmartScreen, or Defender warnings. Only continue if the installer
    came from the project GitHub Release and you accept that preview status.
 4. Launch ASCII VJ Remix from the Start menu.

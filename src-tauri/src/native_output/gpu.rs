@@ -413,7 +413,7 @@ impl NativeGpuPresenter {
             .ok_or_else(|| "native GPU surface has no supported color format".to_string())?;
         config.present_mode = present_mode;
         config.desired_maximum_frame_latency = 1;
-        surface.configure(&device, &config);
+        configure_surface_checked(&surface, &device, &config)?;
 
         let compute_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ASCILINE native GPU cell pass"),
@@ -575,7 +575,7 @@ impl NativeGpuPresenter {
                 metal_view.resize();
             }
         }
-        self.configure_surface(width, height);
+        self.configure_surface(width, height)?;
 
         // Acquire before scheduling queue writes. When the output is occluded,
         // wgpu has no render submission to retire write_texture staging buffers;
@@ -813,7 +813,7 @@ impl NativeGpuPresenter {
             wgpu::CurrentSurfaceTexture::Timeout => Ok((None, "timeout")),
             wgpu::CurrentSurfaceTexture::Occluded => Ok((None, "occluded")),
             wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.device, &self.config);
+                configure_surface_checked(&self.surface, &self.device, &self.config)?;
                 match self.surface.get_current_texture() {
                     wgpu::CurrentSurfaceTexture::Success(texture) => {
                         Ok((Some(texture), "outdated-success"))
@@ -830,13 +830,13 @@ impl NativeGpuPresenter {
         }
     }
 
-    fn configure_surface(&mut self, width: u32, height: u32) {
+    fn configure_surface(&mut self, width: u32, height: u32) -> Result<(), String> {
         if self.config.width == width && self.config.height == height {
-            return;
+            return Ok(());
         }
         self.config.width = width;
         self.config.height = height;
-        self.surface.configure(&self.device, &self.config);
+        configure_surface_checked(&self.surface, &self.device, &self.config)
     }
 
     fn ensure_source_texture(
@@ -1011,6 +1011,19 @@ impl NativeGpuPresenter {
         self.cell_size = (cols, rows);
         self.compute_bind_group = None;
         self.render_bind_group = None;
+    }
+}
+
+fn configure_surface_checked(
+    surface: &wgpu::Surface<'_>,
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+) -> Result<(), String> {
+    let validation_scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+    surface.configure(device, config);
+    match pollster::block_on(validation_scope.pop()) {
+        Some(error) => Err(format!("native GPU surface configure failed: {error}")),
+        None => Ok(()),
     }
 }
 
