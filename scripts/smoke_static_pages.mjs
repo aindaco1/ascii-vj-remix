@@ -300,7 +300,7 @@ async function runSmoke() {
     if (
       !main.manualDiagnostics.integratedInReportsDialog ||
       main.manualDiagnostics.noteLimit !== 500 ||
-      !['nativeOutputCapabilities', 'nativeOutputSync', 'nativeOutputMirror', 'rendererDiagnostics', 'renderer'].every((key) => main.manualDiagnostics.contextKeys.includes(key))
+      !['nativeOutputCapabilities', 'nativeOutputAdapter', 'nativeOutputSync', 'nativeOutputMirror', 'rendererDiagnostics', 'renderer'].every((key) => main.manualDiagnostics.contextKeys.includes(key))
     ) {
       throw new Error(`Manual diagnostics should extend the existing bounded Reports workflow: ${JSON.stringify(main.manualDiagnostics)}`);
     }

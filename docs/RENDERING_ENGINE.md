@@ -580,8 +580,10 @@ Native output design rules:
   handle loss during normal close/replacement is recoverable teardown, not a
   process panic or crash-report event.
 - Windows/Linux native camera capture must produce a preflight frame before the
-  output window opens. Linux restores the WebView camera before mirror fallback
-  or after an exclusive native session closes.
+  output window opens. Both platforms restore the WebView camera before mirror
+  fallback or after an exclusive native session closes. Windows matches the
+  optional Chromium USB model suffix only when the Media Foundation friendly
+  name match is unambiguous.
 - primary renderer behavior must not regress when Pop Out is open.
 - browser fallback must remain available.
 

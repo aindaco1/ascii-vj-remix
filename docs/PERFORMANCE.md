@@ -305,7 +305,8 @@ Rules:
 - Windows Media Foundation and Linux V4L2 single-camera Pop Out feed the native
   `wgpu` presenter without WebView readback or per-frame IPC. If native opening
   fails, the bounded 640x360 mirror keeps only one request in flight and is
-  capped at 30 FPS; diagnostics report accepted FPS and transfer timings.
+  capped at 30 FPS; diagnostics report the native-open reason, accepted FPS,
+  and transfer timings.
 - For multi-camera, be explicit about the mixing cost and the selected layout.
 
 ### Audio Reactivity

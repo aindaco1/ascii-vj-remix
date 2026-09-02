@@ -360,7 +360,10 @@ Use this after user-facing renderer, source, audio, or output changes:
 17. Close Pop Out and confirm CPU/GPU usage settles.
 18. With one camera selected on Windows, capture a manual diagnostic while Pop
     Out is open and confirm `cameraFallbackActive` is false. Confirm live output
-    remains smooth while changing presets and FPS.
+    remains smooth while changing presets and FPS. The main preview may pause
+    while Media Foundation owns the camera and must restore after close. If
+    fallback activates, confirm `nativeOutputAdapter.nativeCameraFailureReason`
+    explains why and the preview is reacquired.
 19. Repeat the single-camera test on Ubuntu with AppImage/deb and Fedora with
     rpm. The main camera preview may pause while V4L2 is owned by native Pop
     Out; confirm it restores after close. If fallback activates, confirm the

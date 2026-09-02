@@ -1,5 +1,47 @@
 use super::{DecodedRgbFrame, NativeCameraSource};
 
+#[cfg(any(target_os = "windows", test))]
+fn normalized_camera_label(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn without_chromium_usb_model_suffix(value: &str) -> &str {
+    let trimmed = value.trim();
+    let Some(suffix_start) = trimmed.rfind(" (") else {
+        return trimmed;
+    };
+    if !trimmed.ends_with(')') {
+        return trimmed;
+    }
+    let model = &trimmed[suffix_start + 2..trimmed.len() - 1];
+    let bytes = model.as_bytes();
+    if bytes.len() == 9
+        && bytes[4] == b':'
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| index == 4 || byte.is_ascii_hexdigit())
+    {
+        trimmed[..suffix_start].trim_end()
+    } else {
+        trimmed
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn camera_labels_match(browser_label: &str, native_label: &str) -> bool {
+    let browser = normalized_camera_label(browser_label);
+    let native = normalized_camera_label(native_label);
+    browser == native
+        || normalized_camera_label(without_chromium_usb_model_suffix(browser_label))
+            == normalized_camera_label(without_chromium_usb_model_suffix(native_label))
+}
+
 #[derive(Debug)]
 pub(super) struct NativeCameraFrameReader {
     inner: platform::NativeCameraFrameReader,
@@ -172,7 +214,9 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use super::{DecodedRgbFrame, NativeCameraSource};
+    use super::{
+        camera_labels_match, normalized_camera_label, DecodedRgbFrame, NativeCameraSource,
+    };
     use std::ptr;
     use windows::Win32::Media::MediaFoundation::{
         IMFActivate, IMFAttributes, IMFMediaSource, IMFSourceReader, MFCreateAttributes,
@@ -419,18 +463,25 @@ mod platform {
             return Err("No Windows camera devices are available".to_string());
         }
 
-        let desired = device_label.map(normalized_label);
-        let mut selected = None;
+        let desired = device_label.map(normalized_camera_label);
+        let mut default_camera = None;
+        let mut exact_match = None;
+        let mut compatible_matches = Vec::new();
         unsafe {
             let activations = std::slice::from_raw_parts_mut(entries, count as usize);
             for activation in activations.iter().flatten() {
                 let label = camera_label(activation).unwrap_or_default();
-                if selected.is_none() && desired.is_none() {
-                    selected = Some(activation.clone());
+                if default_camera.is_none() {
+                    default_camera = Some(activation.clone());
                 }
-                if desired.as_deref() == Some(normalized_label(&label).as_str()) {
-                    selected = Some(activation.clone());
-                    break;
+                if exact_match.is_none()
+                    && desired.as_deref() == Some(normalized_camera_label(&label).as_str())
+                {
+                    exact_match = Some(activation.clone());
+                } else if let Some(browser_label) = device_label {
+                    if camera_labels_match(browser_label, &label) {
+                        compatible_matches.push(activation.clone());
+                    }
                 }
             }
             for activation in activations {
@@ -439,9 +490,22 @@ mod platform {
             CoTaskMemFree(Some(entries.cast()));
         }
 
-        selected.ok_or_else(|| {
-            "The selected Windows camera is not available to native output".to_string()
-        })
+        if desired.is_none() {
+            return default_camera
+                .ok_or_else(|| "No Windows camera devices are available".to_string());
+        }
+        if let Some(activation) = exact_match {
+            return Ok(activation);
+        }
+        match compatible_matches.len() {
+            1 => Ok(compatible_matches.remove(0)),
+            0 => Err(format!(
+                "No Media Foundation camera matched the WebView device label ({count} device(s) enumerated)"
+            )),
+            matched => Err(format!(
+                "The WebView camera label matched {matched} Media Foundation devices; select a uniquely named camera"
+            )),
+        }
     }
 
     fn camera_label(activation: &IMFActivate) -> Result<String, String> {
@@ -454,10 +518,6 @@ mod platform {
                 .map_err(|error| format!("Windows camera label failed: {error}"))?;
         }
         Ok(String::from_utf16_lossy(&value[..length as usize]))
-    }
-
-    fn normalized_label(value: &str) -> String {
-        value.trim().to_lowercase()
     }
 
     fn pack_ratio(numerator: u32, denominator: u32) -> u64 {
@@ -523,6 +583,51 @@ mod platform {
             let rgb = copy_rgb32_frame(bgra.as_ptr(), bgra.len(), 2, 2, -12).unwrap();
             assert_eq!(rgb, [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
         }
+    }
+}
+
+#[cfg(test)]
+mod camera_label_tests {
+    use super::{camera_labels_match, normalized_camera_label, without_chromium_usb_model_suffix};
+
+    #[test]
+    fn normalizes_case_and_whitespace() {
+        assert_eq!(
+            normalized_camera_label("  Logitech   BRIO\t"),
+            "logitech brio"
+        );
+    }
+
+    #[test]
+    fn matches_chromium_usb_model_suffix_to_media_foundation_name() {
+        assert!(camera_labels_match(
+            "Logitech BRIO (046d:085e)",
+            "Logitech BRIO"
+        ));
+        assert!(camera_labels_match(
+            "Logitech BRIO (046D:085E)",
+            "  LOGITECH   BRIO  "
+        ));
+    }
+
+    #[test]
+    fn preserves_non_usb_parenthetical_names() {
+        assert_eq!(
+            without_chromium_usb_model_suffix("Integrated Camera (Front)"),
+            "Integrated Camera (Front)"
+        );
+        assert!(!camera_labels_match(
+            "Integrated Camera (Front)",
+            "Integrated Camera"
+        ));
+    }
+
+    #[test]
+    fn does_not_accept_different_camera_names() {
+        assert!(!camera_labels_match(
+            "Logitech BRIO (046d:085e)",
+            "Integrated Camera"
+        ));
     }
 }
 

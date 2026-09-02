@@ -62,7 +62,7 @@ pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
             target_os = "windows",
             target_os = "linux"
         )),
-        native_camera_exclusive: cfg!(target_os = "linux"),
+        native_camera_exclusive: cfg!(any(target_os = "windows", target_os = "linux")),
         native_camera_mirror_fallback: cfg!(any(target_os = "windows", target_os = "linux")),
         mirror: true,
     }
@@ -1450,9 +1450,9 @@ async fn start_or_update_native_camera_output(
                 eprintln!(
                     "[NativeOutputCamera] native open failed; mirror fallback required: {error}"
                 );
-                return Ok(unavailable(
-                    "native camera output is unavailable; use mirror fallback",
-                ));
+                return Ok(unavailable(format!(
+                    "native camera output is unavailable: {error}"
+                )));
             }
         }
     };
@@ -4853,7 +4853,7 @@ mod tests {
         );
         assert_eq!(
             capabilities.native_camera_exclusive,
-            cfg!(target_os = "linux")
+            cfg!(any(target_os = "windows", target_os = "linux"))
         );
         assert_eq!(
             capabilities.native_camera_mirror_fallback,

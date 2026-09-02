@@ -16,10 +16,14 @@
 
 ### Changed
 
-- Linux releases the WebView camera while native Pop Out owns an exclusive
-  V4L2 device, then restores the main preview when Pop Out closes. If native
-  capture cannot produce a frame, the app reacquires the WebView camera and
-  uses the existing mirror path.
+- Windows and Linux release the WebView camera while native Pop Out owns the
+  device, then restore the main preview when Pop Out closes. If native capture
+  cannot produce a frame, the app reacquires the WebView camera and uses the
+  existing mirror path.
+- Windows camera selection accepts Chromium's trailing USB model identifier
+  when it unambiguously matches the Media Foundation friendly name. Manual
+  diagnostics retain the native-open failure reason when mirror fallback is
+  required.
 - Windows/Linux camera-mirror fallback uses a latest-frame, one-request-in-
   flight 640x360 profile capped at 30 FPS. Other mirror paths retain their
   previous dimensions and 15 FPS cap.

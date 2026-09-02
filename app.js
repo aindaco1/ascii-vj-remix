@@ -77,6 +77,7 @@ import {
     emitTauriEventToApp,
     finishTauriMidiSysexCapture,
     getTauriCrashReportState,
+    getTauriOutputDiagnostics,
     installTauriUpdate,
     isTauriRuntime,
     isTauriUpdaterAvailable,
@@ -5882,6 +5883,7 @@ class RendererLabApp {
             running: this.running,
             transitioning: this.transitioning,
             nativeOutputCapabilities: this.nativeOutputCapabilities,
+            nativeOutputAdapter: getTauriOutputDiagnostics(),
             nativeOutputSync: {
                 attempts: this.nativeOutputSyncAttemptCount,
                 succeeded: this.nativeOutputSyncOkCount,

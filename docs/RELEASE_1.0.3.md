@@ -33,8 +33,9 @@ separate.
 
 For each row, select exactly one camera, open Pop Out, change several presets,
 change FPS, leave the output running for at least two minutes, close it, and
-confirm camera preview recovery. Capture one manual diagnostic while Pop Out is
-open.
+confirm camera preview recovery. The main preview may pause while Windows or
+Linux native output owns the camera. Capture one manual diagnostic while Pop
+Out is open.
 
 | Platform | Candidate artifact | Required observation |
 | --- | --- | --- |
@@ -45,5 +46,6 @@ open.
 
 If native device opening fails, the output must automatically use the bounded
 mirror path, the main preview must be live, and the manual report must contain
-mirror accepted FPS and timing metrics. A successful fallback is useful
-diagnostic evidence but does not satisfy native-path acceptance for that row.
+the native-open failure reason plus mirror accepted FPS and timing metrics. A
+successful fallback is useful diagnostic evidence but does not satisfy
+native-path acceptance for that row.
