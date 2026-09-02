@@ -228,6 +228,11 @@ npm run test:rust
 npm run check:desktop
 ```
 
+The policy gate also checks that every command invoked by the desktop adapter
+has a generated Tauri permission and a grant in the main-window capability. A
+Rust command registered in `generate_handler!` is not callable from a packaged
+webview until both ACL pieces exist.
+
 Manually verify macOS Camera, Microphone, Screen/System Audio, and Pop Out
 behavior when the permission model changes.
 

@@ -105,7 +105,8 @@ The production runtime is intentionally narrow:
   localhost stream/dev endpoints exist only in `devCsp`.
 - `npm run check:tauri-policy` verifies the local-only runtime policy, the
   GitHub updater endpoint exception, and the Rust-only crash reporter command
-  boundary.
+  boundary. It also matches each literal frontend Tauri invocation to its
+  generated permission file and main-window capability grant.
 - Capabilities in `src-tauri/capabilities/` split main-window privileges from
   output-window privileges.
 - The main window owns media selection, output management, audio providers, and

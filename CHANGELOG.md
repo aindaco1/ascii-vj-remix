@@ -38,6 +38,14 @@
   Windows reports retain the failed shared-open reason and the preview bridge's
   accepted FPS, encoded throughput, read, encode, and decode timings.
 
+### Fixed
+
+- Granted the main window the narrow Tauri permission required to read frames
+  from the Windows native camera preview bridge. The desktop policy gate now
+  verifies every frontend Tauri command has both a generated permission and a
+  main-window capability, preventing packaged builds from silently denying a
+  newly added command.
+
 ### Preserved
 
 - macOS single-camera Pop Out remains on the existing AVFoundation/display-link

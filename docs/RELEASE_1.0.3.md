@@ -29,7 +29,10 @@ separate.
    runtime exposes V4L2 before packaging succeeds.
 5. Existing macOS renderer, native-output, static smoke, and Rust suites pass;
    the macOS-gated AVFoundation implementation block remains unchanged.
-6. Tagging and public deployment remain blocked until the physical camera
+6. The Tauri policy gate confirms the main window can invoke the native preview
+   frame reader and that every frontend Tauri command has a generated narrow
+   permission before packaging.
+7. Tagging and public deployment remain blocked until the physical camera
    matrix below is accepted.
 
 ## Physical Camera Matrix
