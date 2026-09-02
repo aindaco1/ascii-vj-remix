@@ -62,6 +62,29 @@ function checkMacosDependencies(platformId, fileName, filePath) {
   }
 }
 
+function checkCameraInputDevice(platformId, ffmpegPath) {
+  if (platformId !== host || !requireCurrentPlatform) return;
+  const requiredDevice = process.platform === 'linux'
+    ? 'v4l2'
+    : process.platform === 'win32'
+      ? 'dshow'
+      : null;
+  if (!requiredDevice) return;
+
+  const result = spawnSync(ffmpegPath, ['-hide_banner', '-devices'], {
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024
+  });
+  if (result.error || result.status !== 0) {
+    issues.push(`${platformId}: failed to inspect FFmpeg input devices: ${result.error?.message || result.stderr || result.stdout}`);
+    return;
+  }
+  const devices = `${result.stdout || ''}\n${result.stderr || ''}`;
+  if (!new RegExp(`\\b${requiredDevice}\\b`, 'i').test(devices)) {
+    issues.push(`${platformId}: FFmpeg must expose the ${requiredDevice} camera input device`);
+  }
+}
+
 async function manifestDirs() {
   const entries = await readdir(ffmpegRoot, { withFileTypes: true });
   const dirs = [];
@@ -125,6 +148,12 @@ async function checkManifest(platformId) {
       issues.push(`${platformId}: sha256 mismatch for ${file.path}`);
     }
     checkMacosDependencies(platformId, file.name || file.path, filePath);
+  }
+
+  const ffmpegName = platformId.startsWith('windows-') ? 'ffmpeg.exe' : 'ffmpeg';
+  const ffmpegEntry = manifest.files.find((file) => file.name === ffmpegName);
+  if (ffmpegEntry?.path) {
+    checkCameraInputDevice(platformId, path.join(ffmpegRoot, ffmpegEntry.path));
   }
 
   if (!(await exists(path.join(platformDir, 'NOTICE.md')))) {

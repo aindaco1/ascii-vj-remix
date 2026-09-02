@@ -2,9 +2,9 @@ use crate::bundled_media::{is_safe_bundled_media_path, resolve_bundled_media_pat
 use crate::desktop_bridge::{media_binaries_for_app, MediaRegistry};
 use crate::crash_reporter::{capture_internal_report, CrashReportInput};
 use crate::media_engine::ffmpeg::{
-    probe_video, spawn_macos_camera_rgb_reader, spawn_rgb_reader_with_options, CameraReaderOptions,
-    DecodeConfig, DecodedRgbFrame, FfmpegBinaries, FfmpegRgbFrameReader, RgbReaderOptions,
-    VideoProbe,
+    probe_video, spawn_platform_camera_rgb_reader, spawn_rgb_reader_with_options,
+    CameraReaderOptions, DecodeConfig, DecodedRgbFrame, FfmpegBinaries, FfmpegRgbFrameReader,
+    RgbReaderOptions, VideoProbe,
 };
 #[cfg(target_os = "macos")]
 use crate::system_audio::{InputAudioCaptureState, SystemAudioCaptureState, SystemAudioFeatures};
@@ -49,13 +49,21 @@ const NATIVE_CAMERA_SOURCE_KEY: &str = "native-camera";
 #[serde(rename_all = "camelCase")]
 pub struct NativeOutputCapabilities {
     pub native_camera: bool,
+    pub native_camera_exclusive: bool,
+    pub native_camera_mirror_fallback: bool,
     pub mirror: bool,
 }
 
 #[tauri::command]
 pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
     NativeOutputCapabilities {
-        native_camera: cfg!(target_os = "macos"),
+        native_camera: cfg!(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux"
+        )),
+        native_camera_exclusive: cfg!(target_os = "linux"),
+        native_camera_mirror_fallback: cfg!(any(target_os = "windows", target_os = "linux")),
         mirror: true,
     }
 }
@@ -1269,7 +1277,11 @@ fn native_camera_backend() -> &'static str {
     {
         "native-wgpu-displaylink-camera"
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        "native-wgpu-camera"
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         "native-softbuffer-camera"
     }
@@ -1428,6 +1440,23 @@ async fn start_or_update_native_camera_output(
         stop_native_output_worker(&mut handle);
     }
 
+    #[cfg(not(target_os = "macos"))]
+    let (initial_reader, initial_frame) = {
+        let binaries = media_binaries_for_app(app);
+        let output_fps = native_camera_source_fps(&source);
+        match prepare_camera_frame_reader(&binaries, &source, output_fps) {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                eprintln!(
+                    "[NativeOutputCamera] native open failed; mirror fallback required: {error}"
+                );
+                return Ok(unavailable(
+                    "native camera output is unavailable; use mirror fallback",
+                ));
+            }
+        }
+    };
+
     let window = ensure_native_window(app, request)?;
     let generation = state.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
     let stop = Arc::new(AtomicBool::new(false));
@@ -1464,6 +1493,8 @@ async fn start_or_update_native_camera_output(
         app.clone(),
         window.clone(),
         source.clone(),
+        initial_reader,
+        initial_frame,
         params_arc.clone(),
         transition.clone(),
         stop.clone(),
@@ -2811,18 +2842,39 @@ fn install_close_watcher(
         }
         WindowEvent::Destroyed => {
             stop.store(true, Ordering::Relaxed);
-            let active_generation = state_inner
-                .lock()
-                .map(|inner| {
-                    inner
+            #[cfg(target_os = "linux")]
+            {
+                let handle = state_inner.lock().ok().and_then(|mut inner| {
+                    let active = inner
                         .handle
                         .as_ref()
                         .map(|handle| handle.generation == generation)
-                        .unwrap_or(false)
-                })
-                .unwrap_or(false);
-            if active_generation {
-                let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                        .unwrap_or(false);
+                    active.then(|| inner.handle.take()).flatten()
+                });
+                if let Some(mut handle) = handle {
+                    let app = app.clone();
+                    std::thread::spawn(move || {
+                        stop_native_output_worker(&mut handle);
+                        let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                    });
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                let active_generation = state_inner
+                    .lock()
+                    .map(|inner| {
+                        inner
+                            .handle
+                            .as_ref()
+                            .map(|handle| handle.generation == generation)
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
+                if active_generation {
+                    let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                }
             }
         }
         _ => {}
@@ -3787,15 +3839,24 @@ fn spawn_camera_render_thread(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
+    initial_reader: CameraFrameReader,
+    initial_frame: DecodedRgbFrame,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let report_app = app.clone();
-        if let Err(error) =
-            run_camera_render_loop(app, window, source, params, transition, stop.clone())
-        {
+        if let Err(error) = run_camera_render_loop(
+            app,
+            window,
+            source,
+            initial_reader,
+            initial_frame,
+            params,
+            transition,
+            stop.clone(),
+        ) {
             eprintln!("[NativeOutputCamera] {error}");
             if should_capture_native_output_failure(stop.load(Ordering::Relaxed), &error) {
                 capture_native_output_failure(&report_app, "camera-presenter", &error);
@@ -3810,13 +3871,14 @@ fn run_camera_render_loop(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
+    mut reader: CameraFrameReader,
+    initial_frame: DecodedRgbFrame,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let binaries = media_binaries_for_app(&app);
     let source_fps = native_camera_source_fps(&source);
-    let mut reader = open_camera_frame_reader(&binaries, &source, source_fps)?;
     let mut gpu_presenter = match gpu::NativeGpuPresenter::new(&window) {
         Ok(presenter) => Some(presenter),
         Err(error) => {
@@ -3825,7 +3887,7 @@ fn run_camera_render_loop(
         }
     };
     let mut softbuffer_presenter = None;
-    let mut last_frame = None;
+    let mut last_frame = Some(initial_frame);
     let mut frame_index = 0usize;
     let mut next_frame_at = Instant::now();
 
@@ -4218,13 +4280,37 @@ fn open_camera_frame_reader(
         capture_fps: Some(source.capture_fps),
         output_fps: None,
     };
-    spawn_macos_camera_rgb_reader(binaries, &decode, &options)
+    spawn_platform_camera_rgb_reader(binaries, &decode, &options)
         .map(CameraFrameReader::Ffmpeg)
         .map_err(|error| {
             format!(
                 "Native camera capture and FFmpeg camera fallback both failed; requested output fps {output_fps:.3}: {error}"
             )
         })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn prepare_camera_frame_reader(
+    binaries: &FfmpegBinaries,
+    source: &NativeCameraSource,
+    output_fps: f64,
+) -> Result<(CameraFrameReader, DecodedRgbFrame), String> {
+    let mut reader = open_camera_frame_reader(binaries, source, output_fps)?;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        match reader.read_frame()? {
+            CameraFrameRead::Frame(frame) => return Ok((reader, frame)),
+            CameraFrameRead::Pending if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(8));
+            }
+            CameraFrameRead::Pending => {
+                return Err("camera opened but did not produce a frame within 3 seconds".to_string())
+            }
+            CameraFrameRead::Ended => {
+                return Err("camera capture ended before producing a frame".to_string())
+            }
+        }
+    }
 }
 
 fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParams {
@@ -4736,7 +4822,22 @@ mod tests {
     #[test]
     fn native_output_capabilities_match_platform_ownership() {
         let capabilities = get_native_output_capabilities();
-        assert_eq!(capabilities.native_camera, cfg!(target_os = "macos"));
+        assert_eq!(
+            capabilities.native_camera,
+            cfg!(any(
+                target_os = "macos",
+                target_os = "windows",
+                target_os = "linux"
+            ))
+        );
+        assert_eq!(
+            capabilities.native_camera_exclusive,
+            cfg!(target_os = "linux")
+        );
+        assert_eq!(
+            capabilities.native_camera_mirror_fallback,
+            cfg!(any(target_os = "windows", target_os = "linux"))
+        );
         assert!(capabilities.mirror);
     }
 

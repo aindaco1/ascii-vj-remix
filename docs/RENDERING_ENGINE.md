@@ -100,16 +100,21 @@ Camera controls include device selection, capture size, FPS, layout, framing,
 and mirror. Facing-mode controls are hidden when irrelevant to the selected
 device capabilities.
 
-Tauri native Pop Out has an additional macOS path for single-camera output:
+Tauri native Pop Out has platform-owned single-camera paths:
 
 ```text
-AVFoundation capture
+macOS: AVFoundation capture
+Windows: Media Foundation source reader
+Linux: bundled FFmpeg V4L2 input
   -> latest BGRA/RGB frame
   -> native output renderer
 ```
 
-That path avoids WebView canvas readback and was introduced to reduce camera
-latency.
+These paths avoid WebView canvas readback and per-frame Tauri IPC. Linux pauses
+the main WebView camera preview while an exclusive V4L2 device is owned by
+native Pop Out, then reacquires it on close. Windows/Linux preflight one frame
+before showing native output and retry through the bounded mirror if native
+device opening fails.
 
 ### Audio
 
@@ -542,10 +547,12 @@ presenter reuses the existing source texture while still encoding/presenting
 with the latest visual and audio-reactive params. Unversioned fallback callers
 retain unconditional uploads. Logs expose source upload and skip counters.
 
-For macOS single-camera output, AVFoundation captures latest frames directly for
-the native presenter. Live camera presets do not use browser mirror transport by
+For single-camera output, AVFoundation on macOS, Media Foundation on Windows,
+and the bundled local FFmpeg V4L2 input on Linux capture frames directly for the
+native presenter. Live camera presets do not use browser mirror transport by
 default because canvas readback and IPC frame transfer are too expensive for
-sustained output.
+sustained output. Multiple cameras and native-open failures keep the bounded
+mirror path.
 
 Native output consumes the same canonical palette, dither, `glyphMode`,
 character-set/custom-ramp, depth/offset/reverse, and glyph/background color
@@ -572,6 +579,9 @@ Native output design rules:
   native worker before reusing the output window. Surface validation or raw
   handle loss during normal close/replacement is recoverable teardown, not a
   process panic or crash-report event.
+- Windows/Linux native camera capture must produce a preflight frame before the
+  output window opens. Linux restores the WebView camera before mirror fallback
+  or after an exclusive native session closes.
 - primary renderer behavior must not regress when Pop Out is open.
 - browser fallback must remain available.
 

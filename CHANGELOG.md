@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.0.3] - 2026-09-02
+
+### Added
+
+- Added native single-camera Pop Out capture on Windows through Media
+  Foundation and on Linux through the bundled local FFmpeg V4L2 input. Both
+  feed the existing native `wgpu` renderer and avoid WebView canvas readback
+  and per-frame Tauri IPC in the normal path.
+- Added Windows DirectShow and Linux V4L2 camera-input fallbacks inside the
+  bundled FFmpeg runtime, plus packaging gates that require the corresponding
+  input device to be present before release artifacts are accepted.
+- Added bounded mirror timing, throughput, and accepted-FPS diagnostics to
+  manual reports so physical-machine fallback behavior is measurable.
+
+### Changed
+
+- Linux releases the WebView camera while native Pop Out owns an exclusive
+  V4L2 device, then restores the main preview when Pop Out closes. If native
+  capture cannot produce a frame, the app reacquires the WebView camera and
+  uses the existing mirror path.
+- Windows/Linux camera-mirror fallback uses a latest-frame, one-request-in-
+  flight 640x360 profile capped at 30 FPS. Other mirror paths retain their
+  previous dimensions and 15 FPS cap.
+- Manual diagnostics now preserve their reviewed report kind/surface through
+  the relay and include native-output runtime state in generated GitHub issues.
+
+### Preserved
+
+- macOS single-camera Pop Out remains on the existing AVFoundation/display-link
+  implementation. No macOS capture or presentation code was changed.
+- Multi-camera output and unsupported native-device cases retain the bounded
+  mirror fallback.
+
 ## [1.0.2] - 2026-09-01
 
 ### Fixed

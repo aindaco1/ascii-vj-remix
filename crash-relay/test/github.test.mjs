@@ -30,6 +30,17 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
         actualBackend: 'canvas2d',
         fallbackBackend: 'canvas2d',
         recovered: true,
+        nativeOutputCapabilities: {
+          nativeCamera: true,
+          nativeCameraMirrorFallback: true,
+          mirror: true
+        },
+        nativeOutputMirror: {
+          active: true,
+          targetFps: 30,
+          acceptedFps: 27.5,
+          transport: 'raw-rgba'
+        },
         rendererDiagnostics: [{
           event: 'fallback-active',
           presetId: 'palette-signal-court',
@@ -65,5 +76,29 @@ test('issue body carries fingerprint and parseable aggregation state', () => {
   assert.match(body, /colno: `33`/);
   assert.match(body, /## Renderer Diagnostics/);
   assert.match(body, /"event": "fallback-active"/);
+  assert.match(body, /## Runtime Diagnostics/);
+  assert.match(body, /"acceptedFps": 27\.5/);
+  assert.match(body, /"nativeCameraMirrorFallback": true/);
   assert.equal(parseState(body, 'abc123').count, 2);
+});
+
+test('issue body accepts legacy renderer diagnostic field', () => {
+  const sanitized = {
+    app: {
+      name: 'ASCII VJ Remix', version: '1.0.2', identifier: 'com.asciline.remix',
+      channel: 'production', buildProfile: 'release', os: 'windows', arch: 'x86_64'
+    },
+    report: {
+      kind: 'manual-diagnostic', surface: 'manual', message: 'Camera test', stack: '',
+      capturedAt: '2026-09-01T00:00:00Z',
+      context: { recentRendererEvents: [{ event: 'legacy-fallback' }] }
+    }
+  };
+  const state = {
+    fingerprint: 'legacy123', count: 1, firstSeen: '2026-09-01T00:00:00Z',
+    lastSeen: '2026-09-01T00:00:00Z', versions: { '1.0.2': 1 },
+    platforms: { 'windows/x86_64': 1 }, grouping: {}
+  };
+
+  assert.match(issueBody(sanitized, 'legacy123', state), /"event": "legacy-fallback"/);
 });

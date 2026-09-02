@@ -6,6 +6,8 @@ import {
   monitorLabel,
   monitorLogicalRect,
   nativeCameraOutputMode,
+  nativeMirrorFrameSize,
+  nativeMirrorTargetFps,
   outputDisplaysFromMonitors,
   selectBrowserScreen,
   selectMonitor
@@ -115,5 +117,18 @@ assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: false, mirror:
 assert.equal(nativeCameraOutputMode(cameraParams, {}, true), 'mirror');
 assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: true }, false), null);
 assert.equal(nativeCameraOutputMode({ sourceMode: 'static', mediaType: 'video' }, { nativeCamera: true }, true), null);
+
+assert.equal(nativeMirrorTargetFps(60), 15);
+assert.equal(nativeMirrorTargetFps(60, true), 30);
+assert.equal(nativeMirrorTargetFps(24), 15);
+assert.equal(nativeMirrorTargetFps(24, true), 24);
+assert.equal(nativeMirrorTargetFps(2), 6);
+assert.equal(nativeMirrorTargetFps(undefined), 12);
+assert.deepEqual(nativeMirrorFrameSize(1920, 1080), { width: 800, height: 450 });
+assert.deepEqual(nativeMirrorFrameSize(1920, 1080, false, true), { width: 960, height: 540 });
+assert.deepEqual(nativeMirrorFrameSize(1920, 1080, true), { width: 640, height: 360 });
+assert.deepEqual(nativeMirrorFrameSize(1280, 960, true), { width: 480, height: 360 });
+assert.deepEqual(nativeMirrorFrameSize(320, 240), { width: 320, height: 240 });
+assert.deepEqual(nativeMirrorFrameSize(0, 1080), { width: 0, height: 0 });
 
 console.log('Output display placement simulation passed.');

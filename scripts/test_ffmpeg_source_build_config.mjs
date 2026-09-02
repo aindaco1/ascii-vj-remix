@@ -32,5 +32,7 @@ assert.match(config.flags, /--disable-network/);
 assert.match(config.flags, /--disable-autodetect/);
 assert.doesNotMatch(config.flags, /--enable-gpl/);
 assert.doesNotMatch(config.flags, /--enable-nonfree/);
+if (process.platform === 'linux') assert.match(config.flags, /--enable-indev=v4l2/);
+if (process.platform === 'win32') assert.match(config.flags, /--enable-indev=dshow/);
 
 console.log('FFmpeg source-build config test passed.');

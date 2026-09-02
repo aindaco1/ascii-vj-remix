@@ -80,7 +80,7 @@ ASCII/cell visuals.
 
 ## Current User-Facing Baseline
 
-The current source/package release is 1.0.2. The Changelog owns release
+The current source/package release candidate is 1.0.3. The Changelog owns release
 history; the Roadmap is prospective only.
 
 Sources:
@@ -179,7 +179,7 @@ Use this map to find the likely owner of a change:
 | Tauri shell, commands, permissions, updater, native audio, native output | [src-tauri/](../src-tauri/) |
 | Native MIDI input/output and SysEx | [midi.rs](../src-tauri/src/midi.rs) |
 | Native Pop Out renderer | [native_output.rs](../src-tauri/src/native_output.rs), [gpu.rs](../src-tauri/src/native_output/gpu.rs) |
-| macOS native camera latency path | [native_camera.rs](../src-tauri/src/native_output/native_camera.rs) |
+| Platform-native camera paths | [native_camera.rs](../src-tauri/src/native_output/native_camera.rs), [ffmpeg.rs](../src-tauri/src/media_engine/ffmpeg.rs) |
 | Rust media engine, codec, FFmpeg sessions | [src-tauri/src/media_engine/](../src-tauri/src/media_engine/) |
 | Built-in demo media and hidden fixtures | [media/](../media/) |
 | Codec/vector experiments | [experiments/](../experiments/) |

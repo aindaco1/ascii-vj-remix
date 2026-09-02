@@ -126,6 +126,8 @@ import { DesktopUpdateController } from './renderers/desktop/update-controller.j
 import {
     browserScreenPlacement,
     nativeCameraOutputMode,
+    nativeMirrorFrameSize,
+    nativeMirrorTargetFps,
     selectBrowserScreen
 } from './renderers/desktop/output-display.js';
 
@@ -5592,7 +5594,12 @@ class RendererLabApp {
         this.popoutRaf = null;
         this.popoutRenderer = null;
         this.nativeOutputActive = false;
-        this.nativeOutputCapabilities = { nativeCamera: false, mirror: false };
+        this.nativeOutputCapabilities = {
+            nativeCamera: false,
+            nativeCameraExclusive: false,
+            nativeCameraMirrorFallback: false,
+            mirror: false
+        };
         this.nativeOutputLastSync = 0;
         this.nativeOutputSyncInFlight = false;
         this.nativeOutputPendingPayload = null;
@@ -5604,6 +5611,9 @@ class RendererLabApp {
         this.nativeOutputMirrorSendPending = false;
         this.nativeOutputMirrorLastSendStart = 0;
         this.nativeOutputMirrorSeq = 0;
+        this.nativeOutputMirrorStats = this._newNativeOutputMirrorStats();
+        this.nativeOutputCameraFallbackActive = false;
+        this.nativeOutputExclusiveCameraActive = false;
         this.nativeOutputPrewarmed = false;
         this.nativeOutputPrewarmPending = false;
         this.nativeOutputSyncAttemptCount = 0;
@@ -5660,7 +5670,12 @@ class RendererLabApp {
                 this.nativeOutputCapabilities = await getTauriNativeOutputCapabilities();
             } catch (error) {
                 console.warn('[TauriOutput] Native output capabilities unavailable; using mirror fallback:', error);
-                this.nativeOutputCapabilities = { nativeCamera: false, mirror: true };
+                this.nativeOutputCapabilities = {
+                    nativeCamera: false,
+                    nativeCameraExclusive: false,
+                    nativeCameraMirrorFallback: false,
+                    mirror: true
+                };
             }
         }
         await this._restoreCustomSource();
@@ -5871,15 +5886,18 @@ class RendererLabApp {
                 attempts: this.nativeOutputSyncAttemptCount,
                 succeeded: this.nativeOutputSyncOkCount,
                 failed: this.nativeOutputSyncFailedCount,
-                lastElapsedMs: this.nativeOutputLastSyncElapsedMs
+                lastElapsedMs: this.nativeOutputLastSyncElapsedMs,
+                cameraFallbackActive: this.nativeOutputCameraFallbackActive,
+                exclusiveCameraActive: this.nativeOutputExclusiveCameraActive
             },
+            nativeOutputMirror: this._nativeOutputMirrorDiagnostics(),
             renderer: {
                 backend: rendererStats.backend || '',
                 fps: Number(rendererStats.fps || 0),
                 cols: Number(rendererStats.cols || this.params.cols || 0),
                 rows: Number(rendererStats.rows || this.params.rows || 0)
             },
-            recentRendererEvents: this.rendererDiagnostics.snapshot()
+            rendererDiagnostics: this.rendererDiagnostics.snapshot()
         };
     }
 
@@ -8281,6 +8299,7 @@ button:hover{background:#202a35}
     }
 
     _nativeCameraOutputMeta(params = this.params) {
+        if (this.nativeOutputCameraFallbackActive) return null;
         if (!this._canUseNativeCameraOutputWindow(params)) return null;
         const selectedIds = selectedCameraDeviceIds(params);
         const selectedLabels = selectedIds
@@ -8350,6 +8369,10 @@ button:hover{background:#202a35}
                 : 'mirror';
         return {
             outputMode,
+            allowCameraMirrorFallback: Boolean(
+                outputMode === 'native-camera'
+                && this.nativeOutputCapabilities?.nativeCameraMirrorFallback
+            ),
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
             params: this._nativeOutputParams(params, cameraMeta),
@@ -8372,19 +8395,40 @@ button:hover{background:#202a35}
 
     async _openNativeOutputWindow() {
         if (!this._canUseNativeOutputWindow()) return false;
+        let exclusiveCameraReleased = false;
         try {
+            this.nativeOutputCameraFallbackActive = false;
+            this.nativeOutputExclusiveCameraActive = false;
             const payload = this._nativeOutputPayload();
+            if (payload.outputMode === 'native-camera'
+                && this.nativeOutputCapabilities?.nativeCameraExclusive) {
+                this._stopCameraStream({ render: false });
+                exclusiveCameraReleased = true;
+            }
             const opened = await openTauriOutputWindow(payload, {
                 outputDisplay: this.outputDisplay,
                 onClosed: () => {
+                    const restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                     this.nativeOutputActive = false;
+                    this.nativeOutputCameraFallbackActive = false;
+                    this.nativeOutputExclusiveCameraActive = false;
                     this._resetNativeOutputSyncState();
                     this._stopNativeOutputMirror();
                     this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputClosed');
                     this._updatePopoutButton();
+                    if (restoreExclusiveCamera) this._restoreCameraPreviewAfterNativeOutput();
                 }
             });
             this.nativeOutputActive = Boolean(opened);
+            this.nativeOutputCameraFallbackActive = Boolean(
+                opened && isCameraParams(this.params) && payload.outputMode === 'mirror'
+            );
+            this.nativeOutputExclusiveCameraActive = Boolean(
+                opened && exclusiveCameraReleased && payload.outputMode === 'native-camera'
+            );
+            if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror') {
+                await this.restart();
+            }
             this.nativeOutputLastSync = performance.now();
             this._updatePopoutButton();
             if (opened) {
@@ -8396,12 +8440,24 @@ button:hover{background:#202a35}
         } catch (error) {
             console.warn('[TauriOutput] Native output failed, falling back to browser pop-out:', error);
             this.nativeOutputActive = false;
+            this.nativeOutputCameraFallbackActive = false;
+            this.nativeOutputExclusiveCameraActive = false;
             this._resetNativeOutputSyncState();
             this._stopNativeOutputMirror();
             this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputFailed');
             this._updatePopoutButton();
         }
+        if (exclusiveCameraReleased && !this.nativeOutputActive) {
+            this._restoreCameraPreviewAfterNativeOutput();
+        }
         return false;
+    }
+
+    _restoreCameraPreviewAfterNativeOutput() {
+        if (!this.running || !isCameraParams(this.params)) return;
+        this.restart().catch((error) => {
+            console.warn('[Camera] Preview restore after native output failed:', error);
+        });
     }
 
     async _prewarmNativeOutputWindow() {
@@ -8562,6 +8618,8 @@ button:hover{background:#202a35}
         }
         if (this.nativeOutputMirrorRaf) return;
 
+        this.nativeOutputMirrorStats = this._newNativeOutputMirrorStats();
+
         const canvas = this.nativeOutputMirrorCanvas || document.createElement('canvas');
         const ctx = canvas.getContext('2d', {
             alpha: false,
@@ -8584,8 +8642,13 @@ button:hover{background:#202a35}
             }
 
             const params = this.renderParams();
-            const fps = Math.min(15, Math.max(6, Number(params.fps) || 12));
-            if (now - lastFrameAt < 1000 / fps || this.nativeOutputMirrorBusy) return;
+            const fps = nativeMirrorTargetFps(params.fps, this.nativeOutputCameraFallbackActive);
+            this.nativeOutputMirrorStats.targetFps = fps;
+            if (now - lastFrameAt < 1000 / fps) return;
+            if (this.nativeOutputMirrorBusy) {
+                this.nativeOutputMirrorStats.busySkips++;
+                return;
+            }
             lastFrameAt = now;
             await this._pushNativeOutputMirrorFrame(ctx, canvas, now);
         };
@@ -8617,31 +8680,47 @@ button:hover{background:#202a35}
     }
 
     async _pushNativeOutputMirrorFrame(ctx, canvas, now = performance.now(), options = {}) {
-        if (this.nativeOutputMirrorBusy && !options.force) return false;
-        if (this.nativeOutputMirrorSendPending && now - this.nativeOutputMirrorLastSendStart < 450 && !options.force) return false;
+        if (this.nativeOutputMirrorBusy && !options.force) {
+            this.nativeOutputMirrorStats.busySkips++;
+            return false;
+        }
+        const stats = this.nativeOutputMirrorStats;
+        stats.attempts++;
+        stats.targetFps = nativeMirrorTargetFps(
+            this.renderParams().fps,
+            this.nativeOutputCameraFallbackActive
+        );
         const params = this.renderParams();
         const source = this._activeRenderSurface();
         const sourceWidth = source?.videoWidth || source?.naturalWidth || source?.width || 0;
         const sourceHeight = source?.videoHeight || source?.naturalHeight || source?.height || 0;
-        if (!source || sourceWidth <= 0 || sourceHeight <= 0) return false;
+        if (!source || sourceWidth <= 0 || sourceHeight <= 0) {
+            stats.sourceSkips++;
+            return false;
+        }
 
-        const maxWidth = options.force ? 960 : 800;
-        const maxHeight = options.force ? 540 : 480;
-        const scale = Math.min(1, maxWidth / sourceWidth, maxHeight / sourceHeight);
-        const width = Math.max(1, Math.floor(sourceWidth * scale));
-        const height = Math.max(1, Math.floor(sourceHeight * scale));
+        const { width, height } = nativeMirrorFrameSize(
+            sourceWidth,
+            sourceHeight,
+            this.nativeOutputCameraFallbackActive,
+            Boolean(options.force)
+        );
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
         }
 
+        const totalStartedAt = performance.now();
         this.nativeOutputMirrorBusy = true;
         try {
+            const readbackStartedAt = performance.now();
             ctx.imageSmoothingEnabled = Boolean(params.smoothing);
             ctx.fillStyle = '#030405';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(source, 0, 0, width, height);
-            this.nativeOutputMirrorBusy = false;
+            stats.captured++;
+            stats.lastWidth = width;
+            stats.lastHeight = height;
             const seq = ++this.nativeOutputMirrorSeq;
             this.nativeOutputMirrorSendPending = true;
             this.nativeOutputMirrorLastSendStart = performance.now();
@@ -8649,6 +8728,13 @@ button:hover{background:#202a35}
             let ok = null;
             try {
                 const pixels = ctx.getImageData(0, 0, width, height);
+                const readbackElapsedMs = performance.now() - readbackStartedAt;
+                stats.rawReadbacks++;
+                stats.lastReadbackMs = readbackElapsedMs;
+                stats.totalReadbackMs += readbackElapsedMs;
+                stats.maxReadbackMs = Math.max(stats.maxReadbackMs, readbackElapsedMs);
+                stats.rawBytes += pixels.data.byteLength;
+                const sendStartedAt = performance.now();
                 ok = await sendTauriOutputPixels({
                     seq,
                     width,
@@ -8657,10 +8743,17 @@ button:hover{background:#202a35}
                     smoothing: Boolean(params.smoothing),
                     label
                 });
+                const sendElapsedMs = performance.now() - sendStartedAt;
+                stats.lastSendMs = sendElapsedMs;
+                stats.totalSendMs += sendElapsedMs;
+                stats.maxSendMs = Math.max(stats.maxSendMs, sendElapsedMs);
+                if (ok !== null) stats.transport = 'raw-rgba';
             } catch (error) {
                 console.info('[TauriOutput] Raw mirror pixels unavailable:', error);
             }
             if (ok === null) {
+                stats.encodedFallbacks++;
+                const sendStartedAt = performance.now();
                 let dataUrl = await this._canvasToDataUrlAsync(canvas, 'image/webp', options.force ? 0.72 : 0.58);
                 if (!String(dataUrl).startsWith('data:image/webp')) {
                     dataUrl = await this._canvasToDataUrlAsync(canvas, 'image/jpeg', options.force ? 0.72 : 0.58);
@@ -8673,8 +8766,19 @@ button:hover{background:#202a35}
                     smoothing: Boolean(params.smoothing),
                     label
                 });
+                const sendElapsedMs = performance.now() - sendStartedAt;
+                stats.lastSendMs = sendElapsedMs;
+                stats.totalSendMs += sendElapsedMs;
+                stats.maxSendMs = Math.max(stats.maxSendMs, sendElapsedMs);
+                stats.transport = 'encoded-image';
             }
             if (seq === this.nativeOutputMirrorSeq) this.nativeOutputMirrorSendPending = false;
+            if (ok) stats.accepted++;
+            else stats.rejected++;
+            const totalElapsedMs = performance.now() - totalStartedAt;
+            stats.lastTotalMs = totalElapsedMs;
+            stats.totalElapsedMs += totalElapsedMs;
+            stats.maxTotalMs = Math.max(stats.maxTotalMs, totalElapsedMs);
             if (!ok) {
                 this.nativeOutputActive = false;
                 this._stopNativeOutputMirror();
@@ -8697,6 +8801,77 @@ button:hover{background:#202a35}
         this.nativeOutputMirrorRaf = null;
         this.nativeOutputMirrorBusy = false;
         this.nativeOutputMirrorSendPending = false;
+        if (!this.nativeOutputMirrorStats.stoppedAtMs) {
+            this.nativeOutputMirrorStats.stoppedAtMs = performance.now();
+        }
+    }
+
+    _newNativeOutputMirrorStats() {
+        return {
+            startedAtMs: performance.now(),
+            stoppedAtMs: 0,
+            targetFps: 0,
+            attempts: 0,
+            busySkips: 0,
+            sourceSkips: 0,
+            captured: 0,
+            rawReadbacks: 0,
+            accepted: 0,
+            rejected: 0,
+            encodedFallbacks: 0,
+            rawBytes: 0,
+            lastWidth: 0,
+            lastHeight: 0,
+            lastReadbackMs: 0,
+            totalReadbackMs: 0,
+            maxReadbackMs: 0,
+            lastSendMs: 0,
+            totalSendMs: 0,
+            maxSendMs: 0,
+            lastTotalMs: 0,
+            totalElapsedMs: 0,
+            maxTotalMs: 0,
+            transport: 'none'
+        };
+    }
+
+    _nativeOutputMirrorDiagnostics() {
+        const stats = this.nativeOutputMirrorStats || this._newNativeOutputMirrorStats();
+        const endedAtMs = stats.stoppedAtMs || performance.now();
+        const elapsedSeconds = Math.max(0, (endedAtMs - stats.startedAtMs) / 1000);
+        const average = (total, count) => count > 0 ? total / count : 0;
+        const rounded = (value) => Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
+        return {
+            active: Boolean(this.nativeOutputMirrorRaf && this.nativeOutputActive),
+            transport: stats.transport,
+            targetFps: rounded(stats.targetFps),
+            acceptedFps: rounded(elapsedSeconds > 0 ? stats.accepted / elapsedSeconds : 0),
+            attempts: stats.attempts,
+            captured: stats.captured,
+            accepted: stats.accepted,
+            rejected: stats.rejected,
+            busySkips: stats.busySkips,
+            sourceSkips: stats.sourceSkips,
+            encodedFallbacks: stats.encodedFallbacks,
+            width: stats.lastWidth,
+            height: stats.lastHeight,
+            rawMiBPerSecond: rounded(elapsedSeconds > 0 ? stats.rawBytes / 1048576 / elapsedSeconds : 0),
+            readbackMs: {
+                last: rounded(stats.lastReadbackMs),
+                average: rounded(average(stats.totalReadbackMs, stats.rawReadbacks)),
+                max: rounded(stats.maxReadbackMs)
+            },
+            sendMs: {
+                last: rounded(stats.lastSendMs),
+                average: rounded(average(stats.totalSendMs, stats.accepted + stats.rejected)),
+                max: rounded(stats.maxSendMs)
+            },
+            totalMs: {
+                last: rounded(stats.lastTotalMs),
+                average: rounded(average(stats.totalElapsedMs, stats.accepted + stats.rejected)),
+                max: rounded(stats.maxTotalMs)
+            }
+        };
     }
 
     async _placePopoutOnExternalScreen(win) {

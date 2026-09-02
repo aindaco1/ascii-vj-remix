@@ -8,8 +8,8 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package release is 1.0.2. Release history is recorded in the
-[Changelog](CHANGELOG.md); prospective work belongs in the
+The current source/package release candidate is 1.0.3. Release history is
+recorded in the [Changelog](CHANGELOG.md); prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
@@ -24,7 +24,7 @@ The current source/package release is 1.0.2. Release history is recorded in the
 - [Testing guide](docs/TESTING.md)
 - [1.0.0 release readiness and acceptance](docs/RELEASE_1.0.0_RC.md)
 - [1.0.1 release readiness and acceptance](docs/RELEASE_1.0.1.md)
-- [1.0.2 release readiness and acceptance](docs/RELEASE_1.0.2.md)
+- [1.0.3 release readiness and acceptance](docs/RELEASE_1.0.3.md)
 - [Accessibility guide](docs/ACCESSIBILITY.md)
 - [Internationalization guide](docs/I18N.md)
 - [UC-33e and mioXC MIDI guide](docs/MIDI_UC33E.md)
@@ -168,9 +168,11 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - The desktop output window is native, not a second heavyweight duplicated UI
   surface.
 - Output display selection is persisted when Tauri can enumerate displays.
-- macOS camera output uses its native AVFoundation path. Windows and Linux
-  camera output use the bounded current-frame mirror path because native camera
-  capture is not implemented on those platforms.
+- Single-camera output uses platform-native capture: AVFoundation on macOS,
+  Media Foundation on Windows, and V4L2 through the bundled local FFmpeg
+  runtime on Linux. Windows/Linux frames feed the native `wgpu` presenter;
+  bounded current-frame mirroring remains available when native device opening
+  fails or multiple cameras are selected.
 - The camera-icon control saves the current primary renderer surface as a PNG
   directly to Desktop. The HTML Stats Overlay is outside that captured surface,
   and no save dialog is opened.
@@ -280,6 +282,9 @@ Notes:
 
 - Most current Windows 10/11 systems already include WebView2. If an installer
   reports that WebView2 is missing, install the Microsoft WebView2 Runtime once.
+- Single-camera Pop Out uses Windows Media Foundation capture and the D3D12
+  native renderer when available, with the existing bounded mirror as a
+  device/driver fallback.
 - Native WASAPI system-audio loopback is not implemented. Current system/display
   audio behavior depends on the capture path exposed by the runtime; verify it
   on the target machine before a live session.
@@ -296,8 +301,12 @@ Notes:
 - Linux Tauri uses the system WebKitGTK stack, so GPU feature support varies by
   distribution, WebKitGTK version, and graphics driver.
 - WebGL2 may be the practical Linux fallback even when WebGPU is not available.
-- Native Linux camera/audio/output coverage is limited outside CI and varies by
-  distribution and hardware.
+- Single-camera Pop Out uses V4L2 capture through the bundled local FFmpeg
+  runtime and Vulkan/GLES native rendering. Because many V4L2 devices are
+  exclusive, the main camera preview pauses while native Pop Out is active and
+  is restored when it closes.
+- Native Linux camera/audio/output behavior varies by distribution and
+  hardware; Ubuntu and Fedora package acceptance remains a physical test.
 
 ## Hardware Guidance
 
@@ -533,6 +542,9 @@ path is diagnosed.
 - Close other GPU-heavy apps.
 - Use AC power on laptops.
 - Try a direct external display connection instead of a wireless display.
+- For a single camera on Windows/Linux, capture a manual report while Pop Out
+  is open. `cameraFallbackActive: false` confirms the native capture path;
+  mirror timing and accepted FPS are included when fallback is active.
 
 ### Video format does not play
 

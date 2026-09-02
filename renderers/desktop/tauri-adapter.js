@@ -526,13 +526,21 @@ async function openNativeSurfaceOutput(payload, options = {}) {
         await recordTauriMediaDiagnostic(
             `[TauriOutput] native-open start mode=${payload?.outputMode || 'unknown'} sourceMode=${params.sourceMode || 'unknown'} mediaType=${params.mediaType || 'unknown'}`
         ).catch(() => {});
-        const result = await invokeTauri('open_native_output_window', {
-            request: {
-                payload,
-                displayPreference: options.outputDisplay || 'auto',
-                visible: options.show !== false
-            }
-        });
+        const request = {
+            payload,
+            displayPreference: options.outputDisplay || 'auto',
+            visible: options.show !== false
+        };
+        let result = await invokeTauri('open_native_output_window', { request });
+        if (!result?.opened
+            && payload?.outputMode === 'native-camera'
+            && payload?.allowCameraMirrorFallback === true) {
+            payload.outputMode = 'mirror';
+            result = await invokeTauri('open_native_output_window', { request });
+            await recordTauriMediaDiagnostic(
+                `[TauriOutput] native-camera unavailable; platform mirror retry opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'}`
+            ).catch(() => {});
+        }
         await recordTauriMediaDiagnostic(
             `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} reason=${result?.reason || ''}`
         ).catch(() => {});

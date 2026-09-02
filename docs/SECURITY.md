@@ -33,7 +33,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly without broad filesystem access. |
 | Built-in demo media | Bundled under `media/` and copied into app assets | Low | Demo media is local and versioned. |
 | Built-in palettes/glyph atlas | Project-owned palette catalog plus pinned, generated, locally bundled glyph pages | Low | No runtime palette pack, font, CDN, or language-resource import/download. |
-| Camera input | Browser `getUserMedia`; macOS native AVFoundation path for Pop Out | Medium | Requires OS privacy permission. Frames stay local. |
+| Camera input | Browser `getUserMedia`; native AVFoundation, Media Foundation, or bundled-FFmpeg V4L2 path for single-camera Pop Out | Medium | Requires OS privacy permission. Frames stay local. Linux releases the WebView camera while an exclusive V4L2 device is in use. |
 | Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
 | Presets/settings | Local browser storage, IndexedDB, imported/exported JSON | Low to Medium | User-authored data. Validate imports before applying. |
@@ -223,6 +223,12 @@ Reactivity is an intentional default mode, so the app may request
 microphone/input permission during startup. Capture remains OS-gated and local,
 and the user can stop it by disabling Audio Reactivity or changing the audio
 source.
+
+Single-camera Pop Out may open the already selected camera through a native
+platform provider: AVFoundation on macOS, Media Foundation on Windows, or V4L2
+through the bundled network-disabled FFmpeg runtime on Linux. It does not add a
+new remote endpoint or persist camera frames. Manual diagnostics may contain
+bounded device-independent timing and fallback counters, never frame bytes.
 
 Current macOS bundle identifier:
 

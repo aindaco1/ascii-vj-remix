@@ -84,6 +84,27 @@ function nativeCameraOutputMode(params, capabilities = {}, tauri = false) {
     return capabilities?.nativeCamera === true ? 'native-camera' : 'mirror';
 }
 
+const NATIVE_MIRROR_MAX_WIDTH = 640;
+const NATIVE_MIRROR_MAX_HEIGHT = 360;
+const NATIVE_MIRROR_MAX_FPS = 30;
+
+function nativeMirrorTargetFps(value, highCadence = false) {
+    return Math.min(highCadence ? NATIVE_MIRROR_MAX_FPS : 15, Math.max(6, Number(value) || 12));
+}
+
+function nativeMirrorFrameSize(sourceWidth, sourceHeight, highCadence = false, force = false) {
+    const width = Math.max(0, Number(sourceWidth) || 0);
+    const height = Math.max(0, Number(sourceHeight) || 0);
+    if (width <= 0 || height <= 0) return { width: 0, height: 0 };
+    const maxWidth = highCadence ? NATIVE_MIRROR_MAX_WIDTH : force ? 960 : 800;
+    const maxHeight = highCadence ? NATIVE_MIRROR_MAX_HEIGHT : force ? 540 : 480;
+    const scale = Math.min(1, maxWidth / width, maxHeight / height);
+    return {
+        width: Math.max(1, Math.floor(width * scale)),
+        height: Math.max(1, Math.floor(height * scale))
+    };
+}
+
 export {
     browserScreenPlacement,
     displayPreferenceIndex,
@@ -91,6 +112,8 @@ export {
     monitorLabel,
     monitorLogicalRect,
     nativeCameraOutputMode,
+    nativeMirrorFrameSize,
+    nativeMirrorTargetFps,
     outputDisplaysFromMonitors,
     selectBrowserScreen,
     selectMonitor

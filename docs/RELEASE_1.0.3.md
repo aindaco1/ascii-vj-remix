@@ -1,0 +1,49 @@
+# 1.0.3 Release Readiness and Acceptance
+
+This document tracks the 1.0.3 camera Pop Out corrective release and keeps
+source, CI, packaged-artifact, installed-app, and physical-platform evidence
+separate.
+
+## Release Scope
+
+- Add native single-camera capture through Media Foundation on Windows and
+  V4L2 through the bundled local FFmpeg runtime on Linux.
+- Feed both platform captures into the existing native `wgpu` presenter,
+  bypassing WebView canvas readback and per-frame Tauri IPC in the normal path.
+- Preserve the existing macOS AVFoundation/display-link implementation.
+- Retain bounded mirror fallback for native-open failures and multiple cameras,
+  with measurable accepted-FPS, readback, send, and throughput diagnostics.
+
+## Acceptance Contract
+
+1. Source metadata agrees on version 1.0.3 and the candidate branch is
+   `release/1.0.3`.
+2. The exact candidate commit passes macOS, Windows, and Linux Desktop jobs.
+3. Windows PR packaging produces an updater-disabled `ASCII VJ Remix Dev`
+   EXE/MSI; Linux packaging produces updater-disabled AppImage, deb, and rpm
+   artifacts from the same commit.
+4. The staged Windows FFmpeg runtime exposes DirectShow and the staged Linux
+   runtime exposes V4L2 before packaging succeeds.
+5. Existing macOS renderer, native-output, static smoke, and Rust suites pass;
+   the macOS-gated AVFoundation implementation block remains unchanged.
+6. Tagging and public deployment remain blocked until the physical camera
+   matrix below is accepted.
+
+## Physical Camera Matrix
+
+For each row, select exactly one camera, open Pop Out, change several presets,
+change FPS, leave the output running for at least two minutes, close it, and
+confirm camera preview recovery. Capture one manual diagnostic while Pop Out is
+open.
+
+| Platform | Candidate artifact | Required observation |
+| --- | --- | --- |
+| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; no blank output or crash report. |
+| Ubuntu x86_64 | Dev AppImage or deb | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
+| Fedora x86_64 | Dev rpm or AppImage | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
+| macOS Apple Silicon | Local candidate smoke | Existing AVFoundation Pop Out behavior remains unchanged. |
+
+If native device opening fails, the output must automatically use the bounded
+mirror path, the main preview must be live, and the manual report must contain
+mirror accepted FPS and timing metrics. A successful fallback is useful
+diagnostic evidence but does not satisfy native-path acceptance for that row.

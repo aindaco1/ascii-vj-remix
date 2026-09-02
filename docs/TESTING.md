@@ -157,11 +157,13 @@ the active ramp, unsupported scalars are reported, and Character Set/Font
 Family changes do not hide the Glyph controls.
 
 For Camera Pop Out, verify the resolved output mode as well as visible motion.
-macOS should select `native-camera`; Windows and Linux should select `mirror`.
-On physical Windows, confirm the camera image advances in both the main and Pop
-Out windows, close/reopen Pop Out, and capture a manual report from the existing
-Reports dialog after any failure. A local policy simulation does not replace
-this device/camera acceptance.
+macOS, Windows, and Linux should select `native-camera` for one camera. Multiple
+cameras should select `mirror`; Windows/Linux should also retry mirror when
+native preflight cannot produce a frame. On physical Windows, confirm the
+camera image advances in both the main and Pop Out windows. On Linux, confirm
+native Pop Out advances while the exclusive WebView preview is paused and that
+the preview is reacquired after close. Capture a manual report from the existing
+Reports dialog; a local policy simulation does not replace device acceptance.
 
 On Windows and Linux, also keep Pop Out open while switching repeatedly between
 Demo Image, Demo Video, and Camera. Each mode change must finish the previous
@@ -356,6 +358,13 @@ Use this after user-facing renderer, source, audio, or output changes:
     visible, and that its colors match the main preview.
 16. Confirm Stats Overlay reports the active preset/source/backend/grid/FPS.
 17. Close Pop Out and confirm CPU/GPU usage settles.
+18. With one camera selected on Windows, capture a manual diagnostic while Pop
+    Out is open and confirm `cameraFallbackActive` is false. Confirm live output
+    remains smooth while changing presets and FPS.
+19. Repeat the single-camera test on Ubuntu with AppImage/deb and Fedora with
+    rpm. The main camera preview may pause while V4L2 is owned by native Pop
+    Out; confirm it restores after close. If fallback activates, confirm the
+    preview is reacquired and the report includes nonzero mirror accepted FPS.
 
 ## Hardware and Platform Checks
 
