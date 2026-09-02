@@ -33,13 +33,15 @@ separate.
 
 For each row, select exactly one camera, open Pop Out, change several presets,
 change FPS, leave the output running for at least two minutes, close it, and
-confirm camera preview recovery. The main preview may pause while Windows or
-Linux native output owns the camera. Capture one manual diagnostic while Pop
-Out is open.
+confirm camera preview recovery. Windows should keep both views live when its
+camera driver accepts concurrent capture; the main preview may pause only when
+`exclusiveCameraActive` reports the driver fallback. Linux may pause while
+native output owns the camera. Capture one manual diagnostic while Pop Out is
+open.
 
 | Platform | Candidate artifact | Required observation |
 | --- | --- | --- |
-| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; no blank output or crash report. |
+| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; `sharedCameraActive` is true when the driver permits it, otherwise exclusive close restores the preview; no blank output or crash report. |
 | Ubuntu x86_64 | Dev AppImage or deb | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | Fedora x86_64 | Dev rpm or AppImage | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | macOS Apple Silicon | Local candidate smoke | Existing AVFoundation Pop Out behavior remains unchanged. |

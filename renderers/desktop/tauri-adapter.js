@@ -549,7 +549,8 @@ async function openNativeSurfaceOutput(payload, options = {}) {
         }
         if (!result?.opened
             && nativeCameraAttempt
-            && payload?.allowCameraMirrorFallback === true) {
+            && payload?.allowCameraMirrorFallback === true
+            && options.deferCameraFallback !== true) {
             payload.outputMode = 'mirror';
             result = await invokeTauri('open_native_output_window', { request });
             await recordTauriMediaDiagnostic(
@@ -581,6 +582,7 @@ async function openTauriOutputWindow(payload, options = {}) {
     const shouldShow = options.show !== false;
 
     if (await openNativeSurfaceOutput(payload, options)) return true;
+    if (options.deferCameraFallback === true) return false;
 
     const existing = await WebviewWindow.getByLabel(OUTPUT_WINDOW_LABEL).catch(() => null);
     if (existing) {

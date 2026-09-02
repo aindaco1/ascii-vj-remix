@@ -307,6 +307,12 @@ Rules:
   fails, the bounded 640x360 mirror keeps only one request in flight and is
   capped at 30 FPS; diagnostics report the native-open reason, accepted FPS,
   and transfer timings.
+- Windows keeps the main preview live by preferring two direct OS capture
+  clients: WebView2 for the primary renderer and Media Foundation for native
+  Pop Out. This adds the driver's concurrent capture/conversion cost but no
+  JavaScript readback, encoding, or per-frame IPC. Drivers that cannot share
+  retry the native path exclusively instead of degrading immediately to the
+  expensive mirror transport.
 - For multi-camera, be explicit about the mixing cost and the selected layout.
 
 ### Audio Reactivity

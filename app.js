@@ -126,6 +126,7 @@ import {
 import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
+    nativeCameraOwnershipPolicy,
     nativeCameraOutputMode,
     nativeMirrorFrameSize,
     nativeMirrorTargetFps,
@@ -5598,6 +5599,7 @@ class RendererLabApp {
         this.nativeOutputCapabilities = {
             nativeCamera: false,
             nativeCameraExclusive: false,
+            nativeCameraExclusiveFallback: false,
             nativeCameraMirrorFallback: false,
             mirror: false
         };
@@ -5615,6 +5617,13 @@ class RendererLabApp {
         this.nativeOutputMirrorStats = this._newNativeOutputMirrorStats();
         this.nativeOutputCameraFallbackActive = false;
         this.nativeOutputExclusiveCameraActive = false;
+        this.nativeOutputSharedCameraAttempted = false;
+        this.nativeOutputSharedCameraActive = false;
+        this.nativeOutputCameraRestoreToken = 0;
+        this.nativeOutputCameraRestorePending = false;
+        this.nativeOutputCameraRestoreAttemptCount = 0;
+        this.nativeOutputCameraRestoreOkCount = 0;
+        this.nativeOutputCameraRestoreFailedCount = 0;
         this.nativeOutputPrewarmed = false;
         this.nativeOutputPrewarmPending = false;
         this.nativeOutputSyncAttemptCount = 0;
@@ -5674,6 +5683,7 @@ class RendererLabApp {
                 this.nativeOutputCapabilities = {
                     nativeCamera: false,
                     nativeCameraExclusive: false,
+                    nativeCameraExclusiveFallback: false,
                     nativeCameraMirrorFallback: false,
                     mirror: true
                 };
@@ -5890,7 +5900,13 @@ class RendererLabApp {
                 failed: this.nativeOutputSyncFailedCount,
                 lastElapsedMs: this.nativeOutputLastSyncElapsedMs,
                 cameraFallbackActive: this.nativeOutputCameraFallbackActive,
-                exclusiveCameraActive: this.nativeOutputExclusiveCameraActive
+                exclusiveCameraActive: this.nativeOutputExclusiveCameraActive,
+                sharedCameraAttempted: this.nativeOutputSharedCameraAttempted,
+                sharedCameraActive: this.nativeOutputSharedCameraActive,
+                previewRestorePending: this.nativeOutputCameraRestorePending,
+                previewRestoreAttempts: this.nativeOutputCameraRestoreAttemptCount,
+                previewRestoreSucceeded: this.nativeOutputCameraRestoreOkCount,
+                previewRestoreFailed: this.nativeOutputCameraRestoreFailedCount
             },
             nativeOutputMirror: this._nativeOutputMirrorDiagnostics(),
             renderer: {
@@ -8092,6 +8108,8 @@ class RendererLabApp {
     }
 
     stop() {
+        this.nativeOutputCameraRestoreToken++;
+        this.nativeOutputCameraRestorePending = false;
         this.startToken++;
         this.starting = false;
         this.running = false;
@@ -8399,28 +8417,54 @@ button:hover{background:#202a35}
         if (!this._canUseNativeOutputWindow()) return false;
         let exclusiveCameraReleased = false;
         try {
+            this.nativeOutputCameraRestoreToken++;
+            this.nativeOutputCameraRestorePending = false;
             this.nativeOutputCameraFallbackActive = false;
             this.nativeOutputExclusiveCameraActive = false;
+            this.nativeOutputSharedCameraAttempted = false;
+            this.nativeOutputSharedCameraActive = false;
             const payload = this._nativeOutputPayload();
-            if (payload.outputMode === 'native-camera'
-                && this.nativeOutputCapabilities?.nativeCameraExclusive) {
+            const cameraOwnership = nativeCameraOwnershipPolicy(
+                this.params,
+                this.nativeOutputCapabilities,
+                true
+            );
+            if (cameraOwnership.releaseBeforeOpen) {
                 this._stopCameraStream({ render: false });
                 exclusiveCameraReleased = true;
             }
-            const opened = await openTauriOutputWindow(payload, {
+            const openOptions = {
                 outputDisplay: this.outputDisplay,
                 onClosed: () => {
                     const restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                     this.nativeOutputActive = false;
                     this.nativeOutputCameraFallbackActive = false;
                     this.nativeOutputExclusiveCameraActive = false;
+                    this.nativeOutputSharedCameraAttempted = false;
+                    this.nativeOutputSharedCameraActive = false;
                     this._resetNativeOutputSyncState();
                     this._stopNativeOutputMirror();
                     this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputClosed');
                     this._updatePopoutButton();
-                    if (restoreExclusiveCamera) this._restoreCameraPreviewAfterNativeOutput();
+                    if (restoreExclusiveCamera) {
+                        void this._restoreCameraPreviewAfterNativeOutput();
+                    }
                 }
-            });
+            };
+            let opened = false;
+            if (cameraOwnership.retryExclusive) {
+                this.nativeOutputSharedCameraAttempted = true;
+                opened = await openTauriOutputWindow(payload, {
+                    ...openOptions,
+                    deferCameraFallback: true
+                });
+                this.nativeOutputSharedCameraActive = Boolean(opened);
+                if (!opened) {
+                    this._stopCameraStream({ render: false });
+                    exclusiveCameraReleased = true;
+                }
+            }
+            if (!opened) opened = await openTauriOutputWindow(payload, openOptions);
             this.nativeOutputActive = Boolean(opened);
             this.nativeOutputCameraFallbackActive = Boolean(
                 opened && isCameraParams(this.params) && payload.outputMode === 'mirror'
@@ -8428,8 +8472,14 @@ button:hover{background:#202a35}
             this.nativeOutputExclusiveCameraActive = Boolean(
                 opened && exclusiveCameraReleased && payload.outputMode === 'native-camera'
             );
+            this.nativeOutputSharedCameraActive = Boolean(
+                opened
+                && this.nativeOutputSharedCameraAttempted
+                && !exclusiveCameraReleased
+                && payload.outputMode === 'native-camera'
+            );
             if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror') {
-                await this.restart();
+                await this._restoreCameraPreviewAfterNativeOutput();
             }
             this.nativeOutputLastSync = performance.now();
             this._updatePopoutButton();
@@ -8444,22 +8494,55 @@ button:hover{background:#202a35}
             this.nativeOutputActive = false;
             this.nativeOutputCameraFallbackActive = false;
             this.nativeOutputExclusiveCameraActive = false;
+            this.nativeOutputSharedCameraAttempted = false;
+            this.nativeOutputSharedCameraActive = false;
             this._resetNativeOutputSyncState();
             this._stopNativeOutputMirror();
             this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputFailed');
             this._updatePopoutButton();
         }
         if (exclusiveCameraReleased && !this.nativeOutputActive) {
-            this._restoreCameraPreviewAfterNativeOutput();
+            await this._restoreCameraPreviewAfterNativeOutput();
         }
         return false;
     }
 
-    _restoreCameraPreviewAfterNativeOutput() {
-        if (!this.running || !isCameraParams(this.params)) return;
-        this.restart().catch((error) => {
-            console.warn('[Camera] Preview restore after native output failed:', error);
-        });
+    async _restoreCameraPreviewAfterNativeOutput() {
+        if (!this.running || !isCameraParams(this.params)) return false;
+        if (this.nativeOutputActive && !this.nativeOutputCameraFallbackActive) return false;
+
+        const token = ++this.nativeOutputCameraRestoreToken;
+        const retryDelays = [0, 160, 500];
+        this.nativeOutputCameraRestorePending = true;
+        try {
+            for (const delay of retryDelays) {
+                if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
+                if (token !== this.nativeOutputCameraRestoreToken
+                    || !isCameraParams(this.params)
+                    || (this.nativeOutputActive && !this.nativeOutputCameraFallbackActive)) {
+                    return false;
+                }
+
+                this.nativeOutputCameraRestoreAttemptCount++;
+                if (this.running) await this.restart();
+                else await this.start({ autoStart: true });
+                if (this.running && this.cameraStatus === 'ready' && this._cameraStreamActive()) {
+                    this.nativeOutputCameraRestoreOkCount++;
+                    return true;
+                }
+            }
+
+            this.nativeOutputCameraRestoreFailedCount++;
+            console.warn(
+                '[Camera] Preview restore after native output failed:',
+                this.cameraError || this.cameraStatus || 'camera did not reopen'
+            );
+            return false;
+        } finally {
+            if (token === this.nativeOutputCameraRestoreToken) {
+                this.nativeOutputCameraRestorePending = false;
+            }
+        }
     }
 
     async _prewarmNativeOutputWindow() {

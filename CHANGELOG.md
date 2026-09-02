@@ -16,10 +16,11 @@
 
 ### Changed
 
-- Windows and Linux release the WebView camera while native Pop Out owns the
-  device, then restore the main preview when Pop Out closes. If native capture
-  cannot produce a frame, the app reacquires the WebView camera and uses the
-  existing mirror path.
+- Windows first opens Media Foundation alongside the WebView camera so the
+  main preview and native Pop Out stay live without per-frame IPC. Drivers that
+  reject concurrent clients retry with exclusive native ownership; Linux keeps
+  its exclusive V4L2 flow. Exclusive sessions now finish native worker shutdown
+  before the app retries preview capture, with bounded reopen attempts.
 - Windows camera selection accepts Chromium's trailing USB model identifier
   when it unambiguously matches the Media Foundation friendly name. Manual
   diagnostics retain the native-open failure reason when mirror fallback is

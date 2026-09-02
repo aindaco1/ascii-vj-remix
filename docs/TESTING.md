@@ -160,10 +160,13 @@ For Camera Pop Out, verify the resolved output mode as well as visible motion.
 macOS, Windows, and Linux should select `native-camera` for one camera. Multiple
 cameras should select `mirror`; Windows/Linux should also retry mirror when
 native preflight cannot produce a frame. On physical Windows, confirm the
-camera image advances in both the main and Pop Out windows. On Linux, confirm
-native Pop Out advances while the exclusive WebView preview is paused and that
-the preview is reacquired after close. Capture a manual report from the existing
-Reports dialog; a local policy simulation does not replace device acceptance.
+camera image advances in both the main and Pop Out windows when
+`sharedCameraActive` is true. If the driver forces `exclusiveCameraActive`,
+confirm the preview pauses only for the session and is reacquired after close.
+On Linux, confirm native Pop Out advances while the exclusive WebView preview
+is paused and that the preview is reacquired after close. Capture a manual
+report from the existing Reports dialog; a local policy simulation does not
+replace device acceptance.
 
 On Windows and Linux, also keep Pop Out open while switching repeatedly between
 Demo Image, Demo Video, and Camera. Each mode change must finish the previous
@@ -360,10 +363,12 @@ Use this after user-facing renderer, source, audio, or output changes:
 17. Close Pop Out and confirm CPU/GPU usage settles.
 18. With one camera selected on Windows, capture a manual diagnostic while Pop
     Out is open and confirm `cameraFallbackActive` is false. Confirm live output
-    remains smooth while changing presets and FPS. The main preview may pause
-    while Media Foundation owns the camera and must restore after close. If
-    fallback activates, confirm `nativeOutputAdapter.nativeCameraFailureReason`
-    explains why and the preview is reacquired.
+    remains smooth while changing presets and FPS. With `sharedCameraActive`,
+    confirm the main preview advances at the same time. If the driver reports
+    `exclusiveCameraActive`, confirm the main preview restores after close and
+    `previewRestoreSucceeded` increases. If mirror fallback activates, confirm
+    `nativeOutputAdapter.nativeCameraFailureReason` explains why and the preview
+    is reacquired.
 19. Repeat the single-camera test on Ubuntu with AppImage/deb and Fedora with
     rpm. The main camera preview may pause while V4L2 is owned by native Pop
     Out; confirm it restores after close. If fallback activates, confirm the

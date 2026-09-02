@@ -84,6 +84,21 @@ function nativeCameraOutputMode(params, capabilities = {}, tauri = false) {
     return capabilities?.nativeCamera === true ? 'native-camera' : 'mirror';
 }
 
+function nativeCameraOwnershipPolicy(params, capabilities = {}, tauri = false) {
+    const outputMode = nativeCameraOutputMode(params, capabilities, tauri);
+    const nativeCamera = outputMode === 'native-camera';
+    const releaseBeforeOpen = Boolean(nativeCamera && capabilities?.nativeCameraExclusive);
+    return {
+        outputMode,
+        releaseBeforeOpen,
+        retryExclusive: Boolean(
+            nativeCamera
+            && !releaseBeforeOpen
+            && capabilities?.nativeCameraExclusiveFallback
+        )
+    };
+}
+
 const NATIVE_MIRROR_MAX_WIDTH = 640;
 const NATIVE_MIRROR_MAX_HEIGHT = 360;
 const NATIVE_MIRROR_MAX_FPS = 30;
@@ -111,6 +126,7 @@ export {
     monitorId,
     monitorLabel,
     monitorLogicalRect,
+    nativeCameraOwnershipPolicy,
     nativeCameraOutputMode,
     nativeMirrorFrameSize,
     nativeMirrorTargetFps,

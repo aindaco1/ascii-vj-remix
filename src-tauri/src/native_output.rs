@@ -50,6 +50,7 @@ const NATIVE_CAMERA_SOURCE_KEY: &str = "native-camera";
 pub struct NativeOutputCapabilities {
     pub native_camera: bool,
     pub native_camera_exclusive: bool,
+    pub native_camera_exclusive_fallback: bool,
     pub native_camera_mirror_fallback: bool,
     pub mirror: bool,
 }
@@ -62,7 +63,8 @@ pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
             target_os = "windows",
             target_os = "linux"
         )),
-        native_camera_exclusive: cfg!(any(target_os = "windows", target_os = "linux")),
+        native_camera_exclusive: cfg!(target_os = "linux"),
+        native_camera_exclusive_fallback: cfg!(target_os = "windows"),
         native_camera_mirror_fallback: cfg!(any(target_os = "windows", target_os = "linux")),
         mirror: true,
     }
@@ -2841,8 +2843,10 @@ fn install_close_watcher(
         }
         WindowEvent::Destroyed => {
             stop.store(true, Ordering::Relaxed);
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
+                // Do not tell the WebView to reacquire an exclusive camera until
+                // the platform worker has dropped Media Foundation/FFmpeg state.
                 let handle = state_inner.lock().ok().and_then(|mut inner| {
                     let active = inner
                         .handle
@@ -2859,7 +2863,7 @@ fn install_close_watcher(
                     });
                 }
             }
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
             {
                 let active_generation = state_inner
                     .lock()
@@ -4853,7 +4857,11 @@ mod tests {
         );
         assert_eq!(
             capabilities.native_camera_exclusive,
-            cfg!(any(target_os = "windows", target_os = "linux"))
+            cfg!(target_os = "linux")
+        );
+        assert_eq!(
+            capabilities.native_camera_exclusive_fallback,
+            cfg!(target_os = "windows")
         );
         assert_eq!(
             capabilities.native_camera_mirror_fallback,

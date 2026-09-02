@@ -5,6 +5,7 @@ import {
   monitorId,
   monitorLabel,
   monitorLogicalRect,
+  nativeCameraOwnershipPolicy,
   nativeCameraOutputMode,
   nativeMirrorFrameSize,
   nativeMirrorTargetFps,
@@ -117,6 +118,33 @@ assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: false, mirror:
 assert.equal(nativeCameraOutputMode(cameraParams, {}, true), 'mirror');
 assert.equal(nativeCameraOutputMode(cameraParams, { nativeCamera: true }, false), null);
 assert.equal(nativeCameraOutputMode({ sourceMode: 'static', mediaType: 'video' }, { nativeCamera: true }, true), null);
+assert.deepEqual(nativeCameraOwnershipPolicy(cameraParams, {
+  nativeCamera: true,
+  nativeCameraExclusive: false,
+  nativeCameraExclusiveFallback: true
+}, true), {
+  outputMode: 'native-camera',
+  releaseBeforeOpen: false,
+  retryExclusive: true
+});
+assert.deepEqual(nativeCameraOwnershipPolicy(cameraParams, {
+  nativeCamera: true,
+  nativeCameraExclusive: true,
+  nativeCameraExclusiveFallback: false
+}, true), {
+  outputMode: 'native-camera',
+  releaseBeforeOpen: true,
+  retryExclusive: false
+});
+assert.deepEqual(nativeCameraOwnershipPolicy(cameraParams, {
+  nativeCamera: true,
+  nativeCameraExclusive: false,
+  nativeCameraExclusiveFallback: false
+}, true), {
+  outputMode: 'native-camera',
+  releaseBeforeOpen: false,
+  retryExclusive: false
+});
 
 assert.equal(nativeMirrorTargetFps(60), 15);
 assert.equal(nativeMirrorTargetFps(60, true), 30);

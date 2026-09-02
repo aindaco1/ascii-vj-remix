@@ -110,11 +110,13 @@ Linux: bundled FFmpeg V4L2 input
   -> native output renderer
 ```
 
-These paths avoid WebView canvas readback and per-frame Tauri IPC. Linux pauses
-the main WebView camera preview while an exclusive V4L2 device is owned by
-native Pop Out, then reacquires it on close. Windows/Linux preflight one frame
-before showing native output and retry through the bounded mirror if native
-device opening fails.
+These paths avoid WebView canvas readback and per-frame Tauri IPC. Windows
+prefers concurrent WebView and Media Foundation capture so both views remain
+live; a driver that rejects sharing is retried with exclusive native ownership.
+Linux pauses the main WebView camera preview while an exclusive V4L2 device is
+owned by native Pop Out, then reacquires it on close. Windows/Linux preflight
+one frame before showing native output and retry through the bounded mirror if
+native device opening fails.
 
 ### Audio
 
@@ -580,8 +582,11 @@ Native output design rules:
   handle loss during normal close/replacement is recoverable teardown, not a
   process panic or crash-report event.
 - Windows/Linux native camera capture must produce a preflight frame before the
-  output window opens. Both platforms restore the WebView camera before mirror
-  fallback or after an exclusive native session closes. Windows matches the
+  output window opens. Windows attempts concurrent WebView/Media Foundation
+  capture first, then retries exclusively if the driver rejects sharing. Both
+  platforms restore the WebView camera before mirror fallback or after an
+  exclusive native session closes, and Windows emits its close event only after
+  the Media Foundation worker has released the device. Windows matches the
   optional Chromium USB model suffix only when the Media Foundation friendly
   name match is unambiguous.
 - primary renderer behavior must not regress when Pop Out is open.
