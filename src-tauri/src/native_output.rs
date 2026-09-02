@@ -1441,11 +1441,11 @@ async fn start_or_update_native_camera_output(
     }
 
     #[cfg(not(target_os = "macos"))]
-    let (initial_reader, initial_frame) = {
+    let initial_frame = {
         let binaries = media_binaries_for_app(app);
         let output_fps = native_camera_source_fps(&source);
-        match prepare_camera_frame_reader(&binaries, &source, output_fps) {
-            Ok(prepared) => prepared,
+        match probe_camera_initial_frame(&binaries, &source, output_fps) {
+            Ok(frame) => frame,
             Err(error) => {
                 eprintln!(
                     "[NativeOutputCamera] native open failed; mirror fallback required: {error}"
@@ -1493,7 +1493,6 @@ async fn start_or_update_native_camera_output(
         app.clone(),
         window.clone(),
         source.clone(),
-        initial_reader,
         initial_frame,
         params_arc.clone(),
         transition.clone(),
@@ -3839,7 +3838,6 @@ fn spawn_camera_render_thread(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
-    initial_reader: CameraFrameReader,
     initial_frame: DecodedRgbFrame,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
@@ -3851,7 +3849,6 @@ fn spawn_camera_render_thread(
             app,
             window,
             source,
-            initial_reader,
             initial_frame,
             params,
             transition,
@@ -3871,7 +3868,6 @@ fn run_camera_render_loop(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
-    mut reader: CameraFrameReader,
     initial_frame: DecodedRgbFrame,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
@@ -3879,6 +3875,10 @@ fn run_camera_render_loop(
 ) -> Result<(), String> {
     let binaries = media_binaries_for_app(&app);
     let source_fps = native_camera_source_fps(&source);
+    // Platform camera handles must be created, used, and dropped on this
+    // worker. In particular, Windows Media Foundation interfaces are tied to
+    // the COM apartment that initialized them and are intentionally not Send.
+    let mut reader = open_camera_frame_reader(&binaries, &source, source_fps)?;
     let mut gpu_presenter = match gpu::NativeGpuPresenter::new(&window) {
         Ok(presenter) => Some(presenter),
         Err(error) => {
@@ -4290,16 +4290,37 @@ fn open_camera_frame_reader(
 }
 
 #[cfg(not(target_os = "macos"))]
-fn prepare_camera_frame_reader(
+fn probe_camera_initial_frame(
     binaries: &FfmpegBinaries,
     source: &NativeCameraSource,
     output_fps: f64,
-) -> Result<(CameraFrameReader, DecodedRgbFrame), String> {
+) -> Result<DecodedRgbFrame, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let binaries = binaries.clone();
+        let source = source.clone();
+        return std::thread::spawn(move || {
+            probe_camera_initial_frame_on_current_thread(&binaries, &source, output_fps)
+        })
+        .join()
+        .map_err(|_| "Windows camera probe thread panicked".to_string())?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    probe_camera_initial_frame_on_current_thread(binaries, source, output_fps)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn probe_camera_initial_frame_on_current_thread(
+    binaries: &FfmpegBinaries,
+    source: &NativeCameraSource,
+    output_fps: f64,
+) -> Result<DecodedRgbFrame, String> {
     let mut reader = open_camera_frame_reader(binaries, source, output_fps)?;
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
         match reader.read_frame()? {
-            CameraFrameRead::Frame(frame) => return Ok((reader, frame)),
+            CameraFrameRead::Frame(frame) => return Ok(frame),
             CameraFrameRead::Pending if Instant::now() < deadline => {
                 std::thread::sleep(Duration::from_millis(8));
             }
