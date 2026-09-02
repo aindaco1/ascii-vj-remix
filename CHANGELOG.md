@@ -13,14 +13,19 @@
   input device to be present before release artifacts are accepted.
 - Added bounded mirror timing, throughput, and accepted-FPS diagnostics to
   manual reports so physical-machine fallback behavior is measurable.
+- Added a Windows-only native camera preview bridge for devices that reject two
+  camera clients. One Media Foundation owner now supplies the native Pop Out
+  and a latest-frame, binary JPEG preview capped at 640x360 and 30 FPS for the
+  existing WebGPU main renderer.
 
 ### Changed
 
 - Windows first opens Media Foundation alongside the WebView camera so the
   main preview and native Pop Out stay live without per-frame IPC. Drivers that
-  reject concurrent clients retry with exclusive native ownership; Linux keeps
-  its exclusive V4L2 flow. Exclusive sessions now finish native worker shutdown
-  before the app retries preview capture, with bounded reopen attempts.
+  reject concurrent clients retry with exclusive native ownership and keep the
+  main preview live through the native preview bridge; Linux keeps its
+  exclusive V4L2 flow. Exclusive sessions now finish native worker shutdown
+  before the app retries browser capture, with bounded reopen attempts.
 - Windows camera selection accepts Chromium's trailing USB model identifier
   when it unambiguously matches the Media Foundation friendly name. Manual
   diagnostics retain the native-open failure reason when mirror fallback is
@@ -30,6 +35,8 @@
   previous dimensions and 15 FPS cap.
 - Manual diagnostics now preserve their reviewed report kind/surface through
   the relay and include native-output runtime state in generated GitHub issues.
+  Windows reports retain the failed shared-open reason and the preview bridge's
+  accepted FPS, encoded throughput, read, encode, and decode timings.
 
 ### Preserved
 

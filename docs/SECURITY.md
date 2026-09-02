@@ -33,7 +33,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly without broad filesystem access. |
 | Built-in demo media | Bundled under `media/` and copied into app assets | Low | Demo media is local and versioned. |
 | Built-in palettes/glyph atlas | Project-owned palette catalog plus pinned, generated, locally bundled glyph pages | Low | No runtime palette pack, font, CDN, or language-resource import/download. |
-| Camera input | Browser `getUserMedia`; native AVFoundation, Media Foundation, or bundled-FFmpeg V4L2 path for single-camera Pop Out | Medium | Requires OS privacy permission. Frames stay local. Windows prefers concurrent WebView/native capture and releases the WebView camera only for an exclusive-driver fallback; Linux releases it for exclusive V4L2 capture. |
+| Camera input | Browser `getUserMedia`; native AVFoundation, Media Foundation, or bundled-FFmpeg V4L2 path for single-camera Pop Out | Medium | Requires OS privacy permission. Frames stay local. Windows prefers concurrent WebView/native capture and uses an in-memory binary preview bridge when a driver requires exclusive native ownership; Linux releases the WebView camera for exclusive V4L2 capture. |
 | Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
 | Presets/settings | Local browser storage, IndexedDB, imported/exported JSON | Low to Medium | User-authored data. Validate imports before applying. |
@@ -231,7 +231,11 @@ new remote endpoint or persist camera frames. Manual diagnostics may contain
 bounded device-independent timing and fallback counters, never frame bytes.
 Windows may hold a WebView and Media Foundation client concurrently when the
 camera driver supports sharing; this remains two local OS capture clients and
-does not send camera pixels through a network or persistent store.
+does not send camera pixels through a network or persistent store. If the
+driver requires exclusive ownership, the native worker exposes only its latest
+downscaled JPEG through a binary command response to the main WebView. The
+frame is drawn in memory, is not logged or persisted, and is replaced by the
+next frame.
 
 Current macOS bundle identifier:
 

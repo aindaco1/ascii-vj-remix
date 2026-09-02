@@ -162,7 +162,8 @@ cameras should select `mirror`; Windows/Linux should also retry mirror when
 native preflight cannot produce a frame. On physical Windows, confirm the
 camera image advances in both the main and Pop Out windows when
 `sharedCameraActive` is true. If the driver forces `exclusiveCameraActive`,
-confirm the preview pauses only for the session and is reacquired after close.
+confirm `nativeOutputPreview.transport` is `binary-jpeg`, both views advance,
+and the browser camera is reacquired after close without changing sources.
 On Linux, confirm native Pop Out advances while the exclusive WebView preview
 is paused and that the preview is reacquired after close. Capture a manual
 report from the existing Reports dialog; a local policy simulation does not
@@ -365,8 +366,9 @@ Use this after user-facing renderer, source, audio, or output changes:
     Out is open and confirm `cameraFallbackActive` is false. Confirm live output
     remains smooth while changing presets and FPS. With `sharedCameraActive`,
     confirm the main preview advances at the same time. If the driver reports
-    `exclusiveCameraActive`, confirm the main preview restores after close and
-    `previewRestoreSucceeded` increases. If mirror fallback activates, confirm
+    `exclusiveCameraActive`, confirm the main preview still advances through
+    `nativeOutputPreview`, its accepted FPS is nonzero, and the normal camera
+    preview restores after close with `previewRestoreSucceeded` increasing. If mirror fallback activates, confirm
     `nativeOutputAdapter.nativeCameraFailureReason` explains why and the preview
     is reacquired.
 19. Repeat the single-camera test on Ubuntu with AppImage/deb and Fedora with

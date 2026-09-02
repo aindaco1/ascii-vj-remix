@@ -311,8 +311,11 @@ Rules:
   clients: WebView2 for the primary renderer and Media Foundation for native
   Pop Out. This adds the driver's concurrent capture/conversion cost but no
   JavaScript readback, encoding, or per-frame IPC. Drivers that cannot share
-  retry the native path exclusively instead of degrading immediately to the
-  expensive mirror transport.
+  retry with one native owner. Its latest frame is downscaled to at most
+  640x360, JPEG-encoded at most 30 times per second, and returned as binary IPC
+  for the existing WebGPU preview. This bounded source bridge avoids the old
+  raw-RGBA JSON serialization path; diagnostics expose accepted FPS, encoded
+  KiB/s, and read/encode/decode latency.
 - For multi-camera, be explicit about the mixing cost and the selected layout.
 
 ### Audio Reactivity

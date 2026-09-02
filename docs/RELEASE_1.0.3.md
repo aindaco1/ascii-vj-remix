@@ -13,6 +13,9 @@ separate.
 - Preserve the existing macOS AVFoundation/display-link implementation.
 - Retain bounded mirror fallback for native-open failures and multiple cameras,
   with measurable accepted-FPS, readback, send, and throughput diagnostics.
+- Keep the Windows main preview live when a driver rejects concurrent clients
+  by feeding the existing WebGPU renderer from the exclusive native owner's
+  bounded binary JPEG preview bridge.
 
 ## Acceptance Contract
 
@@ -34,14 +37,14 @@ separate.
 For each row, select exactly one camera, open Pop Out, change several presets,
 change FPS, leave the output running for at least two minutes, close it, and
 confirm camera preview recovery. Windows should keep both views live when its
-camera driver accepts concurrent capture; the main preview may pause only when
-`exclusiveCameraActive` reports the driver fallback. Linux may pause while
+camera driver accepts concurrent capture or when `exclusiveCameraActive` uses
+the native preview bridge. Linux may pause while
 native output owns the camera. Capture one manual diagnostic while Pop Out is
 open.
 
 | Platform | Candidate artifact | Required observation |
 | --- | --- | --- |
-| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; `sharedCameraActive` is true when the driver permits it, otherwise exclusive close restores the preview; no blank output or crash report. |
+| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; both views advance with either shared capture or the `binary-jpeg` exclusive preview bridge; close restores normal browser capture; no blank output or crash report. |
 | Ubuntu x86_64 | Dev AppImage or deb | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | Fedora x86_64 | Dev rpm or AppImage | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | macOS Apple Silicon | Local candidate smoke | Existing AVFoundation Pop Out behavior remains unchanged. |

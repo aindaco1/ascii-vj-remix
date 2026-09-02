@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   browserScreenPlacement,
+  decodeNativeCameraPreviewPacket,
   displayPreferenceIndex,
   monitorId,
   monitorLabel,
@@ -158,5 +159,26 @@ assert.deepEqual(nativeMirrorFrameSize(1920, 1080, true), { width: 640, height: 
 assert.deepEqual(nativeMirrorFrameSize(1280, 960, true), { width: 480, height: 360 });
 assert.deepEqual(nativeMirrorFrameSize(320, 240), { width: 320, height: 240 });
 assert.deepEqual(nativeMirrorFrameSize(0, 1080), { width: 0, height: 0 });
+
+const previewPacket = new Uint8Array(36);
+previewPacket.set([0x41, 0x56, 0x50, 0x31]);
+const previewView = new DataView(previewPacket.buffer);
+previewView.setBigUint64(4, 9n, true);
+previewView.setUint32(12, 640, true);
+previewView.setUint32(16, 360, true);
+previewView.setUint32(20, 1280, true);
+previewView.setUint32(24, 720, true);
+previewView.setUint32(28, 4250, true);
+previewPacket.set([0xff, 0xd8, 0xff, 0xd9], 32);
+const decodedPreview = decodeNativeCameraPreviewPacket(previewPacket);
+assert.equal(decodedPreview.version, 9);
+assert.equal(decodedPreview.width, 640);
+assert.equal(decodedPreview.height, 360);
+assert.equal(decodedPreview.sourceWidth, 1280);
+assert.equal(decodedPreview.sourceHeight, 720);
+assert.equal(decodedPreview.encodeMs, 4.25);
+assert.deepEqual([...decodedPreview.jpeg], [0xff, 0xd8, 0xff, 0xd9]);
+assert.equal(decodeNativeCameraPreviewPacket(new Uint8Array()), null);
+assert.throws(() => decodeNativeCameraPreviewPacket(new Uint8Array(12)), /short/);
 
 console.log('Output display placement simulation passed.');

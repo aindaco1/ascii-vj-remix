@@ -254,6 +254,11 @@ async function readTauriRawVideoFrames(sessionId, maxFrames = 1) {
     return invokeTauri('read_raw_video_frames', { sessionId, maxFrames });
 }
 
+async function readTauriNativeOutputPreviewFrame(afterVersion = 0) {
+    if (!isTauriRuntime()) return null;
+    return invokeTauri('read_native_output_preview_frame', { afterVersion });
+}
+
 async function stopTauriRawVideoSession(sessionId) {
     if (!isTauriRuntime() || !sessionId) return false;
     return invokeTauri('stop_raw_video_session', { sessionId });
@@ -530,7 +535,9 @@ async function watchNativeOutputClosed(onClosed) {
 async function openNativeSurfaceOutput(payload, options = {}) {
     if (!isTauriRuntime() || options.show === false) return false;
     const nativeCameraAttempt = payload?.outputMode === 'native-camera';
-    if (nativeCameraAttempt) nativeCameraFailureReason = '';
+    if (nativeCameraAttempt && options.preserveCameraFailureReason !== true) {
+        nativeCameraFailureReason = '';
+    }
     try {
         const params = payload?.params || {};
         await recordTauriMediaDiagnostic(
@@ -661,6 +668,7 @@ export {
     readTauriMidiEvents,
     readTauriMediaSessionFrame,
     readTauriMediaSessionFrames,
+    readTauriNativeOutputPreviewFrame,
     readTauriRawVideoFrames,
     readTauriSystemAudioFeatures,
     recordTauriMediaDiagnostic,

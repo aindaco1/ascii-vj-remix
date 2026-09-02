@@ -286,8 +286,11 @@ Notes:
   native renderer when available, with the existing bounded mirror as a
   device/driver fallback. It first shares the camera with the WebView so both
   the main preview and Pop Out remain live without per-frame IPC. Drivers that
-  reject concurrent capture retry with exclusive native ownership; the preview
-  is restored after the native worker fully releases the camera.
+  reject concurrent capture retry with one exclusive native owner. That owner
+  also supplies a downscaled, latest-frame binary JPEG feed to the existing
+  WebGPU main renderer, avoiding camera contention and raw-RGBA serialization.
+  Browser camera capture is restored after the native worker fully releases the
+  device.
 - Native WASAPI system-audio loopback is not implemented. Current system/display
   audio behavior depends on the capture path exposed by the runtime; verify it
   on the target machine before a live session.
