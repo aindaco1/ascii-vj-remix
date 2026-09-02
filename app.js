@@ -8415,21 +8415,30 @@ button:hover{background:#202a35}
 
     async _openNativeOutputWindow() {
         if (!this._canUseNativeOutputWindow()) return false;
-        let exclusiveCameraReleased = false;
+        const outputAlreadyActive = this.nativeOutputActive;
+        const previousCameraFallbackActive = this.nativeOutputCameraFallbackActive;
+        const previousExclusiveCameraActive = this.nativeOutputExclusiveCameraActive;
+        const previousSharedCameraAttempted = this.nativeOutputSharedCameraAttempted;
+        const previousSharedCameraActive = this.nativeOutputSharedCameraActive;
+        let exclusiveCameraReleased = Boolean(
+            outputAlreadyActive && previousExclusiveCameraActive
+        );
         try {
             this.nativeOutputCameraRestoreToken++;
             this.nativeOutputCameraRestorePending = false;
-            this.nativeOutputCameraFallbackActive = false;
-            this.nativeOutputExclusiveCameraActive = false;
-            this.nativeOutputSharedCameraAttempted = false;
-            this.nativeOutputSharedCameraActive = false;
+            if (!outputAlreadyActive) {
+                this.nativeOutputCameraFallbackActive = false;
+                this.nativeOutputExclusiveCameraActive = false;
+                this.nativeOutputSharedCameraAttempted = false;
+                this.nativeOutputSharedCameraActive = false;
+            }
             const payload = this._nativeOutputPayload();
             const cameraOwnership = nativeCameraOwnershipPolicy(
                 this.params,
                 this.nativeOutputCapabilities,
                 true
             );
-            if (cameraOwnership.releaseBeforeOpen) {
+            if (!outputAlreadyActive && cameraOwnership.releaseBeforeOpen) {
                 this._stopCameraStream({ render: false });
                 exclusiveCameraReleased = true;
             }
@@ -8452,7 +8461,7 @@ button:hover{background:#202a35}
                 }
             };
             let opened = false;
-            if (cameraOwnership.retryExclusive) {
+            if (!outputAlreadyActive && cameraOwnership.retryExclusive) {
                 this.nativeOutputSharedCameraAttempted = true;
                 opened = await openTauriOutputWindow(payload, {
                     ...openOptions,
@@ -8466,18 +8475,25 @@ button:hover{background:#202a35}
             }
             if (!opened) opened = await openTauriOutputWindow(payload, openOptions);
             this.nativeOutputActive = Boolean(opened);
-            this.nativeOutputCameraFallbackActive = Boolean(
-                opened && isCameraParams(this.params) && payload.outputMode === 'mirror'
-            );
-            this.nativeOutputExclusiveCameraActive = Boolean(
-                opened && exclusiveCameraReleased && payload.outputMode === 'native-camera'
-            );
-            this.nativeOutputSharedCameraActive = Boolean(
-                opened
-                && this.nativeOutputSharedCameraAttempted
-                && !exclusiveCameraReleased
-                && payload.outputMode === 'native-camera'
-            );
+            if (outputAlreadyActive && opened) {
+                this.nativeOutputCameraFallbackActive = previousCameraFallbackActive;
+                this.nativeOutputExclusiveCameraActive = previousExclusiveCameraActive;
+                this.nativeOutputSharedCameraAttempted = previousSharedCameraAttempted;
+                this.nativeOutputSharedCameraActive = previousSharedCameraActive;
+            } else {
+                this.nativeOutputCameraFallbackActive = Boolean(
+                    opened && isCameraParams(this.params) && payload.outputMode === 'mirror'
+                );
+                this.nativeOutputExclusiveCameraActive = Boolean(
+                    opened && exclusiveCameraReleased && payload.outputMode === 'native-camera'
+                );
+                this.nativeOutputSharedCameraActive = Boolean(
+                    opened
+                    && this.nativeOutputSharedCameraAttempted
+                    && !exclusiveCameraReleased
+                    && payload.outputMode === 'native-camera'
+                );
+            }
             if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror') {
                 await this._restoreCameraPreviewAfterNativeOutput();
             }
