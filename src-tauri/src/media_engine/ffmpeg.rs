@@ -580,13 +580,30 @@ fn ffmpeg_windows_camera_decode_args(
 fn windows_camera_input_name(device_label: Option<&str>) -> Option<String> {
     device_label
         .map(|label| {
-            label
+            without_chromium_usb_model_suffix(label)
                 .trim()
                 .chars()
                 .filter(|ch| !ch.is_control() && *ch != '"')
                 .collect::<String>()
         })
         .filter(|label| !label.is_empty() && label != "Selected camera" && label != "Camera 1")
+        // DirectShow parses colon-separated av_get_token values even though
+        // Command bypasses the shell. Escape its grammar, not shell syntax.
+        .map(|label| label.chars().flat_map(|ch| {
+            if matches!(ch, ':' | '\'' | '\\') { vec!['\\', ch] } else { vec![ch] }
+        }).collect())
+}
+
+#[cfg(any(target_os = "windows", test))]
+pub(crate) fn without_chromium_usb_model_suffix(value: &str) -> &str {
+    let trimmed = value.trim();
+    let Some(start) = trimmed.rfind(" (") else { return trimmed; };
+    if !trimmed.ends_with(')') { return trimmed; }
+    let bytes = trimmed[start + 2..trimmed.len() - 1].as_bytes();
+    if bytes.len() == 9 && bytes[4] == b':' && bytes.iter().enumerate()
+        .all(|(index, byte)| index == 4 || byte.is_ascii_hexdigit()) {
+        trimmed[..start].trim_end()
+    } else { trimmed }
 }
 
 #[cfg(any(target_os = "linux", test))]
@@ -940,6 +957,8 @@ mod tests {
         assert!(
             ffmpeg_windows_camera_decode_args(&config, &CameraReaderOptions::default()).is_err()
         );
+        assert_eq!(windows_camera_input_name(Some("Webcam (1bcf:2cb4)")), Some("Webcam".to_string()));
+        assert_eq!(windows_camera_input_name(Some("Capture: HDMI")), Some("Capture\\: HDMI".to_string()));
     }
 
     #[test]

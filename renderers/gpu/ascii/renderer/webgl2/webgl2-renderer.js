@@ -11,6 +11,7 @@ import {
     buildPaletteLut,
     paletteById
 } from '../../../../shared/palettes.js';
+import { syncNativePreviewGeometry } from '../../../../shared/native-preview-geometry.js';
 import {
     GLYPH_ATLAS_MIP_LEVEL_COUNT,
     GLYPH_ATLAS_PAGE_COUNT,
@@ -472,6 +473,10 @@ export class WebGL2Renderer {
         this.canvas.style.imageRendering = 'pixelated';
     }
 
+    syncNativePreviewGeometry(params = this.nativePreviewParams) {
+        syncNativePreviewGeometry(this, params);
+    }
+
     _createCellTexture() {
         const gl = this.gl;
         if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
@@ -591,6 +596,7 @@ export class WebGL2Renderer {
 
     _renderFrame() {
         if (!this.initialized) return;
+        if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
         this.frameCount++;
         const gl = this.gl;

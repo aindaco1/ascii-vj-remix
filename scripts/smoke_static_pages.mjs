@@ -126,7 +126,8 @@ async function runSmoke() {
     const browser = await chromium.launch({
       headless: true,
       executablePath,
-      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+        ...(process.env.SMOKE_REQUIRE_WEBGPU === '1' ? ['--enable-unsafe-webgpu'] : [])]
     });
     const errors = [];
 
@@ -1410,8 +1411,14 @@ async function runSmoke() {
               gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
               glError = gl.getError();
             } else {
-              pixels = canvas.getContext('2d', { willReadFrequently: true })
-                ?.getImageData(0, 0, canvas.width, canvas.height).data || null;
+              // WebGPU canvases cannot also create a 2D context. Snapshot the
+              // rendered surface, as the application's screenshot path does.
+              const readback = document.createElement('canvas');
+              readback.width = canvas.width;
+              readback.height = canvas.height;
+              const ctx = readback.getContext('2d', { willReadFrequently: true });
+              ctx.drawImage(canvas, 0, 0);
+              pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             }
           }
 
@@ -1467,6 +1474,57 @@ async function runSmoke() {
       })}`);
     }
 
+    // Feed the real renderer a synthetic native-preview canvas. Camera hardware
+    // remains a separate acceptance gate, but texture/viewport resize is testable.
+    const nativePreviewGeometry = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      app.audioReactiveRuntime?.stop?.();
+      app.stop();
+      const canvas = document.createElement('canvas');
+      const source = { canvas, element: canvas, isVideo: true, isNativeOutputPreview: true,
+        type: 'camera', ready: true, destroy() {}, updateParams() {} };
+      const resize = (width, height) => {
+        source.width = canvas.width = width;
+        source.height = canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ff8844'; ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#44bbff'; ctx.fillRect(width / 2, 0, width / 2, height);
+      };
+      resize(480, 360);
+      app.loadStaticSource = async () => source;
+      app.params = { ...app.params, sourceMode: 'static', mediaType: 'camera', mediaUrl: 'camera:',
+        backend: 'auto', cols: 620, autoRows: true, cellWidth: 1, cellHeight: 2, aspectCorrection: 1,
+        solidMode: true, glyphMode: false, pixel: false, paletteId: '', ditherMode: 'none' };
+      await app.start();
+      const results = [];
+      for (const [width, height, cols, cellWidth, cellHeight] of [
+        [480, 360, 620, 1, 2], [640, 360, 620, 1, 2], [640, 360, 520, 2, 3], [480, 360, 520, 2, 3]
+      ]) {
+        resize(width, height);
+        app.params = { ...app.params, cols, cellWidth, cellHeight };
+        app.staticRuntime.updateParams(app.params);
+        const renderer = app.staticRuntime.renderer;
+        renderer.renderFrame();
+        await renderer.device?.queue?.onSubmittedWorkDone?.();
+        renderer.renderFrame();
+        const sample = document.createElement('canvas'); sample.width = 16; sample.height = 16;
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(renderer.canvas, 0, 0, 16, 16);
+        const pixels = ctx.getImageData(0, 0, 16, 16).data;
+        const right = [...pixels].filter((_, i) => (Math.floor(i / 4) % 16) >= 12 && i % 4 < 3);
+        const rightMax = Math.max(...right);
+        const aspectError = Math.abs((renderer.canvas.width / renderer.canvas.height) / (width / height) - 1);
+        if (rightMax < 25 || aspectError > 0.01) throw new Error(`Native preview geometry failed: ${JSON.stringify({ width, height, cols, rightMax, aspectError })}`);
+        results.push({ backend: renderer.getStats().backend, source: `${width}x${height}`,
+          canvas: `${renderer.canvas.width}x${renderer.canvas.height}`, rightMax, aspectError });
+      }
+      return results;
+    });
+
+    if (process.env.SMOKE_REQUIRE_WEBGPU === '1' && nativePreviewGeometry.some((row) => row.backend !== 'webgpu')) {
+      throw new Error(`WebGPU preview was required: ${JSON.stringify(nativePreviewGeometry)}`);
+    }
+    if (process.env.SMOKE_SCREENSHOT_PATH) await page.screenshot({ path: process.env.SMOKE_SCREENSHOT_PATH });
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     output.on('console', (msg) => { if (msg.type() === 'error') errors.push(`output:${msg.text()}`); });
     const outputResponse = await output.goto(`${baseUrl}/output.html`, { waitUntil: 'domcontentloaded' });
@@ -1578,6 +1636,7 @@ async function runSmoke() {
       main,
       output: outputState,
       mirrorOutput: mirrorState,
+      nativePreviewGeometry,
       errors
     };
     console.log(JSON.stringify(result, null, 2));

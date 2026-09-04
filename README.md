@@ -284,13 +284,12 @@ Notes:
   reports that WebView2 is missing, install the Microsoft WebView2 Runtime once.
 - Single-camera Pop Out uses Windows Media Foundation capture and the D3D12
   native renderer when available, with the existing bounded mirror as a
-  device/driver fallback. It first shares the camera with the WebView so both
-  the main preview and Pop Out remain live without per-frame IPC. Drivers that
-  reject concurrent capture retry with one exclusive native owner. That owner
+  device/driver fallback. One native owner captures for both views, avoiding
+  failed concurrent-open probes and device reacquisition on preset changes. It
   also supplies a downscaled, latest-frame binary JPEG feed to the existing
   WebGPU main renderer, avoiding camera contention and raw-RGBA serialization.
   Browser camera capture is restored after the native worker fully releases the
-  device.
+  device. Source switches settle ownership before starting the next preview.
 - Native WASAPI system-audio loopback is not implemented. Current system/display
   audio behavior depends on the capture path exposed by the runtime; verify it
   on the target machine before a live session.

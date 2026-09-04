@@ -111,14 +111,15 @@ Linux: bundled FFmpeg V4L2 input
 ```
 
 Native Pop Out presentation avoids WebView canvas readback and per-frame Tauri
-IPC. Windows prefers concurrent WebView and Media Foundation capture so both views remain
-live. A driver that rejects sharing is retried with one exclusive native owner;
+IPC. Windows uses one exclusive native owner for both views;
 its latest camera frame is downscaled, JPEG-encoded, and returned through a
 binary Tauri response to a canvas consumed by the existing WebGPU preview.
 Linux pauses the main WebView camera preview while an exclusive V4L2 device is
 owned by native Pop Out, then reacquires it on close. Windows/Linux preflight
 one frame before showing native output and retry through the bounded mirror if
-native device opening fails.
+native device opening fails. Windows keeps the preflight capture alive instead
+of opening the same device twice. Its asynchronous Media Foundation callback
+feeds a latest-frame slot independently of GPU rendering and preview reads.
 
 ### Audio
 
@@ -568,6 +569,8 @@ The frontend resolves the selected catalog entry into a bounded base
 `charsetRamp`; Rust validates supported scalars and applies depth, offset, and
 reverse once to create a maximum 96-id ramp. Required 1024px R8 atlas pages are
 decoded/uploaded lazily and retained in the presenter's fixed 16-layer texture.
+Windows also uploads the four max-coverage mip levels used by the browser's
+tiny-cell glyph path. macOS and Linux retain their existing base-page sampling.
 `fontFamily` remains preview/control-surface metadata; native output never loads
 arbitrary system or user fonts.
 
@@ -584,8 +587,7 @@ Native output design rules:
   handle loss during normal close/replacement is recoverable teardown, not a
   process panic or crash-report event.
 - Windows/Linux native camera capture must produce a preflight frame before the
-  output window opens. Windows attempts concurrent WebView/Media Foundation
-  capture first, then retries exclusively if the driver rejects sharing. Both
+  output window opens. Windows retains that capture as the sole owner. Both
   platforms restore the WebView camera before mirror fallback or after an
   exclusive native session closes. During a Windows exclusive session, a
   bounded latest-frame binary JPEG bridge keeps the main WebGPU preview live;

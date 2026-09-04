@@ -1,4 +1,6 @@
 use super::{DecodedRgbFrame, NativeCameraSource};
+#[cfg(any(target_os = "windows", test))]
+use crate::media_engine::ffmpeg::without_chromium_usb_model_suffix;
 
 #[cfg(any(target_os = "windows", test))]
 fn normalized_camera_label(value: &str) -> String {
@@ -7,30 +9,6 @@ fn normalized_camera_label(value: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
         .to_lowercase()
-}
-
-#[cfg(any(target_os = "windows", test))]
-fn without_chromium_usb_model_suffix(value: &str) -> &str {
-    let trimmed = value.trim();
-    let Some(suffix_start) = trimmed.rfind(" (") else {
-        return trimmed;
-    };
-    if !trimmed.ends_with(')') {
-        return trimmed;
-    }
-    let model = &trimmed[suffix_start + 2..trimmed.len() - 1];
-    let bytes = model.as_bytes();
-    if bytes.len() == 9
-        && bytes[4] == b':'
-        && bytes
-            .iter()
-            .enumerate()
-            .all(|(index, byte)| index == 4 || byte.is_ascii_hexdigit())
-    {
-        trimmed[..suffix_start].trim_end()
-    } else {
-        trimmed
-    }
 }
 
 #[cfg(any(target_os = "windows", test))]
@@ -218,8 +196,11 @@ mod platform {
         camera_labels_match, normalized_camera_label, DecodedRgbFrame, NativeCameraSource,
     };
     use std::ptr;
+    use std::sync::{Arc, Mutex};
+    use windows::core::{implement, Ref, HRESULT};
     use windows::Win32::Media::MediaFoundation::{
-        IMFActivate, IMFAttributes, IMFMediaSource, IMFSourceReader, MFCreateAttributes,
+        IMFActivate, IMFAttributes, IMFMediaSource, IMFSourceReader, IMFSourceReaderCallback,
+        IMFSourceReaderCallback_Impl, IMFSample, IMFMediaEvent, MF_SOURCE_READER_ASYNC_CALLBACK, MFCreateAttributes,
         MFCreateMediaType, MFCreateSourceReaderFromMediaSource, MFEnumDeviceSources,
         MFMediaType_Video, MFShutdown, MFStartup, MFVideoFormat_RGB32,
         MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
@@ -236,15 +217,46 @@ mod platform {
 
     const FIRST_VIDEO_STREAM: u32 = MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32;
 
+    type PendingSample = Arc<Mutex<Option<Result<DecodedRgbFrame, String>>>>;
+
+    #[implement(IMFSourceReaderCallback)]
+    struct CameraCallback {
+        sample: PendingSample,
+        format: Arc<Mutex<(u32, u32, i32)>>,
+    }
+
+    impl IMFSourceReaderCallback_Impl for CameraCallback_Impl {
+        fn OnReadSample(&self, status: HRESULT, _stream: u32, flags: u32, _time: i64, sample: Ref<IMFSample>) -> windows::core::Result<()> {
+            let result = (|| {
+                status.ok().map_err(|error| format!("Windows camera frame read failed: {error}"))?;
+                if flags & (MF_SOURCE_READERF_ERROR.0 | MF_SOURCE_READERF_ENDOFSTREAM.0) as u32 != 0 {
+                    return Err("Windows camera source ended or reported an error".to_string());
+                }
+                let Some(sample) = sample.as_ref() else { return Ok(None); };
+                let (width, height, stride) = *self.format.lock().map_err(|_| "camera format lock poisoned")?;
+                decode_sample(sample, width, height, stride).map(Some)
+            })();
+            if let Ok(mut pending) = self.sample.lock() {
+                // An empty sample also completes a request; represent it with
+                // a zero-sized frame so the owner can request the next one.
+                *pending = Some(result.map(|frame| frame.unwrap_or(DecodedRgbFrame {
+                    index: 0, width: 0, height: 0, data: Vec::new(),
+                })));
+            }
+            Ok(())
+        }
+        fn OnFlush(&self, _stream: u32) -> windows::core::Result<()> { Ok(()) }
+        fn OnEvent(&self, _stream: u32, _event: Ref<IMFMediaEvent>) -> windows::core::Result<()> { Ok(()) }
+    }
+
     #[derive(Debug)]
     pub(super) struct NativeCameraFrameReader {
         reader: IMFSourceReader,
         source: IMFMediaSource,
-        width: u32,
-        height: u32,
-        stride: i32,
         sequence: usize,
         pending_frame: Option<DecodedRgbFrame>,
+        sample: PendingSample,
+        read_pending: bool,
         com_initialized: bool,
         media_foundation_started: bool,
     }
@@ -267,7 +279,8 @@ mod platform {
                     capture.com_initialized = true;
                     capture.media_foundation_started = true;
                     let mut first_frame = None;
-                    for _ in 0..8 {
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                    while std::time::Instant::now() < deadline {
                         first_frame = capture.read_sample()?;
                         if first_frame.is_some() {
                             break;
@@ -300,8 +313,13 @@ mod platform {
             let media_source = unsafe { activation.ActivateObject::<IMFMediaSource>() }
                 .map_err(|error| format!("Windows camera activation failed: {error}"))?;
 
-            let attributes = create_attributes(3)?;
+            let sample = Arc::new(Mutex::new(None));
+            let format = Arc::new(Mutex::new((0, 0, 0)));
+            let callback: IMFSourceReaderCallback = CameraCallback { sample: sample.clone(), format: format.clone() }.into();
+            let attributes = create_attributes(4)?;
             unsafe {
+                attributes.SetUnknown(&MF_SOURCE_READER_ASYNC_CALLBACK, &callback)
+                    .map_err(|error| format!("Windows camera async callback failed: {error}"))?;
                 attributes
                     .SetUINT32(&MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, 1)
                     .map_err(|error| {
@@ -357,44 +375,41 @@ mod platform {
             if stride == 0 || stride.unsigned_abs() < width.saturating_mul(4) {
                 return Err("Windows camera negotiated invalid frame stride".to_string());
             }
+            *format.lock().map_err(|_| "camera format lock poisoned")? = (width, height, stride);
 
             Ok(Self {
                 reader,
                 source: media_source,
-                width,
-                height,
-                stride,
                 sequence: 0,
                 pending_frame: None,
+                sample,
+                read_pending: false,
                 com_initialized: false,
                 media_foundation_started: false,
             })
         }
 
         fn read_sample(&mut self) -> Result<Option<DecodedRgbFrame>, String> {
-            let mut flags = 0u32;
-            let mut sample = None;
-            unsafe {
-                self.reader
-                    .ReadSample(
-                        FIRST_VIDEO_STREAM,
-                        0,
-                        None,
-                        Some(&mut flags),
-                        None,
-                        Some(&mut sample),
-                    )
-                    .map_err(|error| format!("Windows camera frame read failed: {error}"))?;
+            let sample = self.sample.lock().map_err(|_| "camera sample lock poisoned")?.take();
+            if sample.is_some() { self.read_pending = false; }
+            let mut frame = sample.transpose()?;
+            if !self.read_pending {
+                // All output pointers MUST be null in asynchronous mode. The
+                // worker remains interruptible even if a camera stops delivering.
+                unsafe { self.reader.ReadSample(FIRST_VIDEO_STREAM, 0, None, None, None, None) }
+                    .map_err(|error| format!("Windows camera read request failed: {error}"))?;
+                self.read_pending = true;
             }
-            if flags & MF_SOURCE_READERF_ERROR.0 as u32 != 0 {
-                return Err("Windows camera source reader reported an error".to_string());
+            if let Some(frame) = frame.as_mut() {
+                if frame.width == 0 { return Ok(None); }
+                self.sequence = self.sequence.wrapping_add(1);
+                frame.index = self.sequence;
             }
-            if flags & MF_SOURCE_READERF_ENDOFSTREAM.0 as u32 != 0 {
-                return Err("Windows camera source ended unexpectedly".to_string());
-            }
-            let Some(sample) = sample else {
-                return Ok(None);
-            };
+            Ok(frame)
+        }
+    }
+
+    fn decode_sample(sample: &IMFSample, width: u32, height: u32, stride: i32) -> Result<DecodedRgbFrame, String> {
             let buffer = unsafe { sample.ConvertToContiguousBuffer() }
                 .map_err(|error| format!("Windows camera sample buffer failed: {error}"))?;
             let mut bytes = ptr::null_mut();
@@ -407,26 +422,25 @@ mod platform {
             let copied = copy_rgb32_frame(
                 bytes,
                 current_length as usize,
-                self.width,
-                self.height,
-                self.stride,
+                width,
+                height,
+                stride,
             );
             let unlock_result = unsafe { buffer.Unlock() };
             unlock_result
                 .map_err(|error| format!("Windows camera buffer unlock failed: {error}"))?;
             let data = copied?;
-            self.sequence = self.sequence.wrapping_add(1);
-            Ok(Some(DecodedRgbFrame {
-                index: self.sequence,
-                width: self.width,
-                height: self.height,
+            Ok(DecodedRgbFrame {
+                index: 0,
+                width,
+                height,
                 data,
-            }))
-        }
+            })
     }
 
     impl Drop for NativeCameraFrameReader {
         fn drop(&mut self) {
+            let _ = unsafe { self.reader.Flush(FIRST_VIDEO_STREAM) };
             let _ = unsafe { self.source.Shutdown() };
             if self.media_foundation_started {
                 let _ = unsafe { MFShutdown() };

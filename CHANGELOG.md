@@ -20,10 +20,8 @@
 
 ### Changed
 
-- Windows first opens Media Foundation alongside the WebView camera so the
-  main preview and native Pop Out stay live without per-frame IPC. Drivers that
-  reject concurrent clients retry with exclusive native ownership and keep the
-  main preview live through the native preview bridge; Linux keeps its
+- Windows opens one Media Foundation camera session and keeps the main preview
+  live through the native preview bridge; Linux keeps its
   exclusive V4L2 flow. Exclusive sessions now finish native worker shutdown
   before the app retries browser capture, with bounded reopen attempts.
 - Windows camera selection accepts Chromium's trailing USB model identifier
@@ -40,6 +38,19 @@
 
 ### Fixed
 
+- Windows native output now uses the primary renderer's max-coverage glyph
+  masks for tiny cells, preserving the pixel-like Acid Snowstorm appearance.
+- Windows preview texture, grid, and canvas dimensions update together when
+  the native camera changes frame size, preventing stale aspect ratios and
+  uncovered right-edge bars after preset changes.
+- Windows image/video/camera switches serialize native ownership before loading
+  the next main preview. Camera reads are asynchronous and capture is decoupled
+  from GPU presentation, so a stalled read cannot block ordinary worker teardown.
+- Windows camera startup retains its first capture session instead of probing,
+  closing, and reopening the device. GPU driver discovery runs off the UI thread
+  and its instance is reused across opens; startup phase timings are logged.
+- DirectShow fallback strips Chromium's USB model suffix and escapes device-name
+  separators; diagnostics preserve the original native capture failure too.
 - Granted the main window the narrow Tauri permission required to read frames
   from the Windows native camera preview bridge. The desktop policy gate now
   verifies every frontend Tauri command has both a generated permission and a

@@ -13,8 +13,8 @@ separate.
 - Preserve the existing macOS AVFoundation/display-link implementation.
 - Retain bounded mirror fallback for native-open failures and multiple cameras,
   with measurable accepted-FPS, readback, send, and throughput diagnostics.
-- Keep the Windows main preview live when a driver rejects concurrent clients
-  by feeding the existing WebGPU renderer from the exclusive native owner's
+- Keep the Windows main preview live by feeding the existing WebGPU renderer
+  from the single native camera owner's
   bounded binary JPEG preview bridge.
 
 ## Acceptance Contract
@@ -39,15 +39,21 @@ separate.
 
 For each row, select exactly one camera, open Pop Out, change several presets,
 change FPS, leave the output running for at least two minutes, close it, and
-confirm camera preview recovery. Windows should keep both views live when its
-camera driver accepts concurrent capture or when `exclusiveCameraActive` uses
-the native preview bridge. Linux may pause while
+confirm camera preview recovery. Windows should keep both views live with
+`exclusiveCameraActive` using the native preview bridge. Linux may pause while
 native output owns the camera. Capture one manual diagnostic while Pop Out is
 open.
 
+The latest Windows follow-up must additionally verify Acid Snowstorm's tiny-cell
+appearance against the main view, Arcade Rain without an uncovered right edge,
+and repeated Camera → Demo Image → Demo Video → Camera switches with Pop Out
+left open. Compare cold and repeat Pop Out opens separately; command timing in
+manual reports is not first-visible-frame timing. Public release remains gated
+on this device check, even when automated geometry/lifecycle tests pass.
+
 | Platform | Candidate artifact | Required observation |
 | --- | --- | --- |
-| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; both views advance with either shared capture or the `binary-jpeg` exclusive preview bridge; close restores normal browser capture; no blank output or crash report. |
+| Windows 10/11 x64 | Dev EXE or MSI | Live output is materially smoother than 1.0.2; `cameraFallbackActive` is false; both views advance through the `binary-jpeg` exclusive preview bridge; close restores normal browser capture; no blank output or crash report. |
 | Ubuntu x86_64 | Dev AppImage or deb | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | Fedora x86_64 | Dev rpm or AppImage | Native V4L2 output remains live; main preview restores after close; `cameraFallbackActive` is false. |
 | macOS Apple Silicon | Local candidate smoke | Existing AVFoundation Pop Out behavior remains unchanged. |

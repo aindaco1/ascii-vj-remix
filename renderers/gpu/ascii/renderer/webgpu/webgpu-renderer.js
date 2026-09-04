@@ -12,6 +12,7 @@ import {
     buildPaletteLut,
     paletteById
 } from '../../../../shared/palettes.js';
+import { syncNativePreviewGeometry } from '../../../../shared/native-preview-geometry.js';
 import {
     GLYPH_RAMP_LIMIT,
     GLYPH_RAMP_TEXTURE_COLUMNS,
@@ -532,6 +533,7 @@ export class WebGPURenderer {
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         });
         this.imageSourceView = this.imageSourceTexture.createView();
+        this.imageSourceSize = [w, h];
         this.imageComputeBindGroup = null;
 
         const sourceEl = this.source.canvas || this.source.element;
@@ -548,6 +550,16 @@ export class WebGPURenderer {
         if (!this.imageSourceTexture) return;
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
+        if (this.source.isNativeOutputPreview
+            && (this.imageSourceSize?.[0] !== this.source.width || this.imageSourceSize?.[1] !== this.source.height)) {
+            this.imageSourceTexture.destroy();
+            // This method performs its upload synchronously; the async signature
+            // is retained for ordinary image initialization.
+            void this._uploadImageTexture();
+            this.syncNativePreviewGeometry();
+            this._createStableBindGroups();
+            return;
+        }
         this.device.queue.copyExternalImageToTexture(
             { source: sourceEl },
             { texture: this.imageSourceTexture },
@@ -573,6 +585,10 @@ export class WebGPURenderer {
             this.canvas.style.maxHeight = '100%';
             this.canvas.style.imageRendering = 'pixelated';
         }
+    }
+
+    syncNativePreviewGeometry(params = this.nativePreviewParams) {
+        syncNativePreviewGeometry(this, params);
     }
 
     _createCellTexture() {
@@ -695,6 +711,8 @@ export class WebGPURenderer {
 
     _renderFrame() {
         if (!this.initialized) return;
+
+        if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
         this.frameCount++;
 

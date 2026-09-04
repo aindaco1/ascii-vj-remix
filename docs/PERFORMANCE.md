@@ -307,15 +307,18 @@ Rules:
   fails, the bounded 640x360 mirror keeps only one request in flight and is
   capped at 30 FPS; diagnostics report the native-open reason, accepted FPS,
   and transfer timings.
-- Windows keeps the main preview live by preferring two direct OS capture
-  clients: WebView2 for the primary renderer and Media Foundation for native
-  Pop Out. This adds the driver's concurrent capture/conversion cost but no
-  JavaScript readback, encoding, or per-frame IPC. Drivers that cannot share
-  retry with one native owner. Its latest frame is downscaled to at most
+- Windows keeps one Media Foundation capture session for both views, without a
+  failed shared-open attempt or a second device open after preflight. Capture
+  runs independently of GPU presentation and uses asynchronous sample callbacks.
+  Its latest frame is downscaled to at most
   640x360, JPEG-encoded at most 30 times per second, and returned as binary IPC
   for the existing WebGPU preview. This bounded source bridge avoids the old
   raw-RGBA JSON serialization path; diagnostics expose accepted FPS, encoded
   KiB/s, and read/encode/decode latency.
+- Windows native GPU driver discovery is off the UI thread and reuses its
+  instance across opens. Local `NativeOutputStartup` logs separate camera-first-
+  frame, surface, and device/pipeline time; manual diagnostics include native
+  open-command latency (not a claim of first-present latency).
 - For multi-camera, be explicit about the mixing cost and the selected layout.
 
 ### Audio Reactivity

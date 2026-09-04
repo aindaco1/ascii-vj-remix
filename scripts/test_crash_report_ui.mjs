@@ -13,7 +13,8 @@ import {
 
 assert.deepEqual(getTauriOutputDiagnostics(), {
   backend: '',
-  nativeCameraFailureReason: ''
+  nativeCameraFailureReason: '',
+  nativeOpenCommandMs: 0
 });
 
 assert.equal(pendingCrashReportCount({ pendingCount: -2 }), 0);

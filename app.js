@@ -4476,6 +4476,7 @@ class StaticRuntime {
         renderer.backgroundColor = params.backgroundColor;
         renderer.atlasStyle = params.atlasStyle;
         renderer.mirrorX = shouldRendererMirrorCamera(params);
+        renderer.syncNativePreviewGeometry?.(params);
         renderer.syncFeatureResources?.();
         if (renderer._applySourceSmoothing) renderer._applySourceSmoothing();
         if (renderer.canvas) {
@@ -8056,7 +8057,11 @@ class RendererLabApp {
             sourceName: cameraSourceName(this.params),
             muted: true
         });
-        await this._ensureCameraMixer(nextParams);
+        // Windows native ownership must be settled before asking WebView2 for
+        // the same device. loadStaticSource performs the appropriate acquisition.
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge || !this.nativeOutputActive) {
+            await this._ensureCameraMixer(nextParams);
+        }
         await this._switchStaticSource(nextParams);
     }
 
@@ -8100,7 +8105,21 @@ class RendererLabApp {
     }
 
     async _switchStaticSource(sourceParams, options = {}) {
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) {
+            return this._switchStaticSourceNow(sourceParams, options);
+        }
+        const previous = this.nativeOutputSourceSwitchPromise || Promise.resolve();
+        const pending = previous.catch(() => {}).then(() => this._switchStaticSourceNow(sourceParams, options));
+        this.nativeOutputSourceSwitchPromise = pending;
+        try { return await pending; }
+        finally {
+            if (this.nativeOutputSourceSwitchPromise === pending) this.nativeOutputSourceSwitchPromise = null;
+        }
+    }
+
+    async _switchStaticSourceNow(sourceParams, options = {}) {
         clearTimeout(this.rebuildTimer);
+        if (this.nativeOutputCapabilities?.nativeCameraPreviewBridge) await this.nativeOutputOpenPromise;
         const resumeWtf = options.interruptTransition !== false
             ? await this._prepareForSourceSwitch()
             : false;
@@ -8116,31 +8135,60 @@ class RendererLabApp {
             this.params.mediaUrl !== nextParams.mediaUrl ||
             this.params.mediaType !== nextParams.mediaType;
 
-        this.params = nextParams;
-        this._syncInputs();
-        this._persist();
-        this._applyVisualState();
-        this._syncPresetToolbar();
-        this._renderSourceList();
+        const handoffNative = Boolean(sourceChanged && this.nativeOutputActive
+            && this.nativeOutputCapabilities?.nativeCameraPreviewBridge);
+        try {
+            if (handoffNative) {
+                this.nativeOutputSourceSwitching = true;
+                this.nativeOutputPendingPayload = null;
+                await this.nativeOutputSyncPromise;
+                this._stopNativeOutputMirror();
+            }
+            this.params = nextParams;
+            this._syncInputs();
+            this._persist();
+            this._applyVisualState();
+            this._syncPresetToolbar();
+            this._renderSourceList();
 
-        if (previousWasCamera && !nextIsCamera) this._stopCameraStream({ render: false });
-        if (!sourceChanged && this.running) {
+            if (previousWasCamera && !nextIsCamera) this._stopCameraStream({ render: false });
+            if (handoffNative) {
+                this.nativeOutputCameraFallbackActive = false;
+                if (nextIsCamera) {
+                    await this._openNativeOutputWindow({ sourceSwitch: true, deferPreviewRestart: true });
+                } else {
+                    // This acknowledgement comes after the old native worker has
+                    // relinquished capture, before any later camera switch starts.
+                    const ok = await sendTauriOutputState(this._nativeOutputPayload());
+                    this.nativeOutputActive = Boolean(ok);
+                    this.nativeOutputExclusiveCameraActive = false;
+                    this.nativeOutputSharedCameraActive = false;
+                    this.nativeOutputSharedCameraAttempted = false;
+                }
+            }
+            if (!sourceChanged && this.running) {
+                if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+                return;
+            }
+
+            if (this.starting) {
+                this.startToken++;
+                this.starting = false;
+                this.running = false;
+                this.staticRuntime.destroy();
+                this.streamRuntime.stop(false);
+            }
+
+            if (this.running && previousSourceMode === 'static') await this._restartStaticSourceFast({ mediaState: null });
+            else if (this.running) await this.restart({ mediaState: null });
+            else await this.start({ autoStart: true });
             if (resumeWtf) this._resumeWtfAfterSourceSwitch();
-            return;
+        } finally {
+            if (handoffNative) {
+                this.nativeOutputSourceSwitching = false;
+                this._syncNativeOutputWindow();
+            }
         }
-
-        if (this.starting) {
-            this.startToken++;
-            this.starting = false;
-            this.running = false;
-            this.staticRuntime.destroy();
-            this.streamRuntime.stop(false);
-        }
-
-        if (this.running && previousSourceMode === 'static') await this._restartStaticSourceFast({ mediaState: null });
-        else if (this.running) await this.restart({ mediaState: null });
-        else await this.start({ autoStart: true });
-        if (resumeWtf) this._resumeWtfAfterSourceSwitch();
     }
 
     async _prepareForSourceSwitch() {
@@ -8564,12 +8612,16 @@ button:hover{background:#202a35}
             .filter((label) => label && label !== 'Selected camera' && label !== 'Camera 1');
         const stream = selectedIds[0] ? this.cameraStreams.get(selectedIds[0]) : this._firstCameraStream();
         const settings = stream?.getVideoTracks?.()[0]?.getSettings?.() || {};
-        return {
+        const key = cameraConstraintKey(params);
+        const cached = this.nativeOutputCameraMeta?.key === key ? this.nativeOutputCameraMeta : null;
+        const meta = {
             deviceLabel: selectedLabels[0] || '',
             selectedLabels,
-            captureWidth: Number(settings.width || 0) || null,
-            captureHeight: Number(settings.height || 0) || null
+            captureWidth: Number(settings.width || 0) || cached?.captureWidth || null,
+            captureHeight: Number(settings.height || 0) || cached?.captureHeight || null
         };
+        if (this.nativeOutputCapabilities?.nativeCameraPreviewBridge) this.nativeOutputCameraMeta = { ...meta, key };
+        return meta;
     }
 
     _nativeOutputParams(params, cameraMeta = this._nativeCameraOutputMeta(this.params)) {
@@ -8649,9 +8701,18 @@ button:hover{background:#202a35}
         return null;
     }
 
-    async _openNativeOutputWindow() {
+    async _openNativeOutputWindow(options = {}) {
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) return this._openNativeOutputWindowNow(options);
+        if (this.nativeOutputOpenPromise) return this.nativeOutputOpenPromise;
+        const pending = this._openNativeOutputWindowNow(options);
+        this.nativeOutputOpenPromise = pending;
+        try { return await pending; }
+        finally { if (this.nativeOutputOpenPromise === pending) this.nativeOutputOpenPromise = null; }
+    }
+
+    async _openNativeOutputWindowNow(options = {}) {
         if (!this._canUseNativeOutputWindow()) return false;
-        const outputAlreadyActive = this.nativeOutputActive;
+        const outputAlreadyActive = this.nativeOutputActive && !options.sourceSwitch;
         const previousCameraFallbackActive = this.nativeOutputCameraFallbackActive;
         const previousExclusiveCameraActive = this.nativeOutputExclusiveCameraActive;
         const previousSharedCameraAttempted = this.nativeOutputSharedCameraAttempted;
@@ -8740,13 +8801,14 @@ button:hover{background:#202a35}
                     && payload.outputMode === 'native-camera'
                 );
             }
-            if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror') {
+            if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror' && !options.deferPreviewRestart) {
                 await this._restoreCameraPreviewAfterNativeOutput();
             }
             this.nativeOutputLastSync = performance.now();
             this._updatePopoutButton();
             if (opened) {
                 if (this.nativeOutputExclusiveCameraActive
+                    && !options.deferPreviewRestart
                     && this.nativeOutputCapabilities?.nativeCameraPreviewBridge
                     && (!outputAlreadyActive || !this.staticRuntime.source?.isNativeOutputPreview)) {
                     if (this.running) await this.restart();
@@ -8769,7 +8831,7 @@ button:hover{background:#202a35}
             this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputFailed');
             this._updatePopoutButton();
         }
-        if (exclusiveCameraReleased && !this.nativeOutputActive) {
+        if (exclusiveCameraReleased && !this.nativeOutputActive && !options.deferPreviewRestart) {
             await this._restoreCameraPreviewAfterNativeOutput();
         }
         return false;
@@ -8818,6 +8880,7 @@ button:hover{background:#202a35}
     }
 
     _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0, options = {}) {
+        if (this.nativeOutputSourceSwitching) return;
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) return;
         if (!options.force && (this.nativeOutputTransitionArming || this.nativeOutputTransition)) return;
         const payload = this._nativeOutputPayload(params);
@@ -8827,6 +8890,7 @@ button:hover{background:#202a35}
     }
 
     _flushNativeOutputWindowSync() {
+        if (this.nativeOutputSourceSwitching) return;
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
             this._resetNativeOutputSyncState();
             return;
@@ -8851,7 +8915,7 @@ button:hover{background:#202a35}
         this.nativeOutputSyncInFlight = true;
         const syncStartedAt = performance.now();
         this.nativeOutputSyncAttemptCount++;
-        sendTauriOutputState(payload).then((ok) => {
+        this.nativeOutputSyncPromise = sendTauriOutputState(payload).then((ok) => {
             if (!ok) {
                 const restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                 this.nativeOutputSyncFailedCount++;
@@ -8893,6 +8957,7 @@ button:hover{background:#202a35}
     }
 
     async _armNativeOutputTransition(from, to, durationMs, kind, token) {
+        if (this.nativeOutputSourceSwitching) return { armed: false, startAtUnixMs: Date.now() };
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
             return { armed: false, startAtUnixMs: Date.now() };
         }
@@ -8928,7 +8993,8 @@ button:hover{background:#202a35}
         let restoreExclusiveCamera = false;
         let ok = false;
         try {
-            ok = await sendTauriOutputState(payload);
+            this.nativeOutputSyncPromise = sendTauriOutputState(payload);
+            ok = await this.nativeOutputSyncPromise;
             if (ok) {
                 this.nativeOutputSyncOkCount++;
                 this.nativeOutputTransitionArmOkCount++;

@@ -18,6 +18,7 @@ let outputDestroyedUnlisten = null;
 let nativeOutputClosedUnlisten = null;
 let outputBackend = null;
 let nativeCameraFailureReason = '';
+let nativeOpenCommandMs = 0;
 let crashReportHandler = null;
 
 const MEDIA_EXTENSIONS = {
@@ -68,7 +69,8 @@ function setTauriCrashReportHandler(handler) {
 function getTauriOutputDiagnostics() {
     return {
         backend: outputBackend || '',
-        nativeCameraFailureReason
+        nativeCameraFailureReason,
+        nativeOpenCommandMs
     };
 }
 
@@ -540,7 +542,7 @@ async function openNativeSurfaceOutput(payload, options = {}) {
     }
     try {
         const params = payload?.params || {};
-        await recordTauriMediaDiagnostic(
+        void recordTauriMediaDiagnostic(
             `[TauriOutput] native-open start mode=${payload?.outputMode || 'unknown'} sourceMode=${params.sourceMode || 'unknown'} mediaType=${params.mediaType || 'unknown'}`
         ).catch(() => {});
         const request = {
@@ -548,7 +550,9 @@ async function openNativeSurfaceOutput(payload, options = {}) {
             displayPreference: options.outputDisplay || 'auto',
             visible: options.show !== false
         };
+        const openStartedAt = performance.now();
         let result = await invokeTauri('open_native_output_window', { request });
+        nativeOpenCommandMs = Math.round(performance.now() - openStartedAt);
         if (nativeCameraAttempt && !result?.opened) {
             nativeCameraFailureReason = String(
                 result?.reason || 'native camera output did not open'
@@ -564,7 +568,7 @@ async function openNativeSurfaceOutput(payload, options = {}) {
                 `[TauriOutput] native-camera unavailable reason=${nativeCameraFailureReason} platform mirror retry opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'}`
             ).catch(() => {});
         }
-        await recordTauriMediaDiagnostic(
+        void recordTauriMediaDiagnostic(
             `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} reason=${result?.reason || ''}`
         ).catch(() => {});
         if (!result?.opened) return false;

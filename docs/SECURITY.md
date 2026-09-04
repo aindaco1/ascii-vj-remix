@@ -230,10 +230,9 @@ platform provider: AVFoundation on macOS, Media Foundation on Windows, or V4L2
 through the bundled network-disabled FFmpeg runtime on Linux. It does not add a
 new remote endpoint or persist camera frames. Manual diagnostics may contain
 bounded device-independent timing and fallback counters, never frame bytes.
-Windows may hold a WebView and Media Foundation client concurrently when the
-camera driver supports sharing; this remains two local OS capture clients and
-does not send camera pixels through a network or persistent store. If the
-driver requires exclusive ownership, the native worker exposes only its latest
+Windows uses one Media Foundation capture client while native output is open.
+It does not send camera pixels through a network or persistent store.
+The native worker exposes only its latest
 downscaled JPEG through a binary command response to the main WebView. The
 frame is drawn in memory, is not logged or persisted, and is replaced by the
 next frame.

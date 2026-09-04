@@ -160,10 +160,14 @@ For Camera Pop Out, verify the resolved output mode as well as visible motion.
 macOS, Windows, and Linux should select `native-camera` for one camera. Multiple
 cameras should select `mirror`; Windows/Linux should also retry mirror when
 native preflight cannot produce a frame. On physical Windows, confirm the
-camera image advances in both the main and Pop Out windows when
-`sharedCameraActive` is true. If the driver forces `exclusiveCameraActive`,
+camera image advances in both the main and Pop Out windows with
+`exclusiveCameraActive` true. In that single-owner session,
 confirm `nativeOutputPreview.transport` is `binary-jpeg`, both views advance,
 and the browser camera is reacquired after close without changing sources.
+`test:output-display` executes the Windows source-handoff ordering and preview
+geometry regression tests; `smoke:static` renders 4:3/16:9 native-preview fixtures
+and checks their right edges. Use `SMOKE_REQUIRE_WEBGPU=1` on a WebGPU-capable
+test runtime to reject fallback and exercise WebGPU texture replacement.
 On Linux, confirm native Pop Out advances while the exclusive WebView preview
 is paused and that the preview is reacquired after close. Capture a manual
 report from the existing Reports dialog; a local policy simulation does not
@@ -369,9 +373,8 @@ Use this after user-facing renderer, source, audio, or output changes:
 17. Close Pop Out and confirm CPU/GPU usage settles.
 18. With one camera selected on Windows, capture a manual diagnostic while Pop
     Out is open and confirm `cameraFallbackActive` is false. Confirm live output
-    remains smooth while changing presets and FPS. With `sharedCameraActive`,
-    confirm the main preview advances at the same time. If the driver reports
-    `exclusiveCameraActive`, confirm the main preview still advances through
+    remains smooth while changing presets and FPS. With
+    `exclusiveCameraActive`, confirm the main preview advances through
     `nativeOutputPreview`, its accepted FPS is nonzero, and the normal camera
     preview restores after close with `previewRestoreSucceeded` increasing. If mirror fallback activates, confirm
     `nativeOutputAdapter.nativeCameraFailureReason` explains why and the preview

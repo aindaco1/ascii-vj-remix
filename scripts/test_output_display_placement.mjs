@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './test_windows_camera_lifecycle.mjs';
 import {
   browserScreenPlacement,
   decodeNativeCameraPreviewPacket,
