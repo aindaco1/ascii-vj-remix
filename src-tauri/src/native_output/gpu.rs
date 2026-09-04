@@ -1267,6 +1267,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_shaders_validate_with_coverage_mip_sampling() {
+        for source in [CELL_PASS_WGSL, RENDER_PASS_WGSL] {
+            let module = wgpu::naga::front::wgsl::parse_str(source)
+                .expect("native WGSL must parse on every build host");
+            wgpu::naga::valid::Validator::new(
+                wgpu::naga::valid::ValidationFlags::all(),
+                wgpu::naga::valid::Capabilities::all(),
+            ).validate(&module).expect("native shader bindings and mip loads must validate");
+        }
+    }
+
+    #[test]
     fn tiny_cells_use_browser_max_coverage_masks() {
         let mut base = vec![0; 16 * 16];
         base[15 * 16 + 15] = 255;

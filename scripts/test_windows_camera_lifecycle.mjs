@@ -67,6 +67,25 @@ await assert.rejects(failed._switchStaticSource({ mediaType: 'image', mediaUrl: 
 assert.equal(failed.nativeOutputSourceSwitching, false, 'failed loads must release the sync guard');
 assert.equal(failed.nativeOutputSourceSwitchPromise, null);
 assert.equal(failed.nativeOutputExclusiveCameraActive, false);
+
+const metaMethod = appSource.slice(appSource.indexOf('    _nativeCameraOutputMeta('), appSource.indexOf('    _nativeOutputParams('));
+const Metadata = new Function('selectedCameraDeviceIds', 'cameraConstraintKey', `return class { ${metaMethod} }`)(
+  () => ['camera-1'], (params) => `${params.cameraResolution}:${params.cameraFps}`
+);
+const metadata = new Metadata();
+Object.assign(metadata, {
+  params: { cameraResolution: 'auto', cameraFps: 30 },
+  nativeOutputCapabilities: { nativeCameraPreviewBridge: true },
+  cameraStreams: new Map([['camera-1', { getVideoTracks: () => [{ getSettings: () => ({ width: 640, height: 480 }) }] }]]),
+  _canUseNativeCameraOutputWindow: () => true,
+  _cameraDeviceLabel: () => 'Webcam',
+});
+const beforeRelease = metadata._nativeCameraOutputMeta();
+metadata.cameraStreams.clear();
+assert.deepEqual(metadata._nativeCameraOutputMeta(), beforeRelease,
+  'releasing the browser camera must not change native source identity/resolution');
+metadata.params.cameraResolution = '1280x720';
+assert.equal(metadata._nativeCameraOutputMeta().captureWidth, null, 'a deliberate constraint change invalidates cached metadata');
 console.log('Windows camera lifecycle ordering passed.');
 
 const preview = Object.create(WebGPURenderer.prototype);
