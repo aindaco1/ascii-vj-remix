@@ -68,6 +68,19 @@ assert.equal(failed.nativeOutputSourceSwitching, false, 'failed loads must relea
 assert.equal(failed.nativeOutputSourceSwitchPromise, null);
 assert.equal(failed.nativeOutputExclusiveCameraActive, false);
 
+const activateMethod = appSource.slice(appSource.indexOf('    async _activateCameraSource('), appSource.indexOf('    async _activateCustomSource('));
+const Activation = new Function('normalizeParams', 'cameraSourceName', 'CAMERA_MEDIA_URL', `return class { ${activateMethod} }`)(
+  (params) => params, () => 'Camera', 'camera:'
+);
+const activation = new Activation();
+Object.assign(activation, {
+  params: {}, nativeOutputCapabilities: { nativeCameraPreviewBridge: true },
+  _clearLocalObjectUrl() {},
+  _ensureCameraMixer() { throw new Error('camera acquired before queued handoff'); },
+  async _switchStaticSource(params) { assert.equal(params.mediaType, 'camera'); }
+});
+await activation._activateCameraSource();
+
 const metaMethod = appSource.slice(appSource.indexOf('    _nativeCameraOutputMeta('), appSource.indexOf('    _nativeOutputParams('));
 const Metadata = new Function('selectedCameraDeviceIds', 'cameraConstraintKey', `return class { ${metaMethod} }`)(
   () => ['camera-1'], (params) => `${params.cameraResolution}:${params.cameraFps}`

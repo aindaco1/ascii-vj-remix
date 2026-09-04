@@ -8059,7 +8059,7 @@ class RendererLabApp {
         });
         // Windows native ownership must be settled before asking WebView2 for
         // the same device. loadStaticSource performs the appropriate acquisition.
-        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge || !this.nativeOutputActive) {
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) {
             await this._ensureCameraMixer(nextParams);
         }
         await this._switchStaticSource(nextParams);
@@ -8703,6 +8703,7 @@ button:hover{background:#202a35}
 
     async _openNativeOutputWindow(options = {}) {
         if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) return this._openNativeOutputWindowNow(options);
+        if (!options.sourceSwitch) await this.nativeOutputSourceSwitchPromise;
         if (this.nativeOutputOpenPromise) return this.nativeOutputOpenPromise;
         const pending = this._openNativeOutputWindowNow(options);
         this.nativeOutputOpenPromise = pending;
