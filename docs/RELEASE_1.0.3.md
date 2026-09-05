@@ -34,8 +34,23 @@ separate.
 6. The Tauri policy gate confirms the main window can invoke the native preview
    frame reader and that every frontend Tauri command has a generated narrow
    permission before packaging.
-7. Tagging and public deployment remain blocked until the physical camera
-   matrix below is accepted.
+7. The owner accepted the Windows development candidate and explicitly
+   authorized Linux publication with Ubuntu/Fedora physical camera testing
+   deferred. Source, package, signing, and updater gates remain required.
+
+## Release Decision — 2026-09-04
+
+- The owner reported that the Windows development build works well and
+  authorized merging and publishing 1.0.3, including both new presets.
+- Thorough Ubuntu/Fedora camera testing is not complete. The owner explicitly
+  approved publishing those packages with hardware validation deferred; do not
+  present automated Linux checks as physical camera acceptance.
+- Application source is pinned to `v1.0.3` at
+  `04e8107d993d1ca62639a8c8ddf0e7ffea491dc7`. The exact merged commit passed
+  [Desktop CI](https://github.com/aindaco1/ascii-vj-remix/actions/runs/33943626231)
+  on macOS, Windows, and Linux.
+- A release-only packaging correction restores Unix FFmpeg executable modes
+  after artifact transfer. It does not change the tagged application source.
 
 ## Physical Camera Matrix
 
@@ -50,8 +65,9 @@ The latest Windows follow-up must additionally verify Acid Snowstorm's tiny-cell
 appearance against the main view, Arcade Rain without an uncovered right edge,
 and repeated Camera → Demo Image → Demo Video → Camera switches with Pop Out
 left open. Compare cold and repeat Pop Out opens separately; command timing in
-manual reports is not first-visible-frame timing. Public release remains gated
-on this device check, even when automated geometry/lifecycle tests pass.
+manual reports is not first-visible-frame timing. The owner's Windows
+acceptance and explicit Linux deferral are recorded above; the remaining Linux
+device observations below are still follow-up work.
 
 | Platform | Candidate artifact | Required observation |
 | --- | --- | --- |

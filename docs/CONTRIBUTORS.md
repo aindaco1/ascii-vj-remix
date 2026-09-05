@@ -515,6 +515,9 @@ successful main-push `Desktop` workflow, then hands both outputs to the bundle
 jobs as immutable one-day workflow artifacts. The restored app binary is
 verified against its commit, platform, version, byte size, and SHA-256 before
 `tauri bundle` packages it without recompiling. Runtime builds remain offline;
+Unix artifact downloads restore executable mode on `ffmpeg` and `ffprobe`
+before the release-input checks, because zipped artifact transfers reset file
+permissions. Runtime hashes and camera-input availability are still verified.
 CI may download official source during release builds, but the packaged app
 never downloads FFmpeg, codecs, or renderer assets at runtime.
 
