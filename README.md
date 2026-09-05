@@ -8,8 +8,9 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package release candidate is 1.0.3. Release history is
-recorded in the [Changelog](CHANGELOG.md); prospective work belongs in the
+The current source/package version is 1.0.3, which is also the stable public
+release. Release history is recorded in the [Changelog](CHANGELOG.md);
+prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 
 ## Quick Links
