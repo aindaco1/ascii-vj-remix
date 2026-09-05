@@ -4,7 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
+import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -368,7 +368,7 @@ async function runSmoke() {
       JSON.stringify(main.presetNames) !== JSON.stringify(sortedPresetNames) ||
       !main.presetNames.includes('Dense Color ASCII') ||
       main.presetNames.includes('Point & Click Default') ||
-      !/^69 built-in · 0 saved$/i.test(main.presetStatus)
+      main.presetStatus.toLowerCase() !== `${BUILTIN_PRESET_BACKEND_BASELINE.presetCount} built-in · 0 saved`
     ) {
       throw new Error(`Preset sections should be separate, renamed, and alphabetical: ${JSON.stringify({
         sections: main.presetSections,
@@ -396,7 +396,7 @@ async function runSmoke() {
     if (
       !filteredPresets.names.length ||
       filteredPresets.names.some((name) => !name.toLocaleLowerCase('en-US').includes('terminal')) ||
-      !new RegExp(`^${filteredPresets.names.length} of 69 presets$`, 'i').test(filteredPresets.status) ||
+      filteredPresets.status.toLowerCase() !== `${filteredPresets.names.length} of ${BUILTIN_PRESET_BACKEND_BASELINE.presetCount} presets` ||
       filteredPresets.activeElement !== 'preset-search'
     ) {
       throw new Error(`Preset search should filter live by display name: ${JSON.stringify(filteredPresets)}`);
@@ -407,7 +407,7 @@ async function runSmoke() {
       count: document.querySelectorAll('#preset-list .preset-name').length,
       activeElement: document.activeElement?.id || ''
     }));
-    if (clearedPresetSearch.value || clearedPresetSearch.count !== 69 || clearedPresetSearch.activeElement !== 'preset-search') {
+    if (clearedPresetSearch.value || clearedPresetSearch.count !== BUILTIN_PRESET_BACKEND_BASELINE.presetCount || clearedPresetSearch.activeElement !== 'preset-search') {
       throw new Error(`Escape should clear preset search and preserve focus: ${JSON.stringify(clearedPresetSearch)}`);
     }
 

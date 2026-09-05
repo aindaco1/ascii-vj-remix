@@ -40,14 +40,14 @@ assert.equal(
 
 assert.equal(validateBuiltInPresetBackendContract(BUILTIN_PRESET_BACKEND_BASELINE).ok, true);
 const collapsedWindowsContract = validateBuiltInPresetBackendContract({
-  presetCount: 69,
+  presetCount: BUILTIN_PRESET_BACKEND_BASELINE.presetCount,
   acceleratedEligible: 7,
-  canvasEligible: 62
+  canvasEligible: BUILTIN_PRESET_BACKEND_BASELINE.presetCount - 7
 });
 assert.equal(collapsedWindowsContract.ok, false);
 assert.deepEqual(collapsedWindowsContract.mismatches, [
-  'acceleratedEligible:7!=41',
-  'canvasEligible:62!=28'
+  'acceleratedEligible:7!=42',
+  'canvasEligible:63!=28'
 ]);
 
 console.log('preset-backend-contract: ok');

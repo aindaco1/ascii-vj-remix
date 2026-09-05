@@ -82,7 +82,7 @@ git diff --check
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 69 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 70 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -265,9 +265,9 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 69 total / 41 accelerated / 28 explicit
+separately requires the centralized 70 total / 42 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 41 accelerated
+physical Windows acceptance must additionally confirm the 42 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 ### FFmpeg and Media Engine

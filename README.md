@@ -109,6 +109,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   Cyberdelic Riot, Acid Snowstorm, Terminal Collapse, and Neon Razorstorm.
 - Built-in traditional ASCII presets, including Classic Camera ASCII, ANSI
   Newsprint, Terminal Mono, and Dense Typewriter.
+- ASCII World Mint applies mint line-character glyphs on a dark teal background
+  to the selected image, video, or camera, inspired by
+  [yeahpython's ASCII World](https://yeahpython.github.io/game/game.html).
 - Classic Camera ASCII is the default for a clean profile. Existing persisted
   profiles keep their visual settings instead of being silently reset. The
   clean-profile visual choice does not override the global Auto renderer

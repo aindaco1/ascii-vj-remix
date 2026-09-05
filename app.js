@@ -524,6 +524,47 @@ const BUILTIN_PRESETS = [
         params: CLASSIC_CAMERA_ASCII_PARAMS
     },
     {
+        id: 'ascii-world-mint',
+        name: 'ASCII World Mint',
+        readonly: true,
+        transitionSeconds: 1.2,
+        // Original preset inspired by yeahpython's ASCII World palette and
+        // thin drawing characters: https://yeahpython.github.io/game/game.html
+        params: {
+            cols: 180,
+            autoRows: true,
+            cellWidth: 8,
+            cellHeight: 12,
+            saturationBoost: 0,
+            contrastBoost: 1.55,
+            brightness: 1,
+            gamma: 1.1,
+            bgBlend: 0,
+            quantizeBits: 0,
+            paletteId: 'none',
+            ditherMode: 'none',
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'custom',
+            customGlyphRamp: '   ._-/\\|+',
+            glyphDepth: 96,
+            glyphOffset: 0,
+            glyphReverse: false,
+            glyphColorMode: 'fixed',
+            glyphColor: '#15ffcd',
+            backgroundColor: '#042a33',
+            fontFamily: 'monospace',
+            mode: 1,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
         id: 'ansi-newsprint',
         name: 'ANSI Newsprint',
         readonly: true,
@@ -1374,7 +1415,8 @@ const BUILTIN_PRESET_DISPLAY_ORDER = [
     'magma-telemetry',
     'glitch-orchid',
     'ultraviolet-siren',
-    'neon-razorstorm'
+    'neon-razorstorm',
+    'ascii-world-mint'
 ];
 
 const EXTREME_WTF_PRESET_IDS = [

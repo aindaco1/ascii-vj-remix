@@ -107,8 +107,8 @@ Rendering:
 - Classic Camera ASCII owns the clean-profile visual state, not the global
   renderer preference. Keep the default backend on Auto; built-ins inherit it
   unless they explicitly declare a compatibility backend.
-- Keep the 69/41/28 built-in backend contract centralized in
-  `renderers/shared/preset-backend-contract.js`: 69 total, 41 accelerated, and
+- Keep the 70/42/28 built-in backend contract centralized in
+  `renderers/shared/preset-backend-contract.js`: 70 total, 42 accelerated, and
   28 explicit Canvas presets. Any intentional ownership change must update the
   contract and its visible preset-matrix evidence together.
 - Native Pop Out preserves glyph-mode and character-set params for traditional

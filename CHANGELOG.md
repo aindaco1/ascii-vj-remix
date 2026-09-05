@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added ASCII World Mint, an original preset inspired by
+  [yeahpython's ASCII World](https://yeahpython.github.io/game/game.html), with
+  thin mint ASCII glyphs, a dark teal background, and stable sampling for the
+  current image, video, or camera source.
 - Added native single-camera Pop Out capture on Windows through Media
   Foundation and on Linux through the bundled local FFmpeg V4L2 input. Both
   feed the existing native `wgpu` renderer and avoid WebView canvas readback

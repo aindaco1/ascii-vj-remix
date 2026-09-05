@@ -1,6 +1,6 @@
 const BUILTIN_PRESET_BACKEND_BASELINE = Object.freeze({
-    presetCount: 69,
-    acceleratedEligible: 41,
+    presetCount: 70,
+    acceleratedEligible: 42,
     canvasEligible: 28
 });
 
