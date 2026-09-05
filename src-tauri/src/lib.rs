@@ -61,6 +61,7 @@ pub fn run() {
             native_output::update_native_output_window,
             native_output::update_native_output_frame,
             native_output::update_native_output_pixels,
+            native_output::read_native_output_preview_frame,
             system_audio::start_system_audio_capture,
             system_audio::read_system_audio_features,
             system_audio::stop_system_audio_capture,

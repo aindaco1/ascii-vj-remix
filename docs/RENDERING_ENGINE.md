@@ -100,16 +100,26 @@ Camera controls include device selection, capture size, FPS, layout, framing,
 and mirror. Facing-mode controls are hidden when irrelevant to the selected
 device capabilities.
 
-Tauri native Pop Out has an additional macOS path for single-camera output:
+Tauri native Pop Out has platform-owned single-camera paths:
 
 ```text
-AVFoundation capture
+macOS: AVFoundation capture
+Windows: Media Foundation source reader
+Linux: bundled FFmpeg V4L2 input
   -> latest BGRA/RGB frame
   -> native output renderer
 ```
 
-That path avoids WebView canvas readback and was introduced to reduce camera
-latency.
+Native Pop Out presentation avoids WebView canvas readback and per-frame Tauri
+IPC. Windows uses one exclusive native owner for both views;
+its latest camera frame is downscaled, JPEG-encoded, and returned through a
+binary Tauri response to a canvas consumed by the existing WebGPU preview.
+Linux pauses the main WebView camera preview while an exclusive V4L2 device is
+owned by native Pop Out, then reacquires it on close. Windows/Linux preflight
+one frame before showing native output and retry through the bounded mirror if
+native device opening fails. Windows keeps the preflight capture alive instead
+of opening the same device twice. Its asynchronous Media Foundation callback
+feeds a latest-frame slot independently of GPU rendering and preview reads.
 
 ### Audio
 
@@ -331,6 +341,8 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
 - images upload once.
 - first pass samples one color per cell into a cell-color texture.
 - first-pass palette/dither math matches the shared contract.
+- palette lookup textures retain their data row order while source images keep
+  their own vertical-flip setting.
 - second pass expands the cell-color texture and optionally samples the same
   Unicode-scalar atlas/ramp contract as WebGPU.
 - shader uniforms match the WebGPU parameter set where possible.
@@ -358,7 +370,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 41 accelerated and 28
+route and requires the Windows preset matrix to preserve 43 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -542,10 +554,12 @@ presenter reuses the existing source texture while still encoding/presenting
 with the latest visual and audio-reactive params. Unversioned fallback callers
 retain unconditional uploads. Logs expose source upload and skip counters.
 
-For macOS single-camera output, AVFoundation captures latest frames directly for
-the native presenter. Live camera presets do not use browser mirror transport by
+For single-camera output, AVFoundation on macOS, Media Foundation on Windows,
+and the bundled local FFmpeg V4L2 input on Linux capture frames directly for the
+native presenter. Live camera presets do not use browser mirror transport by
 default because canvas readback and IPC frame transfer are too expensive for
-sustained output.
+sustained output. Multiple cameras and native-open failures keep the bounded
+mirror path.
 
 Native output consumes the same canonical palette, dither, `glyphMode`,
 character-set/custom-ramp, depth/offset/reverse, and glyph/background color
@@ -557,6 +571,8 @@ The frontend resolves the selected catalog entry into a bounded base
 `charsetRamp`; Rust validates supported scalars and applies depth, offset, and
 reverse once to create a maximum 96-id ramp. Required 1024px R8 atlas pages are
 decoded/uploaded lazily and retained in the presenter's fixed 16-layer texture.
+Windows also uploads the four max-coverage mip levels used by the browser's
+tiny-cell glyph path. macOS and Linux retain their existing base-page sampling.
 `fontFamily` remains preview/control-surface metadata; native output never loads
 arbitrary system or user fonts.
 
@@ -572,6 +588,15 @@ Native output design rules:
   native worker before reusing the output window. Surface validation or raw
   handle loss during normal close/replacement is recoverable teardown, not a
   process panic or crash-report event.
+- Windows/Linux native camera capture must produce a preflight frame before the
+  output window opens. Windows retains that capture as the sole owner. Both
+  platforms restore the WebView camera before mirror fallback or after an
+  exclusive native session closes. During a Windows exclusive session, a
+  bounded latest-frame binary JPEG bridge keeps the main WebGPU preview live;
+  Windows emits its close event only after the Media Foundation worker has
+  released the device. Windows matches the
+  optional Chromium USB model suffix only when the Media Foundation friendly
+  name match is unambiguous.
 - primary renderer behavior must not regress when Pop Out is open.
 - browser fallback must remain available.
 

@@ -17,6 +17,8 @@ const PRODUCTION_APP_NAME = 'ASCII VJ Remix';
 let outputDestroyedUnlisten = null;
 let nativeOutputClosedUnlisten = null;
 let outputBackend = null;
+let nativeCameraFailureReason = '';
+let nativeOpenCommandMs = 0;
 let crashReportHandler = null;
 
 const MEDIA_EXTENSIONS = {
@@ -62,6 +64,14 @@ function safelyUnlisten(unlisten, label) {
 
 function setTauriCrashReportHandler(handler) {
     crashReportHandler = typeof handler === 'function' ? handler : null;
+}
+
+function getTauriOutputDiagnostics() {
+    return {
+        backend: outputBackend || '',
+        nativeCameraFailureReason,
+        nativeOpenCommandMs
+    };
 }
 
 function crashContextForError(error) {
@@ -244,6 +254,11 @@ async function startTauriRawVideoSession(file, request) {
 async function readTauriRawVideoFrames(sessionId, maxFrames = 1) {
     if (!isTauriRuntime() || !sessionId) return null;
     return invokeTauri('read_raw_video_frames', { sessionId, maxFrames });
+}
+
+async function readTauriNativeOutputPreviewFrame(afterVersion = 0) {
+    if (!isTauriRuntime()) return null;
+    return invokeTauri('read_native_output_preview_frame', { afterVersion });
 }
 
 async function stopTauriRawVideoSession(sessionId) {
@@ -521,19 +536,39 @@ async function watchNativeOutputClosed(onClosed) {
 
 async function openNativeSurfaceOutput(payload, options = {}) {
     if (!isTauriRuntime() || options.show === false) return false;
+    const nativeCameraAttempt = payload?.outputMode === 'native-camera';
+    if (nativeCameraAttempt && options.preserveCameraFailureReason !== true) {
+        nativeCameraFailureReason = '';
+    }
     try {
         const params = payload?.params || {};
-        await recordTauriMediaDiagnostic(
+        void recordTauriMediaDiagnostic(
             `[TauriOutput] native-open start mode=${payload?.outputMode || 'unknown'} sourceMode=${params.sourceMode || 'unknown'} mediaType=${params.mediaType || 'unknown'}`
         ).catch(() => {});
-        const result = await invokeTauri('open_native_output_window', {
-            request: {
-                payload,
-                displayPreference: options.outputDisplay || 'auto',
-                visible: options.show !== false
-            }
-        });
-        await recordTauriMediaDiagnostic(
+        const request = {
+            payload,
+            displayPreference: options.outputDisplay || 'auto',
+            visible: options.show !== false
+        };
+        const openStartedAt = performance.now();
+        let result = await invokeTauri('open_native_output_window', { request });
+        nativeOpenCommandMs = Math.round(performance.now() - openStartedAt);
+        if (nativeCameraAttempt && !result?.opened) {
+            nativeCameraFailureReason = String(
+                result?.reason || 'native camera output did not open'
+            ).slice(0, 500);
+        }
+        if (!result?.opened
+            && nativeCameraAttempt
+            && payload?.allowCameraMirrorFallback === true
+            && options.deferCameraFallback !== true) {
+            payload.outputMode = 'mirror';
+            result = await invokeTauri('open_native_output_window', { request });
+            await recordTauriMediaDiagnostic(
+                `[TauriOutput] native-camera unavailable reason=${nativeCameraFailureReason} platform mirror retry opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'}`
+            ).catch(() => {});
+        }
+        void recordTauriMediaDiagnostic(
             `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} reason=${result?.reason || ''}`
         ).catch(() => {});
         if (!result?.opened) return false;
@@ -543,6 +578,9 @@ async function openNativeSurfaceOutput(payload, options = {}) {
         await existing?.close?.().catch(() => {});
         return true;
     } catch (error) {
+        if (nativeCameraAttempt) {
+            nativeCameraFailureReason = String(error?.message || error || 'native camera output failed').slice(0, 500);
+        }
         await recordTauriMediaDiagnostic(`[TauriOutput] native-open error ${error?.message || error}`).catch(() => {});
         console.info('[TauriOutput] Native surface unavailable:', error);
         outputBackend = null;
@@ -555,6 +593,7 @@ async function openTauriOutputWindow(payload, options = {}) {
     const shouldShow = options.show !== false;
 
     if (await openNativeSurfaceOutput(payload, options)) return true;
+    if (options.deferCameraFallback === true) return false;
 
     const existing = await WebviewWindow.getByLabel(OUTPUT_WINDOW_LABEL).catch(() => null);
     if (existing) {
@@ -618,6 +657,7 @@ export {
     getTauriCrashReportState,
     getTauriMidiState,
     getTauriNativeOutputCapabilities,
+    getTauriOutputDiagnostics,
     installTauriUpdate,
     isTauriRuntime,
     isTauriUpdaterAvailable,
@@ -632,6 +672,7 @@ export {
     readTauriMidiEvents,
     readTauriMediaSessionFrame,
     readTauriMediaSessionFrames,
+    readTauriNativeOutputPreviewFrame,
     readTauriRawVideoFrames,
     readTauriSystemAudioFeatures,
     recordTauriMediaDiagnostic,

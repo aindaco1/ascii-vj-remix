@@ -1,4 +1,24 @@
 use super::{DecodedRgbFrame, NativeCameraSource};
+#[cfg(any(target_os = "windows", test))]
+use crate::media_engine::ffmpeg::without_chromium_usb_model_suffix;
+
+#[cfg(any(target_os = "windows", test))]
+fn normalized_camera_label(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn camera_labels_match(browser_label: &str, native_label: &str) -> bool {
+    let browser = normalized_camera_label(browser_label);
+    let native = normalized_camera_label(native_label);
+    browser == native
+        || normalized_camera_label(without_chromium_usb_model_suffix(browser_label))
+            == normalized_camera_label(without_chromium_usb_model_suffix(native_label))
+}
 
 #[derive(Debug)]
 pub(super) struct NativeCameraFrameReader {
@@ -170,7 +190,462 @@ mod platform {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+mod platform {
+    use super::{
+        camera_labels_match, normalized_camera_label, DecodedRgbFrame, NativeCameraSource,
+    };
+    use std::ptr;
+    use std::sync::{Arc, Mutex};
+    use windows::core::{implement, Ref, HRESULT};
+    use windows::Win32::Media::MediaFoundation::{
+        IMFActivate, IMFAttributes, IMFMediaSource, IMFSourceReader, IMFSourceReaderCallback,
+        IMFSourceReaderCallback_Impl, IMFSample, IMFMediaEvent, MF_SOURCE_READER_ASYNC_CALLBACK, MFCreateAttributes,
+        MFCreateMediaType, MFCreateSourceReaderFromMediaSource, MFEnumDeviceSources,
+        MFMediaType_Video, MFShutdown, MFStartup, MFVideoFormat_RGB32,
+        MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+        MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID, MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE,
+        MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS,
+        MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READERF_ERROR,
+        MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN,
+        MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+        MF_VERSION,
+    };
+    use windows::Win32::System::Com::{
+        CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_MULTITHREADED,
+    };
+
+    const FIRST_VIDEO_STREAM: u32 = MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32;
+
+    type PendingSample = Arc<Mutex<Option<Result<DecodedRgbFrame, String>>>>;
+
+    #[implement(IMFSourceReaderCallback)]
+    struct CameraCallback {
+        sample: PendingSample,
+        format: Arc<Mutex<(u32, u32, i32)>>,
+    }
+
+    impl IMFSourceReaderCallback_Impl for CameraCallback_Impl {
+        fn OnReadSample(&self, status: HRESULT, _stream: u32, flags: u32, _time: i64, sample: Ref<IMFSample>) -> windows::core::Result<()> {
+            let result = (|| {
+                status.ok().map_err(|error| format!("Windows camera frame read failed: {error}"))?;
+                if flags & (MF_SOURCE_READERF_ERROR.0 | MF_SOURCE_READERF_ENDOFSTREAM.0) as u32 != 0 {
+                    return Err("Windows camera source ended or reported an error".to_string());
+                }
+                let Some(sample) = sample.as_ref() else { return Ok(None); };
+                let (width, height, stride) = *self.format.lock().map_err(|_| "camera format lock poisoned")?;
+                decode_sample(sample, width, height, stride).map(Some)
+            })();
+            if let Ok(mut pending) = self.sample.lock() {
+                // An empty sample also completes a request; represent it with
+                // a zero-sized frame so the owner can request the next one.
+                *pending = Some(result.map(|frame| frame.unwrap_or(DecodedRgbFrame {
+                    index: 0, width: 0, height: 0, data: Vec::new(),
+                })));
+            }
+            Ok(())
+        }
+        fn OnFlush(&self, _stream: u32) -> windows::core::Result<()> { Ok(()) }
+        fn OnEvent(&self, _stream: u32, _event: Ref<IMFMediaEvent>) -> windows::core::Result<()> { Ok(()) }
+    }
+
+    #[derive(Debug)]
+    pub(super) struct NativeCameraFrameReader {
+        reader: IMFSourceReader,
+        source: IMFMediaSource,
+        sequence: usize,
+        pending_frame: Option<DecodedRgbFrame>,
+        sample: PendingSample,
+        read_pending: bool,
+        com_initialized: bool,
+        media_foundation_started: bool,
+    }
+
+    impl NativeCameraFrameReader {
+        pub(super) fn start(source: &NativeCameraSource) -> Result<Self, String> {
+            let com_initialized =
+                unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).ok().is_ok() };
+            if !com_initialized {
+                return Err("Windows camera COM initialization failed".to_string());
+            }
+
+            if let Err(error) = unsafe { MFStartup(MF_VERSION, 0) } {
+                unsafe { CoUninitialize() };
+                return Err(format!("Windows Media Foundation startup failed: {error}"));
+            }
+
+            match Self::start_after_platform_init(source) {
+                Ok(mut capture) => {
+                    capture.com_initialized = true;
+                    capture.media_foundation_started = true;
+                    let mut first_frame = None;
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                    while std::time::Instant::now() < deadline {
+                        first_frame = capture.read_sample()?;
+                        if first_frame.is_some() {
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
+                    if first_frame.is_none() {
+                        return Err("Windows camera opened without producing a frame".to_string());
+                    }
+                    capture.pending_frame = first_frame;
+                    Ok(capture)
+                }
+                Err(error) => {
+                    let _ = unsafe { MFShutdown() };
+                    unsafe { CoUninitialize() };
+                    Err(error)
+                }
+            }
+        }
+
+        pub(super) fn read_latest_frame(&mut self) -> Result<Option<DecodedRgbFrame>, String> {
+            if self.pending_frame.is_some() {
+                return Ok(self.pending_frame.take());
+            }
+            self.read_sample()
+        }
+
+        fn start_after_platform_init(source: &NativeCameraSource) -> Result<Self, String> {
+            let activation = select_camera(source.device_label.as_deref())?;
+            let media_source = unsafe { activation.ActivateObject::<IMFMediaSource>() }
+                .map_err(|error| format!("Windows camera activation failed: {error}"))?;
+
+            let sample = Arc::new(Mutex::new(None));
+            let format = Arc::new(Mutex::new((0, 0, 0)));
+            let callback: IMFSourceReaderCallback = CameraCallback { sample: sample.clone(), format: format.clone() }.into();
+            let attributes = create_attributes(4)?;
+            unsafe {
+                attributes.SetUnknown(&MF_SOURCE_READER_ASYNC_CALLBACK, &callback)
+                    .map_err(|error| format!("Windows camera async callback failed: {error}"))?;
+                attributes
+                    .SetUINT32(&MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, 1)
+                    .map_err(|error| {
+                        format!("Windows camera video processing setup failed: {error}")
+                    })?;
+                attributes
+                    .SetUINT32(&MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, 1)
+                    .map_err(|error| {
+                        format!("Windows camera hardware transform setup failed: {error}")
+                    })?;
+                attributes
+                    .SetUINT32(&MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN, 1)
+                    .map_err(|error| format!("Windows camera shutdown setup failed: {error}"))?;
+            }
+            let reader = unsafe { MFCreateSourceReaderFromMediaSource(&media_source, &attributes) }
+                .map_err(|error| format!("Windows camera source reader failed: {error}"))?;
+
+            let output_type = unsafe { MFCreateMediaType() }
+                .map_err(|error| format!("Windows camera output type failed: {error}"))?;
+            let requested_fps = source.capture_fps.round().clamp(1.0, 60.0) as u32;
+            unsafe {
+                output_type
+                    .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
+                    .map_err(|error| format!("Windows camera major type failed: {error}"))?;
+                output_type
+                    .SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_RGB32)
+                    .map_err(|error| format!("Windows camera RGB output failed: {error}"))?;
+                output_type
+                    .SetUINT64(
+                        &MF_MT_FRAME_SIZE,
+                        pack_ratio(source.output_width, source.output_height),
+                    )
+                    .map_err(|error| format!("Windows camera frame size failed: {error}"))?;
+                output_type
+                    .SetUINT64(&MF_MT_FRAME_RATE, pack_ratio(requested_fps, 1))
+                    .map_err(|error| format!("Windows camera frame rate failed: {error}"))?;
+                reader
+                    .SetCurrentMediaType(FIRST_VIDEO_STREAM, None, &output_type)
+                    .map_err(|error| format!("Windows camera RGB32 conversion failed: {error}"))?;
+            }
+
+            let current_type = unsafe { reader.GetCurrentMediaType(FIRST_VIDEO_STREAM) }
+                .map_err(|error| format!("Windows camera negotiated type failed: {error}"))?;
+            let frame_size = unsafe { current_type.GetUINT64(&MF_MT_FRAME_SIZE) }
+                .map_err(|error| format!("Windows camera negotiated size failed: {error}"))?;
+            let (width, height) = unpack_ratio(frame_size);
+            if width == 0 || height == 0 || width.max(height) > 4096 {
+                return Err("Windows camera negotiated invalid frame dimensions".to_string());
+            }
+            let stride = unsafe { current_type.GetUINT32(&MF_MT_DEFAULT_STRIDE) }
+                .map(|value| value as i32)
+                .unwrap_or_else(|_| (width * 4) as i32);
+            if stride == 0 || stride.unsigned_abs() < width.saturating_mul(4) {
+                return Err("Windows camera negotiated invalid frame stride".to_string());
+            }
+            *format.lock().map_err(|_| "camera format lock poisoned")? = (width, height, stride);
+
+            Ok(Self {
+                reader,
+                source: media_source,
+                sequence: 0,
+                pending_frame: None,
+                sample,
+                read_pending: false,
+                com_initialized: false,
+                media_foundation_started: false,
+            })
+        }
+
+        fn read_sample(&mut self) -> Result<Option<DecodedRgbFrame>, String> {
+            let sample = self.sample.lock().map_err(|_| "camera sample lock poisoned")?.take();
+            if sample.is_some() { self.read_pending = false; }
+            let mut frame = sample.transpose()?;
+            if !self.read_pending {
+                // All output pointers MUST be null in asynchronous mode. The
+                // worker remains interruptible even if a camera stops delivering.
+                unsafe { self.reader.ReadSample(FIRST_VIDEO_STREAM, 0, None, None, None, None) }
+                    .map_err(|error| format!("Windows camera read request failed: {error}"))?;
+                self.read_pending = true;
+            }
+            if let Some(frame) = frame.as_mut() {
+                if frame.width == 0 { return Ok(None); }
+                self.sequence = self.sequence.wrapping_add(1);
+                frame.index = self.sequence;
+            }
+            Ok(frame)
+        }
+    }
+
+    fn decode_sample(sample: &IMFSample, width: u32, height: u32, stride: i32) -> Result<DecodedRgbFrame, String> {
+            let buffer = unsafe { sample.ConvertToContiguousBuffer() }
+                .map_err(|error| format!("Windows camera sample buffer failed: {error}"))?;
+            let mut bytes = ptr::null_mut();
+            let mut current_length = 0u32;
+            unsafe {
+                buffer
+                    .Lock(&mut bytes, None, Some(&mut current_length))
+                    .map_err(|error| format!("Windows camera buffer lock failed: {error}"))?;
+            }
+            let copied = copy_rgb32_frame(
+                bytes,
+                current_length as usize,
+                width,
+                height,
+                stride,
+            );
+            let unlock_result = unsafe { buffer.Unlock() };
+            unlock_result
+                .map_err(|error| format!("Windows camera buffer unlock failed: {error}"))?;
+            let data = copied?;
+            Ok(DecodedRgbFrame {
+                index: 0,
+                width,
+                height,
+                data,
+            })
+    }
+
+    impl Drop for NativeCameraFrameReader {
+        fn drop(&mut self) {
+            let _ = unsafe { self.reader.Flush(FIRST_VIDEO_STREAM) };
+            let _ = unsafe { self.source.Shutdown() };
+            if self.media_foundation_started {
+                let _ = unsafe { MFShutdown() };
+            }
+            if self.com_initialized {
+                unsafe { CoUninitialize() };
+            }
+        }
+    }
+
+    fn create_attributes(capacity: u32) -> Result<IMFAttributes, String> {
+        let mut attributes = None;
+        unsafe { MFCreateAttributes(&mut attributes, capacity) }
+            .map_err(|error| format!("Windows camera attributes failed: {error}"))?;
+        attributes.ok_or_else(|| "Windows camera attributes were not created".to_string())
+    }
+
+    fn select_camera(device_label: Option<&str>) -> Result<IMFActivate, String> {
+        let attributes = create_attributes(1)?;
+        unsafe {
+            attributes
+                .SetGUID(
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
+                )
+                .map_err(|error| format!("Windows camera enumeration setup failed: {error}"))?;
+        }
+
+        let mut entries = ptr::null_mut();
+        let mut count = 0u32;
+        unsafe { MFEnumDeviceSources(&attributes, &mut entries, &mut count) }
+            .map_err(|error| format!("Windows camera enumeration failed: {error}"))?;
+        if entries.is_null() || count == 0 {
+            return Err("No Windows camera devices are available".to_string());
+        }
+
+        let desired = device_label.map(normalized_camera_label);
+        let mut default_camera = None;
+        let mut exact_match = None;
+        let mut compatible_matches = Vec::new();
+        unsafe {
+            let activations = std::slice::from_raw_parts_mut(entries, count as usize);
+            for activation in activations.iter().flatten() {
+                let label = camera_label(activation).unwrap_or_default();
+                if default_camera.is_none() {
+                    default_camera = Some(activation.clone());
+                }
+                if exact_match.is_none()
+                    && desired.as_deref() == Some(normalized_camera_label(&label).as_str())
+                {
+                    exact_match = Some(activation.clone());
+                } else if let Some(browser_label) = device_label {
+                    if camera_labels_match(browser_label, &label) {
+                        compatible_matches.push(activation.clone());
+                    }
+                }
+            }
+            for activation in activations {
+                ptr::drop_in_place(activation);
+            }
+            CoTaskMemFree(Some(entries.cast()));
+        }
+
+        if desired.is_none() {
+            return default_camera
+                .ok_or_else(|| "No Windows camera devices are available".to_string());
+        }
+        if let Some(activation) = exact_match {
+            return Ok(activation);
+        }
+        match compatible_matches.len() {
+            1 => Ok(compatible_matches.remove(0)),
+            0 => Err(format!(
+                "No Media Foundation camera matched the WebView device label ({count} device(s) enumerated)"
+            )),
+            matched => Err(format!(
+                "The WebView camera label matched {matched} Media Foundation devices; select a uniquely named camera"
+            )),
+        }
+    }
+
+    fn camera_label(activation: &IMFActivate) -> Result<String, String> {
+        let length = unsafe { activation.GetStringLength(&MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME) }
+            .map_err(|error| format!("Windows camera label length failed: {error}"))?;
+        let mut value = vec![0u16; length as usize + 1];
+        unsafe {
+            activation
+                .GetString(&MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &mut value, None)
+                .map_err(|error| format!("Windows camera label failed: {error}"))?;
+        }
+        Ok(String::from_utf16_lossy(&value[..length as usize]))
+    }
+
+    fn pack_ratio(numerator: u32, denominator: u32) -> u64 {
+        (u64::from(numerator) << 32) | u64::from(denominator)
+    }
+
+    fn unpack_ratio(value: u64) -> (u32, u32) {
+        ((value >> 32) as u32, value as u32)
+    }
+
+    fn copy_rgb32_frame(
+        bytes: *const u8,
+        length: usize,
+        width: u32,
+        height: u32,
+        stride: i32,
+    ) -> Result<Vec<u8>, String> {
+        if bytes.is_null() {
+            return Err("Windows camera returned an empty frame buffer".to_string());
+        }
+        let row_bytes = width as usize * 4;
+        let stride_bytes = stride.unsigned_abs() as usize;
+        let required = stride_bytes
+            .saturating_mul(height.saturating_sub(1) as usize)
+            .saturating_add(row_bytes);
+        if row_bytes == 0 || height == 0 || length < required {
+            return Err("Windows camera returned a short RGB32 frame".to_string());
+        }
+        let source = unsafe { std::slice::from_raw_parts(bytes, length) };
+        let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
+        for y in 0..height as usize {
+            let source_y = if stride < 0 {
+                height as usize - 1 - y
+            } else {
+                y
+            };
+            let row = &source[source_y * stride_bytes..source_y * stride_bytes + row_bytes];
+            for pixel in row.chunks_exact(4) {
+                rgb.extend_from_slice(&[pixel[2], pixel[1], pixel[0]]);
+            }
+        }
+        Ok(rgb)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::copy_rgb32_frame;
+
+        #[test]
+        fn converts_top_down_bgra_rows_to_rgb() {
+            let bgra = [
+                0, 0, 255, 255, 0, 255, 0, 255, 255, 0, 0, 255, 255, 255, 255, 255,
+            ];
+            let rgb = copy_rgb32_frame(bgra.as_ptr(), bgra.len(), 2, 2, 8).unwrap();
+            assert_eq!(rgb, [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
+        }
+
+        #[test]
+        fn flips_bottom_up_bgra_rows_and_honors_padding() {
+            let bgra = [
+                255, 0, 0, 255, 255, 255, 255, 255, 9, 9, 9, 9, 0, 0, 255, 255, 0, 255, 0, 255,
+            ];
+            let rgb = copy_rgb32_frame(bgra.as_ptr(), bgra.len(), 2, 2, -12).unwrap();
+            assert_eq!(rgb, [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod camera_label_tests {
+    use super::{camera_labels_match, normalized_camera_label, without_chromium_usb_model_suffix};
+
+    #[test]
+    fn normalizes_case_and_whitespace() {
+        assert_eq!(
+            normalized_camera_label("  Logitech   BRIO\t"),
+            "logitech brio"
+        );
+    }
+
+    #[test]
+    fn matches_chromium_usb_model_suffix_to_media_foundation_name() {
+        assert!(camera_labels_match(
+            "Logitech BRIO (046d:085e)",
+            "Logitech BRIO"
+        ));
+        assert!(camera_labels_match(
+            "Logitech BRIO (046D:085E)",
+            "  LOGITECH   BRIO  "
+        ));
+    }
+
+    #[test]
+    fn preserves_non_usb_parenthetical_names() {
+        assert_eq!(
+            without_chromium_usb_model_suffix("Integrated Camera (Front)"),
+            "Integrated Camera (Front)"
+        );
+        assert!(!camera_labels_match(
+            "Integrated Camera (Front)",
+            "Integrated Camera"
+        ));
+    }
+
+    #[test]
+    fn does_not_accept_different_camera_names() {
+        assert!(!camera_labels_match(
+            "Logitech BRIO (046d:085e)",
+            "Integrated Camera"
+        ));
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod platform {
     use super::{DecodedRgbFrame, NativeCameraSource};
 
@@ -179,7 +654,7 @@ mod platform {
 
     impl NativeCameraFrameReader {
         pub(super) fn start(_source: &NativeCameraSource) -> Result<Self, String> {
-            Err("Native camera capture is only implemented on macOS".to_string())
+            Err("Native camera capture is not implemented on this platform".to_string())
         }
 
         pub(super) fn read_latest_frame(&mut self) -> Result<Option<DecodedRgbFrame>, String> {

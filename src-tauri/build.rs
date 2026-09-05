@@ -34,6 +34,7 @@ fn main() {
             "record_media_diagnostic",
             "save_screenshot_to_desktop",
             "get_native_output_capabilities",
+            "read_native_output_preview_frame",
             "start_system_audio_capture",
             "read_system_audio_features",
             "stop_system_audio_capture",

@@ -59,8 +59,10 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 ## Camera and Native Texture Paths
 
 - Evaluate AVFoundation/CVPixelBuffer-to-Metal texture sharing on macOS.
-- Evaluate Media Foundation-to-D3D texture sharing on Windows.
-- Evaluate PipeWire/V4L2-to-Vulkan or GLES interop on Linux where practical.
+- Evaluate zero-copy Media Foundation-to-D3D texture sharing beyond the 1.0.3
+  native RGB-frame path on Windows.
+- Evaluate PipeWire or zero-copy V4L2-to-Vulkan/GLES interop beyond the 1.0.3
+  bundled-FFmpeg V4L2 path on Linux.
 - Add native multi-camera composition without forcing every path through
   WebView canvas readback.
 - Preserve latest-frame behavior so live output does not accumulate stale

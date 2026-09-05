@@ -4,7 +4,8 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
+import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
+import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -126,7 +127,8 @@ async function runSmoke() {
     const browser = await chromium.launch({
       headless: true,
       executablePath,
-      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+        ...(process.env.SMOKE_REQUIRE_WEBGPU === '1' ? ['--enable-unsafe-webgpu'] : [])]
     });
     const errors = [];
 
@@ -300,7 +302,7 @@ async function runSmoke() {
     if (
       !main.manualDiagnostics.integratedInReportsDialog ||
       main.manualDiagnostics.noteLimit !== 500 ||
-      !['nativeOutputCapabilities', 'nativeOutputSync', 'recentRendererEvents', 'renderer'].every((key) => main.manualDiagnostics.contextKeys.includes(key))
+      !['nativeOutputCapabilities', 'nativeOutputAdapter', 'nativeOutputSync', 'nativeOutputMirror', 'rendererDiagnostics', 'renderer'].every((key) => main.manualDiagnostics.contextKeys.includes(key))
     ) {
       throw new Error(`Manual diagnostics should extend the existing bounded Reports workflow: ${JSON.stringify(main.manualDiagnostics)}`);
     }
@@ -367,7 +369,7 @@ async function runSmoke() {
       JSON.stringify(main.presetNames) !== JSON.stringify(sortedPresetNames) ||
       !main.presetNames.includes('Dense Color ASCII') ||
       main.presetNames.includes('Point & Click Default') ||
-      !/^69 built-in · 0 saved$/i.test(main.presetStatus)
+      main.presetStatus.toLowerCase() !== `${BUILTIN_PRESET_BACKEND_BASELINE.presetCount} built-in · 0 saved`
     ) {
       throw new Error(`Preset sections should be separate, renamed, and alphabetical: ${JSON.stringify({
         sections: main.presetSections,
@@ -395,7 +397,7 @@ async function runSmoke() {
     if (
       !filteredPresets.names.length ||
       filteredPresets.names.some((name) => !name.toLocaleLowerCase('en-US').includes('terminal')) ||
-      !new RegExp(`^${filteredPresets.names.length} of 69 presets$`, 'i').test(filteredPresets.status) ||
+      filteredPresets.status.toLowerCase() !== `${filteredPresets.names.length} of ${BUILTIN_PRESET_BACKEND_BASELINE.presetCount} presets` ||
       filteredPresets.activeElement !== 'preset-search'
     ) {
       throw new Error(`Preset search should filter live by display name: ${JSON.stringify(filteredPresets)}`);
@@ -406,7 +408,7 @@ async function runSmoke() {
       count: document.querySelectorAll('#preset-list .preset-name').length,
       activeElement: document.activeElement?.id || ''
     }));
-    if (clearedPresetSearch.value || clearedPresetSearch.count !== 69 || clearedPresetSearch.activeElement !== 'preset-search') {
+    if (clearedPresetSearch.value || clearedPresetSearch.count !== BUILTIN_PRESET_BACKEND_BASELINE.presetCount || clearedPresetSearch.activeElement !== 'preset-search') {
       throw new Error(`Escape should clear preset search and preserve focus: ${JSON.stringify(clearedPresetSearch)}`);
     }
 
@@ -1401,18 +1403,44 @@ async function runSmoke() {
           renderer?.renderFrame?.();
 
           const canvas = app._activeRenderSurface?.();
-          let pixels = null;
           let glError = 0;
-          if (canvas?.width && canvas?.height) {
+          const readPixels = () => {
+            if (!canvas?.width || !canvas?.height) return null;
             const gl = renderer?.gl;
             if (gl) {
-              pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              const pixels = new Uint8Array(canvas.width * canvas.height * 4);
               gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
               glError = gl.getError();
+              return pixels;
             } else {
-              pixels = canvas.getContext('2d', { willReadFrequently: true })
-                ?.getImageData(0, 0, canvas.width, canvas.height).data || null;
+              // WebGPU canvases cannot also create a 2D context. Snapshot the
+              // rendered surface, as the application's screenshot path does.
+              const readback = document.createElement('canvas');
+              readback.width = canvas.width;
+              readback.height = canvas.height;
+              const ctx = readback.getContext('2d', { willReadFrequently: true });
+              ctx.drawImage(canvas, 0, 0);
+              return ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             }
+          };
+          const pixels = readPixels();
+
+          // These looks must keep moving on a still image without audio or a
+          // preset transition. Observe normal animation ticks, not forced ones.
+          let animation = null;
+          if (['ascii-world-mint', 'ascii-city-nightshift'].includes(preset.id)) {
+            const firstFrame = renderer.frameCount;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            const next = await new Promise((resolve) => requestAnimationFrame(() => resolve(readPixels())));
+            let changedPixels = 0;
+            for (let i = 0; pixels && next && i < pixels.length; i += 4) {
+              if (Math.abs(pixels[i] - next[i]) + Math.abs(pixels[i + 1] - next[i + 1]) +
+                  Math.abs(pixels[i + 2] - next[i + 2]) > 12) changedPixels += 1;
+            }
+            animation = {
+              framesAdvanced: renderer.frameCount - firstFrame,
+              changedFraction: changedPixels / (canvas.width * canvas.height)
+            };
           }
 
           const background = app.params.backgroundColor.match(/[0-9a-f]{2}/gi).map((value) => Number.parseInt(value, 16));
@@ -1437,6 +1465,7 @@ async function runSmoke() {
             aspectError: canvasRatio ? Math.abs(canvasRatio / sourceRatio - 1) : 1,
             glError,
             pendingGlyphPages: renderer?.pendingGlyphPages?.size || 0,
+            animation,
             canvasSize: `${canvas?.width || 0}x${canvas?.height || 0}`
           });
         }
@@ -1450,7 +1479,8 @@ async function runSmoke() {
       !preset.hasSignal ||
       preset.aspectError > 0.03 ||
       preset.glError !== 0 ||
-      preset.pendingGlyphPages !== 0
+      preset.pendingGlyphPages !== 0 ||
+      (preset.animation && (preset.animation.framesAdvanced <= 0 || preset.animation.changedFraction < 0.001))
     );
     if (presetFailures.length) {
       throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
@@ -1467,6 +1497,116 @@ async function runSmoke() {
       })}`);
     }
 
+    // Palette tables are row-addressed data, unlike vertically flipped source
+    // images. Check real WebGL pixels at startup and after live palette changes.
+    // Non-extreme channels avoid LUT bucket boundaries where shader rounding
+    // can legitimately select either neighboring quantized input.
+    const paletteSwatches = [[0, 0, 0], [255, 255, 255], [137, 180, 143], [141, 113, 63],
+      [85, 141, 156], [12, 44, 92], [215, 22, 45], [124, 126, 122]];
+    const paletteCases = [
+      ['city-nightshift', 'nearest'], ['none', 'nearest'],
+      ...PALETTES.flatMap(({ id }) => [[id, 'nearest'], [id, 'luminance']])
+    ].map(([id, mapping]) => ({ id, mapping,
+      expected: paletteSwatches.map(color => mapColorToPalette(color, id, mapping, buildPaletteLut(id, mapping))) }));
+    await page.evaluate(async ({ swatches, cases }) => {
+      const app = window.ascilineRemix;
+      app.stop();
+      const canvas = document.createElement('canvas');
+      canvas.width = 96; canvas.height = 48;
+      const ctx = canvas.getContext('2d');
+      swatches.forEach((color, index) => {
+        ctx.fillStyle = `rgb(${color.join(',')})`;
+        ctx.fillRect(index * 12, 0, 12, 48);
+      });
+      const source = { canvas, element: canvas, isImage: true, type: 'image', ready: true,
+        width: 96, height: 48, destroy() {}, updateParams() {} };
+      app.loadStaticSource = async () => source;
+      app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
+        cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
+        solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
+        paletteMapping: cases[0].mapping, ditherMode: 'none' };
+      try {
+        await app.start();
+        const renderer = app.staticRuntime.renderer;
+        if (renderer.getStats().backend !== 'webgl2') throw new Error('Palette check requires actual WebGL2');
+        const gl = renderer.gl;
+        for (const [index, test] of cases.entries()) {
+          if (index > 0) {
+            renderer.paletteId = test.id;
+            renderer.paletteMapping = test.mapping;
+            renderer.syncFeatureResources();
+          }
+          renderer.renderFrame();
+          const pixels = new Uint8Array(96 * 48 * 4);
+          gl.readPixels(0, 0, 96, 48, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          test.expected.forEach((color, column) => {
+            const offset = (24 * 96 + column * 12 + 6) * 4;
+            const actual = [...pixels.slice(offset, offset + 3)];
+            if (actual.some((value, channel) => Math.abs(value - color[channel]) > 2)) {
+              throw new Error(`WebGL palette ${test.id}/${test.mapping} swatch ${column}: ${actual} != ${color}`);
+            }
+          });
+          if (!gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL)) throw new Error('Source image orientation was not restored');
+          if (gl.getError()) throw new Error('WebGL palette check produced a GL error');
+        }
+      } finally {
+        app.stop();
+      }
+    }, { swatches: paletteSwatches, cases: paletteCases });
+
+    // Feed the real renderer a synthetic native-preview canvas. Camera hardware
+    // remains a separate acceptance gate, but texture/viewport resize is testable.
+    const nativePreviewGeometry = await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      app.audioReactiveRuntime?.stop?.();
+      app.stop();
+      const canvas = document.createElement('canvas');
+      const source = { canvas, element: canvas, isVideo: true, isNativeOutputPreview: true,
+        type: 'camera', ready: true, destroy() {}, updateParams() {} };
+      const resize = (width, height) => {
+        source.width = canvas.width = width;
+        source.height = canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ff8844'; ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#44bbff'; ctx.fillRect(width / 2, 0, width / 2, height);
+      };
+      resize(480, 360);
+      app.loadStaticSource = async () => source;
+      app.params = { ...app.params, sourceMode: 'static', mediaType: 'camera', mediaUrl: 'camera:',
+        backend: 'auto', cols: 620, autoRows: true, cellWidth: 1, cellHeight: 2, aspectCorrection: 1,
+        solidMode: true, glyphMode: false, pixel: false, paletteId: '', ditherMode: 'none' };
+      await app.start();
+      const results = [];
+      for (const [width, height, cols, cellWidth, cellHeight] of [
+        [480, 360, 620, 1, 2], [640, 360, 620, 1, 2], [640, 360, 520, 2, 3], [480, 360, 520, 2, 3]
+      ]) {
+        resize(width, height);
+        app.params = { ...app.params, cols, cellWidth, cellHeight };
+        app.staticRuntime.updateParams(app.params);
+        const renderer = app.staticRuntime.renderer;
+        renderer.renderFrame();
+        await renderer.device?.queue?.onSubmittedWorkDone?.();
+        renderer.renderFrame();
+        const sample = document.createElement('canvas'); sample.width = 16; sample.height = 16;
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(renderer.canvas, 0, 0, 16, 16);
+        const pixels = ctx.getImageData(0, 0, 16, 16).data;
+        const right = [...pixels].filter((_, i) => (Math.floor(i / 4) % 16) >= 12 && i % 4 < 3);
+        const rightMax = Math.max(...right);
+        const aspectError = Math.abs((renderer.canvas.width / renderer.canvas.height) / (width / height) - 1);
+        if (rightMax < 25 || aspectError > 0.01) throw new Error(`Native preview geometry failed: ${JSON.stringify({ width, height, cols, rightMax, aspectError })}`);
+        results.push({ backend: renderer.getStats().backend, source: `${width}x${height}`,
+          canvas: `${renderer.canvas.width}x${renderer.canvas.height}`, rightMax, aspectError });
+      }
+      return results;
+    });
+
+    if (process.env.SMOKE_REQUIRE_WEBGPU === '1' && nativePreviewGeometry.some((row) => row.backend !== 'webgpu')) {
+      throw new Error(`WebGPU preview was required: ${JSON.stringify(nativePreviewGeometry)}`);
+    }
+    if (process.env.SMOKE_SCREENSHOT_PATH) await page.screenshot({ path: process.env.SMOKE_SCREENSHOT_PATH });
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     output.on('console', (msg) => { if (msg.type() === 'error') errors.push(`output:${msg.text()}`); });
     const outputResponse = await output.goto(`${baseUrl}/output.html`, { waitUntil: 'domcontentloaded' });
@@ -1578,6 +1718,8 @@ async function runSmoke() {
       main,
       output: outputState,
       mirrorOutput: mirrorState,
+      stillImageAnimation: presetMatrix.filter((preset) => preset.animation),
+      nativePreviewGeometry,
       errors
     };
     console.log(JSON.stringify(result, null, 2));

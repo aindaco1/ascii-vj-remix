@@ -167,7 +167,7 @@ struct RenderParams {
     glyphColor: u32,
     backgroundColor: u32,
     opacity: f32,
-    _pad1: u32,
+    coverageGlyphs: u32,
     _pad2: u32,
 };
 
@@ -209,21 +209,34 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
         return vec4<f32>(cell.rgb, params.opacity);
     }
 
-    let localX = renderX - f32(cellX * params.cellW);
-    let localY = renderY - f32(cellY * params.cellH);
-    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(params.glyphTileW)), params.glyphTileW - 1u);
-    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(params.glyphTileH)), params.glyphTileH - 1u);
+    var localX = renderX - f32(cellX * params.cellW);
+    var localY = renderY - f32(cellY * params.cellH);
+    var glyphMip = 0u;
+    if (params.coverageGlyphs != 0u) {
+        // Match the primary canvas's logical pixel centers before enlargement.
+        localX = floor(localX) + 0.5;
+        localY = floor(localY) + 0.5;
+        let minCell = min(params.cellW, params.cellH);
+        if (minCell <= 8u) { glyphMip = 1u; }
+        if (minCell <= 4u) { glyphMip = 2u; }
+        if (minCell <= 2u) { glyphMip = 3u; }
+        if (minCell <= 1u) { glyphMip = 4u; }
+    }
+    let tileW = params.glyphTileW >> glyphMip;
+    let tileH = params.glyphTileH >> glyphMip;
+    let glyphX = min(u32(localX / f32(max(params.cellW, 1u)) * f32(tileW)), tileW - 1u);
+    let glyphY = min(u32(localY / f32(max(params.cellH, 1u)) * f32(tileH)), tileH - 1u);
     let rampX = min(u32(clamp(cell.a, 0.0, 0.99999) * f32(params.glyphCount)), params.glyphCount - 1u);
     let glyphIndex = glyphRamp[rampX];
     let glyphPage = glyphIndex / 4096u;
     let glyphSlot = glyphIndex % 4096u;
-    let atlasX = (glyphSlot % 64u) * params.glyphTileW + glyphX;
-    let atlasY = (glyphSlot / 64u) * params.glyphTileH + glyphY;
+    let atlasX = (glyphSlot % 64u) * tileW + glyphX;
+    let atlasY = (glyphSlot / 64u) * tileH + glyphY;
     let alpha = textureLoad(
         glyphAtlasTex,
         vec2<i32>(i32(atlasX), i32(atlasY)),
         i32(glyphPage),
-        0
+        i32(glyphMip)
     ).r;
     if (alpha <= 0.5) {
         return vec4<f32>(unpackColor(params.backgroundColor), params.opacity);
@@ -361,8 +374,17 @@ fn source_frame_needs_upload(
 impl NativeGpuPresenter {
     #[cfg(not(target_os = "macos"))]
     pub(super) fn new(window: &Window) -> Result<Self, String> {
+        let started_at = Instant::now();
         let (instance, surface) = create_surface_on_main_thread(window)?;
-        Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync)
+        let surface_ready_at = Instant::now();
+        let result = Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync);
+        #[cfg(target_os = "windows")]
+        eprintln!("[NativeOutputStartup] phase=gpu-ready surfaceMs={} devicePipelineMs={} totalMs={} ready={}",
+            surface_ready_at.duration_since(started_at).as_millis(), surface_ready_at.elapsed().as_millis(),
+            started_at.elapsed().as_millis(), result.is_ok());
+        #[cfg(not(target_os = "windows"))]
+        let _ = (started_at, surface_ready_at);
+        result
     }
 
     #[cfg(target_os = "macos")]
@@ -487,7 +509,7 @@ impl NativeGpuPresenter {
                 height: NATIVE_GLYPH_ATLAS_PAGE_SIZE,
                 depth_or_array_layers: NATIVE_GLYPH_ATLAS_PAGE_COUNT,
             },
-            mip_level_count: 1,
+            mip_level_count: if cfg!(target_os = "windows") { 5 } else { 1 },
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R8Unorm,
@@ -977,6 +999,21 @@ impl NativeGpuPresenter {
                     depth_or_array_layers: 1,
                 },
             );
+            #[cfg(target_os = "windows")]
+            for (level, pixels) in coverage_mips(native_glyph_atlas_page_bytes(page as u32), NATIVE_GLYPH_ATLAS_PAGE_SIZE).iter().enumerate() {
+                let size = NATIVE_GLYPH_ATLAS_PAGE_SIZE >> (level + 1);
+                self.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &self._glyph_atlas_texture,
+                        mip_level: level as u32 + 1,
+                        origin: wgpu::Origin3d { x: 0, y: 0, z: page as u32 },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    pixels,
+                    wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(size), rows_per_image: Some(size) },
+                    wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 1 },
+                );
+            }
             self.loaded_glyph_pages[page] = true;
         }
 
@@ -1027,15 +1064,46 @@ fn configure_surface_checked(
     }
 }
 
+// Same max-coverage reduction as renderers/shared/glyph-atlas.js. Averaging
+// would erase fine strokes and turn the 1px Acid Snowstorm cells black.
+#[cfg(any(target_os = "windows", test))]
+fn coverage_mips(base: &[u8], base_size: u32) -> Vec<Vec<u8>> {
+    let mut levels: Vec<Vec<u8>> = Vec::with_capacity(4);
+    let mut size = base_size as usize;
+    for _ in 0..4 {
+        let previous = levels.last().map(Vec::as_slice).unwrap_or(base);
+        let next_size = size / 2;
+        let mut next = vec![0; next_size * next_size];
+        for y in 0..next_size {
+            for x in 0..next_size {
+                let src = y * 2 * size + x * 2;
+                next[y * next_size + x] = previous[src].max(previous[src + 1])
+                    .max(previous[src + size]).max(previous[src + size + 1]);
+            }
+        }
+        levels.push(next);
+        size = next_size;
+    }
+    levels
+}
+
 #[cfg(not(target_os = "macos"))]
 fn create_surface_on_main_thread(
     window: &Window,
 ) -> Result<(wgpu::Instance, wgpu::Surface<'static>), String> {
     let (tx, rx) = mpsc::sync_channel(1);
     let window_for_surface = window.clone();
+    // Driver discovery can take seconds on Windows. Do it on the worker and
+    // reuse the instance on subsequent opens, never on the UI message loop.
+    #[cfg(target_os = "windows")]
+    let instance = {
+        static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
+        INSTANCE.get_or_init(wgpu::Instance::default).clone()
+    };
     window
         .run_on_main_thread(move || {
             let result = (|| {
+                #[cfg(not(target_os = "windows"))]
                 let instance = wgpu::Instance::default();
                 let surface = instance
                     .create_surface(window_for_surface)
@@ -1178,6 +1246,7 @@ fn render_params_bytes(
     put_u32(&mut bytes, 44, pack_rgb(params.glyph_color));
     put_u32(&mut bytes, 48, pack_rgb(params.background_color));
     put_f32(&mut bytes, 52, opacity.clamp(0.0, 1.0));
+    put_u32(&mut bytes, 56, u32::from(cfg!(target_os = "windows")));
     bytes
 }
 
@@ -1196,6 +1265,31 @@ fn put_f32(bytes: &mut [u8], offset: usize, value: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_shaders_validate_with_coverage_mip_sampling() {
+        for source in [CELL_PASS_WGSL, RENDER_PASS_WGSL] {
+            let module = wgpu::naga::front::wgsl::parse_str(source)
+                .expect("native WGSL must parse on every build host");
+            wgpu::naga::valid::Validator::new(
+                wgpu::naga::valid::ValidationFlags::all(),
+                wgpu::naga::valid::Capabilities::all(),
+            ).validate(&module).expect("native shader bindings and mip loads must validate");
+        }
+    }
+
+    #[test]
+    fn tiny_cells_use_browser_max_coverage_masks() {
+        let mut base = vec![0; 16 * 16];
+        base[15 * 16 + 15] = 255;
+        let levels = coverage_mips(&base, 16);
+        assert_eq!(levels.iter().map(Vec::len).collect::<Vec<_>>(), [64, 16, 4, 1]);
+        for level in levels {
+            assert_eq!(level.iter().filter(|value| **value != 0).count(), 1);
+            assert_eq!(level.last(), Some(&255));
+        }
+        assert_eq!(coverage_mips(&vec![0; 256], 16)[3], [0]);
+    }
 
     #[test]
     fn source_upload_version_skips_only_identical_versioned_frames() {

@@ -194,9 +194,9 @@ WebKit glyph preview.
 For the primary macOS Apple WebKit view, acceleration-eligible glyph presets
 use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
 the normal software density ceiling. The installed all-preset sweep resolves
-41 built-ins to WebGPU and 28 to Canvas2D, keeps all 69 visible, and confirms
+43 built-ins to WebGPU and 28 to Canvas2D, keeps all 71 visible, and confirms
 every GPU-eligible preset is accelerated. Native Pop Out remains independently
-GPU-rendered. A 30-second structural run held the primary view at 30.0 FPS,
+GPU-rendered. An earlier 30-second structural run held the primary view at 30.0 FPS,
 native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS
 fixture, and completed 16 synchronized crossfades with zero GPU or transition
 failures. These are M1 Max development-host regression results, not M1/16 GB
@@ -302,6 +302,23 @@ Rules:
 - Do not queue old camera frames when the renderer falls behind.
 - Use platform-native capture/texture paths where they produce meaningful
   latency reductions.
+- Windows Media Foundation and Linux V4L2 single-camera Pop Out feed the native
+  `wgpu` presenter without WebView readback or per-frame IPC. If native opening
+  fails, the bounded 640x360 mirror keeps only one request in flight and is
+  capped at 30 FPS; diagnostics report the native-open reason, accepted FPS,
+  and transfer timings.
+- Windows keeps one Media Foundation capture session for both views, without a
+  failed shared-open attempt or a second device open after preflight. Capture
+  runs independently of GPU presentation and uses asynchronous sample callbacks.
+  Its latest frame is downscaled to at most
+  640x360, JPEG-encoded at most 30 times per second, and returned as binary IPC
+  for the existing WebGPU preview. This bounded source bridge avoids the old
+  raw-RGBA JSON serialization path; diagnostics expose accepted FPS, encoded
+  KiB/s, and read/encode/decode latency.
+- Windows native GPU driver discovery is off the UI thread and reuses its
+  instance across opens. Local `NativeOutputStartup` logs separate camera-first-
+  frame, surface, and device/pipeline time; manual diagnostics include native
+  open-command latency (not a claim of first-present latency).
 - For multi-camera, be explicit about the mixing cost and the selected layout.
 
 ### Audio Reactivity

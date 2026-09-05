@@ -39,6 +39,7 @@
     "allow-record-media-diagnostic",
     "allow-save-screenshot-to-desktop",
     "allow-get-native-output-capabilities",
+    "allow-read-native-output-preview-frame",
     "allow-open-native-output-window",
     "allow-update-native-output-window",
     "allow-update-native-output-frame",

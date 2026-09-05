@@ -2,13 +2,14 @@ use crate::bundled_media::{is_safe_bundled_media_path, resolve_bundled_media_pat
 use crate::desktop_bridge::{media_binaries_for_app, MediaRegistry};
 use crate::crash_reporter::{capture_internal_report, CrashReportInput};
 use crate::media_engine::ffmpeg::{
-    probe_video, spawn_macos_camera_rgb_reader, spawn_rgb_reader_with_options, CameraReaderOptions,
-    DecodeConfig, DecodedRgbFrame, FfmpegBinaries, FfmpegRgbFrameReader, RgbReaderOptions,
-    VideoProbe,
+    probe_video, spawn_platform_camera_rgb_reader, spawn_rgb_reader_with_options,
+    CameraReaderOptions, DecodeConfig, DecodedRgbFrame, FfmpegBinaries, FfmpegRgbFrameReader,
+    RgbReaderOptions, VideoProbe,
 };
 #[cfg(target_os = "macos")]
 use crate::system_audio::{InputAudioCaptureState, SystemAudioCaptureState, SystemAudioFeatures};
 use base64::{engine::general_purpose, Engine as _};
+use image::codecs::jpeg::JpegEncoder;
 #[cfg(target_os = "macos")]
 use objc2::rc::autoreleasepool;
 use serde::{Deserialize, Serialize};
@@ -44,18 +45,35 @@ const MAX_NATIVE_SOURCE_FPS: f64 = 60.0;
 const DEFAULT_NATIVE_SOURCE_FPS: f64 = 24.0;
 const MIRROR_SOURCE_KEY: &str = "mirror";
 const NATIVE_CAMERA_SOURCE_KEY: &str = "native-camera";
+const NATIVE_CAMERA_PREVIEW_MAGIC: &[u8; 4] = b"AVP1";
+const NATIVE_CAMERA_PREVIEW_HEADER_BYTES: usize = 32;
+const NATIVE_CAMERA_PREVIEW_MAX_WIDTH: u32 = 640;
+const NATIVE_CAMERA_PREVIEW_MAX_HEIGHT: u32 = 360;
+const NATIVE_CAMERA_PREVIEW_JPEG_QUALITY: u8 = 72;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeOutputCapabilities {
     pub native_camera: bool,
+    pub native_camera_exclusive: bool,
+    pub native_camera_exclusive_fallback: bool,
+    pub native_camera_preview_bridge: bool,
+    pub native_camera_mirror_fallback: bool,
     pub mirror: bool,
 }
 
 #[tauri::command]
 pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
     NativeOutputCapabilities {
-        native_camera: cfg!(target_os = "macos"),
+        native_camera: cfg!(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux"
+        )),
+        native_camera_exclusive: cfg!(any(target_os = "windows", target_os = "linux")),
+        native_camera_exclusive_fallback: false,
+        native_camera_preview_bridge: cfg!(target_os = "windows"),
+        native_camera_mirror_fallback: cfg!(any(target_os = "windows", target_os = "linux")),
         mirror: true,
     }
 }
@@ -242,6 +260,7 @@ struct NativeOutputHandle {
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     param_version: Arc<AtomicU64>,
     mirror_slot: Option<Arc<NativeMirrorFrameSlot>>,
+    camera_preview_slot: Option<Arc<NativeCameraPreviewFrameSlot>>,
     #[cfg(target_os = "macos")]
     _display_link: Option<NativeMacDisplayLinkPresenter>,
     window: Window,
@@ -305,6 +324,91 @@ impl CameraFrameReader {
 struct NativeMirrorFrameSlot {
     frame: Mutex<Option<NativeMirrorFrame>>,
     version: AtomicU64,
+}
+
+#[derive(Debug, Default)]
+struct NativeCameraPreviewFrameSlot {
+    frame: Mutex<Option<Arc<DecodedRgbFrame>>>,
+    version: AtomicU64,
+}
+
+impl NativeCameraPreviewFrameSlot {
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
+    fn set(&self, frame: Arc<DecodedRgbFrame>) -> Result<(), String> {
+        *self
+            .frame
+            .lock()
+            .map_err(|_| "native camera preview frame lock poisoned".to_string())? = Some(frame);
+        self.version.fetch_add(1, Ordering::Release);
+        Ok(())
+    }
+
+    fn latest_after(&self, after_version: u64) -> Option<(u64, Arc<DecodedRgbFrame>)> {
+        let version = self.version.load(Ordering::Acquire);
+        if version <= after_version {
+            return None;
+        }
+        let frame = self.frame.lock().ok()?.clone()?;
+        Some((version, frame))
+    }
+}
+
+// Windows opens one camera once. Capture continues independently of GPU
+// presentation and JPEG consumers; neither can hold up the other or queue
+// stale frames. The COM reader never leaves its owning thread.
+#[cfg(target_os = "windows")]
+struct WindowsCameraCapture {
+    slot: Arc<NativeCameraPreviewFrameSlot>,
+    stop: Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(target_os = "windows")]
+impl WindowsCameraCapture {
+    async fn start(binaries: FfmpegBinaries, source: NativeCameraSource, stop: Arc<AtomicBool>) -> Result<Self, String> {
+        let started_at = Instant::now();
+        let slot = Arc::new(NativeCameraPreviewFrameSlot::default());
+        let capture_slot = slot.clone();
+        let capture_stop = stop.clone();
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let worker = std::thread::spawn(move || {
+            let result = (|| {
+                let mut reader = open_camera_frame_reader(&binaries, &source, native_camera_source_fps(&source))?;
+                let mut ready = false;
+                while !capture_stop.load(Ordering::Relaxed) {
+                    match reader.read_frame()? {
+                        CameraFrameRead::Frame(frame) => {
+                            capture_slot.set(Arc::new(frame))?;
+                            if !ready { let _ = ready_tx.send(Ok(())); ready = true; }
+                        }
+                        CameraFrameRead::Pending => std::thread::sleep(Duration::from_millis(2)),
+                        CameraFrameRead::Ended => return Err("Windows camera capture ended".to_string()),
+                    }
+                }
+                Ok::<(), String>(())
+            })();
+            if let Err(error) = result {
+                let _ = ready_tx.try_send(Err(error.clone()));
+                eprintln!("[NativeOutputCameraCapture] {error}");
+                capture_stop.store(true, Ordering::Relaxed);
+            }
+        });
+        let capture = Self { slot, stop, worker: Some(worker) };
+        tauri::async_runtime::spawn_blocking(move || {
+            ready_rx.recv_timeout(Duration::from_secs(8))
+                .map_err(|_| "Windows camera did not produce a first frame within 8 seconds".to_string())??;
+            eprintln!("[NativeOutputStartup] phase=camera-first-frame elapsedMs={}", started_at.elapsed().as_millis());
+            Ok(capture)
+        }).await.map_err(|error| error.to_string())?
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WindowsCameraCapture {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(worker) = self.worker.take() { let _ = worker.join(); }
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -1095,6 +1199,94 @@ pub async fn update_native_output_pixels(
     state.update_mirror_pixels(frame)
 }
 
+#[tauri::command]
+pub async fn read_native_output_preview_frame(
+    state: State<'_, NativeOutputState>,
+    after_version: u64,
+) -> Result<tauri::ipc::Response, String> {
+    let latest = {
+        let inner = state
+            .inner
+            .lock()
+            .map_err(|_| "native output state lock poisoned".to_string())?;
+        inner
+            .handle
+            .as_ref()
+            .and_then(|handle| handle.camera_preview_slot.as_ref())
+            .and_then(|slot| slot.latest_after(after_version))
+    };
+    let Some((version, frame)) = latest else {
+        return Ok(tauri::ipc::Response::new(Vec::<u8>::new()));
+    };
+
+    let packet = tauri::async_runtime::spawn_blocking(move || {
+        encode_native_camera_preview_packet(version, frame.as_ref())
+    })
+    .await
+    .map_err(|error| format!("native camera preview encode task failed: {error}"))??;
+    Ok(tauri::ipc::Response::new(packet))
+}
+
+fn encode_native_camera_preview_packet(
+    version: u64,
+    frame: &DecodedRgbFrame,
+) -> Result<Vec<u8>, String> {
+    let started = Instant::now();
+    let (width, height, rgb) = downsample_native_camera_preview(frame)?;
+    let mut jpeg = Vec::new();
+    JpegEncoder::new_with_quality(&mut jpeg, NATIVE_CAMERA_PREVIEW_JPEG_QUALITY)
+        .encode(&rgb, width, height, image::ExtendedColorType::Rgb8)
+        .map_err(|error| format!("native camera preview JPEG encode failed: {error}"))?;
+    let encode_micros = started.elapsed().as_micros().min(u128::from(u32::MAX)) as u32;
+
+    let mut packet = Vec::with_capacity(NATIVE_CAMERA_PREVIEW_HEADER_BYTES + jpeg.len());
+    packet.extend_from_slice(NATIVE_CAMERA_PREVIEW_MAGIC);
+    packet.extend_from_slice(&version.to_le_bytes());
+    packet.extend_from_slice(&width.to_le_bytes());
+    packet.extend_from_slice(&height.to_le_bytes());
+    packet.extend_from_slice(&frame.width.to_le_bytes());
+    packet.extend_from_slice(&frame.height.to_le_bytes());
+    packet.extend_from_slice(&encode_micros.to_le_bytes());
+    packet.extend_from_slice(&jpeg);
+    Ok(packet)
+}
+
+fn downsample_native_camera_preview(
+    frame: &DecodedRgbFrame,
+) -> Result<(u32, u32, Vec<u8>), String> {
+    let source_len = frame
+        .width
+        .checked_mul(frame.height)
+        .and_then(|pixels| pixels.checked_mul(3))
+        .map(|len| len as usize)
+        .ok_or_else(|| "native camera preview frame is too large".to_string())?;
+    if frame.width == 0 || frame.height == 0 || frame.data.len() < source_len {
+        return Err("native camera preview frame is empty or short".to_string());
+    }
+
+    let scale = (NATIVE_CAMERA_PREVIEW_MAX_WIDTH as f64 / frame.width as f64)
+        .min(NATIVE_CAMERA_PREVIEW_MAX_HEIGHT as f64 / frame.height as f64)
+        .min(1.0);
+    let width = ((frame.width as f64 * scale).round() as u32).max(1);
+    let height = ((frame.height as f64 * scale).round() as u32).max(1);
+    if width == frame.width && height == frame.height {
+        return Ok((width, height, frame.data[..source_len].to_vec()));
+    }
+
+    let mut rgb = vec![0u8; width as usize * height as usize * 3];
+    for y in 0..height as usize {
+        let source_y = y * frame.height as usize / height as usize;
+        for x in 0..width as usize {
+            let source_x = x * frame.width as usize / width as usize;
+            let source_index = (source_y * frame.width as usize + source_x) * 3;
+            let target_index = (y * width as usize + x) * 3;
+            rgb[target_index..target_index + 3]
+                .copy_from_slice(&frame.data[source_index..source_index + 3]);
+        }
+    }
+    Ok((width, height, rgb))
+}
+
 pub async fn open_native_output_smoke(
     app: AppHandle,
     state: &NativeOutputState,
@@ -1269,7 +1461,11 @@ fn native_camera_backend() -> &'static str {
     {
         "native-wgpu-displaylink-camera"
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        "native-wgpu-camera"
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         "native-softbuffer-camera"
     }
@@ -1374,6 +1570,7 @@ async fn start_or_update_native_static_output(
         transition,
         param_version,
         mirror_slot: None,
+        camera_preview_slot: None,
         #[cfg(target_os = "macos")]
         _display_link: display_link,
         window,
@@ -1428,9 +1625,32 @@ async fn start_or_update_native_camera_output(
         stop_native_output_worker(&mut handle);
     }
 
+    let stop = Arc::new(AtomicBool::new(false));
+    #[cfg(target_os = "windows")]
+    let capture = match WindowsCameraCapture::start(media_binaries_for_app(app), source.clone(), stop.clone()).await {
+        Ok(capture) => capture,
+        Err(error) => return Ok(unavailable(error)),
+    };
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let initial_frame = {
+        let binaries = media_binaries_for_app(app);
+        let output_fps = native_camera_source_fps(&source);
+        match probe_camera_initial_frame(&binaries, &source, output_fps) {
+            Ok(frame) => frame,
+            Err(error) => {
+                eprintln!(
+                    "[NativeOutputCamera] native open failed; mirror fallback required: {error}"
+                );
+                return Ok(unavailable(format!(
+                    "native camera output is unavailable: {error}"
+                )));
+            }
+        }
+    };
+
     let window = ensure_native_window(app, request)?;
     let generation = state.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
-    let stop = Arc::new(AtomicBool::new(false));
     let params_arc = Arc::new(Mutex::new(params));
     let transition = Arc::new(Mutex::new(requested_transition));
     let param_version = Arc::new(AtomicU64::new(1));
@@ -1459,15 +1679,33 @@ async fn start_or_update_native_camera_output(
         Some(display_link)
     };
 
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let camera_preview_slot = {
+        let slot = Arc::new(NativeCameraPreviewFrameSlot::default());
+        let initial_frame = Arc::new(initial_frame);
+        slot.set(initial_frame.clone())?;
+        Some((slot, initial_frame))
+    };
+
+    #[cfg(target_os = "windows")]
+    let camera_preview_slot = Some((capture.slot.clone(), capture.slot.frame.lock()
+        .map_err(|_| "camera preview lock poisoned")?.clone().ok_or("camera preview missing first frame")?));
+
     #[cfg(not(target_os = "macos"))]
-    let worker = Some(spawn_camera_render_thread(
-        app.clone(),
-        window.clone(),
-        source.clone(),
-        params_arc.clone(),
-        transition.clone(),
-        stop.clone(),
-    ));
+    let worker = camera_preview_slot.as_ref().map(|(slot, initial_frame)| {
+        spawn_camera_render_thread(
+            app.clone(),
+            window.clone(),
+            source.clone(),
+            initial_frame.clone(),
+            params_arc.clone(),
+            transition.clone(),
+            stop.clone(),
+            slot.clone(),
+            #[cfg(target_os = "windows")]
+            capture,
+        )
+    });
 
     #[cfg(target_os = "macos")]
     let worker = None;
@@ -1485,6 +1723,16 @@ async fn start_or_update_native_camera_output(
         transition,
         param_version,
         mirror_slot: None,
+        camera_preview_slot: {
+            #[cfg(not(target_os = "macos"))]
+            {
+                camera_preview_slot.map(|(slot, _)| slot)
+            }
+            #[cfg(target_os = "macos")]
+            {
+                None
+            }
+        },
         #[cfg(target_os = "macos")]
         _display_link: display_link,
         window,
@@ -1567,6 +1815,7 @@ async fn start_or_update_native_mirror_output(
         transition,
         param_version,
         mirror_slot: Some(mirror_slot),
+        camera_preview_slot: None,
         #[cfg(target_os = "macos")]
         _display_link: None,
         window,
@@ -2811,18 +3060,41 @@ fn install_close_watcher(
         }
         WindowEvent::Destroyed => {
             stop.store(true, Ordering::Relaxed);
-            let active_generation = state_inner
-                .lock()
-                .map(|inner| {
-                    inner
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            {
+                // Do not tell the WebView to reacquire an exclusive camera until
+                // the platform worker has dropped Media Foundation/FFmpeg state.
+                let handle = state_inner.lock().ok().and_then(|mut inner| {
+                    let active = inner
                         .handle
                         .as_ref()
                         .map(|handle| handle.generation == generation)
-                        .unwrap_or(false)
-                })
-                .unwrap_or(false);
-            if active_generation {
-                let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                        .unwrap_or(false);
+                    active.then(|| inner.handle.take()).flatten()
+                });
+                if let Some(mut handle) = handle {
+                    let app = app.clone();
+                    std::thread::spawn(move || {
+                        stop_native_output_worker(&mut handle);
+                        let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                    });
+                }
+            }
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            {
+                let active_generation = state_inner
+                    .lock()
+                    .map(|inner| {
+                        inner
+                            .handle
+                            .as_ref()
+                            .map(|handle| handle.generation == generation)
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
+                if active_generation {
+                    let _ = app.emit_to("main", NATIVE_OUTPUT_CLOSED_EVENT, ());
+                }
             }
         }
         _ => {}
@@ -2834,6 +3106,12 @@ fn ensure_native_window(
     request: &NativeOutputWindowRequest,
 ) -> Result<Window, String> {
     if let Some(window) = app.get_window(NATIVE_OUTPUT_LABEL) {
+        #[cfg(target_os = "windows")]
+        if request.visible == Some(false) {
+            // A source/parameter update is not a request to move or resize a
+            // user's existing output window.
+            return Ok(window);
+        }
         place_native_window(&window, app, request.display_preference.as_deref())?;
         if request.visible.unwrap_or(true) {
             #[cfg(target_os = "macos")]
@@ -3787,15 +4065,27 @@ fn spawn_camera_render_thread(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
+    initial_frame: Arc<DecodedRgbFrame>,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
+    preview_slot: Arc<NativeCameraPreviewFrameSlot>,
+    #[cfg(target_os = "windows")] capture: WindowsCameraCapture,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let report_app = app.clone();
-        if let Err(error) =
-            run_camera_render_loop(app, window, source, params, transition, stop.clone())
-        {
+        if let Err(error) = run_camera_render_loop(
+            app,
+            window,
+            source,
+            initial_frame,
+            params,
+            transition,
+            stop.clone(),
+            preview_slot,
+            #[cfg(target_os = "windows")]
+            capture,
+        ) {
             eprintln!("[NativeOutputCamera] {error}");
             if should_capture_native_output_failure(stop.load(Ordering::Relaxed), &error) {
                 capture_native_output_failure(&report_app, "camera-presenter", &error);
@@ -3810,12 +4100,22 @@ fn run_camera_render_loop(
     app: AppHandle,
     window: Window,
     source: NativeCameraSource,
+    initial_frame: Arc<DecodedRgbFrame>,
     params: Arc<Mutex<NativeRenderParams>>,
     transition: Arc<Mutex<Option<NativeRenderTransition>>>,
     stop: Arc<AtomicBool>,
+    preview_slot: Arc<NativeCameraPreviewFrameSlot>,
+    #[cfg(target_os = "windows")] _capture: WindowsCameraCapture,
 ) -> Result<(), String> {
+    #[cfg(not(target_os = "windows"))]
     let binaries = media_binaries_for_app(&app);
+    #[cfg(target_os = "windows")]
+    let _ = app;
     let source_fps = native_camera_source_fps(&source);
+    // Platform camera handles must be created, used, and dropped on this
+    // worker. In particular, Windows Media Foundation interfaces are tied to
+    // the COM apartment that initialized them and are intentionally not Send.
+    #[cfg(not(target_os = "windows"))]
     let mut reader = open_camera_frame_reader(&binaries, &source, source_fps)?;
     let mut gpu_presenter = match gpu::NativeGpuPresenter::new(&window) {
         Ok(presenter) => Some(presenter),
@@ -3825,7 +4125,7 @@ fn run_camera_render_loop(
         }
     };
     let mut softbuffer_presenter = None;
-    let mut last_frame = None;
+    let mut last_frame = Some(initial_frame);
     let mut frame_index = 0usize;
     let mut next_frame_at = Instant::now();
 
@@ -3840,8 +4140,15 @@ fn run_camera_render_loop(
         }
         next_frame_at = now + interval;
 
+        #[cfg(target_os = "windows")]
+        if let Some((_, frame)) = preview_slot.latest_after(0) { last_frame = Some(frame); }
+        #[cfg(not(target_os = "windows"))]
         match reader.read_frame()? {
-            CameraFrameRead::Frame(frame) => last_frame = Some(frame),
+            CameraFrameRead::Frame(frame) => {
+                let frame = Arc::new(frame);
+                preview_slot.set(frame.clone())?;
+                last_frame = Some(frame);
+            }
             CameraFrameRead::Pending => {}
             CameraFrameRead::Ended => {
                 reader = open_camera_frame_reader(&binaries, &source, source_fps)?;
@@ -3855,7 +4162,7 @@ fn run_camera_render_loop(
         if let Some(presenter) = gpu_presenter.as_mut() {
             match presenter.render_frame(
                 &window,
-                frame,
+                frame.as_ref(),
                 &current_params,
                 frame_index,
                 current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
@@ -3882,7 +4189,7 @@ fn run_camera_render_loop(
             .expect("softbuffer presenter initialized")
             .render_frame(
                 &window,
-                frame,
+                frame.as_ref(),
                 &current_params,
                 frame_index,
                 current_sample.crossfade.as_ref().map(|(from, mix)| (from, *mix)),
@@ -4199,15 +4506,16 @@ fn open_camera_frame_reader(
     source: &NativeCameraSource,
     output_fps: f64,
 ) -> Result<CameraFrameReader, String> {
-    match native_camera::NativeCameraFrameReader::start(source) {
+    let native_error = match native_camera::NativeCameraFrameReader::start(source) {
         Ok(reader) => {
             eprintln!("[NativeOutputCamera] using native platform camera capture");
             return Ok(CameraFrameReader::Native(reader));
         }
         Err(error) => {
             eprintln!("[NativeOutputCamera] native capture unavailable, using FFmpeg: {error}");
+            error
         }
-    }
+    };
 
     let decode = DecodeConfig::new(source.output_width, source.output_height, MAX_READER_FRAMES)
         .map_err(|error| error.to_string())?;
@@ -4218,13 +4526,46 @@ fn open_camera_frame_reader(
         capture_fps: Some(source.capture_fps),
         output_fps: None,
     };
-    spawn_macos_camera_rgb_reader(binaries, &decode, &options)
+    spawn_platform_camera_rgb_reader(binaries, &decode, &options)
         .map(CameraFrameReader::Ffmpeg)
         .map_err(|error| {
             format!(
-                "Native camera capture and FFmpeg camera fallback both failed; requested output fps {output_fps:.3}: {error}"
+                "Native camera: {native_error}; FFmpeg fallback at {output_fps:.3} fps: {error}"
             )
         })
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn probe_camera_initial_frame(
+    binaries: &FfmpegBinaries,
+    source: &NativeCameraSource,
+    output_fps: f64,
+) -> Result<DecodedRgbFrame, String> {
+    probe_camera_initial_frame_on_current_thread(binaries, source, output_fps)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn probe_camera_initial_frame_on_current_thread(
+    binaries: &FfmpegBinaries,
+    source: &NativeCameraSource,
+    output_fps: f64,
+) -> Result<DecodedRgbFrame, String> {
+    let mut reader = open_camera_frame_reader(binaries, source, output_fps)?;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        match reader.read_frame()? {
+            CameraFrameRead::Frame(frame) => return Ok(frame),
+            CameraFrameRead::Pending if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(8));
+            }
+            CameraFrameRead::Pending => {
+                return Err("camera opened but did not produce a frame within 3 seconds".to_string())
+            }
+            CameraFrameRead::Ended => {
+                return Err("camera capture ended before producing a frame".to_string())
+            }
+        }
+    }
 }
 
 fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParams {
@@ -4736,7 +5077,27 @@ mod tests {
     #[test]
     fn native_output_capabilities_match_platform_ownership() {
         let capabilities = get_native_output_capabilities();
-        assert_eq!(capabilities.native_camera, cfg!(target_os = "macos"));
+        assert_eq!(
+            capabilities.native_camera,
+            cfg!(any(
+                target_os = "macos",
+                target_os = "windows",
+                target_os = "linux"
+            ))
+        );
+        assert_eq!(
+            capabilities.native_camera_exclusive,
+            cfg!(any(target_os = "windows", target_os = "linux"))
+        );
+        assert!(!capabilities.native_camera_exclusive_fallback);
+        assert_eq!(
+            capabilities.native_camera_preview_bridge,
+            cfg!(target_os = "windows")
+        );
+        assert_eq!(
+            capabilities.native_camera_mirror_fallback,
+            cfg!(any(target_os = "windows", target_os = "linux"))
+        );
         assert!(capabilities.mirror);
     }
 
@@ -5215,5 +5576,28 @@ mod tests {
         assert_eq!(&frame.data[..3], &[255, 0, 0]);
         assert_eq!(&frame.data[3..6], &[1, 130, 2]);
         assert!(!frame.smoothing);
+    }
+
+    #[test]
+    fn native_camera_preview_packet_is_bounded_and_decodable() {
+        let frame = DecodedRgbFrame {
+            index: 7,
+            width: 1280,
+            height: 720,
+            data: vec![96; 1280 * 720 * 3],
+        };
+        let packet = encode_native_camera_preview_packet(42, &frame)
+            .expect("native camera preview should encode");
+
+        assert_eq!(&packet[..4], NATIVE_CAMERA_PREVIEW_MAGIC);
+        assert_eq!(u64::from_le_bytes(packet[4..12].try_into().unwrap()), 42);
+        assert_eq!(u32::from_le_bytes(packet[12..16].try_into().unwrap()), 640);
+        assert_eq!(u32::from_le_bytes(packet[16..20].try_into().unwrap()), 360);
+        assert_eq!(u32::from_le_bytes(packet[20..24].try_into().unwrap()), 1280);
+        assert_eq!(u32::from_le_bytes(packet[24..28].try_into().unwrap()), 720);
+        assert!(u32::from_le_bytes(packet[28..32].try_into().unwrap()) > 0);
+        let decoded = image::load_from_memory(&packet[NATIVE_CAMERA_PREVIEW_HEADER_BYTES..])
+            .expect("preview JPEG should decode");
+        assert_eq!((decoded.width(), decoded.height()), (640, 360));
     }
 }

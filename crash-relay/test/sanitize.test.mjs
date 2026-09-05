@@ -37,6 +37,22 @@ test('rejects reports from unexpected app identifiers', () => {
   }, env), /identifier/);
 });
 
+test('preserves manual diagnostic kind and surface', () => {
+  const report = sanitizeCrashPayload({
+    app: { identifier: 'com.asciline.remix', version: '1.0.3' },
+    report: {
+      kind: 'manual-diagnostic',
+      surface: 'manual',
+      message: 'Camera Pop Out is choppy',
+      context: { nativeOutputMirror: { acceptedFps: 14.2 } }
+    }
+  }, env);
+
+  assert.equal(report.report.kind, 'manual-diagnostic');
+  assert.equal(report.report.surface, 'manual');
+  assert.equal(report.report.context.nativeOutputMirror.acceptedFps, 14.2);
+});
+
 test('fingerprint is stable across local paths and patch versions', async () => {
   const left = sanitizeCrashPayload({
     app: { identifier: 'com.asciline.remix', version: '0.9.2' },

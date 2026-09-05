@@ -33,7 +33,7 @@ FFmpeg sidecars, signed update artifacts, and reviewed/sanitized crash reports.
 | Local image/video files | Browser File API or Tauri dialog plus session-local media registry | Medium | Files are selected explicitly without broad filesystem access. |
 | Built-in demo media | Bundled under `media/` and copied into app assets | Low | Demo media is local and versioned. |
 | Built-in palettes/glyph atlas | Project-owned palette catalog plus pinned, generated, locally bundled glyph pages | Low | No runtime palette pack, font, CDN, or language-resource import/download. |
-| Camera input | Browser `getUserMedia`; macOS native AVFoundation path for Pop Out | Medium | Requires OS privacy permission. Frames stay local. |
+| Camera input | Browser `getUserMedia`; native AVFoundation, Media Foundation, or bundled-FFmpeg V4L2 path for single-camera Pop Out | Medium | Requires OS privacy permission. Frames stay local. Windows prefers concurrent WebView/native capture and uses an in-memory binary preview bridge when a driver requires exclusive native ownership; Linux releases the WebView camera for exclusive V4L2 capture. |
 | Mic/input audio | Web Audio and native Tauri providers | Medium | Requires OS privacy permission. Analysis features are bounded. |
 | System/display audio | Browser display audio when present; native desktop providers where available | Medium | Platform permissions vary. Do not broaden capture beyond feature needs. |
 | Presets/settings | Local browser storage, IndexedDB, imported/exported JSON | Low to Medium | User-authored data. Validate imports before applying. |
@@ -105,7 +105,8 @@ The production runtime is intentionally narrow:
   localhost stream/dev endpoints exist only in `devCsp`.
 - `npm run check:tauri-policy` verifies the local-only runtime policy, the
   GitHub updater endpoint exception, and the Rust-only crash reporter command
-  boundary.
+  boundary. It also matches each literal frontend Tauri invocation to its
+  generated permission file and main-window capability grant.
 - Capabilities in `src-tauri/capabilities/` split main-window privileges from
   output-window privileges.
 - The main window owns media selection, output management, audio providers, and
@@ -223,6 +224,18 @@ Reactivity is an intentional default mode, so the app may request
 microphone/input permission during startup. Capture remains OS-gated and local,
 and the user can stop it by disabling Audio Reactivity or changing the audio
 source.
+
+Single-camera Pop Out may open the already selected camera through a native
+platform provider: AVFoundation on macOS, Media Foundation on Windows, or V4L2
+through the bundled network-disabled FFmpeg runtime on Linux. It does not add a
+new remote endpoint or persist camera frames. Manual diagnostics may contain
+bounded device-independent timing and fallback counters, never frame bytes.
+Windows uses one Media Foundation capture client while native output is open.
+It does not send camera pixels through a network or persistent store.
+The native worker exposes only its latest
+downscaled JPEG through a binary command response to the main WebView. The
+frame is drawn in memory, is not logged or persisted, and is replaced by the
+next frame.
 
 Current macOS bundle identifier:
 

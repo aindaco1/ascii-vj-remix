@@ -55,7 +55,10 @@ CONFIG_FLAGS=(
 
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
-    CONFIG_FLAGS+=("--target-os=mingw32" "--extra-ldflags=-static")
+    CONFIG_FLAGS+=("--target-os=mingw32" "--extra-ldflags=-static" "--enable-indev=dshow")
+    ;;
+  Linux*)
+    CONFIG_FLAGS+=("--enable-indev=v4l2")
     ;;
 esac
 

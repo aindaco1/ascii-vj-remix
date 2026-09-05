@@ -77,6 +77,7 @@ import {
     emitTauriEventToApp,
     finishTauriMidiSysexCapture,
     getTauriCrashReportState,
+    getTauriOutputDiagnostics,
     installTauriUpdate,
     isTauriRuntime,
     isTauriUpdaterAvailable,
@@ -90,6 +91,7 @@ import {
     readTauriInputAudioFeatures,
     readTauriMidiEvents,
     readTauriMediaSessionFrames,
+    readTauriNativeOutputPreviewFrame,
     readTauriRawVideoFrames,
     readTauriSystemAudioFeatures,
     recordTauriMediaDiagnostic,
@@ -125,7 +127,11 @@ import {
 import { DesktopUpdateController } from './renderers/desktop/update-controller.js?v=20260826-launch-update';
 import {
     browserScreenPlacement,
+    decodeNativeCameraPreviewPacket,
+    nativeCameraOwnershipPolicy,
     nativeCameraOutputMode,
+    nativeMirrorFrameSize,
+    nativeMirrorTargetFps,
     selectBrowserScreen
 } from './renderers/desktop/output-display.js';
 
@@ -516,6 +522,87 @@ const BUILTIN_PRESETS = [
         readonly: true,
         transitionSeconds: 1.1,
         params: CLASSIC_CAMERA_ASCII_PARAMS
+    },
+    {
+        id: 'ascii-world-mint',
+        name: 'ASCII World Mint',
+        readonly: true,
+        transitionSeconds: 1.2,
+        // Original preset inspired by yeahpython's ASCII World palette and
+        // thin drawing characters: https://yeahpython.github.io/game/game.html
+        params: {
+            cols: 180,
+            autoRows: true,
+            cellWidth: 8,
+            cellHeight: 12,
+            saturationBoost: 0,
+            contrastBoost: 1.55,
+            brightness: 1,
+            gamma: 1.1,
+            bgBlend: 0,
+            quantizeBits: 0,
+            paletteId: 'none',
+            ditherMode: 'none',
+            jitterAmount: 0.32,
+            jitterSpeed: 0.85,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'custom',
+            customGlyphRamp: '   ._-/\\|+',
+            glyphDepth: 96,
+            glyphOffset: 0,
+            glyphReverse: false,
+            glyphColorMode: 'fixed',
+            glyphColor: '#15ffcd',
+            backgroundColor: '#042a33',
+            fontFamily: 'monospace',
+            mode: 1,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
+        id: 'ascii-city-nightshift',
+        name: 'ASCII City Nightshift',
+        readonly: true,
+        transitionSeconds: 1.4,
+        // Night-scene styling inspired by https://tweakyourpc.github.io/ascii-city/
+        params: {
+            cols: 200,
+            autoRows: true,
+            cellWidth: 8,
+            cellHeight: 14,
+            saturationBoost: 0.9,
+            contrastBoost: 1.65,
+            brightness: 0.92,
+            gamma: 1.2,
+            bgBlend: 0,
+            quantizeBits: 0,
+            paletteId: 'city-nightshift',
+            paletteMapping: 'nearest',
+            ditherMode: 'none',
+            jitterAmount: 0.28,
+            jitterSpeed: 0.65,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'custom',
+            customGlyphRamp: '  .:|#%8',
+            glyphDepth: 96,
+            glyphOffset: 0,
+            glyphReverse: false,
+            glyphColorMode: 'palette',
+            backgroundColor: '#03040c',
+            fontFamily: 'monospace',
+            mode: 3,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
     },
     {
         id: 'ansi-newsprint',
@@ -1368,7 +1455,9 @@ const BUILTIN_PRESET_DISPLAY_ORDER = [
     'magma-telemetry',
     'glitch-orchid',
     'ultraviolet-siren',
-    'neon-razorstorm'
+    'neon-razorstorm',
+    'ascii-world-mint',
+    'ascii-city-nightshift'
 ];
 
 const EXTREME_WTF_PRESET_IDS = [
@@ -3896,6 +3985,204 @@ class TauriRawVideoSource {
     }
 }
 
+class NativeOutputCameraPreviewSource {
+    constructor(params = {}) {
+        this.params = { ...params };
+        this.type = 'camera';
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.element = this.canvas;
+        this.width = 640;
+        this.height = 360;
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        this.ready = false;
+        this.isVideo = true;
+        this.isImage = false;
+        this.isNativeOutputPreview = true;
+        this.running = false;
+        this.raf = 0;
+        this.version = 0;
+        this.lastReadAt = 0;
+        this.targetFps = Math.min(30, Math.max(12, Number(params.cameraFps || params.fps) || 30));
+        this.stats = {
+            startedAtMs: performance.now(),
+            stoppedAtMs: 0,
+            polls: 0,
+            emptyPolls: 0,
+            frames: 0,
+            errors: 0,
+            bytes: 0,
+            sourceWidth: 0,
+            sourceHeight: 0,
+            width: 0,
+            height: 0,
+            totalReadMs: 0,
+            maxReadMs: 0,
+            lastReadMs: 0,
+            totalDecodeMs: 0,
+            maxDecodeMs: 0,
+            lastDecodeMs: 0,
+            totalEncodeMs: 0,
+            maxEncodeMs: 0,
+            lastEncodeMs: 0
+        };
+    }
+
+    async start() {
+        if (!this.ctx) throw new Error('Native camera preview canvas is unavailable');
+        this.running = true;
+        const deadline = performance.now() + 4000;
+        while (this.running && performance.now() < deadline) {
+            if (await this._readAndDraw()) {
+                this.ready = true;
+                this._schedule();
+                return this;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 24));
+        }
+        this.destroy();
+        throw new Error('Native camera preview did not produce a frame within 4 seconds');
+    }
+
+    updateParams(params = {}) {
+        this.params = { ...params };
+        this.targetFps = Math.min(30, Math.max(12, Number(params.cameraFps || params.fps) || 30));
+    }
+
+    _schedule() {
+        if (!this.running || this.raf) return;
+        this.raf = requestAnimationFrame((now) => {
+            this.raf = 0;
+            const interval = 1000 / Math.max(1, this.targetFps);
+            if (now - this.lastReadAt < interval) {
+                this._schedule();
+                return;
+            }
+            this.lastReadAt = now;
+            this._readAndDraw()
+                .catch((error) => {
+                    this.stats.errors++;
+                    console.info('[Camera] Native preview frame unavailable:', error);
+                })
+                .finally(() => this._schedule());
+        });
+    }
+
+    async _readAndDraw() {
+        if (!this.running) return false;
+        const readStartedAt = performance.now();
+        this.stats.polls++;
+        const value = await readTauriNativeOutputPreviewFrame(this.version);
+        const readElapsedMs = performance.now() - readStartedAt;
+        this.stats.lastReadMs = readElapsedMs;
+        this.stats.totalReadMs += readElapsedMs;
+        this.stats.maxReadMs = Math.max(this.stats.maxReadMs, readElapsedMs);
+        const packet = decodeNativeCameraPreviewPacket(value);
+        if (!packet) {
+            this.stats.emptyPolls++;
+            return false;
+        }
+
+        const decodeStartedAt = performance.now();
+        const blob = new Blob([packet.jpeg], { type: 'image/jpeg' });
+        const bitmap = await this._decodeBitmap(blob);
+        const decodeElapsedMs = performance.now() - decodeStartedAt;
+        if (!this.running) {
+            bitmap?.close?.();
+            return false;
+        }
+        if (this.canvas.width !== packet.width || this.canvas.height !== packet.height) {
+            this.canvas.width = packet.width;
+            this.canvas.height = packet.height;
+        }
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.drawImage(bitmap, 0, 0, packet.width, packet.height);
+        bitmap?.close?.();
+
+        this.version = packet.version;
+        this.width = packet.width;
+        this.height = packet.height;
+        this.stats.frames++;
+        this.stats.bytes += packet.jpeg.byteLength;
+        this.stats.sourceWidth = packet.sourceWidth;
+        this.stats.sourceHeight = packet.sourceHeight;
+        this.stats.width = packet.width;
+        this.stats.height = packet.height;
+        this.stats.lastDecodeMs = decodeElapsedMs;
+        this.stats.totalDecodeMs += decodeElapsedMs;
+        this.stats.maxDecodeMs = Math.max(this.stats.maxDecodeMs, decodeElapsedMs);
+        this.stats.lastEncodeMs = packet.encodeMs;
+        this.stats.totalEncodeMs += packet.encodeMs;
+        this.stats.maxEncodeMs = Math.max(this.stats.maxEncodeMs, packet.encodeMs);
+        return true;
+    }
+
+    async _decodeBitmap(blob) {
+        if (typeof createImageBitmap === 'function') {
+            try {
+                return await createImageBitmap(blob);
+            } catch (error) {
+                console.info('[Camera] ImageBitmap decode unavailable; using image decode:', error);
+            }
+        }
+        const url = URL.createObjectURL(blob);
+        try {
+            const image = new Image();
+            image.decoding = 'async';
+            image.src = url;
+            await image.decode();
+            return image;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+
+    diagnostics() {
+        const stoppedAtMs = this.stats.stoppedAtMs || performance.now();
+        const elapsedSeconds = Math.max(0, (stoppedAtMs - this.stats.startedAtMs) / 1000);
+        const average = (total, count) => count > 0 ? total / count : 0;
+        const rounded = (value) => Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
+        return {
+            active: Boolean(this.running),
+            transport: 'binary-jpeg',
+            targetFps: rounded(this.targetFps),
+            acceptedFps: rounded(elapsedSeconds > 0 ? this.stats.frames / elapsedSeconds : 0),
+            polls: this.stats.polls,
+            emptyPolls: this.stats.emptyPolls,
+            frames: this.stats.frames,
+            errors: this.stats.errors,
+            sourceWidth: this.stats.sourceWidth,
+            sourceHeight: this.stats.sourceHeight,
+            width: this.stats.width,
+            height: this.stats.height,
+            encodedKiBPerSecond: rounded(elapsedSeconds > 0 ? this.stats.bytes / 1024 / elapsedSeconds : 0),
+            readMs: {
+                last: rounded(this.stats.lastReadMs),
+                average: rounded(average(this.stats.totalReadMs, this.stats.polls)),
+                max: rounded(this.stats.maxReadMs)
+            },
+            encodeMs: {
+                last: rounded(this.stats.lastEncodeMs),
+                average: rounded(average(this.stats.totalEncodeMs, this.stats.frames)),
+                max: rounded(this.stats.maxEncodeMs)
+            },
+            decodeMs: {
+                last: rounded(this.stats.lastDecodeMs),
+                average: rounded(average(this.stats.totalDecodeMs, this.stats.frames)),
+                max: rounded(this.stats.maxDecodeMs)
+            }
+        };
+    }
+
+    destroy() {
+        this.running = false;
+        this.stats.stoppedAtMs ||= performance.now();
+        if (this.raf) cancelAnimationFrame(this.raf);
+        this.raf = 0;
+    }
+}
+
 class CanvasStaticRenderer {
     constructor(targetElement) {
         this.targetElement = targetElement;
@@ -4272,6 +4559,7 @@ class StaticRuntime {
         renderer.backgroundColor = params.backgroundColor;
         renderer.atlasStyle = params.atlasStyle;
         renderer.mirrorX = shouldRendererMirrorCamera(params);
+        renderer.syncNativePreviewGeometry?.(params);
         renderer.syncFeatureResources?.();
         if (renderer._applySourceSmoothing) renderer._applySourceSmoothing();
         if (renderer.canvas) {
@@ -5592,7 +5880,14 @@ class RendererLabApp {
         this.popoutRaf = null;
         this.popoutRenderer = null;
         this.nativeOutputActive = false;
-        this.nativeOutputCapabilities = { nativeCamera: false, mirror: false };
+        this.nativeOutputCapabilities = {
+            nativeCamera: false,
+            nativeCameraExclusive: false,
+            nativeCameraExclusiveFallback: false,
+            nativeCameraPreviewBridge: false,
+            nativeCameraMirrorFallback: false,
+            mirror: false
+        };
         this.nativeOutputLastSync = 0;
         this.nativeOutputSyncInFlight = false;
         this.nativeOutputPendingPayload = null;
@@ -5604,6 +5899,18 @@ class RendererLabApp {
         this.nativeOutputMirrorSendPending = false;
         this.nativeOutputMirrorLastSendStart = 0;
         this.nativeOutputMirrorSeq = 0;
+        this.nativeOutputMirrorStats = this._newNativeOutputMirrorStats();
+        this.nativeOutputCameraFallbackActive = false;
+        this.nativeOutputExclusiveCameraActive = false;
+        this.nativeOutputSharedCameraAttempted = false;
+        this.nativeOutputSharedCameraActive = false;
+        this.nativeOutputSharedCameraFailureReason = '';
+        this.nativeOutputPreviewSource = null;
+        this.nativeOutputCameraRestoreToken = 0;
+        this.nativeOutputCameraRestorePending = false;
+        this.nativeOutputCameraRestoreAttemptCount = 0;
+        this.nativeOutputCameraRestoreOkCount = 0;
+        this.nativeOutputCameraRestoreFailedCount = 0;
         this.nativeOutputPrewarmed = false;
         this.nativeOutputPrewarmPending = false;
         this.nativeOutputSyncAttemptCount = 0;
@@ -5660,7 +5967,14 @@ class RendererLabApp {
                 this.nativeOutputCapabilities = await getTauriNativeOutputCapabilities();
             } catch (error) {
                 console.warn('[TauriOutput] Native output capabilities unavailable; using mirror fallback:', error);
-                this.nativeOutputCapabilities = { nativeCamera: false, mirror: true };
+                this.nativeOutputCapabilities = {
+                    nativeCamera: false,
+                    nativeCameraExclusive: false,
+                    nativeCameraExclusiveFallback: false,
+                    nativeCameraPreviewBridge: false,
+                    nativeCameraMirrorFallback: false,
+                    mirror: true
+                };
             }
         }
         await this._restoreCustomSource();
@@ -5867,19 +6181,31 @@ class RendererLabApp {
             running: this.running,
             transitioning: this.transitioning,
             nativeOutputCapabilities: this.nativeOutputCapabilities,
+            nativeOutputAdapter: getTauriOutputDiagnostics(),
             nativeOutputSync: {
                 attempts: this.nativeOutputSyncAttemptCount,
                 succeeded: this.nativeOutputSyncOkCount,
                 failed: this.nativeOutputSyncFailedCount,
-                lastElapsedMs: this.nativeOutputLastSyncElapsedMs
+                lastElapsedMs: this.nativeOutputLastSyncElapsedMs,
+                cameraFallbackActive: this.nativeOutputCameraFallbackActive,
+                exclusiveCameraActive: this.nativeOutputExclusiveCameraActive,
+                sharedCameraAttempted: this.nativeOutputSharedCameraAttempted,
+                sharedCameraActive: this.nativeOutputSharedCameraActive,
+                sharedCameraFailureReason: this.nativeOutputSharedCameraFailureReason,
+                previewRestorePending: this.nativeOutputCameraRestorePending,
+                previewRestoreAttempts: this.nativeOutputCameraRestoreAttemptCount,
+                previewRestoreSucceeded: this.nativeOutputCameraRestoreOkCount,
+                previewRestoreFailed: this.nativeOutputCameraRestoreFailedCount
             },
+            nativeOutputPreview: this._nativeOutputPreviewDiagnostics(),
+            nativeOutputMirror: this._nativeOutputMirrorDiagnostics(),
             renderer: {
                 backend: rendererStats.backend || '',
                 fps: Number(rendererStats.fps || 0),
                 cols: Number(rendererStats.cols || this.params.cols || 0),
                 rows: Number(rendererStats.rows || this.params.rows || 0)
             },
-            recentRendererEvents: this.rendererDiagnostics.snapshot()
+            rendererDiagnostics: this.rendererDiagnostics.snapshot()
         };
     }
 
@@ -6461,8 +6787,38 @@ class RendererLabApp {
         return source.start();
     }
 
+    _shouldUseNativeOutputCameraPreview(params = this.params) {
+        return Boolean(
+            isTauriRuntime()
+            && isCameraParams(params)
+            && this.nativeOutputActive
+            && this.nativeOutputExclusiveCameraActive
+            && this.nativeOutputCapabilities?.nativeCameraPreviewBridge
+        );
+    }
+
+    async _loadNativeOutputCameraPreview(params) {
+        const source = new NativeOutputCameraPreviewSource(params);
+        this.nativeOutputPreviewSource = source;
+        try {
+            const started = await source.start();
+            this.cameraStatus = 'ready';
+            this.cameraError = '';
+            this._renderSourceList();
+            return started;
+        } catch (error) {
+            this.cameraStatus = 'error';
+            this.cameraError = error?.message || 'Native camera preview unavailable';
+            this._renderSourceList();
+            throw error;
+        }
+    }
+
     async loadStaticSource(params, options = {}) {
         if (isCameraParams(params)) {
+            if (this._shouldUseNativeOutputCameraPreview(params)) {
+                return this._loadNativeOutputCameraPreview(params);
+            }
             const mixer = await this._ensureCameraMixer(params);
             return loadMediaSource(CAMERA_MIX_MEDIA_URL, {
                 type: 'camera-mix',
@@ -7784,7 +8140,11 @@ class RendererLabApp {
             sourceName: cameraSourceName(this.params),
             muted: true
         });
-        await this._ensureCameraMixer(nextParams);
+        // Windows native ownership must be settled before asking WebView2 for
+        // the same device. loadStaticSource performs the appropriate acquisition.
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) {
+            await this._ensureCameraMixer(nextParams);
+        }
         await this._switchStaticSource(nextParams);
     }
 
@@ -7828,7 +8188,21 @@ class RendererLabApp {
     }
 
     async _switchStaticSource(sourceParams, options = {}) {
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) {
+            return this._switchStaticSourceNow(sourceParams, options);
+        }
+        const previous = this.nativeOutputSourceSwitchPromise || Promise.resolve();
+        const pending = previous.catch(() => {}).then(() => this._switchStaticSourceNow(sourceParams, options));
+        this.nativeOutputSourceSwitchPromise = pending;
+        try { return await pending; }
+        finally {
+            if (this.nativeOutputSourceSwitchPromise === pending) this.nativeOutputSourceSwitchPromise = null;
+        }
+    }
+
+    async _switchStaticSourceNow(sourceParams, options = {}) {
         clearTimeout(this.rebuildTimer);
+        if (this.nativeOutputCapabilities?.nativeCameraPreviewBridge) await this.nativeOutputOpenPromise;
         const resumeWtf = options.interruptTransition !== false
             ? await this._prepareForSourceSwitch()
             : false;
@@ -7844,31 +8218,60 @@ class RendererLabApp {
             this.params.mediaUrl !== nextParams.mediaUrl ||
             this.params.mediaType !== nextParams.mediaType;
 
-        this.params = nextParams;
-        this._syncInputs();
-        this._persist();
-        this._applyVisualState();
-        this._syncPresetToolbar();
-        this._renderSourceList();
+        const handoffNative = Boolean(sourceChanged && this.nativeOutputActive
+            && this.nativeOutputCapabilities?.nativeCameraPreviewBridge);
+        try {
+            if (handoffNative) {
+                this.nativeOutputSourceSwitching = true;
+                this.nativeOutputPendingPayload = null;
+                await this.nativeOutputSyncPromise;
+                this._stopNativeOutputMirror();
+            }
+            this.params = nextParams;
+            this._syncInputs();
+            this._persist();
+            this._applyVisualState();
+            this._syncPresetToolbar();
+            this._renderSourceList();
 
-        if (previousWasCamera && !nextIsCamera) this._stopCameraStream({ render: false });
-        if (!sourceChanged && this.running) {
+            if (previousWasCamera && !nextIsCamera) this._stopCameraStream({ render: false });
+            if (handoffNative) {
+                this.nativeOutputCameraFallbackActive = false;
+                if (nextIsCamera) {
+                    await this._openNativeOutputWindow({ sourceSwitch: true, deferPreviewRestart: true });
+                } else {
+                    // This acknowledgement comes after the old native worker has
+                    // relinquished capture, before any later camera switch starts.
+                    const ok = await sendTauriOutputState(this._nativeOutputPayload());
+                    this.nativeOutputActive = Boolean(ok);
+                    this.nativeOutputExclusiveCameraActive = false;
+                    this.nativeOutputSharedCameraActive = false;
+                    this.nativeOutputSharedCameraAttempted = false;
+                }
+            }
+            if (!sourceChanged && this.running) {
+                if (resumeWtf) this._resumeWtfAfterSourceSwitch();
+                return;
+            }
+
+            if (this.starting) {
+                this.startToken++;
+                this.starting = false;
+                this.running = false;
+                this.staticRuntime.destroy();
+                this.streamRuntime.stop(false);
+            }
+
+            if (this.running && previousSourceMode === 'static') await this._restartStaticSourceFast({ mediaState: null });
+            else if (this.running) await this.restart({ mediaState: null });
+            else await this.start({ autoStart: true });
             if (resumeWtf) this._resumeWtfAfterSourceSwitch();
-            return;
+        } finally {
+            if (handoffNative) {
+                this.nativeOutputSourceSwitching = false;
+                this._syncNativeOutputWindow();
+            }
         }
-
-        if (this.starting) {
-            this.startToken++;
-            this.starting = false;
-            this.running = false;
-            this.staticRuntime.destroy();
-            this.streamRuntime.stop(false);
-        }
-
-        if (this.running && previousSourceMode === 'static') await this._restartStaticSourceFast({ mediaState: null });
-        else if (this.running) await this.restart({ mediaState: null });
-        else await this.start({ autoStart: true });
-        if (resumeWtf) this._resumeWtfAfterSourceSwitch();
     }
 
     async _prepareForSourceSwitch() {
@@ -8072,6 +8475,8 @@ class RendererLabApp {
     }
 
     stop() {
+        this.nativeOutputCameraRestoreToken++;
+        this.nativeOutputCameraRestorePending = false;
         this.startToken++;
         this.starting = false;
         this.running = false;
@@ -8281,6 +8686,7 @@ button:hover{background:#202a35}
     }
 
     _nativeCameraOutputMeta(params = this.params) {
+        if (this.nativeOutputCameraFallbackActive) return null;
         if (!this._canUseNativeCameraOutputWindow(params)) return null;
         const selectedIds = selectedCameraDeviceIds(params);
         const selectedLabels = selectedIds
@@ -8289,12 +8695,16 @@ button:hover{background:#202a35}
             .filter((label) => label && label !== 'Selected camera' && label !== 'Camera 1');
         const stream = selectedIds[0] ? this.cameraStreams.get(selectedIds[0]) : this._firstCameraStream();
         const settings = stream?.getVideoTracks?.()[0]?.getSettings?.() || {};
-        return {
+        const key = cameraConstraintKey(params);
+        const cached = this.nativeOutputCameraMeta?.key === key ? this.nativeOutputCameraMeta : null;
+        const meta = {
             deviceLabel: selectedLabels[0] || '',
             selectedLabels,
-            captureWidth: Number(settings.width || 0) || null,
-            captureHeight: Number(settings.height || 0) || null
+            captureWidth: Number(settings.width || 0) || cached?.captureWidth || null,
+            captureHeight: Number(settings.height || 0) || cached?.captureHeight || null
         };
+        if (this.nativeOutputCapabilities?.nativeCameraPreviewBridge) this.nativeOutputCameraMeta = { ...meta, key };
+        return meta;
     }
 
     _nativeOutputParams(params, cameraMeta = this._nativeCameraOutputMeta(this.params)) {
@@ -8350,6 +8760,10 @@ button:hover{background:#202a35}
                 : 'mirror';
         return {
             outputMode,
+            allowCameraMirrorFallback: Boolean(
+                outputMode === 'native-camera'
+                && this.nativeOutputCapabilities?.nativeCameraMirrorFallback
+            ),
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
             params: this._nativeOutputParams(params, cameraMeta),
@@ -8370,24 +8784,120 @@ button:hover{background:#202a35}
         return null;
     }
 
-    async _openNativeOutputWindow() {
+    async _openNativeOutputWindow(options = {}) {
+        if (!this.nativeOutputCapabilities?.nativeCameraPreviewBridge) return this._openNativeOutputWindowNow(options);
+        if (!options.sourceSwitch) await this.nativeOutputSourceSwitchPromise;
+        if (this.nativeOutputOpenPromise) return this.nativeOutputOpenPromise;
+        const pending = this._openNativeOutputWindowNow(options);
+        this.nativeOutputOpenPromise = pending;
+        try { return await pending; }
+        finally { if (this.nativeOutputOpenPromise === pending) this.nativeOutputOpenPromise = null; }
+    }
+
+    async _openNativeOutputWindowNow(options = {}) {
         if (!this._canUseNativeOutputWindow()) return false;
+        const outputAlreadyActive = this.nativeOutputActive && !options.sourceSwitch;
+        const previousCameraFallbackActive = this.nativeOutputCameraFallbackActive;
+        const previousExclusiveCameraActive = this.nativeOutputExclusiveCameraActive;
+        const previousSharedCameraAttempted = this.nativeOutputSharedCameraAttempted;
+        const previousSharedCameraActive = this.nativeOutputSharedCameraActive;
+        const previousSharedCameraFailureReason = this.nativeOutputSharedCameraFailureReason;
+        let exclusiveCameraReleased = Boolean(
+            outputAlreadyActive && previousExclusiveCameraActive
+        );
         try {
+            this.nativeOutputCameraRestoreToken++;
+            this.nativeOutputCameraRestorePending = false;
+            if (!outputAlreadyActive) {
+                this.nativeOutputCameraFallbackActive = false;
+                this.nativeOutputExclusiveCameraActive = false;
+                this.nativeOutputSharedCameraAttempted = false;
+                this.nativeOutputSharedCameraActive = false;
+                this.nativeOutputSharedCameraFailureReason = '';
+            }
             const payload = this._nativeOutputPayload();
-            const opened = await openTauriOutputWindow(payload, {
+            const cameraOwnership = nativeCameraOwnershipPolicy(
+                this.params,
+                this.nativeOutputCapabilities,
+                true
+            );
+            if (!outputAlreadyActive && cameraOwnership.releaseBeforeOpen) {
+                this._stopCameraStream({ render: false });
+                exclusiveCameraReleased = true;
+            }
+            const openOptions = {
                 outputDisplay: this.outputDisplay,
                 onClosed: () => {
+                    const restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                     this.nativeOutputActive = false;
+                    this.nativeOutputCameraFallbackActive = false;
+                    this.nativeOutputExclusiveCameraActive = false;
+                    this.nativeOutputSharedCameraAttempted = false;
+                    this.nativeOutputSharedCameraActive = false;
                     this._resetNativeOutputSyncState();
                     this._stopNativeOutputMirror();
                     this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputClosed');
                     this._updatePopoutButton();
+                    if (restoreExclusiveCamera) {
+                        void this._restoreCameraPreviewAfterNativeOutput();
+                    }
                 }
-            });
+            };
+            let opened = false;
+            if (!outputAlreadyActive && cameraOwnership.retryExclusive) {
+                this.nativeOutputSharedCameraAttempted = true;
+                opened = await openTauriOutputWindow(payload, {
+                    ...openOptions,
+                    deferCameraFallback: true
+                });
+                this.nativeOutputSharedCameraActive = Boolean(opened);
+                if (!opened) {
+                    this.nativeOutputSharedCameraFailureReason = getTauriOutputDiagnostics()
+                        .nativeCameraFailureReason || 'Windows shared camera capture was unavailable';
+                    this._stopCameraStream({ render: false });
+                    exclusiveCameraReleased = true;
+                }
+            }
+            if (!opened) {
+                opened = await openTauriOutputWindow(payload, {
+                    ...openOptions,
+                    preserveCameraFailureReason: this.nativeOutputSharedCameraAttempted
+                });
+            }
             this.nativeOutputActive = Boolean(opened);
+            if (outputAlreadyActive && opened) {
+                this.nativeOutputCameraFallbackActive = previousCameraFallbackActive;
+                this.nativeOutputExclusiveCameraActive = previousExclusiveCameraActive;
+                this.nativeOutputSharedCameraAttempted = previousSharedCameraAttempted;
+                this.nativeOutputSharedCameraActive = previousSharedCameraActive;
+                this.nativeOutputSharedCameraFailureReason = previousSharedCameraFailureReason;
+            } else {
+                this.nativeOutputCameraFallbackActive = Boolean(
+                    opened && isCameraParams(this.params) && payload.outputMode === 'mirror'
+                );
+                this.nativeOutputExclusiveCameraActive = Boolean(
+                    opened && exclusiveCameraReleased && payload.outputMode === 'native-camera'
+                );
+                this.nativeOutputSharedCameraActive = Boolean(
+                    opened
+                    && this.nativeOutputSharedCameraAttempted
+                    && !exclusiveCameraReleased
+                    && payload.outputMode === 'native-camera'
+                );
+            }
+            if (opened && exclusiveCameraReleased && payload.outputMode === 'mirror' && !options.deferPreviewRestart) {
+                await this._restoreCameraPreviewAfterNativeOutput();
+            }
             this.nativeOutputLastSync = performance.now();
             this._updatePopoutButton();
             if (opened) {
+                if (this.nativeOutputExclusiveCameraActive
+                    && !options.deferPreviewRestart
+                    && this.nativeOutputCapabilities?.nativeCameraPreviewBridge
+                    && (!outputAlreadyActive || !this.staticRuntime.source?.isNativeOutputPreview)) {
+                    if (this.running) await this.restart();
+                    else await this.start({ autoStart: true });
+                }
                 this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputOpen');
                 this._scheduleStaticVideoPlaybackEnsure('nativeOutputOpen');
                 this._syncNativeOutputMode(payload.outputMode);
@@ -8396,12 +8906,57 @@ button:hover{background:#202a35}
         } catch (error) {
             console.warn('[TauriOutput] Native output failed, falling back to browser pop-out:', error);
             this.nativeOutputActive = false;
+            this.nativeOutputCameraFallbackActive = false;
+            this.nativeOutputExclusiveCameraActive = false;
+            this.nativeOutputSharedCameraAttempted = false;
+            this.nativeOutputSharedCameraActive = false;
             this._resetNativeOutputSyncState();
             this._stopNativeOutputMirror();
             this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputFailed');
             this._updatePopoutButton();
         }
+        if (exclusiveCameraReleased && !this.nativeOutputActive && !options.deferPreviewRestart) {
+            await this._restoreCameraPreviewAfterNativeOutput();
+        }
         return false;
+    }
+
+    async _restoreCameraPreviewAfterNativeOutput() {
+        if (!isCameraParams(this.params)) return false;
+        if (this.nativeOutputActive && !this.nativeOutputCameraFallbackActive) return false;
+
+        const token = ++this.nativeOutputCameraRestoreToken;
+        const retryDelays = [0, 160, 500];
+        this.nativeOutputCameraRestorePending = true;
+        try {
+            for (const delay of retryDelays) {
+                if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
+                if (token !== this.nativeOutputCameraRestoreToken
+                    || !isCameraParams(this.params)
+                    || (this.nativeOutputActive && !this.nativeOutputCameraFallbackActive)) {
+                    return false;
+                }
+
+                this.nativeOutputCameraRestoreAttemptCount++;
+                if (this.running) await this.restart();
+                else await this.start({ autoStart: true });
+                if (this.running && this.cameraStatus === 'ready' && this._cameraStreamActive()) {
+                    this.nativeOutputCameraRestoreOkCount++;
+                    return true;
+                }
+            }
+
+            this.nativeOutputCameraRestoreFailedCount++;
+            console.warn(
+                '[Camera] Preview restore after native output failed:',
+                this.cameraError || this.cameraStatus || 'camera did not reopen'
+            );
+            return false;
+        } finally {
+            if (token === this.nativeOutputCameraRestoreToken) {
+                this.nativeOutputCameraRestorePending = false;
+            }
+        }
     }
 
     async _prewarmNativeOutputWindow() {
@@ -8409,6 +8964,7 @@ button:hover{background:#202a35}
     }
 
     _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0, options = {}) {
+        if (this.nativeOutputSourceSwitching) return;
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) return;
         if (!options.force && (this.nativeOutputTransitionArming || this.nativeOutputTransition)) return;
         const payload = this._nativeOutputPayload(params);
@@ -8418,6 +8974,7 @@ button:hover{background:#202a35}
     }
 
     _flushNativeOutputWindowSync() {
+        if (this.nativeOutputSourceSwitching) return;
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
             this._resetNativeOutputSyncState();
             return;
@@ -8442,13 +8999,19 @@ button:hover{background:#202a35}
         this.nativeOutputSyncInFlight = true;
         const syncStartedAt = performance.now();
         this.nativeOutputSyncAttemptCount++;
-        sendTauriOutputState(payload).then((ok) => {
+        this.nativeOutputSyncPromise = sendTauriOutputState(payload).then((ok) => {
             if (!ok) {
+                const restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                 this.nativeOutputSyncFailedCount++;
                 this.nativeOutputActive = false;
+                this.nativeOutputExclusiveCameraActive = false;
+                this.nativeOutputSharedCameraActive = false;
                 this._resetNativeOutputSyncState();
                 this._stopNativeOutputMirror();
                 this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputLost');
+                if (restoreExclusiveCamera) {
+                    void this._restoreCameraPreviewAfterNativeOutput();
+                }
             } else {
                 this.nativeOutputSyncOkCount++;
                 this.nativeOutputLastSyncElapsedMs = performance.now() - syncStartedAt;
@@ -8478,6 +9041,7 @@ button:hover{background:#202a35}
     }
 
     async _armNativeOutputTransition(from, to, durationMs, kind, token) {
+        if (this.nativeOutputSourceSwitching) return { armed: false, startAtUnixMs: Date.now() };
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
             return { armed: false, startAtUnixMs: Date.now() };
         }
@@ -8510,17 +9074,22 @@ button:hover{background:#202a35}
         this.nativeOutputSyncInFlight = true;
         this.nativeOutputSyncAttemptCount++;
         this.nativeOutputTransitionArmAttemptCount++;
+        let restoreExclusiveCamera = false;
         let ok = false;
         try {
-            ok = await sendTauriOutputState(payload);
+            this.nativeOutputSyncPromise = sendTauriOutputState(payload);
+            ok = await this.nativeOutputSyncPromise;
             if (ok) {
                 this.nativeOutputSyncOkCount++;
                 this.nativeOutputTransitionArmOkCount++;
                 this.nativeOutputLastSyncElapsedMs = performance.now() - syncStartedAt;
             } else {
+                restoreExclusiveCamera = this.nativeOutputExclusiveCameraActive;
                 this.nativeOutputSyncFailedCount++;
                 this.nativeOutputTransitionArmFailedCount++;
                 this.nativeOutputActive = false;
+                this.nativeOutputExclusiveCameraActive = false;
+                this.nativeOutputSharedCameraActive = false;
             }
         } finally {
             this.nativeOutputSyncInFlight = false;
@@ -8532,6 +9101,9 @@ button:hover{background:#202a35}
                 this._stopNativeOutputMirror();
                 this._applyMainPreviewRendererParams(this.renderParams(), 'nativeOutputLost');
                 this._updatePopoutButton();
+                if (restoreExclusiveCamera) {
+                    void this._restoreCameraPreviewAfterNativeOutput();
+                }
             }
             return { armed: false, startAtUnixMs: Date.now() };
         }
@@ -8562,6 +9134,8 @@ button:hover{background:#202a35}
         }
         if (this.nativeOutputMirrorRaf) return;
 
+        this.nativeOutputMirrorStats = this._newNativeOutputMirrorStats();
+
         const canvas = this.nativeOutputMirrorCanvas || document.createElement('canvas');
         const ctx = canvas.getContext('2d', {
             alpha: false,
@@ -8584,8 +9158,13 @@ button:hover{background:#202a35}
             }
 
             const params = this.renderParams();
-            const fps = Math.min(15, Math.max(6, Number(params.fps) || 12));
-            if (now - lastFrameAt < 1000 / fps || this.nativeOutputMirrorBusy) return;
+            const fps = nativeMirrorTargetFps(params.fps, this.nativeOutputCameraFallbackActive);
+            this.nativeOutputMirrorStats.targetFps = fps;
+            if (now - lastFrameAt < 1000 / fps) return;
+            if (this.nativeOutputMirrorBusy) {
+                this.nativeOutputMirrorStats.busySkips++;
+                return;
+            }
             lastFrameAt = now;
             await this._pushNativeOutputMirrorFrame(ctx, canvas, now);
         };
@@ -8617,31 +9196,47 @@ button:hover{background:#202a35}
     }
 
     async _pushNativeOutputMirrorFrame(ctx, canvas, now = performance.now(), options = {}) {
-        if (this.nativeOutputMirrorBusy && !options.force) return false;
-        if (this.nativeOutputMirrorSendPending && now - this.nativeOutputMirrorLastSendStart < 450 && !options.force) return false;
+        if (this.nativeOutputMirrorBusy && !options.force) {
+            this.nativeOutputMirrorStats.busySkips++;
+            return false;
+        }
+        const stats = this.nativeOutputMirrorStats;
+        stats.attempts++;
+        stats.targetFps = nativeMirrorTargetFps(
+            this.renderParams().fps,
+            this.nativeOutputCameraFallbackActive
+        );
         const params = this.renderParams();
         const source = this._activeRenderSurface();
         const sourceWidth = source?.videoWidth || source?.naturalWidth || source?.width || 0;
         const sourceHeight = source?.videoHeight || source?.naturalHeight || source?.height || 0;
-        if (!source || sourceWidth <= 0 || sourceHeight <= 0) return false;
+        if (!source || sourceWidth <= 0 || sourceHeight <= 0) {
+            stats.sourceSkips++;
+            return false;
+        }
 
-        const maxWidth = options.force ? 960 : 800;
-        const maxHeight = options.force ? 540 : 480;
-        const scale = Math.min(1, maxWidth / sourceWidth, maxHeight / sourceHeight);
-        const width = Math.max(1, Math.floor(sourceWidth * scale));
-        const height = Math.max(1, Math.floor(sourceHeight * scale));
+        const { width, height } = nativeMirrorFrameSize(
+            sourceWidth,
+            sourceHeight,
+            this.nativeOutputCameraFallbackActive,
+            Boolean(options.force)
+        );
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
         }
 
+        const totalStartedAt = performance.now();
         this.nativeOutputMirrorBusy = true;
         try {
+            const readbackStartedAt = performance.now();
             ctx.imageSmoothingEnabled = Boolean(params.smoothing);
             ctx.fillStyle = '#030405';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(source, 0, 0, width, height);
-            this.nativeOutputMirrorBusy = false;
+            stats.captured++;
+            stats.lastWidth = width;
+            stats.lastHeight = height;
             const seq = ++this.nativeOutputMirrorSeq;
             this.nativeOutputMirrorSendPending = true;
             this.nativeOutputMirrorLastSendStart = performance.now();
@@ -8649,6 +9244,13 @@ button:hover{background:#202a35}
             let ok = null;
             try {
                 const pixels = ctx.getImageData(0, 0, width, height);
+                const readbackElapsedMs = performance.now() - readbackStartedAt;
+                stats.rawReadbacks++;
+                stats.lastReadbackMs = readbackElapsedMs;
+                stats.totalReadbackMs += readbackElapsedMs;
+                stats.maxReadbackMs = Math.max(stats.maxReadbackMs, readbackElapsedMs);
+                stats.rawBytes += pixels.data.byteLength;
+                const sendStartedAt = performance.now();
                 ok = await sendTauriOutputPixels({
                     seq,
                     width,
@@ -8657,10 +9259,17 @@ button:hover{background:#202a35}
                     smoothing: Boolean(params.smoothing),
                     label
                 });
+                const sendElapsedMs = performance.now() - sendStartedAt;
+                stats.lastSendMs = sendElapsedMs;
+                stats.totalSendMs += sendElapsedMs;
+                stats.maxSendMs = Math.max(stats.maxSendMs, sendElapsedMs);
+                if (ok !== null) stats.transport = 'raw-rgba';
             } catch (error) {
                 console.info('[TauriOutput] Raw mirror pixels unavailable:', error);
             }
             if (ok === null) {
+                stats.encodedFallbacks++;
+                const sendStartedAt = performance.now();
                 let dataUrl = await this._canvasToDataUrlAsync(canvas, 'image/webp', options.force ? 0.72 : 0.58);
                 if (!String(dataUrl).startsWith('data:image/webp')) {
                     dataUrl = await this._canvasToDataUrlAsync(canvas, 'image/jpeg', options.force ? 0.72 : 0.58);
@@ -8673,8 +9282,19 @@ button:hover{background:#202a35}
                     smoothing: Boolean(params.smoothing),
                     label
                 });
+                const sendElapsedMs = performance.now() - sendStartedAt;
+                stats.lastSendMs = sendElapsedMs;
+                stats.totalSendMs += sendElapsedMs;
+                stats.maxSendMs = Math.max(stats.maxSendMs, sendElapsedMs);
+                stats.transport = 'encoded-image';
             }
             if (seq === this.nativeOutputMirrorSeq) this.nativeOutputMirrorSendPending = false;
+            if (ok) stats.accepted++;
+            else stats.rejected++;
+            const totalElapsedMs = performance.now() - totalStartedAt;
+            stats.lastTotalMs = totalElapsedMs;
+            stats.totalElapsedMs += totalElapsedMs;
+            stats.maxTotalMs = Math.max(stats.maxTotalMs, totalElapsedMs);
             if (!ok) {
                 this.nativeOutputActive = false;
                 this._stopNativeOutputMirror();
@@ -8697,6 +9317,101 @@ button:hover{background:#202a35}
         this.nativeOutputMirrorRaf = null;
         this.nativeOutputMirrorBusy = false;
         this.nativeOutputMirrorSendPending = false;
+        if (!this.nativeOutputMirrorStats.stoppedAtMs) {
+            this.nativeOutputMirrorStats.stoppedAtMs = performance.now();
+        }
+    }
+
+    _nativeOutputPreviewDiagnostics() {
+        if (this.nativeOutputPreviewSource?.diagnostics) {
+            return this.nativeOutputPreviewSource.diagnostics();
+        }
+        return {
+            active: false,
+            transport: 'none',
+            targetFps: 0,
+            acceptedFps: 0,
+            polls: 0,
+            emptyPolls: 0,
+            frames: 0,
+            errors: 0,
+            sourceWidth: 0,
+            sourceHeight: 0,
+            width: 0,
+            height: 0,
+            encodedKiBPerSecond: 0,
+            readMs: { last: 0, average: 0, max: 0 },
+            encodeMs: { last: 0, average: 0, max: 0 },
+            decodeMs: { last: 0, average: 0, max: 0 }
+        };
+    }
+
+    _newNativeOutputMirrorStats() {
+        return {
+            startedAtMs: performance.now(),
+            stoppedAtMs: 0,
+            targetFps: 0,
+            attempts: 0,
+            busySkips: 0,
+            sourceSkips: 0,
+            captured: 0,
+            rawReadbacks: 0,
+            accepted: 0,
+            rejected: 0,
+            encodedFallbacks: 0,
+            rawBytes: 0,
+            lastWidth: 0,
+            lastHeight: 0,
+            lastReadbackMs: 0,
+            totalReadbackMs: 0,
+            maxReadbackMs: 0,
+            lastSendMs: 0,
+            totalSendMs: 0,
+            maxSendMs: 0,
+            lastTotalMs: 0,
+            totalElapsedMs: 0,
+            maxTotalMs: 0,
+            transport: 'none'
+        };
+    }
+
+    _nativeOutputMirrorDiagnostics() {
+        const stats = this.nativeOutputMirrorStats || this._newNativeOutputMirrorStats();
+        const endedAtMs = stats.stoppedAtMs || performance.now();
+        const elapsedSeconds = Math.max(0, (endedAtMs - stats.startedAtMs) / 1000);
+        const average = (total, count) => count > 0 ? total / count : 0;
+        const rounded = (value) => Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
+        return {
+            active: Boolean(this.nativeOutputMirrorRaf && this.nativeOutputActive),
+            transport: stats.transport,
+            targetFps: rounded(stats.targetFps),
+            acceptedFps: rounded(elapsedSeconds > 0 ? stats.accepted / elapsedSeconds : 0),
+            attempts: stats.attempts,
+            captured: stats.captured,
+            accepted: stats.accepted,
+            rejected: stats.rejected,
+            busySkips: stats.busySkips,
+            sourceSkips: stats.sourceSkips,
+            encodedFallbacks: stats.encodedFallbacks,
+            width: stats.lastWidth,
+            height: stats.lastHeight,
+            rawMiBPerSecond: rounded(elapsedSeconds > 0 ? stats.rawBytes / 1048576 / elapsedSeconds : 0),
+            readbackMs: {
+                last: rounded(stats.lastReadbackMs),
+                average: rounded(average(stats.totalReadbackMs, stats.rawReadbacks)),
+                max: rounded(stats.maxReadbackMs)
+            },
+            sendMs: {
+                last: rounded(stats.lastSendMs),
+                average: rounded(average(stats.totalSendMs, stats.accepted + stats.rejected)),
+                max: rounded(stats.maxSendMs)
+            },
+            totalMs: {
+                last: rounded(stats.lastTotalMs),
+                average: rounded(average(stats.totalElapsedMs, stats.accepted + stats.rejected)),
+                max: rounded(stats.maxTotalMs)
+            }
+        };
     }
 
     async _placePopoutOnExternalScreen(win) {

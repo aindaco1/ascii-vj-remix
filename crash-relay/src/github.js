@@ -132,11 +132,33 @@ function summarizeContext(context = {}) {
 }
 
 function summarizeRendererDiagnostics(context = {}) {
-  const diagnostics = Array.isArray(context.rendererDiagnostics)
-    ? context.rendererDiagnostics.slice(-8)
+  const source = Array.isArray(context.rendererDiagnostics)
+    ? context.rendererDiagnostics
+    : Array.isArray(context.recentRendererEvents)
+      ? context.recentRendererEvents
+      : [];
+  const diagnostics = source.length
+    ? source.slice(-8)
     : [];
   if (!diagnostics.length) return '_No renderer diagnostics captured._';
   return `\`\`\`json\n${JSON.stringify(diagnostics, null, 2)}\n\`\`\``;
+}
+
+function summarizeRuntimeDiagnostics(context = {}) {
+  const details = {};
+  for (const key of [
+    'cameraStatus',
+    'running',
+    'transitioning',
+    'nativeOutputCapabilities',
+    'nativeOutputSync',
+    'nativeOutputMirror',
+    'renderer'
+  ]) {
+    if (context[key] !== undefined && context[key] !== null) details[key] = context[key];
+  }
+  if (!Object.keys(details).length) return '_No runtime diagnostics captured._';
+  return `\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
 }
 
 function countRows(map = {}) {
@@ -224,6 +246,10 @@ ${summarizeContext(report.context)}
 ## Renderer Diagnostics
 
 ${summarizeRendererDiagnostics(report.context)}
+
+## Runtime Diagnostics
+
+${summarizeRuntimeDiagnostics(report.context)}
 
 ## Versions
 

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+#[cfg(target_os = "linux")]
+use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
@@ -359,45 +361,64 @@ pub fn spawn_rgb_reader_with_options(
     })
 }
 
-pub fn spawn_macos_camera_rgb_reader(
+pub fn spawn_platform_camera_rgb_reader(
     binaries: &FfmpegBinaries,
     config: &DecodeConfig,
     options: &CameraReaderOptions,
 ) -> Result<FfmpegRgbFrameReader, FfmpegError> {
     #[cfg(target_os = "macos")]
-    {
-        let mut child = sidecar_command(&binaries.ffmpeg)
-            .args(ffmpeg_macos_camera_decode_args(config, options))
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|source| FfmpegError::Io {
-                program: binaries.ffmpeg.clone(),
-                source,
-            })?;
-        let stdout = child.stdout.take().ok_or_else(|| {
-            FfmpegError::InvalidDecodeConfig("ffmpeg stdout pipe was not available".to_string())
-        })?;
+    let args = ffmpeg_macos_camera_decode_args(config, options);
 
-        Ok(FfmpegRgbFrameReader {
-            child,
-            stdout,
-            program: binaries.ffmpeg.clone(),
-            width: config.width,
-            height: config.height,
-            frame_bytes: checked_rgb_frame_bytes(config.width, config.height)?,
-            index: 0,
-            finished: false,
-        })
-    }
+    #[cfg(target_os = "windows")]
+    let args = ffmpeg_windows_camera_decode_args(config, options)?;
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    let args = {
+        let device = linux_camera_input_path(options.device_label.as_deref())?;
+        ffmpeg_linux_camera_decode_args(config, options, &device)
+    };
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         let _ = (binaries, config, options);
-        Err(FfmpegError::InvalidDecodeConfig(
-            "native camera output is currently implemented for macOS only".to_string(),
-        ))
+        return Err(FfmpegError::InvalidDecodeConfig(
+            "native camera output is unavailable on this platform".to_string(),
+        ));
     }
+
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    spawn_camera_rgb_reader_with_args(binaries, config, args)
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+fn spawn_camera_rgb_reader_with_args(
+    binaries: &FfmpegBinaries,
+    config: &DecodeConfig,
+    args: Vec<String>,
+) -> Result<FfmpegRgbFrameReader, FfmpegError> {
+    let mut child = sidecar_command(&binaries.ffmpeg)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|source| FfmpegError::Io {
+            program: binaries.ffmpeg.clone(),
+            source,
+        })?;
+    let stdout = child.stdout.take().ok_or_else(|| {
+        FfmpegError::InvalidDecodeConfig("ffmpeg stdout pipe was not available".to_string())
+    })?;
+
+    Ok(FfmpegRgbFrameReader {
+        child,
+        stdout,
+        program: binaries.ffmpeg.clone(),
+        width: config.width,
+        height: config.height,
+        frame_bytes: checked_rgb_frame_bytes(config.width, config.height)?,
+        index: 0,
+        finished: false,
+    })
 }
 
 fn sidecar_command(program: &Path) -> Command {
@@ -535,6 +556,204 @@ fn macos_camera_input_name(device_label: Option<&str>) -> String {
         Some(label) => format!("{label}:none"),
         None => "0:none".to_string(),
     }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn ffmpeg_windows_camera_decode_args(
+    config: &DecodeConfig,
+    options: &CameraReaderOptions,
+) -> Result<Vec<String>, FfmpegError> {
+    let device = windows_camera_input_name(options.device_label.as_deref()).ok_or_else(|| {
+        FfmpegError::InvalidDecodeConfig(
+            "DirectShow camera fallback requires a concrete device label".to_string(),
+        )
+    })?;
+    Ok(ffmpeg_camera_decode_args(
+        config,
+        options,
+        "dshow",
+        format!("video={device}"),
+    ))
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_camera_input_name(device_label: Option<&str>) -> Option<String> {
+    device_label
+        .map(|label| {
+            without_chromium_usb_model_suffix(label)
+                .trim()
+                .chars()
+                .filter(|ch| !ch.is_control() && *ch != '"')
+                .collect::<String>()
+        })
+        .filter(|label| !label.is_empty() && label != "Selected camera" && label != "Camera 1")
+        // DirectShow parses colon-separated av_get_token values even though
+        // Command bypasses the shell. Escape its grammar, not shell syntax.
+        .map(|label| label.chars().flat_map(|ch| {
+            if matches!(ch, ':' | '\'' | '\\') { vec!['\\', ch] } else { vec![ch] }
+        }).collect())
+}
+
+#[cfg(any(target_os = "windows", test))]
+pub(crate) fn without_chromium_usb_model_suffix(value: &str) -> &str {
+    let trimmed = value.trim();
+    let Some(start) = trimmed.rfind(" (") else { return trimmed; };
+    if !trimmed.ends_with(')') { return trimmed; }
+    let bytes = trimmed[start + 2..trimmed.len() - 1].as_bytes();
+    if bytes.len() == 9 && bytes[4] == b':' && bytes.iter().enumerate()
+        .all(|(index, byte)| index == 4 || byte.is_ascii_hexdigit()) {
+        trimmed[..start].trim_end()
+    } else { trimmed }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn ffmpeg_linux_camera_decode_args(
+    config: &DecodeConfig,
+    options: &CameraReaderOptions,
+    device: &Path,
+) -> Vec<String> {
+    ffmpeg_camera_decode_args(
+        config,
+        options,
+        "v4l2",
+        device.to_string_lossy().into_owned(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn linux_camera_input_path(device_label: Option<&str>) -> Result<PathBuf, FfmpegError> {
+    let sys_root = Path::new("/sys/class/video4linux");
+    let mut candidates = fs::read_dir(sys_root)
+        .map_err(|source| FfmpegError::Io {
+            program: sys_root.to_path_buf(),
+            source,
+        })?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let entry_name = entry.file_name().to_string_lossy().into_owned();
+            if !is_linux_video_device_name(&entry_name) {
+                return None;
+            }
+            let name = fs::read_to_string(entry.path().join("name"))
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            Some((entry_name, name))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| {
+        linux_video_device_sort_key(&left.0).cmp(&linux_video_device_sort_key(&right.0))
+    });
+
+    select_linux_camera_path(&candidates, device_label).ok_or_else(|| {
+        FfmpegError::InvalidDecodeConfig(
+            match device_label.filter(|label| !label.trim().is_empty()) {
+                Some(label) => format!("V4L2 camera device not found for label {label:?}"),
+                None => "no V4L2 camera devices were found".to_string(),
+            },
+        )
+    })
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn select_linux_camera_path(
+    candidates: &[(String, String)],
+    device_label: Option<&str>,
+) -> Option<PathBuf> {
+    let requested = normalize_camera_label(device_label.unwrap_or_default());
+    let selected = if requested.is_empty()
+        || requested == normalize_camera_label("Selected camera")
+        || requested == normalize_camera_label("Camera 1")
+    {
+        candidates.first()
+    } else {
+        candidates.iter().find(|(_, name)| {
+            let candidate = normalize_camera_label(name);
+            candidate == requested
+                || (!candidate.is_empty()
+                    && (candidate.contains(&requested) || requested.contains(&candidate)))
+        })
+    };
+
+    selected.map(|(entry_name, _)| Path::new("/dev").join(entry_name))
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn is_linux_video_device_name(value: &str) -> bool {
+    value
+        .strip_prefix("video")
+        .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+#[cfg(target_os = "linux")]
+fn linux_video_device_sort_key(value: &str) -> u32 {
+    value
+        .strip_prefix("video")
+        .and_then(|suffix| suffix.parse().ok())
+        .unwrap_or(u32::MAX)
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn normalize_camera_label(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
+fn ffmpeg_camera_decode_args(
+    config: &DecodeConfig,
+    options: &CameraReaderOptions,
+    input_format: &str,
+    input: String,
+) -> Vec<String> {
+    let mut args = vec![
+        "-nostdin".to_string(),
+        "-v".to_string(),
+        "error".to_string(),
+        "-f".to_string(),
+        input_format.to_string(),
+    ];
+
+    if let Some(fps) = options
+        .capture_fps
+        .filter(|fps| fps.is_finite() && *fps > 0.0)
+    {
+        args.push("-framerate".to_string());
+        args.push(format!("{fps:.3}"));
+    }
+
+    if let (Some(width), Some(height)) = (options.capture_width, options.capture_height) {
+        if width > 0 && height > 0 {
+            args.push("-video_size".to_string());
+            args.push(format!("{width}x{height}"));
+        }
+    }
+
+    args.extend([
+        "-i".to_string(),
+        input,
+        "-an".to_string(),
+        "-sn".to_string(),
+        "-dn".to_string(),
+        "-vf".to_string(),
+        ffmpeg_video_filter(
+            config,
+            &RgbReaderOptions {
+                start_seconds: None,
+                output_fps: None,
+            },
+        ),
+        "-pix_fmt".to_string(),
+        "rgb24".to_string(),
+        "-f".to_string(),
+        "rawvideo".to_string(),
+        "pipe:1".to_string(),
+    ]);
+
+    args
 }
 
 fn ffmpeg_video_filter(config: &DecodeConfig, options: &RgbReaderOptions) -> String {
@@ -713,6 +932,68 @@ mod tests {
             macos_camera_input_name(Some("USB: Camera")),
             "USB Camera:none"
         );
+    }
+
+    #[test]
+    fn builds_windows_directshow_camera_args_without_shell() {
+        let config = DecodeConfig::new(640, 360, 3).unwrap();
+        let args = ffmpeg_windows_camera_decode_args(
+            &config,
+            &CameraReaderOptions {
+                device_label: Some("Integrated Camera".to_string()),
+                capture_width: Some(1280),
+                capture_height: Some(720),
+                capture_fps: Some(30.0),
+                output_fps: None,
+            },
+        )
+        .unwrap();
+
+        assert!(args.contains(&"dshow".to_string()));
+        assert!(args.contains(&"video=Integrated Camera".to_string()));
+        assert!(args.contains(&"1280x720".to_string()));
+        assert!(args.contains(&"scale=640:360:flags=bilinear".to_string()));
+        assert_eq!(args.last().map(String::as_str), Some("pipe:1"));
+        assert!(
+            ffmpeg_windows_camera_decode_args(&config, &CameraReaderOptions::default()).is_err()
+        );
+        assert_eq!(windows_camera_input_name(Some("Webcam (1bcf:2cb4)")), Some("Webcam".to_string()));
+        assert_eq!(windows_camera_input_name(Some("Capture: HDMI")), Some("Capture\\: HDMI".to_string()));
+    }
+
+    #[test]
+    fn builds_linux_v4l2_camera_args_and_selects_matching_device() {
+        let config = DecodeConfig::new(640, 360, 3).unwrap();
+        let options = CameraReaderOptions {
+            device_label: Some("Logitech BRIO".to_string()),
+            capture_width: Some(1920),
+            capture_height: Some(1080),
+            capture_fps: Some(30.0),
+            output_fps: None,
+        };
+        let args = ffmpeg_linux_camera_decode_args(&config, &options, Path::new("/dev/video2"));
+
+        assert!(args.contains(&"v4l2".to_string()));
+        assert!(args.contains(&"/dev/video2".to_string()));
+        assert!(args.contains(&"1920x1080".to_string()));
+        assert!(args.contains(&"scale=640:360:flags=bilinear".to_string()));
+        assert_eq!(args.last().map(String::as_str), Some("pipe:1"));
+
+        let candidates = vec![
+            ("video0".to_string(), "Integrated Camera".to_string()),
+            ("video2".to_string(), "Logitech BRIO: USB".to_string()),
+        ];
+        assert_eq!(
+            select_linux_camera_path(&candidates, Some("Logitech BRIO USB")),
+            Some(PathBuf::from("/dev/video2"))
+        );
+        assert_eq!(
+            select_linux_camera_path(&candidates, Some("Selected camera")),
+            Some(PathBuf::from("/dev/video0"))
+        );
+        assert_eq!(select_linux_camera_path(&candidates, Some("Missing")), None);
+        assert!(is_linux_video_device_name("video12"));
+        assert!(!is_linux_video_device_name("video-meta"));
     }
 
     #[test]

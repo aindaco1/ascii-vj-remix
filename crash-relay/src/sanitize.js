@@ -8,7 +8,8 @@ const ALLOWED_KINDS = new Set([
   'tauri-command',
   'rust-panic',
   'renderer-error',
-  'native-output-error'
+  'native-output-error',
+  'manual-diagnostic'
 ]);
 
 const ALLOWED_SURFACES = new Set([
@@ -18,6 +19,7 @@ const ALLOWED_SURFACES = new Set([
   'native-output',
   'startup',
   'panic-hook',
+  'manual',
   'unknown'
 ]);
 

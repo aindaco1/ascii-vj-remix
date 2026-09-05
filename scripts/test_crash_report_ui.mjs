@@ -6,7 +6,16 @@ import {
   isCrashReportControlLabel,
   pendingCrashReportCount
 } from '../renderers/desktop/crash-report-ui.js';
-import { isReportableTauriCommandFailure } from '../renderers/desktop/tauri-adapter.js';
+import {
+  getTauriOutputDiagnostics,
+  isReportableTauriCommandFailure
+} from '../renderers/desktop/tauri-adapter.js';
+
+assert.deepEqual(getTauriOutputDiagnostics(), {
+  backend: '',
+  nativeCameraFailureReason: '',
+  nativeOpenCommandMs: 0
+});
 
 assert.equal(pendingCrashReportCount({ pendingCount: -2 }), 0);
 assert.equal(pendingCrashReportCount({ pendingCount: 2.9 }), 2);

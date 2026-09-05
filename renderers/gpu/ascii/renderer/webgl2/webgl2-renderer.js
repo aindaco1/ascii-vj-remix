@@ -11,6 +11,7 @@ import {
     buildPaletteLut,
     paletteById
 } from '../../../../shared/palettes.js';
+import { syncNativePreviewGeometry } from '../../../../shared/native-preview-geometry.js';
 import {
     GLYPH_ATLAS_MIP_LEVEL_COUNT,
     GLYPH_ATLAS_PAGE_COUNT,
@@ -472,6 +473,10 @@ export class WebGL2Renderer {
         this.canvas.style.imageRendering = 'pixelated';
     }
 
+    syncNativePreviewGeometry(params = this.nativePreviewParams) {
+        syncNativePreviewGeometry(this, params);
+    }
+
     _createCellTexture() {
         const gl = this.gl;
         if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
@@ -530,7 +535,15 @@ export class WebGL2Renderer {
 
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 1024, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+        // LUT rows encode red/green indices; source-image flipping would
+        // reverse that lookup and map dark pixels to unrelated bright colors.
+        const sourceFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+        try {
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 1024, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+        } finally {
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, sourceFlipY);
+        }
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -591,6 +604,7 @@ export class WebGL2Renderer {
 
     _renderFrame() {
         if (!this.initialized) return;
+        if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
         this.frameCount++;
         const gl = this.gl;
