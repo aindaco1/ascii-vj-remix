@@ -294,6 +294,15 @@ jobs:
           name: release-binary-${{ matrix.platform }}-${{ needs.release-context.outputs.release_sha }}
           path: ${{ runner.temp }}/tauri-release-binary
 
+      - name: Restore Unix FFmpeg executable permissions
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          # Zipped Actions artifacts restore files as 0644. The camera-input
+          # gate must execute these two verified tools before bundling.
+          chmod 755 "src-tauri/resources/ffmpeg/${{ matrix.platform }}/bin/ffmpeg" \
+            "src-tauri/resources/ffmpeg/${{ matrix.platform }}/bin/ffprobe"
+
       - name: Restore exact release binary
         shell: bash
         run: >-

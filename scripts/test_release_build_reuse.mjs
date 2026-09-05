@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { selectWorkflowRun, workflowRunState } from './lib/github_workflow_acceptance.mjs';
@@ -22,6 +23,34 @@ assert.equal(selectWorkflowRun([], { commit }), null);
 
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'ascii-vj-release-reuse-'));
 try {
+  const workflow = await readFile(new URL('../.github/workflows/release-desktop.yml', import.meta.url), 'utf8');
+  const restoreStep = workflow.indexOf('- name: Restore Unix FFmpeg executable permissions');
+  assert.ok(restoreStep > workflow.indexOf('- name: Download verified FFmpeg runtime'));
+  assert.ok(restoreStep < workflow.indexOf('- name: Verify release package inputs'));
+  const step = workflow.slice(restoreStep, workflow.indexOf('\n      - name:', restoreStep + 1));
+  assert.match(step, /if: runner\.os != 'Windows'/);
+  const shell = step.split('run: |\n')[1].split('\n').map(line => line.replace(/^          /, '')).join('\n');
+  if (process.platform !== 'win32') {
+    for (const platform of ['linux-x86_64', 'macos-aarch64']) {
+      const bin = path.join(tempRoot, 'src-tauri/resources/ffmpeg', platform, 'bin');
+      await mkdir(bin, { recursive: true });
+      for (const name of ['ffmpeg', 'ffprobe']) {
+        const tool = path.join(bin, name);
+        await writeFile(tool, '#!/bin/sh\nexit 0\n');
+        await chmod(tool, 0o644);
+        assert.equal(spawnSync(tool).error?.code, 'EACCES');
+      }
+      const restore = spawnSync('bash', ['-c', shell.replaceAll('${{ matrix.platform }}', platform)], {
+        cwd: tempRoot, encoding: 'utf8'
+      });
+      assert.equal(restore.status, 0, restore.stderr);
+      for (const name of ['ffmpeg', 'ffprobe']) {
+        const tool = path.join(bin, name);
+        assert.equal((await stat(tool)).mode & 0o777, 0o755);
+        assert.equal(spawnSync(tool).status, 0);
+      }
+    }
+  }
   const source = path.join(tempRoot, 'ascii-vj-remix');
   const packed = path.join(tempRoot, 'packed');
   const restored = path.join(tempRoot, 'restored', 'ascii-vj-remix');
