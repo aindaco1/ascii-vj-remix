@@ -1403,14 +1403,15 @@ async function runSmoke() {
           renderer?.renderFrame?.();
 
           const canvas = app._activeRenderSurface?.();
-          let pixels = null;
           let glError = 0;
-          if (canvas?.width && canvas?.height) {
+          const readPixels = () => {
+            if (!canvas?.width || !canvas?.height) return null;
             const gl = renderer?.gl;
             if (gl) {
-              pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              const pixels = new Uint8Array(canvas.width * canvas.height * 4);
               gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
               glError = gl.getError();
+              return pixels;
             } else {
               // WebGPU canvases cannot also create a 2D context. Snapshot the
               // rendered surface, as the application's screenshot path does.
@@ -1419,8 +1420,27 @@ async function runSmoke() {
               readback.height = canvas.height;
               const ctx = readback.getContext('2d', { willReadFrequently: true });
               ctx.drawImage(canvas, 0, 0);
-              pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+              return ctx.getImageData(0, 0, canvas.width, canvas.height).data;
             }
+          };
+          const pixels = readPixels();
+
+          // These looks must keep moving on a still image without audio or a
+          // preset transition. Observe normal animation ticks, not forced ones.
+          let animation = null;
+          if (['ascii-world-mint', 'ascii-city-nightshift'].includes(preset.id)) {
+            const firstFrame = renderer.frameCount;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            const next = await new Promise((resolve) => requestAnimationFrame(() => resolve(readPixels())));
+            let changedPixels = 0;
+            for (let i = 0; pixels && next && i < pixels.length; i += 4) {
+              if (Math.abs(pixels[i] - next[i]) + Math.abs(pixels[i + 1] - next[i + 1]) +
+                  Math.abs(pixels[i + 2] - next[i + 2]) > 12) changedPixels += 1;
+            }
+            animation = {
+              framesAdvanced: renderer.frameCount - firstFrame,
+              changedFraction: changedPixels / (canvas.width * canvas.height)
+            };
           }
 
           const background = app.params.backgroundColor.match(/[0-9a-f]{2}/gi).map((value) => Number.parseInt(value, 16));
@@ -1445,6 +1465,7 @@ async function runSmoke() {
             aspectError: canvasRatio ? Math.abs(canvasRatio / sourceRatio - 1) : 1,
             glError,
             pendingGlyphPages: renderer?.pendingGlyphPages?.size || 0,
+            animation,
             canvasSize: `${canvas?.width || 0}x${canvas?.height || 0}`
           });
         }
@@ -1458,7 +1479,8 @@ async function runSmoke() {
       !preset.hasSignal ||
       preset.aspectError > 0.03 ||
       preset.glError !== 0 ||
-      preset.pendingGlyphPages !== 0
+      preset.pendingGlyphPages !== 0 ||
+      (preset.animation && (preset.animation.framesAdvanced <= 0 || preset.animation.changedFraction < 0.001))
     );
     if (presetFailures.length) {
       throw new Error(`Primary Demo Image preset matrix failed: ${JSON.stringify(presetFailures)}`);
@@ -1696,6 +1718,7 @@ async function runSmoke() {
       main,
       output: outputState,
       mirrorOutput: mirrorState,
+      stillImageAnimation: presetMatrix.filter((preset) => preset.animation),
       nativePreviewGeometry,
       errors
     };

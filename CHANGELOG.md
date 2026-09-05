@@ -7,10 +7,11 @@
 - Added ASCII City Nightshift, an original preset inspired by
   [tweakyourpc's ASCII City](https://tweakyourpc.github.io/ascii-city/), with a
   shared City Nightshift palette, near-black shadows, amber/sage highlights,
-  and dense terminal glyphs for the selected image, video, or camera.
+  and gently jittering dense terminal glyphs for the selected image, video, or
+  camera. Still images animate without audio input.
 - Added ASCII World Mint, an original preset inspired by
   [yeahpython's ASCII World](https://yeahpython.github.io/game/game.html), with
-  thin mint ASCII glyphs, a dark teal background, and stable sampling for the
+  thin mint ASCII glyphs, a dark teal background, and continuous jitter for the
   current image, video, or camera source.
 - Added native single-camera Pop Out capture on Windows through Media
   Foundation and on Linux through the bundled local FFmpeg V4L2 input. Both
