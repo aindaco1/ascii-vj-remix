@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added ASCII City Nightshift, an original preset inspired by
+  [tweakyourpc's ASCII City](https://tweakyourpc.github.io/ascii-city/), with a
+  shared City Nightshift palette, near-black shadows, amber/sage highlights,
+  and dense terminal glyphs for the selected image, video, or camera.
 - Added ASCII World Mint, an original preset inspired by
   [yeahpython's ASCII World](https://yeahpython.github.io/game/game.html), with
   thin mint ASCII glyphs, a dark teal background, and stable sampling for the
@@ -42,6 +46,9 @@
 
 ### Fixed
 
+- WebGL2 palette lookup uploads now preserve row order independently of source
+  image orientation, keeping dark and bright colors consistent with the shared
+  palette mapping during startup and live palette changes.
 - Windows native output now uses the primary renderer's max-coverage glyph
   masks for tiny cells, preserving the pixel-like Acid Snowstorm appearance.
 - Windows preview texture, grid, and canvas dimensions update together when

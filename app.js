@@ -565,6 +565,46 @@ const BUILTIN_PRESETS = [
         }
     },
     {
+        id: 'ascii-city-nightshift',
+        name: 'ASCII City Nightshift',
+        readonly: true,
+        transitionSeconds: 1.4,
+        // Night-scene styling inspired by https://tweakyourpc.github.io/ascii-city/
+        params: {
+            cols: 200,
+            autoRows: true,
+            cellWidth: 8,
+            cellHeight: 14,
+            saturationBoost: 0.9,
+            contrastBoost: 1.65,
+            brightness: 0.92,
+            gamma: 1.2,
+            bgBlend: 0,
+            quantizeBits: 0,
+            paletteId: 'city-nightshift',
+            paletteMapping: 'nearest',
+            ditherMode: 'none',
+            jitterAmount: 0,
+            jitterSpeed: 0,
+            sampleX: 0.5,
+            sampleY: 0.5,
+            smoothing: false,
+            solidMode: false,
+            glyphMode: true,
+            charset: 'custom',
+            customGlyphRamp: '  .:|#%8',
+            glyphDepth: 96,
+            glyphOffset: 0,
+            glyphReverse: false,
+            glyphColorMode: 'palette',
+            backgroundColor: '#03040c',
+            fontFamily: 'monospace',
+            mode: 3,
+            pixel: false,
+            codecQuality: 'balanced'
+        }
+    },
+    {
         id: 'ansi-newsprint',
         name: 'ANSI Newsprint',
         readonly: true,
@@ -1416,7 +1456,8 @@ const BUILTIN_PRESET_DISPLAY_ORDER = [
     'glitch-orchid',
     'ultraviolet-siren',
     'neon-razorstorm',
-    'ascii-world-mint'
+    'ascii-world-mint',
+    'ascii-city-nightshift'
 ];
 
 const EXTREME_WTF_PRESET_IDS = [

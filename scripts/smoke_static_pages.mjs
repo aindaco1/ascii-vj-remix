@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
+import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -1473,6 +1474,65 @@ async function runSmoke() {
         failures: acceleratedPresetFailures
       })}`);
     }
+
+    // Palette tables are row-addressed data, unlike vertically flipped source
+    // images. Check real WebGL pixels at startup and after live palette changes.
+    // Non-extreme channels avoid LUT bucket boundaries where shader rounding
+    // can legitimately select either neighboring quantized input.
+    const paletteSwatches = [[0, 0, 0], [255, 255, 255], [137, 180, 143], [141, 113, 63],
+      [85, 141, 156], [12, 44, 92], [215, 22, 45], [124, 126, 122]];
+    const paletteCases = [
+      ['city-nightshift', 'nearest'], ['none', 'nearest'],
+      ...PALETTES.flatMap(({ id }) => [[id, 'nearest'], [id, 'luminance']])
+    ].map(([id, mapping]) => ({ id, mapping,
+      expected: paletteSwatches.map(color => mapColorToPalette(color, id, mapping, buildPaletteLut(id, mapping))) }));
+    await page.evaluate(async ({ swatches, cases }) => {
+      const app = window.ascilineRemix;
+      app.stop();
+      const canvas = document.createElement('canvas');
+      canvas.width = 96; canvas.height = 48;
+      const ctx = canvas.getContext('2d');
+      swatches.forEach((color, index) => {
+        ctx.fillStyle = `rgb(${color.join(',')})`;
+        ctx.fillRect(index * 12, 0, 12, 48);
+      });
+      const source = { canvas, element: canvas, isImage: true, type: 'image', ready: true,
+        width: 96, height: 48, destroy() {}, updateParams() {} };
+      app.loadStaticSource = async () => source;
+      app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
+        cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
+        solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
+        paletteMapping: cases[0].mapping, ditherMode: 'none' };
+      try {
+        await app.start();
+        const renderer = app.staticRuntime.renderer;
+        if (renderer.getStats().backend !== 'webgl2') throw new Error('Palette check requires actual WebGL2');
+        const gl = renderer.gl;
+        for (const [index, test] of cases.entries()) {
+          if (index > 0) {
+            renderer.paletteId = test.id;
+            renderer.paletteMapping = test.mapping;
+            renderer.syncFeatureResources();
+          }
+          renderer.renderFrame();
+          const pixels = new Uint8Array(96 * 48 * 4);
+          gl.readPixels(0, 0, 96, 48, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          test.expected.forEach((color, column) => {
+            const offset = (24 * 96 + column * 12 + 6) * 4;
+            const actual = [...pixels.slice(offset, offset + 3)];
+            if (actual.some((value, channel) => Math.abs(value - color[channel]) > 2)) {
+              throw new Error(`WebGL palette ${test.id}/${test.mapping} swatch ${column}: ${actual} != ${color}`);
+            }
+          });
+          if (!gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL)) throw new Error('Source image orientation was not restored');
+          if (gl.getError()) throw new Error('WebGL palette check produced a GL error');
+        }
+      } finally {
+        app.stop();
+      }
+    }, { swatches: paletteSwatches, cases: paletteCases });
 
     // Feed the real renderer a synthetic native-preview canvas. Camera hardware
     // remains a separate acceptance gate, but texture/viewport resize is testable.

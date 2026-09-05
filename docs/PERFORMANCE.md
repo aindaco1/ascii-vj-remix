@@ -194,9 +194,9 @@ WebKit glyph preview.
 For the primary macOS Apple WebKit view, acceleration-eligible glyph presets
 use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
 the normal software density ceiling. The installed all-preset sweep resolves
-41 built-ins to WebGPU and 28 to Canvas2D, keeps all 69 visible, and confirms
+43 built-ins to WebGPU and 28 to Canvas2D, keeps all 71 visible, and confirms
 every GPU-eligible preset is accelerated. Native Pop Out remains independently
-GPU-rendered. A 30-second structural run held the primary view at 30.0 FPS,
+GPU-rendered. An earlier 30-second structural run held the primary view at 30.0 FPS,
 native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS
 fixture, and completed 16 synchronized crossfades with zero GPU or transition
 failures. These are M1 Max development-host regression results, not M1/16 GB

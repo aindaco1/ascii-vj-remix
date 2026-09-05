@@ -341,6 +341,8 @@ The WebGL2 backend mirrors the WebGPU visual model as closely as practical:
 - images upload once.
 - first pass samples one color per cell into a cell-color texture.
 - first-pass palette/dither math matches the shared contract.
+- palette lookup textures retain their data row order while source images keep
+  their own vertical-flip setting.
 - second pass expands the cell-color texture and optionally samples the same
   Unicode-scalar atlas/ramp contract as WebGPU.
 - shader uniforms match the WebGPU parameter set where possible.
@@ -368,7 +370,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 42 accelerated and 28
+route and requires the Windows preset matrix to preserve 43 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 

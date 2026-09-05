@@ -107,13 +107,13 @@ Rendering:
 - Classic Camera ASCII owns the clean-profile visual state, not the global
   renderer preference. Keep the default backend on Auto; built-ins inherit it
   unless they explicitly declare a compatibility backend.
-- Keep the 70/42/28 built-in backend contract centralized in
-  `renderers/shared/preset-backend-contract.js`: 70 total, 42 accelerated, and
+- Keep the 71/43/28 built-in backend contract centralized in
+  `renderers/shared/preset-backend-contract.js`: 71 total, 43 accelerated, and
   28 explicit Canvas presets. Any intentional ownership change must update the
   contract and its visible preset-matrix evidence together.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets.
-- Sixteen project-native palettes, nearest/luminance mapping, and Bayer
+- Seventeen project-native palettes, nearest/luminance mapping, and Bayer
   2x2/4x4/8x8 dithering use the shared palette catalog and cached 32x32x32 LUT.
 - The neutral generated Unicode atlas covers the approved common BMP blocks in
   sixteen 1024px pages. Browser decoded-page cache is capped at four; native

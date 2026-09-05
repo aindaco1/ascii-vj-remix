@@ -82,7 +82,7 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   - Vulkan/GLES on Linux.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets instead of flattening them into solid cells.
-- Sixteen project-native palettes, nearest-color/luminance mapping, and ordered
+- Seventeen project-native palettes, nearest-color/luminance mapping, and ordered
   Bayer 2x2/4x4/8x8 dithering share one parameter and lookup-table contract
   across browser, Canvas, and native output paths.
 - Glyph controls cover depth, offset, reverse, source/fixed color, background,
@@ -112,6 +112,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - ASCII World Mint applies mint line-character glyphs on a dark teal background
   to the selected image, video, or camera, inspired by
   [yeahpython's ASCII World](https://yeahpython.github.io/game/game.html).
+- ASCII City Nightshift uses a near-black background, amber and sage lighting,
+  and dense terminal characters, inspired by
+  [tweakyourpc's ASCII City](https://tweakyourpc.github.io/ascii-city/).
 - Classic Camera ASCII is the default for a clean profile. Existing persisted
   profiles keep their visual settings instead of being silently reset. The
   clean-profile visual choice does not override the global Auto renderer
@@ -129,9 +132,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
   geometry so traditional ASCII tuning stays aligned in the dense sidebar.
 - Palette, mapping, ordered-dither, glyph-ramp, and glyph-color controls are
   independently tunable and saved through the existing visual-preset schema.
-- Ten built-in palette/glyph variants include Braille, box drawing, CJK marks,
-  Hiragana, Katakana, CJK Unified, and Hangul looks. The other six palettes are
-  incorporated into existing presets.
+- Eleven built-in palette/glyph variants include ASCII City Nightshift, Braille,
+  box drawing, CJK marks, Hiragana, Katakana, CJK Unified, and Hangul looks. The
+  other six palettes are incorporated into existing presets.
 - User presets can be saved, duplicated, updated, deleted, imported, and
   exported.
 - Multiple named preset playlists can be saved with reordered stable preset

@@ -16,6 +16,8 @@ separate.
 - Keep the Windows main preview live by feeding the existing WebGPU renderer
   from the single native camera owner's
   bounded binary JPEG preview bridge.
+- Add ASCII World Mint and ASCII City Nightshift as visual presets for the
+  current source, using the existing glyph, palette, and renderer paths.
 
 ## Acceptance Contract
 
