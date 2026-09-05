@@ -22,14 +22,20 @@ assert.equal(workflowRunState({ ...matching, status: 'completed', conclusion: 'f
 assert.equal(selectWorkflowRun([], { commit }), null);
 
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'ascii-vj-release-reuse-'));
-try {
-  const workflow = await readFile(new URL('../.github/workflows/release-desktop.yml', import.meta.url), 'utf8');
+function restoreRuntimeScript(text) {
+  // Git may check YAML out with CRLF on Windows runners.
+  const workflow = text.replace(/\r\n?/g, '\n');
   const restoreStep = workflow.indexOf('- name: Restore Unix FFmpeg executable permissions');
   assert.ok(restoreStep > workflow.indexOf('- name: Download verified FFmpeg runtime'));
   assert.ok(restoreStep < workflow.indexOf('- name: Verify release package inputs'));
   const step = workflow.slice(restoreStep, workflow.indexOf('\n      - name:', restoreStep + 1));
   assert.match(step, /if: runner\.os != 'Windows'/);
-  const shell = step.split('run: |\n')[1].split('\n').map(line => line.replace(/^          /, '')).join('\n');
+  return step.split('run: |\n')[1].split('\n').map(line => line.replace(/^          /, '')).join('\n');
+}
+try {
+  const workflow = await readFile(new URL('../.github/workflows/release-desktop.yml', import.meta.url), 'utf8');
+  const shell = restoreRuntimeScript(workflow);
+  assert.equal(restoreRuntimeScript(workflow.replace(/\r?\n/g, '\r\n')), shell);
   if (process.platform !== 'win32') {
     for (const platform of ['linux-x86_64', 'macos-aarch64']) {
       const bin = path.join(tempRoot, 'src-tauri/resources/ffmpeg', platform, 'bin');
