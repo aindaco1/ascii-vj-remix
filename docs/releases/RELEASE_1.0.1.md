@@ -1,4 +1,14 @@
-# 1.0.1 Release Readiness and Acceptance
+# 1.0.1 Release Readiness and Acceptance Record
+
+Historical pre-release snapshot. Pass, Partial, and Pending below describe
+the evidence collected for the 1.0.1 candidate at that stage. They do not
+describe current CI, publication, or hardware acceptance.
+
+See the [release index](README.md) for other records and
+[Release and Updater Guide](../RELEASING.md) for the maintained procedure.
+Current behavior is described in the [User Guide](../USER_GUIDE.md), release
+history in the [Changelog](../../CHANGELOG.md), and platform check selection in
+[Testing](../TESTING.md#hardware-and-platform-checks).
 
 This document tracks the 1.0.1 corrective release. It separates implemented
 contracts and local QA from packaged, installed, and physical-platform
@@ -17,7 +27,7 @@ acceptance.
   shared hold interval, and random or in-order looping through the canonical
   preset transition path.
 
-## Current Evidence
+## Recorded Evidence
 
 | Gate | Status | Evidence / boundary |
 | --- | --- | --- |
@@ -56,5 +66,5 @@ Repeat step 6 in the packaged Linux app as well as Windows. The shared browser
 contract is platform-neutral, but physical WebView2 and WebKitGTK interaction
 remain separate acceptance gates.
 
-Do not call 1.0.1 physically accepted until the applicable pending rows are
-recorded against exact packaged artifacts.
+At this snapshot, physical 1.0.1 acceptance required the applicable pending
+rows to be recorded against exact packaged artifacts.

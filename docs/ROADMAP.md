@@ -2,7 +2,7 @@
 
 This document contains prospective work only. It is not a description of the
 current product and it does not promise a release date or version. Current
-behavior belongs in the [README](../README.md) and practice guides; completed
+behavior belongs in the [User Guide](USER_GUIDE.md) and practice guides; completed
 work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Distribution and Platform Validation
@@ -14,7 +14,9 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 - Run install, launch, and updater-hop smoke tests on representative physical or
   virtual Windows and Linux machines.
 - Validate Linux AppImage, deb, and rpm packages across a maintained distro
-  matrix.
+  matrix. Complete the Ubuntu/Fedora physical camera testing deferred in the
+  [1.0.3 release decision](releases/RELEASE_1.0.3.md#release-decision--2026-09-04),
+  using the maintained [hardware checks](TESTING.md#hardware-and-platform-checks).
 - Confirm macOS privacy grants survive an identity-stable public updater hop on
   a clean machine.
 - Decide whether Windows releases need a fixed WebView2 runtime for offline
@@ -136,8 +138,8 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
   UC-33e/mioXC rig.
 - Maintain a troubleshooting matrix for permissions, GPU fallback, codecs, and
   output-window issues.
-- Keep README, renderer, security, performance, testing, accessibility, and
-  internationalization documentation aligned with verified behavior.
+- Keep the [documentation index](README.md), user/developer guides, and practice
+  guides aligned with verified behavior.
 
 ## Planning Constraints
 

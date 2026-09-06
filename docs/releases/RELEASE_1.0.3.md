@@ -1,4 +1,14 @@
-# 1.0.3 Release Readiness and Acceptance
+# 1.0.3 Release Readiness and Acceptance Record
+
+Release decision record for 1.0.3, including the 2026-09-04 Windows acceptance
+and explicit Ubuntu/Fedora physical camera testing deferral. The candidate
+requirements below are retained as evidence of that release decision.
+
+See the [release index](README.md) for other records and
+[Release and Updater Guide](../RELEASING.md) for the maintained procedure.
+Current behavior is described in the [User Guide](../USER_GUIDE.md), release
+history in the [Changelog](../../CHANGELOG.md), and platform check selection in
+[Testing](../TESTING.md#hardware-and-platform-checks).
 
 This document tracks the 1.0.3 camera Pop Out corrective release and keeps
 source, CI, packaged-artifact, installed-app, and physical-platform evidence

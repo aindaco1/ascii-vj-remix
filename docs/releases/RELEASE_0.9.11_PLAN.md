@@ -1,4 +1,14 @@
-# ASCII VJ Remix 0.9.11 Implementation Plan
+# 0.9.11 Implementation Record
+
+Historical implementation record. The plan and local evidence below describe
+the 0.9.11 work as recorded on 2026-08-28; release-stage statements are not
+current publication status.
+
+See the [release index](README.md) for other records and
+[Release and Updater Guide](../RELEASING.md) for the maintained procedure.
+Current behavior is described in the [User Guide](../USER_GUIDE.md), release
+history in the [Changelog](../../CHANGELOG.md), and platform check selection in
+[Testing](../TESTING.md#hardware-and-platform-checks).
 
 Status: implemented; local release gates completed on 2026-08-28. Cross-platform
 CI, publication, and post-publication acceptance remain release-stage evidence.

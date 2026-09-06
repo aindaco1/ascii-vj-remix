@@ -8,20 +8,25 @@ files usually own each kind of change.
 
 Read these in order before making non-trivial changes:
 
-1. [README](../README.md): product overview, current user-facing feature set,
-   install notes, system requirements, license/support/contact information.
-2. [Changelog](../CHANGELOG.md): current release feature baseline and recent
-   behavioral expectations.
+1. [README](../README.md): product overview, install basics, first run, and
+   current source/release version. The [User Guide](USER_GUIDE.md) owns the full
+   feature set, system requirements, permissions, and troubleshooting.
+2. [Changelog](../CHANGELOG.md): recent released and unreleased changes.
 3. [Roadmap](ROADMAP.md): prospective work only.
 4. [Rendering Engine](RENDERING_ENGINE.md): source flow, renderer backends,
-   native output architecture, media engine, audio reactivity, and MIDI
-   integration.
-5. [Contributor Guide](CONTRIBUTORS.md): development setup, test commands,
-   release/updater notes, FFmpeg sidecar policy, and contribution workflow.
-6. Project practice docs when relevant:
-   [Security](SECURITY.md), [Performance](PERFORMANCE.md),
-   [Testing](TESTING.md), [Accessibility](ACCESSIBILITY.md), and
-   [Internationalization](I18N.md).
+   native output, media engine, audio reactivity, and MIDI integration.
+5. [Contributor Guide](CONTRIBUTORS.md): setup, local app identity, FFmpeg,
+   Podman, and contribution workflow.
+6. [Testing](TESTING.md): check selection and manual verification. Read the
+   relevant [Security](SECURITY.md), [Performance](PERFORMANCE.md),
+   [Accessibility](ACCESSIBILITY.md), and [Internationalization](I18N.md) guide
+   for the affected behavior.
+
+The [documentation index](README.md) routes to every maintained guide. For
+packaging, signing, publication, or updater work, also read
+[Release and Updater Guide](RELEASING.md). Version-specific
+[release records](releases/README.md) preserve historical evidence and do not
+replace the current guides.
 
 For MIDI, UC-33e mapping, or SysEx work, also read
 [UC-33e and mioXC MIDI Control](MIDI_UC33E.md).
@@ -78,93 +83,39 @@ ASCII/cell visuals.
   practice docs under `docs/`; update them when architectural assumptions
   change.
 
-## Current User-Facing Baseline
+## Behavior and Ownership Constraints
 
-The current source/package version is 1.0.3, which is also the stable public
-release. The Changelog owns release history; the Roadmap is prospective only.
+Use the [User Guide](USER_GUIDE.md) for current behavior and
+[Rendering Engine](RENDERING_ENGINE.md) for the detailed contracts. When editing:
 
-Sources:
-
-- Demo Image is the default startup source.
-- Demo Video is the single visible built-in video source.
-- Custom local images and videos can be selected.
-- Camera is a first-class source.
-- Multiple cameras can be mixed locally when the OS/runtime supports concurrent
-  capture.
-- Camera controls appear directly below Source while Camera is active.
-
-Rendering:
-
-- WebGPU is the primary quality target.
-- WebGL2 is the main embedded GPU fallback.
-- Canvas2D and pixel Canvas remain compatibility fallbacks.
-- Packaged desktop views attempt WebGPU for every acceleration-eligible preset,
-  then WebGL2 and Canvas2D through the shared bounded fallback. Do not use host
-  platform or user-agent identity to preemptively reassign preset ownership.
-- Native Pop Out output uses `wgpu` where available, with Metal on macOS and
-  corresponding GPU backends on Windows/Linux.
-- The active renderer is controlled by one canonical parameter model.
-- Classic Camera ASCII owns the clean-profile visual state, not the global
-  renderer preference. Keep the default backend on Auto; built-ins inherit it
-  unless they explicitly declare a compatibility backend.
-- Keep the 71/43/28 built-in backend contract centralized in
-  `renderers/shared/preset-backend-contract.js`: 71 total, 43 accelerated, and
-  28 explicit Canvas presets. Any intentional ownership change must update the
-  contract and its visible preset-matrix evidence together.
-- Native Pop Out preserves glyph-mode and character-set params for traditional
-  ASCII presets.
-- Seventeen project-native palettes, nearest/luminance mapping, and Bayer
-  2x2/4x4/8x8 dithering use the shared palette catalog and cached 32x32x32 LUT.
-- The neutral generated Unicode atlas covers the approved common BMP blocks in
-  sixteen 1024px pages. Browser decoded-page cache is capped at four; native
-  and browser GPU output use Unicode scalar ids and a maximum 96-id ramp. The
-  WebGPU preview compacts the active ramp and coverage mips into a two-row RGBA
-  texture; WebGL2 and native output retain paged atlas resources.
-- Normal density is capped by shared accelerated/software column and total-cell
-  limits. Advanced Density is global, allows up to 900 columns without a 30 FPS
-  guarantee, and must never be stored in visual presets.
-- The shared character-set catalog includes 23 credited ascii.today-derived
-  luminance ramps and matching read-only presets.
-- Native glyph output uses bounded paged atlas/ramp resources;
-  `fontFamily` is UI/preview metadata, not a native font-loading sink.
-- Reuse stable WebGPU/WebGL resources, keep native source uploads keyed to
-  source-frame versions, and do not trade quality/resolution for performance.
-
-Live behavior:
-
-- Presets are read-only unless created by the user.
-- Preset transitions are smooth crossfades, not fade-to-black.
-- Presets preserve the active media source unless explicitly changed.
-- WTF mode runs indefinitely while active and transitions through live-safe
-  randomized settings, including anchors from traditional ASCII presets.
-- Audio reactivity is enabled by default, starts from Mic/Input by default, and
-  modulates live effective params without rewriting saved presets.
-- Audio reactivity uses bounded feature vectors, including RMS, bands,
-  transient/flux, presence, brightness, density, beat pulse, and phase. Do not
-  ship raw audio buffers through IPC or diagnostics.
-- Safe clamps prevent pure black or pure white outputs from randomized or
-  audio-driven states.
-- The experimental MIDI rig is the UC-33e through both DIN directions of a
-  mioXC; direct UC USB is not supported.
-- MIDI uses four channel-addressed pages, soft takeover, numeric preset slots,
-  MIDI Learn overrides, and bounded full-bank SysEx capture/restore.
-- MIDI targets visual/audio/preset/WTF behavior only. Do not add source, Camera,
-  Pop Out, output-display, file, updater, or crash-report actions.
-- Read [MIDI_UC33E](MIDI_UC33E.md) before changing mappings or hardware policy.
-
-UI:
-
-- The current theme is extreme black/white/grey with neon pink and neon blue
-  state accents.
-- The layout is intentionally dense.
-- Do not reduce control density when changing visual styling.
-- Avoid adding explanatory marketing text inside the app UI.
-- Keep the top-bar Reports control reachable with an empty queue; pending state
-  is additive. Renderer failures may attach the bounded, sanitized renderer
-  event summary defined by the security contract. Do not attach local media
-  diagnostics or arbitrary logs.
-- Keep backend selection in the center control. Resolved-backend diagnostics
-  belong in the user-owned Stats Overlay, not a duplicate top-bar readout.
+- Preserve the clean-profile Demo Image / Classic Camera ASCII state and keep
+  backend preference on Auto. Existing profiles retain their settings.
+- Keep preset backend ownership in
+  `renderers/shared/preset-backend-contract.js` (71 total, 43 accelerated,
+  28 explicit Canvas). Intentional changes must update the contract and visible
+  preset-matrix evidence together. Platform identity must not preemptively
+  reassign ownership.
+- Keep one canonical parameter model. Saved presets, live effective params,
+  source selection, transitions, WTF, audio, MIDI, and native output must agree.
+  Preset transitions preserve source identity and playback.
+- Extend shared palette, character-set, glyph-atlas, and grid policies. Keep
+  Advanced Density global and out of presets; do not add per-renderer limits or
+  runtime system-font lookup. Read the renderer guide before changing bounds.
+- Reuse GPU resources and source-frame versions; do not reduce visual quality
+  or resolution to obtain a performance improvement.
+- Keep audio feature frames bounded and raw audio out of IPC and diagnostics.
+  Preserve safe clamps and avoid rewriting saved presets during modulation.
+- Keep UC-33e control on the documented mioXC DIN path. MIDI targets visual,
+  audio, preset, and WTF behavior; it must not target source, Camera, Pop Out,
+  output-display, file, updater, or report actions. Read [MIDI_UC33E](MIDI_UC33E.md)
+  before changing mapping or hardware policy.
+- Preserve the dense black/white/grey UI with pink/blue state accents. Do not
+  reduce control density or add explanatory marketing text inside the app.
+- Keep Reports reachable with an empty queue. Renderer diagnostics follow the
+  bounded [security contract](SECURITY.md#crash-reporting); do not attach local
+  media diagnostics or arbitrary logs.
+- Keep backend selection in the center control and resolved-backend diagnostics
+  in the user-owned Stats Overlay, without a duplicate top-bar readout.
 
 ## Repository Ownership Map
 
@@ -208,95 +159,25 @@ When editing:
 - Update docs when changing product behavior, release behavior, renderer
   architecture, or setup requirements.
 
-## Common Validation Commands
+## Validation and Packaging
 
-Pick the smallest set that covers the change.
+Use [Testing: Recommended Check Sets](TESTING.md#recommended-check-sets) to
+select the smallest checks that cover the change. Documentation-only changes
+require `git diff --check`; moves also require link, anchor, and path-reference
+validation. Do not treat local checks, CI packages, installed-app smokes, and
+physical hardware acceptance as interchangeable.
 
-Documentation only:
+Use [Contributor Guide](CONTRIBUTORS.md) for local build commands and
+[macOS development identity](CONTRIBUTORS.md#macos-permissions-during-development).
+Normal local builds use `ASCII VJ Remix Dev` / `com.asciline.remix.dev`, and
+permission testing requires stable local signing. The contributor guide also
+owns the iCloud build-directory behavior and canonical icon generation flow.
 
-```bash
-git diff --check
-```
-
-For broader test selection, read [Testing](TESTING.md).
-
-Frontend/UI/source behavior:
-
-```bash
-npm run build
-npm run smoke:static
-```
-
-Rust/Tauri behavior:
-
-```bash
-npm run test:rust
-npm run check:desktop
-```
-
-MIDI behavior:
-
-```bash
-npm run test:midi
-npm run midi:probe -- --connect
-npm run test:rust
-```
-
-Optimized macOS app build:
-
-```bash
-npm run tauri:build:dev -- --bundles app
-```
-
-Release packaging:
-
-```bash
-npm run ffmpeg:build-sidecar
-npm run check:release
-npm run bundle:release
-```
-
-Expected local release-build note:
-
-- Public macOS artifacts are Developer ID signed, notarized, stapled, and
-  Gatekeeper-validated. Current Windows artifacts are unsigned previews.
-  Normal local builds use
-  `ASCII VJ Remix Dev` / `com.asciline.remix.dev`; the local launcher requires a
-  stable identity before permission testing.
-- If `TAURI_SIGNING_PRIVATE_KEY` or `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is
-  absent while updater artifacts are enabled, release bundling will fail at
-  updater signing. The local validation paths are documented in the contributor
-  guide; never commit either file.
-
-## Tauri and Packaging Notes
-
-- Tauri v2 is the desktop shell.
-- Production builds perform one non-blocking updater check per launch. A
-  current or failed background check stays silent; download/install remains an
-  explicit user action through the existing Update control.
-- `src-tauri/tauri.conf.json` is the cross-platform production base config; its
-  macOS ad-hoc identity is used only by explicit non-notarized packaging paths.
-- `src-tauri/tauri.dev.conf.json` isolates normal local commands from the
-  production name, bundle identifier, and updater.
-- `src-tauri/tauri.notarized.conf.json` is for Developer ID notarized macOS
-  release builds.
-- `assets/branding/ascii-vj-remix-app-icon-1024.png` is the canonical app icon.
-  Run `npm run icons:generate` instead of editing platform files under
-  `src-tauri/icons/` independently; `npm run check:icons` verifies the complete
-  generated set.
-- `src-tauri/tauri.windows-signed.conf.json` and its Authenticode helper exist
-  but are inactive. The current Windows release path uses the default unsigned
-  config.
-- macOS builds in iCloud Drive workspaces redirect target output to
-  `/private/tmp/ascii-vj-remix-tauri-target` through the helper scripts to avoid
-  iCloud extended attributes breaking codesign.
-- Release updater artifacts are signed with a minisign key. The public key is
-  committed; the private key belongs in GitHub Actions secrets.
-- FFmpeg sidecars must be reviewed, local, and policy-checked. The packaged app
-  does not download FFmpeg, codecs, renderer assets, or fonts at runtime.
-
-See [Contributor Guide: Release and Updater Work](CONTRIBUTORS.md#release-and-updater-work)
-for the full release/updater procedure.
+Use [Release and Updater Guide](RELEASING.md) for packaging configs, signing,
+secrets, FFmpeg release inputs, and public-artifact validation. Updater-enabled
+bundling requires its signing key/password; missing secrets are not a reason to
+weaken the release gate. Never commit them. Public macOS signing and the current
+unsigned Windows preview path are defined there and in [Security](SECURITY.md).
 
 ## Renderer Mental Model
 
@@ -330,28 +211,25 @@ See [Rendering Engine](RENDERING_ENGINE.md) for deeper architecture details.
 
 ## Documentation Update Rules
 
-When behavior changes, update the closest durable doc:
+Use the ownership map in the [documentation index](README.md). Update the
+closest durable guide and link to it instead of maintaining parallel procedures:
 
-- User-facing feature or install behavior: [README](../README.md).
-- Current and unreleased release behavior: [Changelog](../CHANGELOG.md).
-- Prospective work only: [Roadmap](ROADMAP.md).
-- Renderer architecture, media flow, native output, audio modulation, MIDI
-  architecture: [Rendering Engine](RENDERING_ENGINE.md).
-- Build, test, release, FFmpeg, Podman, or contributor workflow:
+- Product overview, installation basics, first run: [root README](../README.md).
+- Detailed user behavior, requirements, permissions, troubleshooting:
+  [User Guide](USER_GUIDE.md).
+- Released/unreleased changes: [Changelog](../CHANGELOG.md).
+- Proposals and future work: [Roadmap](ROADMAP.md).
+- Rendering/media/output/audio/MIDI architecture: [Rendering Engine](RENDERING_ENGINE.md).
+- Local setup, development identity, FFmpeg/Podman, contributions:
   [Contributor Guide](CONTRIBUTORS.md).
-- Security model, local media, permissions, updater signing, or Tauri
-  capabilities: [Security](SECURITY.md).
-- Performance-sensitive renderer, Pop Out, camera, audio, or source behavior:
-  [Performance](PERFORMANCE.md).
-- Check selection and manual verification: [Testing](TESTING.md).
-- Keyboard/focus/contrast/control-label behavior:
-  [Accessibility](ACCESSIBILITY.md).
-- User-visible string, locale, or translation architecture:
-  [Internationalization](I18N.md).
-- Agent onboarding assumptions: this file.
+- Packaging, signing, publication, updater procedure: [Release Guide](RELEASING.md).
+- Version-specific decisions and evidence: [release records](releases/README.md).
+- Security, performance, check selection, accessibility, and string ownership:
+  the corresponding practice guide linked above.
+- Agent onboarding and source ownership: this file.
 
-Keep docs native-app focused. Current-state docs use present tense and describe
-verified behavior. Do not put proposals, future candidates, deferred work, or
-completed release plans in those documents. Put prospective work in the
-[Roadmap](ROADMAP.md), and keep release history in the
-[Changelog](../CHANGELOG.md).
+Current-state guides describe verified behavior in the present tense. Keep
+proposals in the Roadmap and completed plans in release records. Testing may
+state known coverage gaps, but a historical pending row must not become a claim
+about current release status. Keep the docs native-app focused and preserve the
+source/CI/artifact/installed-app/physical-platform evidence boundaries.

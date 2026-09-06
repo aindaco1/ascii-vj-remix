@@ -1,4 +1,14 @@
-# 1.0.2 Release Readiness and Acceptance
+# 1.0.2 Release Readiness and Acceptance Record
+
+Historical corrective-release record. The scope, acceptance contract, and
+manual observations below describe 1.0.2; they are not a current release
+checklist or a later platform-acceptance claim.
+
+See the [release index](README.md) for other records and
+[Release and Updater Guide](../RELEASING.md) for the maintained procedure.
+Current behavior is described in the [User Guide](../USER_GUIDE.md), release
+history in the [Changelog](../../CHANGELOG.md), and platform check selection in
+[Testing](../TESTING.md#hardware-and-platform-checks).
 
 This document tracks the 1.0.2 corrective release and keeps source, CI,
 published-artifact, installed-app, and physical-platform evidence separate.

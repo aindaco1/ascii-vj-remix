@@ -21,7 +21,7 @@ desktop-only feature is added.
 | `media/` | Built-in demo image/video and hidden development fixtures. |
 | `experiments/` | Legacy/adaptive codec vector and stream experiments. |
 | `scripts/` | Build checks, Podman setup, release helpers, updater helpers, FFmpeg staging/build scripts, and smoke tests. |
-| `docs/` | Roadmap, rendering-engine guide, security, performance, testing, accessibility, i18n, LLM agent guide, and contributor documentation. |
+| `docs/` | [Documentation index](README.md), user/developer guides, practice guides, release records, and performance evidence. |
 
 ## Prerequisites
 
@@ -98,25 +98,17 @@ attributes do not break app signing. You can override the build directory with
 | `npm run dev` | Browser dev server on `127.0.0.1:8010`. |
 | `npm run build` | Vite production build plus runtime asset copy. |
 | `npm run preview` | Preview the production build. |
-| `npm run check:offline` | Build and verify no remote runtime assets are required. |
-| `npm run smoke:static` | Browser smoke test for source UI, renderer startup, output fallback, and audio fake devices. |
-| `npm run test:renderer-fallback` | Deterministic GPU-to-Canvas fallback and bounded renderer-report contract tests. |
 | `npm run tauri:dev` | Tauri desktop dev mode. |
-| `npm run check:desktop` | Offline build, Tauri policy, output-display simulation, updater manifest, FFmpeg resource policy, Rust tests, and debug no-bundle build. |
-| `npm run icons:generate` | Regenerate every Tauri platform icon from the canonical 1024px source. |
-| `npm run check:icons` | Regenerate icons in isolation and verify the committed set matches. |
-| `npm run bundle:debug` | Build a local debug desktop bundle and validate it. |
-| `npm run bundle:test` | On Windows with the current verified FFmpeg resources staged, build an unsigned release-profile development installer and verify its GUI subsystem. |
-| `npm run bundle:test:linux` | On Linux with the current verified FFmpeg resources staged, build updater-disabled development AppImage, deb, and rpm packages. |
-| `npm run bundle:release` | Run release gates, build release bundle, and validate it. |
-| `npm run test:rust` | Run Rust tests. |
-| `npm run check:media` | Run frame prep, decode/resize, and native session media checks. |
-| `npm run test:output-display` | Deterministic secondary-display placement simulation. |
-| `npm run test:desktop-updater` | Launch/manual updater orchestration, silent-check, install, and progress tests. |
-| `npm run smoke:native-output` | Native output performance smoke helper. |
-| `npm run smoke:ui-perf` | UI performance smoke helper. |
-| `npm run test:midi` | MIDI map, scaling, soft-takeover, action, and scope tests. |
-| `npm run midi:probe` | List physical MIDI inputs/outputs; add `-- --connect` to open both mioXC directions. |
+| `npm run tauri:build:dev -- --bundles app` | Optimized macOS development app. |
+| `npm run bundle:debug` | Build and validate a local debug desktop bundle. |
+| `npm run bundle:test` | Windows release-profile development EXE/MSI with staged FFmpeg. |
+| `npm run bundle:test:linux` | Linux development AppImage, deb, and rpm with staged FFmpeg. |
+| `npm run icons:generate` | Regenerate platform icons from the canonical source. |
+| `npm run midi:probe` | List MIDI ports; add `-- --connect` to open both mioXC directions. |
+
+The [Testing quick reference](TESTING.md#quick-reference) owns validation
+commands; its [recommended check sets](TESTING.md#recommended-check-sets)
+explain which to run for a change.
 
 Same-repository pull requests also package updater-disabled development
 artifacts after the platform's desktop gate passes. The unsigned `ASCII VJ
@@ -237,14 +229,8 @@ in `src-tauri/src/midi.rs`; the first supported port is the DIN-connected
 mioXC. Do not grant MIDI or SysEx commands to the output window. See
 [MIDI_UC33E](MIDI_UC33E.md) before changing the hardware profile.
 
-MIDI checks:
-
-```bash
-npm run test:midi
-npm run midi:probe
-npm run midi:probe -- --connect
-npm run test:rust
-```
+Select the [MIDI checks](TESTING.md#midi-uc-33e-or-sysex-changes) for mapping,
+transport, or SysEx changes.
 
 The production CSP in `src-tauri/tauri.conf.json` intentionally blocks
 arbitrary remote HTTP(S) connections. If you need a new protocol or resource
@@ -294,6 +280,9 @@ The local runner installs `~/Applications/ASCII VJ Remix Dev.app`, verifies
 build that will not receive persistent privacy grants, explicitly opt in with
 `ASCILINE_ALLOW_ADHOC_LOCAL=1`.
 
+Override `ASCILINE_CODESIGN_IDENTITY` only when deliberately testing a
+different stable signing identity.
+
 Reset development privacy grants when needed:
 
 ```bash
@@ -329,13 +318,8 @@ npm run media:pipeline-preview -- media/demo-video-2.mp4 96 54 12 5 false
 npm run media:native-session-preview -- media/demo-video-2.mp4 96 54 12 5 true 4
 ```
 
-Run parity checks:
-
-```bash
-npm run test:frame-prep
-npm run test:decode-resize
-npm run check:media
-```
+Run the [FFmpeg and media checks](TESTING.md#ffmpeg-and-media-engine) when
+changing frame preparation, decode, or native media sessions.
 
 The release workflow uses reviewed FFmpeg/ffprobe sidecars. Stage local binaries
 with explicit provenance:
@@ -351,253 +335,17 @@ Do not commit generated sidecar binaries or private release keys.
 
 ## Release and Updater Work
 
-ASCII VJ Remix desktop builds must remain standalone at runtime. The Tauri
-updater is an intentional online path: the production app invokes it once in
-the background at launch and when the user requests a manual recheck. A current
-or failed launch check stays silent. Downloading, installation, and relaunch
-remain explicit user actions through the existing Update control.
-
-Releases are published by `.github/workflows/release-desktop.yml`. The release
-matrix builds macOS, Windows, and Linux artifacts, verifies them, writes updater
-manifest fragments, merges those fragments into `latest.json`, and uploads
-installers, updater packages, signatures, and `latest.json` to GitHub Releases.
-The workflow builds from the requested `v*` tag so release artifacts match the
-tagged source, not whatever happens to be at `main` later.
-
-`.github/workflows/auto-version-release.yml` automates the common release path.
-When `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`,
-`src-tauri/tauri.conf.json`, or `CHANGELOG.md` changes on `main`, it validates
-that the app versions match with `npm run release:version:check`, creates
-`vX.Y.Z` when that tag does not already exist, and dispatches the desktop
-release workflow with that tag. If the tag already exists, it skips release
-dispatch so repeated pushes do not overwrite a published version accidentally.
-
-The GitHub Releases updater reads:
-
-```text
-https://github.com/aindaco1/ascii-vj-remix/releases/latest/download/latest.json
-```
-
-Updater packages are signed with a minisign key pair. The public key is
-committed in `src-tauri/tauri.conf.json`. The private key must be stored as the
-GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`; never commit it.
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` is required for the current encrypted
-release key.
-
-The current public key was generated with a password-protected key:
-
-```bash
-npm run tauri -- signer generate --ci -w /private/tmp/ascii-vj-remix-updater.key -p "$(cat /private/tmp/ascii-vj-remix-updater.password)"
-```
-
-For this local workspace, the generated private key is expected at
-`/private/tmp/ascii-vj-remix-updater.key` and the password is expected at
-`/private/tmp/ascii-vj-remix-updater.password`. Never commit either file.
-
-Set/check the updater key with GitHub CLI:
-
-```bash
-npm run updater:secret:check
-npm run updater:secret:set
-npm run release:secrets:check
-npm run release:secrets:check:public
-```
-
-The updater secret script passes values to `gh secret set` over stdin, not as
-command-line arguments. Use `-- --repo owner/repo` or `-- --key /path/to/key`
-after the npm script if the defaults are wrong.
-
-`release:secrets:check:public` requires updater signing and macOS Developer ID
-notarization readiness. The current Windows release path publishes unsigned
-preview artifacts and does not require Windows signing secrets.
-
-For an updater-disabled local development bundle:
-
-```bash
-npm run bundle:debug
-```
-
-Production-shaped release packaging still requires the updater key and must not
-be installed as a local permission-testing build.
-
-The base config retains `bundle.macOS.signingIdentity = "-"` for portable
-packaging defaults, but normal local commands layer
-`src-tauri/tauri.dev.conf.json` to change the app name and identifier and disable
-production updates. Public macOS release builds use
-`src-tauri/tauri.notarized.conf.json` and fail if Developer ID signing and
-notarization credentials are missing.
-
-`scripts/run_local_desktop_app.sh` requires the stable local identity by
-default. Override `ASCILINE_CODESIGN_IDENTITY` only when deliberately testing a
-different stable signing identity:
-
-```bash
-npm run desktop:codesign:local
-npm run desktop:run-local -- --build
-```
-
-Developer ID signing and notarization require Apple Developer Program
-membership, a base64 Developer ID Application `.p12`, its password, a CI
-keychain password, and either App Store Connect API credentials or Apple ID
-notarization credentials. Check readiness or upload App Store Connect API
-credentials with:
-
-```bash
-npm run release:secrets:check:notarized
-npm run release:secrets:set:macos -- \
-  --certificate /path/to/developer-id-application.p12 \
-  --certificate-password-file /path/to/p12-password.txt \
-  --api-key ABCDE12345 \
-  --api-issuer 00000000-0000-0000-0000-000000000000 \
-  --api-key-file /path/to/AuthKey_ABCDE12345.p8
-```
-
-Apple ID credentials are also supported:
-
-```bash
-npm run release:secrets:set:macos -- \
-  --certificate /path/to/developer-id-application.p12 \
-  --certificate-password-file /path/to/p12-password.txt \
-  --apple-id-file /path/to/apple-id-email.txt \
-  --apple-password-file /path/to/app-specific-password.txt \
-  --apple-team-id TEAMID12345
-```
-
-When `--keychain-password-file` is omitted, the script generates a random
-temporary keychain password and stores it in `KEYCHAIN_PASSWORD`.
-
-The repository contains an inactive Azure Artifact Signing path in
-`src-tauri/tauri.windows-signed.conf.json`, which invokes
-`src-tauri/windows-artifact-sign.cmd`; that wrapper calls
-`scripts/windows_artifact_sign.ps1`. This signs Windows artifacts before Tauri
-creates updater signatures. The current Windows release path does not use this
-config and publishes unsigned Windows preview artifacts. Configure the Azure
-values only after Windows signing is enabled as a release policy:
-
-```bash
-npm run release:secrets:set:windows -- \
-  --client-id "<app-client-id>" \
-  --tenant-id "<tenant-id>" \
-  --client-secret-file /path/to/azure-client-secret.txt \
-  --endpoint "https://<region>.codesigning.azure.net/" \
-  --account "<signing-account-name>" \
-  --certificate-profile "<certificate-profile-name>"
-node scripts/check_github_release_secrets.mjs --require-windows-signing
-```
-
-The helper stores `AZURE_CLIENT_SECRET` as a GitHub Actions secret and the other
-Azure IDs as GitHub repository variables. The Azure client secret is the only
-required Windows signing secret; keep it out of shell history and chat logs.
-Provider selection and Windows signing rollout remain roadmap decisions; the
-inactive tooling does not describe the current distribution posture.
-
-Use these checks before publishing release changes:
-
-```bash
-npm run check:desktop
-npm run test:desktop-updater
-npm run test:updater-manifest
-npm run check:bundle:debug
-```
-
-On this macOS iCloud Drive workspace, Tauri build output is redirected to
-`/private/tmp/ascii-vj-remix-tauri-target` to avoid iCloud extended attributes
-breaking `codesign`. Normal CI and non-iCloud workspaces continue to use
-`src-tauri/target`. Override with `ASCILINE_TAURI_TARGET_DIR` or
-`CARGO_TARGET_DIR` when needed.
-
-Local release builds run `npm run ffmpeg:build-sidecar` before
-`npm run check:release`. Public release CI keeps the same pinned official FFmpeg
-8.1.2 source, completed-download promotion, source SHA-256, disabled network
-protocols, and LGPL-compatible resource checks, but builds that runtime in
-parallel with `tauri build --no-bundle`. It requires the exact commit's
-successful main-push `Desktop` workflow, then hands both outputs to the bundle
-jobs as immutable one-day workflow artifacts. The restored app binary is
-verified against its commit, platform, version, byte size, and SHA-256 before
-`tauri bundle` packages it without recompiling. Runtime builds remain offline;
-Unix artifact downloads restore executable mode on `ffmpeg` and `ffprobe`
-before the release-input checks, because zipped artifact transfers reset file
-permissions. Runtime hashes and camera-input availability are still verified.
-CI may download official source during release builds, but the packaged app
-never downloads FFmpeg, codecs, or renderer assets at runtime.
-
-The release workflow also runs `scripts/smoke_tauri_release_install.mjs` on
-macOS, Windows, and Linux after publishing. It downloads artifacts from GitHub
-Releases instead of reusing local build directories, catching missing assets,
-bad `latest.json` URLs, installer layout issues, a hidden Update control, and
-broken signed updater downloads. macOS additionally extracts consecutive
-updater archives, requires the DMG to contain the real app, exact
-`/Applications` link, and reviewed Tauri Finder metadata; validates the
-downloaded DMG and mounted app; extracts
-consecutive updater archives; requires the stable production designated
-requirement; performs a true updater self-replacement; and validates the
-resulting app identity. Release upload does not replace already-published
-artifact bytes for the same tag. CI-only smoke hooks are inactive unless these
-environment variables are set:
-
-The updater-hop smoke defaults to `ASCILINE_UPDATER_SMOKE_MIN_VERSION=0.9.0`.
-Older `0.1.x` releases used an incompatible updater signing key, so they can be
-kept as historical releases but cannot be used as a cryptographic updater-hop
-baseline for the current app line.
-
-- `ASCILINE_DESKTOP_SMOKE=launch`: bounded launch smoke with a report.
-- `ASCILINE_DESKTOP_SMOKE=updater-ui`: requires the packaged production Update
-  and Reports controls to remain visible after initialization and requires the
-  duplicate top-bar backend readout to be absent.
-- `ASCILINE_CRASH_REPORT_SMOKE=submit`: production-only acceptance canary. It
-  refuses to run with an existing pending report or an `off` preference,
-  captures one hard-coded sanitized report, submits it through the Rust relay
-  path, and requires the queue to return to empty.
-- `ASCILINE_UPDATER_SMOKE=download`: checks `latest.json`, downloads the signed
-  updater package, verifies its signature, writes a report, and exits.
-- `ASCILINE_UPDATER_SMOKE=install`: downloads and verifies the updater package,
-  writes a pre-install report, and invokes Tauri's installer path.
-- `ASCILINE_UPDATER_SMOKE_FORCE_FROM_VERSION`: records the forced older-version
-  hop used by CI.
-
-The true app-driven updater hop needs a previous release that already contains
-`ASCILINE_UPDATER_SMOKE=install`. Releases before v0.1.5 can only participate in
-direct install and updater download smoke.
+Follow the [Release and Updater Guide](RELEASING.md) for packaging, signing,
+publication, immutable artifacts, and post-publication acceptance. Use
+[Testing: Release and Updater](TESTING.md#release-and-updater) for check selection.
+Version-specific evidence lives in [release records](releases/README.md).
 
 ## Pull Request Checklist
 
-Before opening a PR, run the smallest useful check set for your change.
-
-See [Testing](TESTING.md) for the full check matrix and manual smoke checklist.
-
-Documentation-only:
-
-```bash
-git diff --check
-```
-
-Frontend/source UI:
-
-```bash
-node --check app.js
-npm run smoke:static
-```
-
-Desktop/Tauri:
-
-```bash
-npm run check:desktop
-```
-
-Media engine:
-
-```bash
-npm run check:media
-npm run test:rust
-```
-
-Release packaging:
-
-```bash
-npm run check:release
-npm run bundle:release
-npm run test:macos-dmg-layout
-```
+Choose the smallest useful [recommended check set](TESTING.md#recommended-check-sets)
+and complete the applicable [manual smoke checks](TESTING.md#manual-smoke-checklist).
+For documentation moves, also verify relative links, heading anchors, and path
+references; `git diff --check` alone does not check links.
 
 ## Contribution Flow
 
@@ -616,7 +364,7 @@ npm run test:macos-dmg-layout
 ## License
 
 The repository uses the upstream ASCILINE license text: MIT License with an
-Anti-Advertisement Restriction. See `LICENSE`.
+Anti-Advertisement Restriction. See [LICENSE](../LICENSE).
 
 Contributions must be compatible with that license and with the project's
 local-first runtime policy.

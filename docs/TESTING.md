@@ -93,6 +93,11 @@ git diff --check
 git diff --check
 ```
 
+For moved or split guides, also check relative file links, heading anchors,
+and workflow/script references to the old paths. Include the new files in link
+validation; `git diff --check` only detects whitespace errors. The
+[documentation index](README.md#maintaining-documentation) defines ownership.
+
 ### Frontend UI, CSS, Presets, Sources, Audio UI
 
 ```bash
@@ -299,8 +304,15 @@ npm run check:ffmpeg-release
 
 ### Release and Updater
 
+The [Release and Updater Guide](RELEASING.md) owns packaging, signing,
+publication, immutable-tag acceptance reruns, and CI smoke-hook configuration.
+Use these checks to validate release changes:
+
 ```bash
+npm run check:desktop
 npm run test:desktop-updater
+npm run test:updater-manifest
+npm run check:bundle:debug
 npm run check:release
 npm run bundle:release
 npm run smoke:release-install
@@ -318,28 +330,18 @@ macOS it verifies the downloaded DMG, mounts it read-only in a private temporary
 root, validates the exact app-to-Applications layout, and inspects the mounted
 app before the updater hop.
 
-If artifact publication succeeds but a post-publication runner exposes an
-acceptance-tooling defect, run the `Release Acceptance` workflow against the
-existing immutable tag after correcting the tooling. It reuses the published
-bytes and does not rebuild or replace release assets.
-Updater-hop smoke uses `0.9.0` as the default minimum previous version because
-older `0.1.x` releases were signed with a different updater key.
-
 The controller test verifies that production availability permits exactly one
 silent check per launch, current/offline results do not announce status, an
 available update is not installed automatically, and the existing manual path
 still performs rechecks and user-triggered installation.
 
-Versions 0.9.6 and 0.9.7 shipped without the main-window app-name capability
-used by the updater availability gate, so their Update control can flash and
-then disappear. Install 0.9.8 manually from the notarized DMG. Relaunch 0.9.8
-and confirm the current-version launch check stays silent while the Update
-control remains visible, then use the control and confirm it reports `Up to
-date`. For the 0.9.10 release, launch the installed 0.9.9 app and confirm its
-background check surfaces 0.9.10 without downloading it automatically. After
-the user-approved install, confirm the new app icon is present, Reports remains
-visible in either its empty or pending-count state, and the right-side backend
-readout is absent.
+For a manual updater check, launch the installed previous supported release,
+confirm the background check surfaces the target version without downloading
+it automatically, then exercise the explicit install action. Verify the target
+version and app icon after relaunch, Reports visibility with an empty/pending
+queue, and absence of the duplicate top-bar backend readout. Record the source
+and target versions and artifact identities. Legacy missing-Update-control
+recovery is documented in the [User Guide](USER_GUIDE.md#upgrading-from-096-or-097).
 
 On macOS, release smoke extracts the current and previous `.app.tar.gz`
 payloads, requires `com.asciline.remix`, Team ID `PWT3Q52LZ2`, hardened runtime,
@@ -388,11 +390,24 @@ Use this after user-facing renderer, source, audio, or output changes:
     rpm. The main camera preview may pause while V4L2 is owned by native Pop
     Out; confirm it restores after close. If fallback activates, confirm the
     preview is reacquired and the report includes nonzero mirror accepted FPS.
+20. With Pop Out open, repeat Camera → Demo Image → Demo Video → Camera, then
+    close and reopen Pop Out. Check Acid Snowstorm's tiny-cell appearance and
+    Arcade Rain's right edge against the main view; resize and change FPS and
+    presets while both surfaces are visible. Keep one camera running for at
+    least two minutes. Record cold and repeat first-visible-frame timings
+    separately from command completion timings.
 
 ## Hardware and Platform Checks
 
 The app depends on real hardware and OS media stacks. Automated tests do not
 cover every hardware and platform combination.
+
+The [1.0.3 release decision](releases/RELEASE_1.0.3.md#release-decision--2026-09-04)
+records Windows owner acceptance and explicit deferral of Ubuntu/Fedora physical
+camera testing. That Linux coverage gap remains open in the documented record;
+run the single-camera checks in the [manual smoke checklist](#manual-smoke-checklist)
+on exact installed artifacts before recording acceptance. CI and Hyper-V
+package checks do not close physical camera coverage.
 
 Important manual matrices:
 
@@ -436,26 +451,14 @@ testing a newer Node baseline.
 
 ## CI and Release Behavior
 
-Release CI:
+The [Release and Updater Guide](RELEASING.md#build-and-package) documents the
+exact-commit Desktop prerequisite, parallel app/FFmpeg builds, immutable input
+handoff, platform signing, publication, and post-publication acceptance.
+[Security](SECURITY.md#release-security-posture) owns the security constraints.
 
-- require a successful `Desktop` main-push run for the exact release commit.
-- compile the app and build FFmpeg concurrently on macOS, Windows, and Linux,
-  then verify and reuse those exact inputs for bundle-only packaging.
-- verify offline bundle behavior.
-- verify Tauri policy.
-- build/check FFmpeg sidecars.
-- run Rust and media tests.
-- generate updater manifest fragments.
-- merge fragments into `latest.json`.
-- upload installers, updater packages, signatures, and `latest.json`.
-- validate macOS Developer ID signing, notarization, stapling, and Gatekeeper
-  acceptance before publishing macOS artifacts.
-- publishes Windows artifacts as unsigned previews; the inactive signed
-  Windows path includes Authenticode signer and timestamp validation.
-- marks the Windows release executable as a GUI application and launches
-  FFmpeg/ffprobe without visible child consoles.
-- run install and visible-updater-UI smoke checks after publishing.
-- run macOS updater identity/replacement smoke on `macos-26`.
+Keep local, CI, published-artifact, installed-app, and physical-platform results
+separate when reporting validation. Historical per-version evidence lives in
+[release records](releases/README.md).
 
 ## Known Gaps
 

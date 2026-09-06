@@ -1,4 +1,14 @@
-# 1.0.0 Release Readiness and Acceptance
+# 1.0.0 Release Readiness and Acceptance Record
+
+Historical release-readiness record. The evidence below preserves the 1.0.0
+candidate and publication decision; it is not a live status table for the
+current source or public artifacts.
+
+See the [release index](README.md) for other records and
+[Release and Updater Guide](../RELEASING.md) for the maintained procedure.
+Current behavior is described in the [User Guide](../USER_GUIDE.md), release
+history in the [Changelog](../../CHANGELOG.md), and platform check selection in
+[Testing](../TESTING.md#hardware-and-platform-checks).
 
 This document records the 1.0.0 release-readiness decision. It separates local
 verification, CI artifacts, virtual-machine acceptance, physical hardware
@@ -38,7 +48,7 @@ confused with pre-release testing.
 - Experimental MIDI remains explicitly labeled and its physical validation
   claims remain limited to the documented macOS UC-33e/mioXC path.
 
-## Current evidence
+## Recorded evidence
 
 | Layer | State | Evidence |
 | --- | --- | --- |
