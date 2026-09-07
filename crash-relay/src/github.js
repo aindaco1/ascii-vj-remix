@@ -198,7 +198,8 @@ function summarizeGrouping(grouping = {}) {
 
 function issueTitle(sanitized, fingerprint) {
   const message = sanitized.report.message.replace(/\s+/g, ' ').slice(0, 82);
-  return `[Crash ${fingerprint}] ${message || sanitized.report.kind}`;
+  const label = ['operationFailure', 'interruptedOperation'].includes(sanitized.report.kind) ? 'Diagnostic' : 'Crash';
+  return `[${label} ${fingerprint}] ${message || sanitized.report.kind}`;
 }
 
 function issueBody(sanitized, fingerprint, state) {

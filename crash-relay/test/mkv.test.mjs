@@ -5,7 +5,7 @@ import worker from '../src/index.js';
 import { mkvFingerprint, mkvRelayReport, validateMkvReport } from '../src/mkv.js';
 import { MkvReportGroup } from '../src/mkv-aggregation.js';
 import { mkvReviewPage } from '../src/mkv-review.js';
-import { issueBody } from '../src/github.js';
+import { issueBody, issueTitle } from '../src/github.js';
 
 const report = () => ({ schema: 'mkv-magic-issue-report-v1', id: crypto.randomUUID(),
   kind: 'operationFailure', version: '0.3.0-test.19', build: '19', operatingSystem: '15.7.4',
@@ -43,6 +43,7 @@ test('MKV shares serial aggregation, fixed repository, duplicate receipts, and r
   const submit = async (env, value, fingerprint, state) => {
     assert.equal(env.GITHUB_REPO, 'mkv-magic');
     assert.match(issueBody(value, fingerprint, state), /mkvDiagnostics/);
+    assert.equal(state.grouping.basis, 'mkv-magic-issue-report-v1');
     if (failing) throw new Error('provider failure');
     counts.push(state.count);
     return { action: counts.length === 1 ? 'created' : 'updated', issueNumber: 42 };
@@ -56,6 +57,13 @@ test('MKV shares serial aggregation, fixed repository, duplicate receipts, and r
   const reopened = new MkvReportGroup(ctx, {}, submit);
   assert.equal((await reopened.fetch(request(c))).status, 200);
   assert.deepEqual(counts, [1, 2, 3]);
+});
+
+test('operation failures and interruptions are diagnostic issues, not claims of a crash', () => {
+  for (const kind of ['operationFailure', 'interruptedOperation']) {
+    assert.match(issueTitle(mkvRelayReport({ ...report(), kind }), 'fixture'), /^\[Diagnostic /);
+  }
+  assert.match(issueTitle({ report: { kind: 'nativeCrash', message: 'Synthetic' } }, 'fixture'), /^\[Crash /);
 });
 
 test('MKV route requires enablement, same-origin JSON, bounds, and strict schema', async () => {
