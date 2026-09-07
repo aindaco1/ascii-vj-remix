@@ -2,6 +2,18 @@
 
 ## Podcast Visualizer adapter
 
+Production acceptance on 2026-09-07: commit `8957cda` is deployed as Worker
+version `d0352f66-269c-40d4-99c1-2167fa056b14`. The existing GitHub App has
+Issues access to both repositories. Synthetic Podcast issue #29 verified
+creation, deduplication, aggregation, and reopening; the native Swift client
+also verified duplicate receipts. JSON key ordering is covered by a regression
+test. All synthetic issues are closed.
+
+The hosted deploy run `34078858653` failed because its existing Cloudflare
+secret has an invalid authorization format. The authenticated local Wrangler
+deployment succeeded. Refresh the Actions secret before using that workflow
+again; production intake is enabled and operational.
+
 The same Worker has a separate route, enabled in production configuration:
 `POST /v1/podcast-visualizer/reports`. It validates the strict
 `podcast-visualizer-issue-report-v1` metadata schema in `src/podcast.js` and
