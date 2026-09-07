@@ -2,7 +2,18 @@
 
 ## MKV Magic adapter
 
-Local implementation (2026-09-07): `GET /mkv-magic/review` hosts an explicit
+Disabled deployment (2026-09-07): source `808a182` passed hosted relay tests and
+deployed in [run 34124578817](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34124578817)
+as Worker `91829184-541f-456c-9e79-5a84c68f683f`. Live health/review GETs return
+200; MKV intake returns 503 as configured. This is not GitHub delivery acceptance.
+Repository access is awaiting interactive GitHub confirmation. Local and hosted
+27-test suites pass; the relay workspace audit is clear after updating Wrangler
+to 4.129.0. The browser bundle is compiled before testing/deploying to avoid
+Worker-generated helper references breaking a serialized validator. The actual
+local browser displayed the exact report, cleared its fragment, and retained an
+unconfirmed submission for explicit retry.
+
+`GET /mkv-magic/review` hosts an explicit
 browser review; `POST /v1/mkv-magic/reports` accepts the strict 4 KiB
 `mkv-magic-issue-report-v1` projection. It routes only to `aindaco1/mkv-magic`.
 MKV intake stays disabled until the existing GitHub App installation has Issues
