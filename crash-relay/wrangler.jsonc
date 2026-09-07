@@ -19,7 +19,7 @@
 		"head_sampling_rate": 1
 	},
 	"vars": {
-		"MKV_REPORTS_ENABLED": "false",
+		"MKV_REPORTS_ENABLED": "true",
 		"PODCAST_REPORTS_ENABLED": "true",
 		"APP_MODE": "production",
 		"WORKER_BASE": "https://crash.dustwave.xyz",
