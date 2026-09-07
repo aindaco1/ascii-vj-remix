@@ -1,5 +1,42 @@
 # ASCII VJ Crash Relay
 
+## Podcast Visualizer adapter
+
+The same Worker has a separate route, enabled in production configuration:
+`POST /v1/podcast-visualizer/reports`. It validates the strict
+`podcast-visualizer-issue-report-v1` metadata schema in `src/podcast.js` and
+routes only to `aindaco1/podcast-visualizer`, reusing GitHub authentication and
+issue formatting. It accepts no arbitrary messages, stacks, paths, or log files.
+The existing ASCII endpoint and client contract remain unchanged.
+
+Podcast fingerprints include command, safe error/cause/reason, phase,
+architecture, process result, and actual codec/background. Progress, aspect,
+report ID, and workflow app version do not fragment a matching issue. Native
+crash frame offsets include build/OS because offsets change between binaries.
+This is symptom grouping, not automatic root-cause proof.
+
+One SQLite Durable Object per Podcast fingerprint serializes external provider
+calls. Counts persist before delivery; the latest 1,000 receipts deduplicate
+retries, with 100 pending IDs and 32 version/platform buckets per group.
+Provider failures are not acknowledged as success. Matching new reports update
+or reopen the indexed issue without adding comments. After an uncertain create,
+retry searches the exact fingerprint marker (including closed issues) and does
+not issue a second POST until the result is reconciled. If GitHub never created
+that issue, an operator must inspect and clear the group's `creation:` intent;
+do not clear it before checking for an existing issue.
+
+Before enabling, grant the GitHub App installation Issues read/write access to
+the Podcast repository, test and deploy the migration in `wrangler.jsonc`, and
+set `PODCAST_REPORTS_ENABLED=true`. The app separately requires the production
+bundle ID, release build, and `PVSupportReportsEnabled=true`. Run a synthetic
+submission/duplicate acceptance only with authorization to create the test
+issue. No private user report should be used for deployment verification.
+
+Validation: `npm run test:crash-relay` from the repository root and
+`npm --workspace crash-relay run deploy:dry-run`. The deploy workflow uses the
+root workspace lockfile. Local tests and dry-run bundling do not establish a
+deployed route or GitHub App installation access.
+
 Cloudflare Worker intake for production crash reports from ASCII VJ Remix.
 
 The desktop app never contains GitHub credentials. The Worker receives bounded,

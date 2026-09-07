@@ -52,7 +52,10 @@ async function githubRequest(env, path, options = {}) {
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
     const message = data?.message || `GitHub API error ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.errors = data?.errors;
+    throw error;
   }
   return data;
 }
@@ -157,6 +160,7 @@ function summarizeRuntimeDiagnostics(context = {}) {
   ]) {
     if (context[key] !== undefined && context[key] !== null) details[key] = context[key];
   }
+  if (context.podcastDiagnostics) details.podcastDiagnostics = context.podcastDiagnostics;
   if (!Object.keys(details).length) return '_No runtime diagnostics captured._';
   return `\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
 }
@@ -303,13 +307,14 @@ async function indexIssue(env, fingerprint, issue) {
   }));
 }
 
-async function searchIssue(env, fingerprint) {
+async function searchIssue(env, fingerprint, includeClosed = false) {
   const { owner, repo } = repoConfig(env);
-  const q = encodeURIComponent(`repo:${owner}/${repo} is:issue is:open in:body ${fingerprint}`);
+  const q = encodeURIComponent(`repo:${owner}/${repo} is:issue ${includeClosed ? '' : 'is:open '}in:body ${fingerprint}`);
   const data = await githubRequest(env, `/search/issues?q=${q}&per_page=5`, { method: 'GET' });
   const item = (data.items || []).find((issue) => {
+    if (includeClosed) return String(issue.body || '').includes(fingerprintMarker(fingerprint));
     return String(issue.title || '').includes(fingerprint) || String(issue.body || '').includes(fingerprint);
-  }) || data.items?.[0];
+  }) || (includeClosed ? null : data.items?.[0]);
   return item?.number ? Number(item.number) : null;
 }
 
@@ -318,7 +323,12 @@ async function getIssue(env, number) {
   return githubRequest(env, `/repos/${owner}/${repo}/issues/${number}`, { method: 'GET' });
 }
 
-async function createIssue(env, sanitized, fingerprint, state) {
+async function createIssue(env, sanitized, fingerprint, state, request = githubRequest) {
+  if (await env.CRASH_CREATION_GUARD?.get(fingerprint)) {
+    // The prior POST had an uncertain outcome. Search on retry must recover
+    // its exact marker before another issue may be created.
+    return { action: 'pending', status: 503, fingerprint };
+  }
   const allowed = await checkDailyIssueLimit(env);
   if (!allowed.ok) {
     return {
@@ -335,17 +345,27 @@ async function createIssue(env, sanitized, fingerprint, state) {
     labels: labels(env)
   };
   let issue;
+  await env.CRASH_CREATION_GUARD?.put(fingerprint, true);
   try {
-    issue = await githubRequest(env, `/repos/${owner}/${repo}/issues`, {
+    issue = await request(env, `/repos/${owner}/${repo}/issues`, {
       method: 'POST',
       body: JSON.stringify(body)
     });
   } catch (error) {
-    if (!body.labels.length) throw error;
-    issue = await githubRequest(env, `/repos/${owner}/${repo}/issues`, {
-      method: 'POST',
-      body: JSON.stringify({ title: body.title, body: body.body })
-    });
+    // An uncertain POST may already have created the issue. Only a definite
+    // invalid-label response permits a second creation request.
+    if (!body.labels.length || error.status !== 422 || !error.errors?.some(item => item.field === 'labels')) {
+      if (error.status >= 400 && error.status < 500) await env.CRASH_CREATION_GUARD?.put(fingerprint, false);
+      throw error;
+    }
+    try {
+      issue = await request(env, `/repos/${owner}/${repo}/issues`, {
+        method: 'POST', body: JSON.stringify({ title: body.title, body: body.body })
+      });
+    } catch (retryError) {
+      if (retryError.status >= 400 && retryError.status < 500) await env.CRASH_CREATION_GUARD?.put(fingerprint, false);
+      throw retryError;
+    }
   }
   await indexIssue(env, fingerprint, issue);
   return {
@@ -356,8 +376,8 @@ async function createIssue(env, sanitized, fingerprint, state) {
   };
 }
 
-async function updateIssue(env, number, sanitized, fingerprint, state) {
-  if (!await shouldUpdateIssue(env, fingerprint)) {
+async function updateIssue(env, number, sanitized, fingerprint, state, force = false) {
+  if (!force && !await shouldUpdateIssue(env, fingerprint)) {
     return {
       action: 'aggregated',
       fingerprint,
@@ -368,7 +388,8 @@ async function updateIssue(env, number, sanitized, fingerprint, state) {
   const issue = await githubRequest(env, `/repos/${owner}/${repo}/issues/${number}`, {
     method: 'PATCH',
     body: JSON.stringify({
-      body: issueBody(sanitized, fingerprint, state)
+      body: issueBody(sanitized, fingerprint, state),
+      ...(force ? { state: 'open' } : {})
     })
   });
   await indexIssue(env, fingerprint, issue);
@@ -380,18 +401,19 @@ async function updateIssue(env, number, sanitized, fingerprint, state) {
   };
 }
 
-export async function submitCrashReport(env, sanitized, fingerprint) {
+export async function submitCrashReport(env, sanitized, fingerprint, aggregateState = null) {
   const now = new Date().toISOString();
   let issueNumber = await findIndexedIssue(env, fingerprint);
-  if (!issueNumber) issueNumber = await searchIssue(env, fingerprint);
+  if (!issueNumber) issueNumber = await searchIssue(env, fingerprint, aggregateState !== null);
 
   if (issueNumber) {
     const issue = await getIssue(env, issueNumber);
     const state = parseState(issue.body, fingerprint);
-    return updateIssue(env, issueNumber, sanitized, fingerprint, updateAggregateState(state, sanitized, fingerprint, now));
+    return updateIssue(env, issueNumber, sanitized, fingerprint,
+      aggregateState ?? updateAggregateState(state, sanitized, fingerprint, now), aggregateState !== null);
   }
 
-  const state = updateAggregateState({
+  const state = aggregateState ?? updateAggregateState({
     fingerprint,
     count: 0,
     firstSeen: now,
@@ -403,4 +425,4 @@ export async function submitCrashReport(env, sanitized, fingerprint) {
   return createIssue(env, sanitized, fingerprint, state);
 }
 
-export { fingerprintMarker, issueBody, issueTitle, parseState, stateMarker };
+export { fingerprintMarker, issueBody, issueTitle, parseState, stateMarker, updateAggregateState, createIssue };

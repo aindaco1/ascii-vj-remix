@@ -22,11 +22,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: crash-relay/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install crash relay dependencies
-        working-directory: crash-relay
-        run: npm ci
+        run: npm ci --workspace crash-relay --include-workspace-root=false
 
       - name: Test crash relay
         working-directory: crash-relay

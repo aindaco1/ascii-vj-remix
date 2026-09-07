@@ -1,0 +1,69 @@
+import { submitCrashReport, updateAggregateState } from './github.js';
+import { podcastFingerprint, podcastRelayReport, validatePodcastReport } from './podcast.js';
+
+// One Durable Object per product fingerprint. A serial promise queue also
+// covers external GitHub awaits, where storage input gates alone do not.
+export class PodcastReportGroup {
+  constructor(ctx, env, submit = submitCrashReport) {
+    this.ctx = ctx;
+    this.env = env;
+    this.tail = Promise.resolve();
+    this.submit = submit;
+  }
+
+  fetch(request) {
+    const operation = this.tail.then(() => this.accept(request));
+    this.tail = operation.catch(() => {});
+    return operation;
+  }
+
+  async accept(request) {
+    try {
+      const report = validatePodcastReport(await request.json());
+      const fingerprint = await podcastFingerprint(report);
+      const relayReport = podcastRelayReport(report);
+      const saved = await this.ctx.storage.get('group') ?? { state: null, receipts: {}, pending: {} };
+      if (saved.receipts[report.id]) {
+        return Response.json({ ok: true, reportId: report.id, action: 'duplicate', issueNumber: saved.receipts[report.id], fingerprint });
+      }
+      if (!saved.pending[report.id]) {
+        // No acknowledgement until GitHub accepts it. Save the increment first
+        // so a retry after a provider/storage error cannot count it twice.
+        saved.state = updateAggregateState(saved.state ?? { fingerprint, count: 0,
+          firstSeen: new Date().toISOString(), versions: {}, platforms: {} }, relayReport, fingerprint, new Date().toISOString());
+        for (const field of ['versions', 'platforms']) {
+          const entries = Object.entries(saved.state[field]);
+          saved.state[field] = Object.fromEntries(entries.slice(-32));
+        }
+        saved.state.count = Math.min(saved.state.count, Number.MAX_SAFE_INTEGER);
+        saved.pending[report.id] = true;
+        if (Object.keys(saved.pending).length > 100) return Response.json({ error: 'Report queue full' }, { status: 503 });
+        await this.ctx.storage.put('group', saved);
+      }
+      const result = await this.submit({ ...this.env, GITHUB_OWNER: 'aindaco1', GITHUB_REPO: 'podcast-visualizer',
+        CRASH_CREATION_GUARD: {
+          get: key => this.ctx.storage.get(`creation:${key}`),
+          put: (key, value) => this.ctx.storage.put(`creation:${key}`, value)
+        },
+        CRASH_INDEX: this.storageIndex(), CRASH_UPDATE_COOLDOWN_SECONDS: '0' }, relayReport, fingerprint, saved.state);
+      if (!result.issueNumber || !['created', 'updated'].includes(result.action)) {
+        return Response.json({ error: 'Report not accepted' }, { status: result.status ?? 503 });
+      }
+      saved.receipts[report.id] = result.issueNumber;
+      delete saved.pending[report.id];
+      const keys = Object.keys(saved.receipts);
+      for (const key of keys.slice(0, Math.max(0, keys.length - 1000))) delete saved.receipts[key];
+      await this.ctx.storage.put('group', saved);
+      return Response.json({ ok: true, reportId: report.id, ...result });
+    } catch {
+      return Response.json({ error: 'Report could not be submitted; retry later' }, { status: 502 });
+    }
+  }
+
+  storageIndex() {
+    return {
+      get: async key => await this.ctx.storage.get(`index:${key}`) ?? null,
+      put: async (key, value) => this.ctx.storage.put(`index:${key}`, JSON.parse(value))
+    };
+  }
+}

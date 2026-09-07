@@ -130,6 +130,11 @@ Crash reporting is opt-in by preference and production-only for network
 submission. Debug/dev builds can capture local reports for testing, but Rust
 refuses to submit them.
 
+The shared relay also contains a separately gated Podcast Visualizer route with
+a strict metadata-only schema, fixed repository routing, and serialized issue
+aggregation. It does not broaden the ASCII desktop report contract. See the
+[relay guide](../crash-relay/README.md) for deployment and deduplication limits.
+
 The crash reporter can capture:
 
 - frontend `error` events.

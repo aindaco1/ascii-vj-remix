@@ -2,6 +2,8 @@ import { crashFingerprint } from './fingerprint.js';
 import { submitCrashReport } from './github.js';
 import { checkIpRateLimit } from './rate-limit.js';
 import { sanitizeCrashPayload } from './sanitize.js';
+import { podcastFingerprint, validatePodcastReport } from './podcast.js';
+export { PodcastReportGroup } from './podcast-aggregation.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -167,6 +169,21 @@ export default {
     }
     if (request.method === 'POST' && url.pathname === '/v1/reports') {
       return handleReport(request, env);
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/podcast-visualizer/reports') {
+      if (env.PODCAST_REPORTS_ENABLED !== 'true' || !env.PODCAST_REPORT_GROUPS) {
+        return json({ error: 'Podcast Visualizer reporting is not enabled' }, 503);
+      }
+      const limited = await checkIpRateLimit(request, env);
+      if (!limited.ok) return json({ error: 'Report rate limit exceeded' }, limited.status || 429);
+      let report;
+      try {
+        if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw new Error();
+        report = validatePodcastReport(await readBoundedJson(request, { CRASH_MAX_PAYLOAD_BYTES: '8192' }));
+      } catch { return json({ error: 'Invalid Podcast Visualizer report' }, 400); }
+      const fingerprint = await podcastFingerprint(report);
+      const group = env.PODCAST_REPORT_GROUPS.get(env.PODCAST_REPORT_GROUPS.idFromName(`podcast-visualizer:${fingerprint}`));
+      return group.fetch(new Request('https://internal/report', { method: 'POST', body: JSON.stringify(report) }));
     }
     return json({ error: 'Not found' }, 404);
   }
