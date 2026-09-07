@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:review": "node scripts/build-review.mjs",
+    "pretest": "npm run build:review",
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
     "deploy:dry-run": "wrangler deploy --dry-run",
@@ -14,6 +16,7 @@
     "@octokit/auth-app": "^8.1.4"
   },
   "devDependencies": {
-    "wrangler": "^4.87.0"
+    "esbuild": "0.28.1",
+    "wrangler": "4.129.0"
   }
 }

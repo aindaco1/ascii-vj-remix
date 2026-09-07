@@ -4,6 +4,9 @@ import { checkIpRateLimit } from './rate-limit.js';
 import { sanitizeCrashPayload } from './sanitize.js';
 import { podcastFingerprint, validatePodcastReport } from './podcast.js';
 export { PodcastReportGroup } from './podcast-aggregation.js';
+import { mkvFingerprint, validateMkvReport } from './mkv.js';
+import { mkvReviewPage } from './mkv-review.js';
+export { MkvReportGroup } from './mkv-aggregation.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -161,29 +164,46 @@ async function handleReport(request, env) {
   }
 }
 
+async function handleReviewedReport(request, env, adapter) {
+  if (env[adapter.enabled] !== 'true' || !env[adapter.binding]) {
+    return json({ error: `${adapter.name} reporting is not enabled` }, 503);
+  }
+  if (adapter.browserOnly && request.headers.get('Origin') !== new URL(request.url).origin) {
+    return json({ error: 'Same-origin review required' }, 403);
+  }
+  const limited = await checkIpRateLimit(request, env);
+  if (!limited.ok) return json({ error: 'Report rate limit exceeded' }, limited.status || 429,
+    limited.retryAfter ? { 'Retry-After': String(limited.retryAfter) } : {});
+  let report;
+  try {
+    if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw new Error();
+    report = adapter.validate(await readBoundedJson(request, { CRASH_MAX_PAYLOAD_BYTES: adapter.maximumBytes }));
+  } catch { return json({ error: `Invalid ${adapter.name} report` }, 400); }
+  const fingerprint = await adapter.fingerprint(report);
+  const groups = env[adapter.binding];
+  const group = groups.get(groups.idFromName(`${adapter.namespace}:${fingerprint}`));
+  return group.fetch(new Request('https://internal/report', { method: 'POST', body: JSON.stringify(report) }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
       return json({ ok: true, service: 'ascii-vj-crash-relay' });
     }
+    if (request.method === 'GET' && url.pathname === '/mkv-magic/review') return mkvReviewPage();
+    if (request.method === 'POST' && url.pathname === '/v1/mkv-magic/reports') {
+      return handleReviewedReport(request, env, { name: 'MKV Magic', enabled: 'MKV_REPORTS_ENABLED',
+        binding: 'MKV_REPORT_GROUPS', namespace: 'mkv-magic', maximumBytes: '4096', browserOnly: true,
+        validate: validateMkvReport, fingerprint: mkvFingerprint });
+    }
     if (request.method === 'POST' && url.pathname === '/v1/reports') {
       return handleReport(request, env);
     }
     if (request.method === 'POST' && url.pathname === '/v1/podcast-visualizer/reports') {
-      if (env.PODCAST_REPORTS_ENABLED !== 'true' || !env.PODCAST_REPORT_GROUPS) {
-        return json({ error: 'Podcast Visualizer reporting is not enabled' }, 503);
-      }
-      const limited = await checkIpRateLimit(request, env);
-      if (!limited.ok) return json({ error: 'Report rate limit exceeded' }, limited.status || 429);
-      let report;
-      try {
-        if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw new Error();
-        report = validatePodcastReport(await readBoundedJson(request, { CRASH_MAX_PAYLOAD_BYTES: '8192' }));
-      } catch { return json({ error: 'Invalid Podcast Visualizer report' }, 400); }
-      const fingerprint = await podcastFingerprint(report);
-      const group = env.PODCAST_REPORT_GROUPS.get(env.PODCAST_REPORT_GROUPS.idFromName(`podcast-visualizer:${fingerprint}`));
-      return group.fetch(new Request('https://internal/report', { method: 'POST', body: JSON.stringify(report) }));
+      return handleReviewedReport(request, env, { name: 'Podcast Visualizer', enabled: 'PODCAST_REPORTS_ENABLED',
+        binding: 'PODCAST_REPORT_GROUPS', namespace: 'podcast-visualizer', maximumBytes: '8192',
+        validate: validatePodcastReport, fingerprint: podcastFingerprint });
     }
     return json({ error: 'Not found' }, 404);
   }

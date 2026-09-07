@@ -135,6 +135,15 @@ a strict metadata-only schema, fixed repository routing, and serialized issue
 aggregation. It does not broaden the ASCII desktop report contract. See the
 [relay guide](../crash-relay/README.md) for deployment and deduplication limits.
 
+The MKV Magic adapter uses a separate, default-disabled intake and a same-origin
+browser review page. A fixed 4 KiB allowlisted projection is submitted only by an
+explicit Send action; no raw logs, media, arbitrary messages, credentials, or full
+crash incidents are accepted. The page clears fragment data before rendering and
+uses nonce CSP/no-referrer/no-store. It shares the serialized aggregation and
+GitHub writer, not application code or desktop permissions. MKV's main app remains
+without network entitlements. Repository access and deployed synthetic acceptance
+are separate gates; see the relay guide for retention and rollback.
+
 The crash reporter can capture:
 
 - frontend `error` events.

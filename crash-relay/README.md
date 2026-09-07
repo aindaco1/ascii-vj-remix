@@ -1,5 +1,41 @@
 # ASCII VJ Crash Relay
 
+## MKV Magic adapter
+
+Local implementation (2026-09-07): `GET /mkv-magic/review` hosts an explicit
+browser review; `POST /v1/mkv-magic/reports` accepts the strict 4 KiB
+`mkv-magic-issue-report-v1` projection. It routes only to `aindaco1/mkv-magic`.
+MKV intake stays disabled until the existing GitHub App installation has Issues
+read/write access to that repository and synthetic deployed acceptance passes.
+No private user report is used for this acceptance.
+
+MKV Magic remains a sandboxed local app without network client/server entitlements.
+It hands bounded sanitized JSON to the fixed browser page in a fragment, never
+in a query. The page clears the fragment, validates it using the same function as
+the Worker, renders text only, and requires **Send Reviewed Report**. Opening the
+page makes no report POST. A single session-storage pending payload supports
+explicit retries with the same ID; discard is disabled while a request is in
+flight. The page uses a nonce CSP, same-origin connections, no referrer, and no
+cache. Browser connection metadata is used for abuse prevention, not copied into
+issues. Native crash import accepts only a bounded allowlisted summary, not raw
+incident files or stack traces.
+
+`ReviewedReportGroup` and the reviewed intake helper are shared by MKV and Podcast
+Visualizer. The original Podcast Durable Object class, namespace, and stored keys
+are unchanged. `mkv-reports-v1` adds only `MkvReportGroup`; never delete a prior
+namespace/migration to roll this feature back. Disable `MKV_REPORTS_ENABLED`
+instead. Retention, uncertain-create reconciliation, and provider-failure behavior
+are the same as documented below for Podcast Visualizer. Native crash fingerprints
+include build/OS and relative frame offsets; workflow symptoms group across patch
+versions. Both clients have a golden fingerprint regression fixture.
+
+Deployment checklist: test all adapters; dry-run Wrangler; confirm the existing
+installation has only the intended repository access; deploy the additive
+migration; enable MKV intake; use synthetic reports to verify new/duplicate/new-ID
+aggregation and reopen behavior; close only the synthetic test issue. Record the
+source SHA, deployed Worker version, test counts, and receipts. An existing health
+response does not prove MKV GitHub issue delivery.
+
 ## Podcast Visualizer adapter
 
 Production acceptance on 2026-09-07: commit `59da9c9` is deployed as Worker

@@ -2,6 +2,7 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "ascii-vj-crash-relay",
 	"main": "src/index.js",
+	"build": { "command": "npm run build:review", "watch_dir": ["src/mkv-review-client.js", "src/mkv.js"] },
 	"compatibility_date": "2026-06-25",
 	"compatibility_flags": [
 		"nodejs_compat"
@@ -18,6 +19,7 @@
 		"head_sampling_rate": 1
 	},
 	"vars": {
+		"MKV_REPORTS_ENABLED": "false",
 		"PODCAST_REPORTS_ENABLED": "true",
 		"APP_MODE": "production",
 		"WORKER_BASE": "https://crash.dustwave.xyz",
@@ -34,8 +36,14 @@
 		"GITHUB_OWNER": "aindaco1",
 		"GITHUB_REPO": "ascii-vj-remix"
 	},
-	"durable_objects": { "bindings": [{ "name": "PODCAST_REPORT_GROUPS", "class_name": "PodcastReportGroup" }] },
-	"migrations": [{ "tag": "podcast-reports-v1", "new_sqlite_classes": ["PodcastReportGroup"] }],
+	"durable_objects": { "bindings": [
+		{ "name": "PODCAST_REPORT_GROUPS", "class_name": "PodcastReportGroup" },
+		{ "name": "MKV_REPORT_GROUPS", "class_name": "MkvReportGroup" }
+	] },
+	"migrations": [
+		{ "tag": "podcast-reports-v1", "new_sqlite_classes": ["PodcastReportGroup"] },
+		{ "tag": "mkv-reports-v1", "new_sqlite_classes": ["MkvReportGroup"] }
+	],
 	"kv_namespaces": [
 		{
 			"binding": "RATELIMIT",

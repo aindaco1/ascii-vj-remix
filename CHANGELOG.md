@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — shared relay
+
+- Added a separately gated, explicitly reviewed MKV Magic report adapter with
+  strict metadata-only validation and a fixed GitHub destination. Podcast and
+  MKV adapters share bounded intake, serialized issue aggregation, and retry
+  receipts. The existing ASCII and Podcast client contracts are unchanged.
+
 ## [1.0.3] - 2026-09-02
 
 ### Added
