@@ -60,8 +60,20 @@ jobs:
         run: npm run check:desktop
 
       - name: Verify Windows preset renderer matrix
+        id: static-smoke
         if: runner.os == 'Windows'
+        env:
+          SMOKE_DIAGNOSTICS_DIR: tmp-smoke-static
         run: node scripts/smoke_static_pages.mjs
+
+      - name: Upload Windows smoke failure diagnostics
+        if: failure() && steps.static-smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ascii-vj-remix-smoke-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp-smoke-static/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Install Windows FFmpeg build prerequisites
         if: runner.os == 'Windows' && github.event_name == 'pull_request'

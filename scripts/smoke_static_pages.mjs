@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { StaticSmokeDiagnostics } from './lib/static_smoke_diagnostics.mjs';
 import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
 
@@ -107,6 +108,13 @@ function waitForServer(url, timeoutMs = 12000) {
 }
 
 async function runSmoke() {
+  const errors = [];
+  const diagnostics = new StaticSmokeDiagnostics({
+    errors,
+    outputDir: path.resolve(root, process.env.SMOKE_DIAGNOSTICS_DIR || 'tmp-smoke-static',
+      `${new Date().toISOString().replaceAll(':', '-')}-${process.pid}`)
+  });
+  let browser;
   const executablePath = findChromiumExecutable();
   if (!executablePath) {
     throw new Error('No Chromium executable found. Set CHROMIUM_EXECUTABLE to a local Chromium or Chrome path.');
@@ -124,16 +132,20 @@ async function runSmoke() {
   try {
     await waitForServer(`${baseUrl}/`);
 
-    const browser = await chromium.launch({
+    diagnostics.phase = 'browser launch';
+    browser = await chromium.launch({
       headless: true,
       executablePath,
       args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
         ...(process.env.SMOKE_REQUIRE_WEBGPU === '1' ? ['--enable-unsafe-webgpu'] : [])]
     });
-    const errors = [];
+    diagnostics.runtime.browser = browser.version();
+    diagnostics.runtime.executable = path.basename(executablePath);
+    console.log(`[smoke:static] Runtime: ${JSON.stringify(diagnostics.runtime)}`);
 
+    diagnostics.phase = 'main page creation';
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(`main:${msg.text()}`); });
+    diagnostics.observe(page, 'main');
     await page.addInitScript(() => {
       const original = navigator.mediaDevices || {};
       const audioDevices = [
@@ -184,17 +196,22 @@ async function runSmoke() {
         }
       });
     });
+    diagnostics.phase = 'main navigation';
     const response = await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
+    diagnostics.phase = 'main app initialization';
     await page.waitForFunction(() => window.ascilineRemix && document.querySelectorAll('#source-list [role=option]').length >= 3, null, { timeout: 15000 });
+    diagnostics.phase = 'audio startup';
     await page.waitForFunction(
       () => window.__smokeAudioCapture?.mic >= 1 && window.ascilineRemix?.audioReactiveRuntime?.active,
       null,
       { timeout: 15000 }
     );
+    diagnostics.phase = 'brand image readiness';
     await page.waitForFunction(() => {
       const mark = document.querySelector('.brand-mark');
       return mark instanceof HTMLImageElement && mark.complete && mark.naturalWidth > 0;
     }, null, { timeout: 15000 });
+    diagnostics.phase = 'main UI and controls';
     const main = await page.evaluate(() => ({
       brandMark: (() => {
         const mark = document.querySelector('.brand-mark');
@@ -1260,7 +1277,8 @@ async function runSmoke() {
       }));
     });
     const migrationPage = await migrationContext.newPage();
-    migrationPage.on('console', (msg) => { if (msg.type() === 'error') errors.push(`migration:${msg.text()}`); });
+    diagnostics.phase = 'stored preset migration';
+    diagnostics.observe(migrationPage, 'migration');
     const migrationResponse = await migrationPage.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
     await migrationPage.waitForFunction(
       () => window.ascilineRemix?.running &&
@@ -1311,6 +1329,7 @@ async function runSmoke() {
       };
     });
     await migrationContext.close();
+    diagnostics.phase = 'audio source switching';
     if (
       migrationResponse.status() >= 400 ||
       !migratedStoredClassic.visible ||
@@ -1385,6 +1404,7 @@ async function runSmoke() {
       throw new Error(`Display audio start still hit user gesture gating: ${JSON.stringify(afterDisplaySelect)}`);
     }
 
+    diagnostics.phase = 'preset renderer matrix';
     const presetMatrix = await page.evaluate(async () => {
       const app = window.ascilineRemix;
       if (app.audioReactive.enabled || app.audioReactiveRuntime.active) await app._toggleAudioReactive();
@@ -1501,6 +1521,7 @@ async function runSmoke() {
     // images. Check real WebGL pixels at startup and after live palette changes.
     // Non-extreme channels avoid LUT bucket boundaries where shader rounding
     // can legitimately select either neighboring quantized input.
+    diagnostics.phase = 'WebGL palette rendering';
     const paletteSwatches = [[0, 0, 0], [255, 255, 255], [137, 180, 143], [141, 113, 63],
       [85, 141, 156], [12, 44, 92], [215, 22, 45], [124, 126, 122]];
     const paletteCases = [
@@ -1558,6 +1579,7 @@ async function runSmoke() {
 
     // Feed the real renderer a synthetic native-preview canvas. Camera hardware
     // remains a separate acceptance gate, but texture/viewport resize is testable.
+    diagnostics.phase = 'native preview geometry';
     const nativePreviewGeometry = await page.evaluate(async () => {
       const app = window.ascilineRemix;
       app.audioReactiveRuntime?.stop?.();
@@ -1607,8 +1629,9 @@ async function runSmoke() {
       throw new Error(`WebGPU preview was required: ${JSON.stringify(nativePreviewGeometry)}`);
     }
     if (process.env.SMOKE_SCREENSHOT_PATH) await page.screenshot({ path: process.env.SMOKE_SCREENSHOT_PATH });
+    diagnostics.phase = 'output page rendering';
     const output = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    output.on('console', (msg) => { if (msg.type() === 'error') errors.push(`output:${msg.text()}`); });
+    diagnostics.observe(output, 'output');
     const outputResponse = await output.goto(`${baseUrl}/output.html`, { waitUntil: 'domcontentloaded' });
     await output.waitForFunction(() => window.ascilineOutput, null, { timeout: 10000 });
     await output.evaluate(() => window.ascilineOutput.applyState({
@@ -1710,8 +1733,6 @@ async function runSmoke() {
       throw new Error(`Mirror output did not render a frame: ${JSON.stringify(mirrorState)}`);
     }
 
-    await browser.close();
-
     const result = {
       mainStatus: response.status(),
       outputStatus: outputResponse.status(),
@@ -1723,13 +1744,14 @@ async function runSmoke() {
       errors
     };
     console.log(JSON.stringify(result, null, 2));
-    if (errors.length) throw new Error(`Console errors: ${errors.join('; ')}`);
+    if (errors.length) throw new Error(`Browser errors: ${errors.join('; ')}`);
   } catch (error) {
-    if (previewOutput.trim()) {
-      console.error(previewOutput.trim());
-    }
+    await diagnostics.capture(error, previewOutput).catch((captureError) => {
+      console.error('[smoke:static] Diagnostic capture failed:', captureError);
+    });
     throw error;
   } finally {
+    await browser?.close().catch((error) => console.error('[smoke:static] Browser cleanup failed:', error));
     preview.kill('SIGTERM');
   }
 }

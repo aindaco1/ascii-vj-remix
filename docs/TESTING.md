@@ -13,6 +13,7 @@ release artifacts, and updater manifests.
 npm run build                    # Vite production build plus local asset copy
 npm run check:offline            # Build and verify bundled/offline assets
 npm run smoke:static             # Static UI/renderer smoke harness
+npm run test:smoke-diagnostics    # Failure capture, bounded waits, and artifact-write failures
 npm run check:tauri-policy       # Production CSP and local-only runtime policy
 npm run check:icons              # Canonical source and generated platform icons
 npm run check:glyph-atlas        # Unicode atlas manifest, dimensions, source, hashes
@@ -107,6 +108,21 @@ npm run smoke:static
 
 Add manual checks for source switching, preset transitions, WTF mode, and audio
 reactivity when behavior changes.
+
+The static smoke prints its browser version and executable name. On failure it
+prints the original error, current phase, bounded console/page errors, failed
+requests and HTTP errors, and explicit startup state for each test page. Request
+URLs omit credentials, queries, and fragments. State capture and screenshots
+have bounded waits so an unresponsive page cannot suppress the failure report.
+The browser is closed on both success and failure.
+
+Each failed invocation saves `failure.json` and best-effort page screenshots in
+a timestamped folder under `tmp-smoke-static/`. Set `SMOKE_DIAGNOSTICS_DIR` to
+choose another parent directory. These fresh browser contexts contain synthetic
+smoke fixtures; diagnostics do not dump storage, environment variables, or the
+full DOM. The Windows Desktop job uploads failure diagnostics as a separate
+artifact retained for seven days. This does not relax startup timeouts, visible
+renderer checks, or the 71/43/28 preset ownership contract.
 
 ### Renderer Backend Changes
 
