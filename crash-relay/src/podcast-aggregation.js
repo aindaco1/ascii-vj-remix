@@ -1,6 +1,12 @@
 import { submitCrashReport, updateAggregateState } from './github.js';
 import { podcastFingerprint, podcastRelayReport, validatePodcastReport } from './podcast.js';
 
+export function podcastRelayFailure(error) {
+  const status = [400, 401, 403, 404, 409, 422, 429, 500, 502, 503, 504].includes(error?.status)
+    ? error.status : null;
+  return { code: 'podcast_report_submission_failed', providerStatus: status };
+}
+
 // One Durable Object per product fingerprint. A serial promise queue also
 // covers external GitHub awaits, where storage input gates alone do not.
 export class PodcastReportGroup {
@@ -55,7 +61,9 @@ export class PodcastReportGroup {
       for (const key of keys.slice(0, Math.max(0, keys.length - 1000))) delete saved.receipts[key];
       await this.ctx.storage.put('group', saved);
       return Response.json({ ok: true, reportId: report.id, ...result });
-    } catch {
+    } catch (error) {
+      // Operator diagnostics contain no report, provider text, URL, or credentials.
+      console.error(podcastRelayFailure(error));
       return Response.json({ error: 'Report could not be submitted; retry later' }, { status: 502 });
     }
   }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import worker from '../src/index.js';
 import { podcastFingerprint, podcastRelayReport, validatePodcastReport } from '../src/podcast.js';
-import { PodcastReportGroup } from '../src/podcast-aggregation.js';
+import { PodcastReportGroup, podcastRelayFailure } from '../src/podcast-aggregation.js';
 import { createIssue, issueBody } from '../src/github.js';
 
 function report() {
@@ -20,6 +20,13 @@ function storage() {
   const values = new Map();
   return { get: async key => structuredClone(values.get(key)), put: async (key, value) => { values.set(key, structuredClone(value)); } };
 }
+
+test('operator failure diagnostics retain only an allowlisted provider status', () => {
+  const error = Object.assign(new Error('/Users/private/transcript and credential'), { status: 403, body: 'private' });
+  assert.deepEqual(podcastRelayFailure(error), { code: 'podcast_report_submission_failed', providerStatus: 403 });
+  assert.equal(podcastRelayFailure({ status: 'private' }).providerStatus, null);
+  assert.equal(podcastRelayFailure(null).providerStatus, null);
+});
 const request = value => new Request('https://crash.dustwave.xyz/v1/podcast-visualizer/reports', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
 
