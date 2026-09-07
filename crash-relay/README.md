@@ -2,11 +2,22 @@
 
 ## MKV Magic adapter
 
+Production acceptance: enabled source `254000f` deployed in
+[run 34125603567](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34125603567),
+Worker `78f9ca5e-7f72-46df-9e70-4fc7b57a5a4a`, with all 28 hosted tests passing.
+The user granted Issues read/write access to MKV Magic while retaining the two
+existing repositories. Browser submission returned an accepted issue link.
+Synthetic [MKV issue #1](https://github.com/aindaco1/mkv-magic/issues/1) verified
+creation, same-ID deduplication, three-report aggregation, and new-ID reopening.
+A duplicate while closed left it closed and did not increment its count. The
+synthetic issue is closed; no private user report was submitted. The app's native
+Intel retry is a separate acceptance step, not established by relay success.
+
 Disabled deployment (2026-09-07): source `808a182` passed hosted relay tests and
 deployed in [run 34124578817](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34124578817)
 as Worker `91829184-541f-456c-9e79-5a84c68f683f`. Live health/review GETs return
 200; MKV intake returns 503 as configured. This is not GitHub delivery acceptance.
-Repository access is awaiting interactive GitHub confirmation. Local and hosted
+That initial deployment awaited interactive GitHub confirmation. Local and hosted
 27-test suites pass; the relay workspace audit is clear after updating Wrangler
 to 4.129.0. The browser bundle is compiled before testing/deploying to avoid
 Worker-generated helper references breaking a serialized validator. The actual
@@ -16,8 +27,8 @@ unconfirmed submission for explicit retry.
 `GET /mkv-magic/review` hosts an explicit
 browser review; `POST /v1/mkv-magic/reports` accepts the strict 4 KiB
 `mkv-magic-issue-report-v1` projection. It routes only to `aindaco1/mkv-magic`.
-MKV intake stays disabled until the existing GitHub App installation has Issues
-read/write access to that repository and synthetic deployed acceptance passes.
+MKV intake is now enabled after the existing GitHub App installation received
+Issues read/write access and synthetic deployed acceptance passed.
 No private user report is used for this acceptance.
 
 MKV Magic remains a sandboxed local app without network client/server entitlements.
