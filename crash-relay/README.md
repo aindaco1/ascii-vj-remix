@@ -2,17 +2,21 @@
 
 ## Podcast Visualizer adapter
 
-Production acceptance on 2026-09-07: commit `8957cda` is deployed as Worker
-version `d0352f66-269c-40d4-99c1-2167fa056b14`. The existing GitHub App has
+Production acceptance on 2026-09-07: commit `59da9c9` is deployed as Worker
+version `2d3f01e9-ff9e-4a22-a034-399f2dda3e8f`. The existing GitHub App has
 Issues access to both repositories. Synthetic Podcast issue #29 verified
 creation, deduplication, aggregation, and reopening; the native Swift client
 also verified duplicate receipts. JSON key ordering is covered by a regression
 test. All synthetic issues are closed.
 
-The hosted deploy run `34078858653` failed because its existing Cloudflare
-secret has an invalid authorization format. The authenticated local Wrangler
-deployment succeeded. Refresh the Actions secret before using that workflow
-again; production intake is enabled and operational.
+The dedicated Cloudflare token was rolled with its existing permissions and
+the Actions `CLOUDFLARE_API_TOKEN` secret refreshed. Hosted
+[deploy run `34081481478`](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34081481478)
+passed all 22 relay tests and deployed successfully. This resolves the invalid
+authorization format in run `34078858653`, which previously required a local
+Wrangler deployment. A live synthetic retry returned HTTP 200 and the existing
+issue #29 receipt; its count stayed at 3 and it remained closed. Production
+intake is enabled and operational.
 
 The same Worker has a separate route, enabled in production configuration:
 `POST /v1/podcast-visualizer/reports`. It validates the strict
@@ -64,6 +68,8 @@ Linux VM without microphone passthrough does not become a crash issue.
 ## Setup
 
 Use a Cloudflare API token with Workers deploy access and Workers KV edit access.
+Store only the token value in the Actions `CLOUDFLARE_API_TOKEN` secret, without
+an `Authorization` header, `Bearer` prefix, quotes, or a copied curl command.
 The Pool token can list namespaces, but it currently cannot create the crash
 relay KV namespaces.
 
