@@ -92,7 +92,11 @@ export function podcastGrouping(report) {
     processExitCode: details.processExitCode ?? '', processSignal: details.processSignal ?? '',
     // Invocation "both/all" must not hide the actual encoder that failed.
     background: progress.background ?? '', codec: progress.alphaCodec ?? '',
-    crash: report.crash ? { ...report.crash, build: report.application.build,
+    // Input JSON key order varies across clients (including Swift JSONEncoder).
+    // Construct the complete grouping shape in canonical order at every depth.
+    crash: report.crash ? { exception: report.crash.exception,
+      signal: report.crash.signal ?? null, image: report.crash.image ?? null,
+      imageOffset: report.crash.imageOffset ?? null, build: report.application.build,
       operatingSystem: report.application.operatingSystem } : null
   };
 }

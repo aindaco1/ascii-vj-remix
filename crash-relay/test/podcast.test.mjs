@@ -105,6 +105,13 @@ test('native crash summary has a separate grouping basis without paths or raw st
   value.crash = { exception: 'EXC_BREAKPOINT', signal: 'SIGTRAP', image: 'libswiftCore.dylib', imageOffset: 1234 };
   assert.equal(podcastRelayReport(value).report.surface, 'native');
   const fingerprint = await podcastFingerprint(value);
+  const reordered = structuredClone(value);
+  reordered.crash = { imageOffset: 1234, image: 'libswiftCore.dylib', signal: 'SIGTRAP', exception: 'EXC_BREAKPOINT' };
+  assert.equal(await podcastFingerprint(reordered), fingerprint, 'Swift JSON key order must not split identical reports');
+  const absent = structuredClone(value), explicitNull = structuredClone(value);
+  delete absent.crash.signal;
+  explicitNull.crash.signal = null;
+  assert.equal(await podcastFingerprint(absent), await podcastFingerprint(explicitNull));
   value.crash.imageOffset++;
   assert.notEqual(await podcastFingerprint(value), fingerprint);
   value.crash.path = '/Users/private/secret';
