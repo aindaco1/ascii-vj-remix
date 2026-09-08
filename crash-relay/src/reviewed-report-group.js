@@ -3,7 +3,11 @@ import { submitCrashReport, updateAggregateState } from './github.js';
 export function reviewedRelayFailure(error, code) {
   const status = [400, 401, 403, 404, 409, 422, 429, 500, 502, 503, 504].includes(error?.status)
     ? error.status : null;
-  return { code, providerStatus: status };
+  const operation = ['GET', 'POST', 'PATCH'].includes(error?.providerOperation)
+    ? error.providerOperation : null;
+  const reason = ['integration_access', 'secondary_rate_limit', 'validation_failed', 'other']
+    .includes(error?.providerReason) ? error.providerReason : null;
+  return { code, providerStatus: status, providerOperation: operation, providerReason: reason };
 }
 
 // One Durable Object per product fingerprint. A serial promise queue also

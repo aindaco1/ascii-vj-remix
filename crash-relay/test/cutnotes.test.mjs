@@ -114,7 +114,17 @@ test('route is disabled by default and rejects invalid or oversized reports befo
 });
 
 test('operator failure logging retains only an allowlisted provider status', () => {
-  const error = Object.assign(new Error('/Users/private/transcript'), { status: 403, body: 'private' });
-  assert.deepEqual(cutNotesRelayFailure(error), { code: 'cutnotes_report_submission_failed', providerStatus: 403 });
-  assert.equal(cutNotesRelayFailure({ status: 'private' }).providerStatus, null);
+  const error = Object.assign(new Error('/Users/private/transcript'), {
+    status: 403, body: 'private', providerOperation: 'PATCH', providerReason: 'integration_access'
+  });
+  assert.deepEqual(cutNotesRelayFailure(error), {
+    code: 'cutnotes_report_submission_failed', providerStatus: 403,
+    providerOperation: 'PATCH', providerReason: 'integration_access'
+  });
+  assert.deepEqual(cutNotesRelayFailure({
+    status: 'private', providerOperation: 'DELETE', providerReason: '/Users/private/transcript'
+  }), {
+    code: 'cutnotes_report_submission_failed', providerStatus: null,
+    providerOperation: null, providerReason: null
+  });
 });
