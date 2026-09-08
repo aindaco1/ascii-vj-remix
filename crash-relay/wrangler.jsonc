@@ -21,6 +21,7 @@
 	"vars": {
 		"MKV_REPORTS_ENABLED": "true",
 		"PODCAST_REPORTS_ENABLED": "true",
+		"AUTO_SUBTITLE_REPORTS_ENABLED": "true",
 		"APP_MODE": "production",
 		"WORKER_BASE": "https://crash.dustwave.xyz",
 		"CRASH_REPORTS_ENABLED": "true",
@@ -38,11 +39,13 @@
 	},
 	"durable_objects": { "bindings": [
 		{ "name": "PODCAST_REPORT_GROUPS", "class_name": "PodcastReportGroup" },
-		{ "name": "MKV_REPORT_GROUPS", "class_name": "MkvReportGroup" }
+		{ "name": "MKV_REPORT_GROUPS", "class_name": "MkvReportGroup" },
+		{ "name": "AUTO_SUBTITLE_REPORT_GROUPS", "class_name": "AutoSubtitleReportGroup" }
 	] },
 	"migrations": [
 		{ "tag": "podcast-reports-v1", "new_sqlite_classes": ["PodcastReportGroup"] },
-		{ "tag": "mkv-reports-v1", "new_sqlite_classes": ["MkvReportGroup"] }
+		{ "tag": "mkv-reports-v1", "new_sqlite_classes": ["MkvReportGroup"] },
+		{ "tag": "auto-subtitle-reports-v1", "new_sqlite_classes": ["AutoSubtitleReportGroup"] }
 	],
 	"kv_namespaces": [
 		{

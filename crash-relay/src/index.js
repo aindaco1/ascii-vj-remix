@@ -7,6 +7,8 @@ export { PodcastReportGroup } from './podcast-aggregation.js';
 import { mkvFingerprint, validateMkvReport } from './mkv.js';
 import { mkvReviewPage } from './mkv-review.js';
 export { MkvReportGroup } from './mkv-aggregation.js';
+import { validateAutoSubtitleReport, autoSubtitleFingerprint } from './auto-subtitle-contract.mjs';
+export { AutoSubtitleReportGroup } from './auto-subtitle-aggregation.js';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -204,6 +206,12 @@ export default {
       return handleReviewedReport(request, env, { name: 'Podcast Visualizer', enabled: 'PODCAST_REPORTS_ENABLED',
         binding: 'PODCAST_REPORT_GROUPS', namespace: 'podcast-visualizer', maximumBytes: '8192',
         validate: validatePodcastReport, fingerprint: podcastFingerprint });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/auto-subtitle/reports') {
+      return handleReviewedReport(request, env, { name: 'Auto Subtitle', enabled: 'AUTO_SUBTITLE_REPORTS_ENABLED',
+        binding: 'AUTO_SUBTITLE_REPORT_GROUPS', namespace: 'auto-subtitle', maximumBytes: '4096',
+        validate: validateAutoSubtitleReport,
+        fingerprint: autoSubtitleFingerprint });
     }
     return json({ error: 'Not found' }, 404);
   }

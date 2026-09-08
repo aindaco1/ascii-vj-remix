@@ -1,5 +1,28 @@
 # ASCII VJ Crash Relay
 
+## Auto Subtitle adapter
+
+`POST /v1/auto-subtitle/reports` accepts the strict 4 KiB
+`auto-subtitle-diagnostic-v1` projection and routes only to
+`aindaco1/auto-subtitle`. Reviewed current-state, workflow, interruption and
+native-crash reports use the existing `ReviewedReportGroup`. Reports include the
+strict filtered projection; raw incidents and arbitrary text are rejected.
+The owner added Auto Subtitle to the GitHub App's selected repositories on
+September 7, 2026, retaining the existing three repositories and permissions.
+
+The canonical contract and adapter live in the Auto Subtitle checkout. Run its
+`node scripts/sync-crash-relay.mjs /path/to/ascii-vj-remix/crash-relay` after changes,
+then this package's `npm run check`. Keep the contract byte-identical.
+
+Acceptance September 7–8, 2026: 32 tests and deployment dry-run passed. Enabled
+Worker `f603dbf7-0e92-4e6e-8887-b5ecb45c9e30` is deployed. Authorized synthetic
+[crash issue #2](https://github.com/aindaco1/auto-subtitle/issues/2) verified two
+crashes aggregate and a duplicate retry does not increase the count.
+[State issue #3](https://github.com/aindaco1/auto-subtitle/issues/3) verified
+reviewed current-state delivery. Both are labeled as tests and closed; no private
+log or media was sent. Native incidents group by their own build/OS/crash facts,
+independent of the current workflow. State/workflow reports use diagnostic labels.
+
 ## MKV Magic adapter
 
 Production acceptance: enabled source `254000f` deployed in
