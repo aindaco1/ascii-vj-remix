@@ -55,6 +55,14 @@ async function githubRequest(env, path, options = {}) {
     const error = new Error(message);
     error.status = response.status;
     error.errors = data?.errors;
+    error.providerOperation = ['GET', 'POST', 'PATCH'].includes(options.method) ? options.method : 'GET';
+    error.providerReason = message === 'Resource not accessible by integration'
+      ? 'integration_access'
+      : message.toLowerCase().includes('secondary rate limit')
+        ? 'secondary_rate_limit'
+        : message === 'Validation Failed'
+          ? 'validation_failed'
+          : 'other';
     throw error;
   }
   return data;

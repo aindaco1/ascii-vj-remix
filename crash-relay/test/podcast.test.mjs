@@ -23,7 +23,10 @@ function storage() {
 
 test('operator failure diagnostics retain only an allowlisted provider status', () => {
   const error = Object.assign(new Error('/Users/private/transcript and credential'), { status: 403, body: 'private' });
-  assert.deepEqual(podcastRelayFailure(error), { code: 'podcast_report_submission_failed', providerStatus: 403 });
+  assert.deepEqual(podcastRelayFailure(error), {
+    code: 'podcast_report_submission_failed', providerStatus: 403,
+    providerOperation: null, providerReason: null
+  });
   assert.equal(podcastRelayFailure({ status: 'private' }).providerStatus, null);
   assert.equal(podcastRelayFailure(null).providerStatus, null);
 });
