@@ -382,7 +382,14 @@ async function createIssue(env, sanitized, fingerprint, state, request = githubR
   };
 }
 
-async function updateIssue(env, number, sanitized, fingerprint, state, force = false) {
+function issueUpdateBody(sanitized, fingerprint, state, reopen = false) {
+  return {
+    body: issueBody(sanitized, fingerprint, state),
+    ...(reopen ? { state: 'open' } : {})
+  };
+}
+
+async function updateIssue(env, number, sanitized, fingerprint, state, force = false, reopen = false) {
   if (!force && !await shouldUpdateIssue(env, fingerprint)) {
     return {
       action: 'aggregated',
@@ -393,10 +400,7 @@ async function updateIssue(env, number, sanitized, fingerprint, state, force = f
   const { owner, repo } = repoConfig(env);
   const issue = await githubRequest(env, `/repos/${owner}/${repo}/issues/${number}`, {
     method: 'PATCH',
-    body: JSON.stringify({
-      body: issueBody(sanitized, fingerprint, state),
-      ...(force ? { state: 'open' } : {})
-    })
+    body: JSON.stringify(issueUpdateBody(sanitized, fingerprint, state, reopen))
   });
   await indexIssue(env, fingerprint, issue);
   return {
@@ -416,7 +420,8 @@ export async function submitCrashReport(env, sanitized, fingerprint, aggregateSt
     const issue = await getIssue(env, issueNumber);
     const state = parseState(issue.body, fingerprint);
     return updateIssue(env, issueNumber, sanitized, fingerprint,
-      aggregateState ?? updateAggregateState(state, sanitized, fingerprint, now), aggregateState !== null);
+      aggregateState ?? updateAggregateState(state, sanitized, fingerprint, now),
+      aggregateState !== null, issue.state === 'closed');
   }
 
   const state = aggregateState ?? updateAggregateState({
@@ -431,4 +436,4 @@ export async function submitCrashReport(env, sanitized, fingerprint, aggregateSt
   return createIssue(env, sanitized, fingerprint, state);
 }
 
-export { fingerprintMarker, issueBody, issueTitle, parseState, stateMarker, updateAggregateState, createIssue };
+export { fingerprintMarker, issueBody, issueTitle, issueUpdateBody, parseState, stateMarker, updateAggregateState, createIssue };

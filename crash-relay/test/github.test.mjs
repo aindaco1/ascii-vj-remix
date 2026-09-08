@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { issueBody, parseState } from '../src/github.js';
+import { issueBody, issueUpdateBody, parseState } from '../src/github.js';
 
 test('issue body carries fingerprint and parseable aggregation state', () => {
   const sanitized = {
@@ -101,4 +101,25 @@ test('issue body accepts legacy renderer diagnostic field', () => {
   };
 
   assert.match(issueBody(sanitized, 'legacy123', state), /"event": "legacy-fallback"/);
+});
+
+test('issue updates change state only when reopening a closed issue', () => {
+  const sanitized = {
+    app: {
+      name: 'CutNotes', version: '1.0.2', identifier: 'com.dustwave.cutnotes',
+      channel: 'production', buildProfile: '3', os: 'macos 26.0', arch: 'arm64'
+    },
+    report: {
+      kind: 'currentState', surface: 'application', message: 'current state: format: ready',
+      stack: '', capturedAt: '2026-09-08T00:00:00Z', context: {}
+    }
+  };
+  const state = {
+    fingerprint: 'cutnotes123', count: 2, firstSeen: '2026-09-08T00:00:00Z',
+    lastSeen: '2026-09-08T00:01:00Z', versions: { '1.0.2': 2 },
+    platforms: { 'macos 26.0/arm64': 2 }, grouping: {}
+  };
+
+  assert.deepEqual(Object.keys(issueUpdateBody(sanitized, 'cutnotes123', state)), ['body']);
+  assert.equal(issueUpdateBody(sanitized, 'cutnotes123', state, true).state, 'open');
 });
