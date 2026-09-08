@@ -23,6 +23,17 @@ Opening its review sheet makes no request. Deployment acceptance must use only
 synthetic data to verify creation, same-ID deduplication, new-ID aggregation,
 and reopen behavior, then close the synthetic issue.
 
+Production acceptance September 8, 2026: source `0cce686` passed 39 focused
+relay tests and the full Linux/macOS/Windows matrix, then deployed in
+[run 34188912743](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34188912743)
+as Worker `cc45c584-3684-46ef-a29c-6041231f87ad`. The GitHub App installation
+retains metadata read and Issues read/write only, with CutNotes added as its
+fifth selected repository. Authorized synthetic
+[CutNotes issue #2](https://github.com/aindaco1/cutnotes/issues/2) verified
+creation, same-ID deduplication, new-ID aggregation through count three, and
+reopening after closure. The synthetic issue is labeled and closed; no private
+app state, crash log, transcript, project data, or media was submitted.
+
 ## Auto Subtitle adapter
 
 `POST /v1/auto-subtitle/reports` accepts the strict 4 KiB
