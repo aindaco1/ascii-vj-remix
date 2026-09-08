@@ -163,6 +163,7 @@ function summarizeRuntimeDiagnostics(context = {}) {
   if (context.podcastDiagnostics) details.podcastDiagnostics = context.podcastDiagnostics;
   if (context.cutnotesDiagnostics) details.cutnotesDiagnostics = context.cutnotesDiagnostics;
   if (context.mkvDiagnostics) details.mkvDiagnostics = context.mkvDiagnostics;
+  if (context.autoSubtitleDiagnostics) details.autoSubtitleDiagnostics = context.autoSubtitleDiagnostics;
   if (!Object.keys(details).length) return '_No runtime diagnostics captured._';
   return `\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
 }
@@ -200,7 +201,8 @@ function summarizeGrouping(grouping = {}) {
 function issueTitle(sanitized, fingerprint) {
   const message = sanitized.report.message.replace(/\s+/g, ' ').slice(0, 82);
   const label = sanitized.report.kind === 'currentState' ? 'Support'
-    : ['operationFailure', 'interruptedOperation'].includes(sanitized.report.kind) ? 'Diagnostic' : 'Crash';
+    : ['operationFailure', 'interruptedOperation', 'current_state', 'workflow_failure', 'interrupted_job'].includes(sanitized.report.kind)
+      ? 'Diagnostic' : 'Crash';
   return `[${label} ${fingerprint}] ${message || sanitized.report.kind}`;
 }
 

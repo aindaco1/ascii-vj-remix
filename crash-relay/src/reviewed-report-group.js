@@ -48,6 +48,7 @@ export class ReviewedReportGroup {
         await this.ctx.storage.put('group', saved);
       }
       const result = await this.submit({ ...this.env, GITHUB_OWNER: 'aindaco1', GITHUB_REPO: this.adapter.repository,
+        ...(this.adapter.labels ? { CRASH_LABELS: this.adapter.labels(report) } : {}),
         CRASH_CREATION_GUARD: {
           get: key => this.ctx.storage.get(`creation:${key}`),
           put: (key, value) => this.ctx.storage.put(`creation:${key}`, value)
