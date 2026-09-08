@@ -1,5 +1,28 @@
 # ASCII VJ Crash Relay
 
+## CutNotes adapter
+
+`POST /v1/cutnotes/reports` accepts only the strict 8 KiB
+`cutnotes-issue-report-v1` projection and routes it to `aindaco1/cutnotes`.
+The schema represents either a bounded current-state snapshot or a native crash
+summary. It cannot represent source media, transcripts, project names,
+editorial context, paths, microphone names, raw logs, crash stacks, or arbitrary
+provider text.
+
+One SQLite Durable Object per CutNotes fingerprint serializes GitHub delivery,
+persists the aggregate count before acknowledgement, deduplicates report IDs,
+and reopens a matching closed issue for a newly reviewed report. Current-state
+fingerprints ignore report ID, app version, source presence, language, and
+microphone count while retaining workflow, stable failure/progress, architecture,
+selected providers, and readiness signals. Native crash fingerprints include
+the allowlisted exception/signal/image/relative offset plus build and OS.
+
+The app separately requires a release build, the exact
+`com.dustwave.cutnotes` identifier, and `CutNotesSupportReportsEnabled=true`.
+Opening its review sheet makes no request. Deployment acceptance must use only
+synthetic data to verify creation, same-ID deduplication, new-ID aggregation,
+and reopen behavior, then close the synthetic issue.
+
 ## MKV Magic adapter
 
 Production acceptance: enabled source `254000f` deployed in
