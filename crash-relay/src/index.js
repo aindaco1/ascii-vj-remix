@@ -4,6 +4,8 @@ import { checkIpRateLimit } from './rate-limit.js';
 import { sanitizeCrashPayload } from './sanitize.js';
 import { podcastFingerprint, validatePodcastReport } from './podcast.js';
 export { PodcastReportGroup } from './podcast-aggregation.js';
+import { cutNotesFingerprint, validateCutNotesReport } from './cutnotes.js';
+export { CutNotesReportGroup } from './cutnotes-aggregation.js';
 import { mkvFingerprint, validateMkvReport } from './mkv.js';
 import { mkvReviewPage } from './mkv-review.js';
 export { MkvReportGroup } from './mkv-aggregation.js';
@@ -206,6 +208,11 @@ export default {
       return handleReviewedReport(request, env, { name: 'Podcast Visualizer', enabled: 'PODCAST_REPORTS_ENABLED',
         binding: 'PODCAST_REPORT_GROUPS', namespace: 'podcast-visualizer', maximumBytes: '8192',
         validate: validatePodcastReport, fingerprint: podcastFingerprint });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/cutnotes/reports') {
+      return handleReviewedReport(request, env, { name: 'CutNotes', enabled: 'CUTNOTES_REPORTS_ENABLED',
+        binding: 'CUTNOTES_REPORT_GROUPS', namespace: 'cutnotes', maximumBytes: '8192',
+        validate: validateCutNotesReport, fingerprint: cutNotesFingerprint });
     }
     if (request.method === 'POST' && url.pathname === '/v1/auto-subtitle/reports') {
       return handleReviewedReport(request, env, { name: 'Auto Subtitle', enabled: 'AUTO_SUBTITLE_REPORTS_ENABLED',
