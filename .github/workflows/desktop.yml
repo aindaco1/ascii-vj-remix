@@ -19,12 +19,25 @@ jobs:
         os:
           # `apple-metal` in the native wgpu stack needs the macOS 26 Metal SDK.
           - macos-26
+          # Compiler/SDK coverage; record the actual hosted OS separately.
+          - xcode-27
           - windows-latest
           - ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Record host and toolchain
+        if: runner.os == 'macOS'
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          xcrun --show-sdk-version
+          if [[ "${{ matrix.os }}" == "xcode-27" ]]; then
+            xcodebuild -version | head -n 1 | grep -E '^Xcode 27([. ]|$)'
+          fi
 
       - name: Install Linux Tauri prerequisites
         if: runner.os == 'Linux'
