@@ -39,6 +39,7 @@ async function githubRequest(env, path, options = {}) {
   const token = await installationToken(env);
   const response = await fetch(`https://api.github.com${path}`, {
     ...options,
+    ...(env.REPORT_ISSUE_BODY ? { signal: AbortSignal.timeout(15000) } : {}),
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
