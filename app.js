@@ -1,3 +1,5 @@
+import { COLOR_CYCLE_PRESETS } from './renderers/shared/color-cycle-presets.js';
+import { PALETTE_CYCLE_DEFAULTS, PALETTE_CONTRACT, paletteCycleParams, fillPaletteDisplay, createCycleTransport, setCycleTransportRate, cycleNowMs } from './renderers/shared/palette-cycling.js';
 import {
     bundledDemoVideoUrl,
     detectMediaType,
@@ -5,7 +7,7 @@ import {
     loadMediaSource,
     nativeVideoFallbackSource
 } from './renderers/gpu/media-source.js?v=20260830-native-demo-fallback';
-import { createRenderer } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
+import { createRenderer, detectCapabilities } from './renderers/gpu/ascii/renderer/index.js?v=20260618-camera-source';
 import {
     explicitCanvasRendererDecision
 } from './renderers/gpu/ascii/renderer/backend-policy.js';
@@ -29,7 +31,7 @@ import {
 import {
     DITHER_MODE_OPTIONS,
     PALETTE_OPTIONS,
-    buildPaletteLut,
+    getPaletteLut,
     paletteById
 } from './renderers/shared/palettes.js?v=20260828-palette-dither';
 import {
@@ -325,6 +327,7 @@ const DEFAULT_PARAMS = {
     rows: 0,
     fps: 60,
     fpsCap: 30,
+    ...PALETTE_CYCLE_DEFAULTS,
     paletteId: 'none',
     paletteMapping: 'nearest',
     ditherMode: 'none',
@@ -699,6 +702,7 @@ const BUILTIN_PRESETS = [
     },
     ...ASCII_TODAY_PRESETS,
     ...PALETTE_PRESETS,
+    ...COLOR_CYCLE_PRESETS,
     {
         id: 'arcade-rain',
         name: 'Arcade Rain',
@@ -1559,6 +1563,9 @@ const CONTROL_GROUPS = [
             { key: 'bgBlend', label: 'Background blend', type: 'range', min: 0, max: 1, step: 0.01 },
             { key: 'quantizeBits', label: 'Quantize bits', type: 'range', min: 0, max: 6, step: 1 },
             { key: 'paletteId', label: 'Palette', type: 'select', options: PALETTE_OPTIONS },
+            { key: 'paletteCycleMode', label: 'Color cycling', type: 'select', options: [['off', 'Off'], ['classic', 'Classic'], ['blend', 'Blend']] },
+            { key: 'paletteCycleSpeed', label: 'Cycle speed', type: 'range', min: -4, max: 4, step: 0.05, unit: '×' },
+            { key: 'paletteCycleAmount', label: 'Cycle amount', type: 'range', min: 0, max: 1, step: 0.01 },
             { key: 'paletteMapping', label: 'Palette mapping', type: 'select', options: [['nearest', 'Nearest color'], ['luminance', 'Luminance ramp']] },
             { key: 'mode', label: 'Stream mode', type: 'select', options: [['1', '1 B&W'], ['2', '2 512c'], ['3', '3 32K'], ['4', '4 262K'], ['5', '5 16M']] },
             { key: 'pixel', label: 'Pixel stream', type: 'checkbox' }
@@ -1644,6 +1651,7 @@ function clampParamValue(key, value) {
 }
 
 const CLIENT_TWEEN_KEYS = new Set([
+    'paletteCycleSpeed', 'paletteCycleAmount',
     'saturationBoost',
     'contrastBoost',
     'brightness',
@@ -1708,7 +1716,7 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity']);
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'paletteCycleTransport', 'paletteCycleClockMs']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -1741,6 +1749,9 @@ const CONTROL_APPLIES = {
     bgBlend: ({ params }) => params.sourceMode === 'static',
     quantizeBits: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     paletteId: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
+    paletteCycleMode: ({ params }) => Boolean(paletteById(params.paletteId)?.cycleRanges.length),
+    paletteCycleSpeed: ({ params }) => params.paletteCycleMode !== 'off' && Boolean(paletteById(params.paletteId)?.cycleRanges.length),
+    paletteCycleAmount: ({ params }) => params.paletteCycleMode !== 'off' && Boolean(paletteById(params.paletteId)?.cycleRanges.length),
     paletteMapping: ({ params }) => params.paletteId !== 'none',
     ditherMode: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     ditherStrength: ({ params }) => params.ditherMode !== 'none',
@@ -2027,6 +2038,8 @@ function normalColumnLimit(params) {
 function normalizeParams(params, options = {}) {
     const { preserveBlob = false } = options;
     const out = { ...DEFAULT_PARAMS, ...params };
+    delete out.paletteCycleTransport;
+    delete out.paletteCycleClockMs;
     let hasRuntimeCustomMedia = isCustomRuntimeMediaUrl(out.mediaUrl);
     if (hasRuntimeCustomMedia && !preserveBlob) {
         out.mediaUrl = DEFAULT_PARAMS.mediaUrl;
@@ -2516,6 +2529,9 @@ function customSourceMetaFromTauriFile(file) {
 }
 
 function persistedParams(params) {
+    params = { ...params };
+    delete params.paletteCycleTransport;
+    delete params.paletteCycleClockMs;
     if (!isCustomRuntimeMediaUrl(params.mediaUrl) && !isCameraParams(params)) return params;
     return {
         ...params,
@@ -2820,6 +2836,8 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     const gridCtx = gridCanvas.getContext('2d');
     const gridImage = gridCtx.createImageData(cols, rows);
     const gridPixels = gridImage.data;
+    const paletteLut = getPaletteLut(params.paletteId, params.paletteMapping);
+    const paletteDisplay = fillPaletteDisplay(new Float32Array(PALETTE_CONTRACT.maxColors * 4), paletteById(params.paletteId), params);
     const time = frameCount / Math.max(1, params.fps || DEFAULT_PARAMS.fps);
     const sourceCellWidth = sourceWidth / cols;
     const sourceCellHeight = sourceHeight / rows;
@@ -2840,7 +2858,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
             const sx = clamp(Math.trunc(sourceX * sampleWidth / sourceWidth), 0, sampleWidth - 1);
             const sy = clamp(Math.trunc(sourceY * sampleHeight / sourceHeight), 0, sampleHeight - 1);
             const srcIndex = (sy * sampleWidth + sx) * 4;
-            const [r, g, b] = processGpuCellColor(sourcePixels[srcIndex], sourcePixels[srcIndex + 1], sourcePixels[srcIndex + 2], params);
+            const [r, g, b] = processGpuCellColor(sourcePixels[srcIndex], sourcePixels[srcIndex + 1], sourcePixels[srcIndex + 2], params, col, row, paletteLut, paletteDisplay);
             const dstIndex = (row * cols + col) * 4;
             gridPixels[dstIndex] = r;
             gridPixels[dstIndex + 1] = g;
@@ -4210,6 +4228,7 @@ class CanvasStaticRenderer {
         this.requestedParams = null;
         this.paletteLutKey = '';
         this.paletteLut = null;
+        this.paletteDisplay = new Float32Array(PALETTE_CONTRACT.maxColors * 4);
         this.glyphRamp = '';
         this.colorCssCache = new Map();
         this.readbackBlocked = false;
@@ -4278,7 +4297,7 @@ class CanvasStaticRenderer {
         const key = `${this.params?.paletteId || 'none'}:${this.params?.paletteMapping || 'nearest'}`;
         if (key === this.paletteLutKey) return;
         this.paletteLutKey = key;
-        this.paletteLut = buildPaletteLut(this.params?.paletteId, this.params?.paletteMapping);
+        this.paletteLut = getPaletteLut(this.params?.paletteId, this.params?.paletteMapping);
         this.colorCssCache.clear();
     }
 
@@ -4370,6 +4389,7 @@ class CanvasStaticRenderer {
         );
         if (!img) return;
         const data = img.data;
+        fillPaletteDisplay(this.paletteDisplay, paletteById(this.params.paletteId), this.params);
         const ctx = this.ctx;
         const time = this.frameCount / Math.max(1, this.params.fps || DEFAULT_PARAMS.fps);
         const jitterAmount = Number(this.params.jitterAmount || 0);
@@ -4391,8 +4411,8 @@ class CanvasStaticRenderer {
                 const sampleX = clamp(Math.trunc((x + sampleXOffset) * sourceCellWidth + jitterX), 0, sampleWidth - 1);
                 const sampleY = clamp(Math.trunc((y + sampleYOffset) * sourceCellHeight + jitterY), 0, sampleHeight - 1);
                 const i = (sampleY * sampleWidth + sampleX) * 4;
-                const [r, g, b] = processColor(
-                    data[i], data[i + 1], data[i + 2], this.params, x, y, this.paletteLut
+                const [r, g, b, baseLuma] = processColor(
+                    data[i], data[i + 1], data[i + 2], this.params, x, y, this.paletteLut, this.paletteDisplay
                 );
                 ctx.fillStyle = this.params.glyphColorMode === 'fixed' && this.params.glyphMode
                     ? this.params.glyphColor
@@ -4400,7 +4420,7 @@ class CanvasStaticRenderer {
                 if (usesPixelCanvas(this.params) || this.params.solidMode || !this.params.glyphMode) {
                     ctx.fillRect(x * this.params.cellWidth, y * this.params.cellHeight, this.params.cellWidth, this.params.cellHeight);
                 } else {
-                    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                    const luma = baseLuma ?? (0.2126 * r + 0.7152 * g + 0.0722 * b);
                     ctx.fillText(glyphForLuma(luma, this.params, this.glyphRamp), x * this.params.cellWidth, y * this.params.cellHeight);
                 }
             }
@@ -4488,6 +4508,7 @@ class StaticRuntime {
             gamma: params.gamma,
             bgBlend: params.bgBlend,
             quantizeBits: params.quantizeBits,
+            ...paletteCycleParams(params, this.app?.paletteCycleTransport || this.paletteCycleTransport || params.paletteCycleTransport),
             paletteId: params.paletteId,
             paletteMapping: params.paletteMapping,
             ditherMode: params.ditherMode,
@@ -4522,7 +4543,7 @@ class StaticRuntime {
     _applyRendererParams(renderer, params) {
         if (!renderer) return;
         if (renderer instanceof CanvasStaticRenderer) {
-            renderer.updateParams(params);
+            renderer.updateParams({ ...params, paletteCycleTransport: this.app.paletteCycleTransport });
             return;
         }
         renderer.saturationBoost = params.saturationBoost;
@@ -4531,6 +4552,7 @@ class StaticRuntime {
         renderer.gamma = params.gamma;
         renderer.bgBlend = params.bgBlend;
         renderer.quantizeBits = params.quantizeBits;
+        Object.assign(renderer, paletteCycleParams(params, this.app.paletteCycleTransport));
         renderer.paletteId = params.paletteId;
         renderer.paletteMapping = params.paletteMapping;
         renderer.ditherMode = params.ditherMode;
@@ -4669,6 +4691,9 @@ class StaticRuntime {
         els.canvas.style.display = 'none';
         els.player.style.display = 'none';
         const layer = this._makeRendererLayer('renderer-buffer-current');
+        if (!explicitCanvasRendererDecision(params)) {
+            void detectCapabilities().catch(error => console.info('[Renderer] Early capability probe failed:', error));
+        }
         this.source = await this.app.loadStaticSource(params, options);
         this.mediaUrl = params.mediaUrl;
         this.mediaType = params.mediaType;
@@ -5835,6 +5860,7 @@ class RendererLabApp {
     constructor() {
         const hasStoredParams = localStorage.getItem(STORAGE_KEY) !== null;
         this.params = startupSafeParams(migrateStoredParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS)));
+        this.paletteCycleTransport = createCycleTransport();
         this.effectiveParams = null;
         this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS };
         this.audioReactiveInputs = new Map();
@@ -5961,7 +5987,7 @@ class RendererLabApp {
         await this._bindTauriSmokeEvents();
         this.desktopUpdater.setAvailable(await isTauriUpdaterAvailable());
         void this.desktopUpdater.checkOnLaunch();
-        await this._initCrashReporter();
+        void this._initCrashReporter().catch(error => console.warn('[CrashReporter] Initialization failed:', error));
         if (isTauriRuntime()) {
             try {
                 this.nativeOutputCapabilities = await getTauriNativeOutputCapabilities();
@@ -5982,10 +6008,11 @@ class RendererLabApp {
         this._buildControls();
         this._buildAudioReactiveControls();
         this._bindEvents();
-        await this.midiRuntime.init();
-        await this._refreshOutputDisplays();
-        await this._refreshCameraDevices();
-        await this._refreshAudioInputDevices();
+        // Device enumeration and optional integrations do not gate the first frame.
+        const devicesReady = Promise.allSettled([
+            this.midiRuntime.init(), this._refreshOutputDisplays(),
+            this._refreshCameraDevices(), this._refreshAudioInputDevices()
+        ]);
         this._renderSourceList();
         this._renderPresets();
         this._syncInputs();
@@ -5995,8 +6022,9 @@ class RendererLabApp {
         this.setConnection('Disconnected');
         this._syncDesktopUpdateUi();
         this._autoStart();
-        this._autoStartAudioReactive();
+        void devicesReady.then(() => this._autoStartAudioReactive());
         this._warmBuiltInMedia();
+        this.initializationComplete = true;
     }
 
     _startWebViewKeepalive() {
@@ -7294,6 +7322,7 @@ class RendererLabApp {
     async _runPrimaryPresetSweep() {
         if (this.uiPerfSmokeActive) return;
         this.uiPerfSmokeActive = true;
+        logMediaDiagnostic('[ASCILINE_UI_PERF_PHASE] begin');
         const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
         const report = {
             ok: false,
@@ -7396,6 +7425,7 @@ class RendererLabApp {
             await recordTauriMediaDiagnostic(
                 `[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(report)}`
             ).catch(() => {});
+            await emitTauriEventToApp('asciline-ui-perf-smoke-result', {ok: report.ok}).catch(() => {});
         }
     }
 
@@ -7403,6 +7433,7 @@ class RendererLabApp {
         if (payload.presetSweep === true) return this._runPrimaryPresetSweep();
         if (this.uiPerfSmokeActive) return;
         this.uiPerfSmokeActive = true;
+        logMediaDiagnostic('[ASCILINE_UI_PERF_PHASE] begin');
         const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
         const durationMs = Math.max(3000, Number(payload.durationMs) || 9000);
         const sampleMs = Math.max(120, Number(payload.sampleMs) || 500);
@@ -7498,6 +7529,7 @@ class RendererLabApp {
         };
 
         const collectPhase = async (phase, phaseDurationMs) => {
+            logMediaDiagnostic(`[ASCILINE_UI_PERF_PHASE] ${phase}`);
             let previous = sample();
             const deadline = performance.now() + Math.max(sampleMs, phaseDurationMs);
             while (performance.now() < deadline) {
@@ -7579,6 +7611,11 @@ class RendererLabApp {
         };
 
         try {
+            const initDeadline = performance.now() + 12000;
+            while (!this.initializationComplete && performance.now() < initDeadline) await wait(50);
+            await this._waitForStartIdle(12000);
+            await this._waitForTransitionIdle(12000);
+            this.audioReactiveRuntime.stop({keepStatus: true});
             await this._refreshOutputDisplays();
             report.outputDisplayCount = this.outputDisplays.length;
             const hasSecondaryOutput = report.outputDisplayCount > 1;
@@ -7790,6 +7827,7 @@ class RendererLabApp {
             await recordTauriMediaDiagnostic(
                 `[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(compactSummary)}`
             ).catch(() => {});
+            await emitTauriEventToApp('asciline-ui-perf-smoke-result', {ok: report.ok}).catch(() => {});
         }
     }
 
@@ -7801,10 +7839,10 @@ class RendererLabApp {
     renderParams() {
         if (this.audioReactiveRuntime?.active && this.audioReactiveFeatures) {
             this.effectiveParams = applyAudioReactiveModulation(this.params, this.audioReactiveFeatures, this.audioReactive, { clampParamValue });
-            return this.effectiveParams;
+            return { ...this.effectiveParams, paletteCycleTransport: this.paletteCycleTransport };
         }
         this.effectiveParams = null;
-        return this.params;
+        return { ...this.params, paletteCycleTransport: this.paletteCycleTransport };
     }
 
     _mainPreviewRenderParams(params = this.renderParams()) {
@@ -7823,6 +7861,10 @@ class RendererLabApp {
 
     _applyEffectiveRendererParams(params = this.renderParams(), key = 'live') {
         if (!this.running) return;
+        if (!this.transitioning && this.paletteCycleTransport.toRate !== params.paletteCycleSpeed) {
+            setCycleTransportRate(this.paletteCycleTransport, params.paletteCycleSpeed);
+        }
+        params = { ...params, paletteCycleTransport: this.paletteCycleTransport };
         this._applyMainPreviewRendererParams(params, key);
         this._updatePopoutRendererParams(params);
         this._syncNativeOutputWindow(params, key === 'audioReactive' ? NATIVE_OUTPUT_REACTIVE_SYNC_MS : 0);
@@ -8365,6 +8407,7 @@ class RendererLabApp {
     }
 
     _paramChanged(key, structural = false) {
+        if (key === 'paletteCycleSpeed') setCycleTransportRate(this.paletteCycleTransport, this.running ? this.params.paletteCycleSpeed : 0);
         this._persist();
         this._applyVisualState();
         this._syncPresetToolbar();
@@ -8442,6 +8485,9 @@ class RendererLabApp {
     async start(options = {}) {
         if (this.running || this.starting) return;
         this.starting = true;
+        const startedAt = performance.now();
+        logMediaDiagnostic('[RendererStartup] begin');
+        setCycleTransportRate(this.paletteCycleTransport, this.params.paletteCycleSpeed);
         const token = ++this.startToken;
         els.overlay.classList.add('hidden');
         els.togglePlay.textContent = 'Stop';
@@ -8459,7 +8505,13 @@ class RendererLabApp {
                 this.running = true;
             }
             this._applyEffectiveRendererParams(this.renderParams());
+            logMediaDiagnostic(`[RendererStartup] ready backend=${this.staticRuntime.getStats()?.backend || 'stream'} elapsedMs=${Math.round(performance.now() - startedAt)}`);
+            scheduleResponsiveFrame(() => {
+                void this._prewarmNativeOutputWindow().catch(error => console.info('[TauriOutput] Prewarm unavailable:', error));
+            });
         } catch (error) {
+            logMediaDiagnostic(`[RendererStartup] failed ${diagnosticErrorLabel(error)}`);
+            setCycleTransportRate(this.paletteCycleTransport, 0);
             console.error(error);
             this.setConnection(error.message || 'Start failed');
             this.running = false;
@@ -8475,6 +8527,8 @@ class RendererLabApp {
     }
 
     stop() {
+        setCycleTransportRate(this.paletteCycleTransport, 0);
+        if (this.nativeOutputActive) this._syncNativeOutputWindow(this.renderParams(), 0, { force: true });
         this.nativeOutputCameraRestoreToken++;
         this.nativeOutputCameraRestorePending = false;
         this.startToken++;
@@ -8716,7 +8770,10 @@ button:hover{background:#202a35}
         );
         return {
             ...effective,
+            ...paletteCycleParams(params, this.paletteCycleTransport),
             paletteColors: paletteById(params.paletteId)?.colors || [],
+            paletteCycleRanges: paletteById(params.paletteId)?.cycleRanges || [],
+            paletteCycleClockMs: cycleNowMs(),
             glyphMode: this._nativeOutputGlyphMode(params),
             charsetRamp: characterSetChars(params.charset, params.customGlyphRamp),
             sourceMode: this.params.sourceMode,
@@ -8960,7 +9017,10 @@ button:hover{background:#202a35}
     }
 
     async _prewarmNativeOutputWindow() {
-        return false;
+        if (!isTauriRuntime() || this.nativeGpuPrewarmed) return false;
+        this.nativeGpuPrewarmed = true;
+        await getTauriNativeOutputCapabilities(true);
+        return true;
     }
 
     _syncNativeOutputWindow(params = this.renderParams(), minIntervalMs = 0, options = {}) {
@@ -9041,9 +9101,14 @@ button:hover{background:#202a35}
     }
 
     async _armNativeOutputTransition(from, to, durationMs, kind, token) {
-        if (this.nativeOutputSourceSwitching) return { armed: false, startAtUnixMs: Date.now() };
+        const localStart = () => {
+            const startAtUnixMs = Date.now();
+            setCycleTransportRate(this.paletteCycleTransport, this.running ? to.paletteCycleSpeed : 0, cycleNowMs(), durationMs);
+            return { armed: false, startAtUnixMs };
+        };
+        if (this.nativeOutputSourceSwitching) return localStart();
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
-            return { armed: false, startAtUnixMs: Date.now() };
+            return localStart();
         }
 
         this.nativeOutputTransitionArming = true;
@@ -9053,7 +9118,7 @@ button:hover{background:#202a35}
         }
         if (token !== this.transitionToken || this.nativeOutputSyncInFlight) {
             this.nativeOutputTransitionArming = false;
-            return { armed: false, startAtUnixMs: Date.now() };
+            return localStart();
         }
 
         if (this.nativeOutputSyncTimer) {
@@ -9064,6 +9129,7 @@ button:hover{background:#202a35}
         this.nativeOutputPendingMinInterval = 0;
 
         const startAtUnixMs = Date.now() + NATIVE_OUTPUT_TRANSITION_LEAD_MS;
+        setCycleTransportRate(this.paletteCycleTransport, this.running ? to.paletteCycleSpeed : 0, cycleNowMs() + NATIVE_OUTPUT_TRANSITION_LEAD_MS, durationMs);
         const payload = this._nativeOutputPayload(to, {
             kind,
             startAtUnixMs,
@@ -9105,7 +9171,7 @@ button:hover{background:#202a35}
                     void this._restoreCameraPreviewAfterNativeOutput();
                 }
             }
-            return { armed: false, startAtUnixMs: Date.now() };
+            return localStart();
         }
 
         this.nativeOutputTransition = { token, kind, startAtUnixMs, durationMs };
@@ -9532,7 +9598,8 @@ button:hover{background:#202a35}
                 gamma: params.gamma,
                 bgBlend: params.bgBlend,
                 quantizeBits: params.quantizeBits,
-                paletteId: params.paletteId,
+                ...paletteCycleParams(params, this.app?.paletteCycleTransport || this.paletteCycleTransport || params.paletteCycleTransport),
+            paletteId: params.paletteId,
                 paletteMapping: params.paletteMapping,
                 ditherMode: params.ditherMode,
                 ditherStrength: params.ditherStrength,
@@ -9585,6 +9652,7 @@ button:hover{background:#202a35}
         this.popoutRenderer.gamma = params.gamma;
         this.popoutRenderer.bgBlend = params.bgBlend;
         this.popoutRenderer.quantizeBits = params.quantizeBits;
+        Object.assign(this.popoutRenderer, paletteCycleParams(params, this.paletteCycleTransport));
         this.popoutRenderer.paletteId = params.paletteId;
         this.popoutRenderer.paletteMapping = params.paletteMapping;
         this.popoutRenderer.ditherMode = params.ditherMode;
@@ -10733,11 +10801,14 @@ button:hover{background:#202a35}
         const token = ++this.transitionToken;
         const before = { ...this.params };
         const changed = Object.keys(target).filter((key) => target[key] !== before[key]);
-        const needsRebuild = changed.some((key) => STRUCTURAL_KEYS.has(key));
+        const needsRebuild = changed.some((key) => STRUCTURAL_KEYS.has(key)) ||
+            ((before.paletteCycleMode !== 'off' || target.paletteCycleMode !== 'off') &&
+            changed.some((key) => ['paletteId', 'paletteCycleMode'].includes(key)));
         if (seconds <= 0) {
             if (token !== this.transitionToken) return false;
             const mediaState = this._captureStaticMediaState(target);
             this.params = target;
+            setCycleTransportRate(this.paletteCycleTransport, this.running ? target.paletteCycleSpeed : 0);
             this._syncInputs();
             this._persist();
             if (this.running) await this.restart({ mediaState });

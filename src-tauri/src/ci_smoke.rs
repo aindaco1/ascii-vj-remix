@@ -689,6 +689,10 @@ fn spawn_ui_perf_smoke(app: &App) {
         .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
+    let (sender, receiver) = mpsc::channel();
+    let listener_id = handle.listen("asciline-ui-perf-smoke-result", move |event| {
+        let _ = sender.send(event.payload().to_string());
+    });
     thread::spawn(move || {
         let start = Instant::now();
         if let Some(main_window) = handle.get_webview_window("main") {
@@ -714,12 +718,14 @@ fn spawn_ui_perf_smoke(app: &App) {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());
             thread::sleep(Duration::from_millis(250));
         }
-        // Allow source startup, Pop Out creation, backend rebuilds, and a loaded
-        // machine to finish reporting before the CI-smoke process exits.
-        thread::sleep(Duration::from_millis(duration_ms + 15_000));
+        // Completion comes from the measured UI, never a successful timer.
+        let result = receiver.recv_timeout(Duration::from_millis(duration_ms + 120_000))
+            .ok().and_then(|payload| serde_json::from_str::<serde_json::Value>(&payload).ok());
+        handle.unlisten(listener_id);
+        let ok = result.as_ref().and_then(|value| value["ok"].as_bool()).unwrap_or(false);
         finish(
             SmokeReport {
-                ok: true,
+                ok,
                 kind: "ui-perf".to_string(),
                 mode: "perf".to_string(),
                 package_version,
@@ -737,9 +743,9 @@ fn spawn_ui_perf_smoke(app: &App) {
                 backend: None,
                 media_url: Some(media_url),
                 elapsed_ms: start.elapsed().as_millis(),
-                error: None,
+                error: (!ok).then(|| if result.is_none() { "UI performance report timed out" } else { "UI performance criteria failed" }.to_string()),
             },
-            0,
+            if ok { 0 } else { 1 },
         );
     });
 }

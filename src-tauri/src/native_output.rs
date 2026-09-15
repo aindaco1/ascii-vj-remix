@@ -30,6 +30,7 @@ use tauri::{
 
 mod gpu;
 mod native_camera;
+mod palette;
 
 const NATIVE_OUTPUT_LABEL: &str = "native-output";
 const NATIVE_OUTPUT_CLOSED_EVENT: &str = "asciline-native-output-closed";
@@ -63,7 +64,11 @@ pub struct NativeOutputCapabilities {
 }
 
 #[tauri::command]
-pub fn get_native_output_capabilities() -> NativeOutputCapabilities {
+pub fn get_native_output_capabilities(warm_gpu: Option<bool>) -> NativeOutputCapabilities {
+    #[cfg(not(test))]
+    if warm_gpu == Some(true) { gpu::prewarm(); }
+    #[cfg(test)]
+    let _ = warm_gpu;
     NativeOutputCapabilities {
         native_camera: cfg!(any(
             target_os = "macos",
@@ -151,6 +156,11 @@ pub struct NativeOutputParams {
     pub palette_id: Option<String>,
     pub palette_mapping: Option<String>,
     pub palette_colors: Option<Vec<[u8; 3]>>,
+    pub palette_cycle_ranges: Option<Vec<palette::CycleRange>>,
+    pub palette_cycle_mode: Option<String>,
+    pub palette_cycle_amount: Option<f64>,
+    pub palette_cycle_transport: Option<palette::Transport>,
+    pub palette_cycle_clock_ms: Option<f64>,
     pub dither_mode: Option<String>,
     pub dither_strength: Option<f64>,
     pub dither_scale: Option<f64>,
@@ -461,6 +471,11 @@ struct NativeRenderParams {
     palette_id: String,
     palette_mapping: String,
     palette_colors: Vec<[u8; 3]>,
+    palette_luminance_order: Vec<usize>,
+    palette_cycle_ranges: Vec<palette::CycleRange>,
+    palette_cycle_mode: String,
+    palette_cycle_amount: f64,
+    palette_cycle_transport: palette::Transport,
     dither_mode: String,
     dither_strength: f64,
     dither_scale: u32,
@@ -591,6 +606,7 @@ fn transition_frame_params(
     tween!(brightness);
     tween!(gamma);
     tween!(bg_blend);
+    tween!(palette_cycle_amount);
     tween!(dither_strength);
     tween!(dither_bias);
     tween!(jitter_amount);
@@ -3421,6 +3437,11 @@ impl NativeRenderParams {
         let params = &payload.params;
         let is_camera = payload.output_mode.as_deref() == Some(NATIVE_CAMERA_SOURCE_KEY)
             || params.media_type.as_deref() == Some("camera");
+        let palette_colors: Vec<_> = params.palette_colors.clone().unwrap_or_default()
+            .into_iter().take(palette::CONTRACT.max_colors).collect();
+        let mut palette_luminance_order: Vec<_> = (0..palette_colors.len()).collect();
+        palette_luminance_order.sort_by(|a, b| native_palette_luma(palette_colors[*a])
+            .total_cmp(&native_palette_luma(palette_colors[*b])).then_with(|| a.cmp(b)));
         Self {
             loop_media: params.loop_.unwrap_or(true),
             cols: u32_param(params.cols, 480).clamp(1, 4096),
@@ -3444,13 +3465,16 @@ impl NativeRenderParams {
                 _ => "nearest",
             }
             .to_string(),
-            palette_colors: params
-                .palette_colors
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .take(16)
-                .collect(),
+            palette_colors,
+            palette_luminance_order,
+            palette_cycle_ranges: palette::validated_ranges(
+                params.palette_cycle_ranges.as_deref().unwrap_or_default(),
+                params.palette_colors.as_ref().map_or(0, |colors| colors.len()).min(palette::CONTRACT.max_colors)),
+            palette_cycle_mode: match params.palette_cycle_mode.as_deref() {
+                Some("classic") => "classic", Some("blend") => "blend", _ => "off"
+            }.to_string(),
+            palette_cycle_amount: f64_param(params.palette_cycle_amount, 1.0).clamp(0.0, 1.0),
+            palette_cycle_transport: palette::Transport::synchronized(params.palette_cycle_transport.as_ref(), params.palette_cycle_clock_ms, palette::now_ms()),
             dither_mode: match params.dither_mode.as_deref() {
                 Some("bayer2") => "bayer2",
                 Some("bayer4") => "bayer4",
@@ -3783,18 +3807,14 @@ fn run_render_loop(
     } else {
         None
     };
+    let probe = if static_image.is_none() {
+        Some(probe_video(&binaries, &source.path).map_err(|error| error.to_string())?)
+    } else { None };
     let (sample_width, sample_height) = if let Some(frame) = static_image.as_ref() {
         (frame.width, frame.height)
-    } else {
-        let probe = probe_video(&binaries, &source.path).map_err(|error| error.to_string())?;
-        sample_dimensions(&probe)
-    };
-    let source_fps = if source.media_type == "image" {
-        DEFAULT_NATIVE_SOURCE_FPS
-    } else {
-        let probe = probe_video(&binaries, &source.path).map_err(|error| error.to_string())?;
-        native_video_source_fps(&probe, &params_snapshot(&params))
-    };
+    } else { sample_dimensions(probe.as_ref().expect("video probe")) };
+    let source_fps = probe.as_ref().map_or(DEFAULT_NATIVE_SOURCE_FPS, |probe|
+        native_video_source_fps(probe, &params_snapshot(&params)));
     let mut reader = if source.media_type == "image" {
         None
     } else {
@@ -4722,13 +4742,17 @@ fn render_native_frame_to_buffer(
             let dst_row = y * width_usize;
             let dst = &mut buffer[dst_row..dst_row + width_usize];
             for span_x in &x_spans {
-                let color = cell_colors[src_row + span_x.index];
+                let packed = cell_colors[src_row + span_x.index];
+                let color = packed & 0x00ff_ffff;
+                let glyph_luma = if params.palette_cycle_mode != "off" && !params.palette_cycle_ranges.is_empty() {
+                    f64::from(packed >> 24)
+                } else { rgb_u32_luma(color) };
                 if !glyph_mode {
                     dst[span_x.start..span_x.end].fill(color);
                     continue;
                 }
 
-                let glyph_index = native_glyph_index_for_luma(rgb_u32_luma(color), &glyph_ramp);
+                let glyph_index = native_glyph_index_for_luma(glyph_luma, &glyph_ramp);
                 let span_width = span_x.end.saturating_sub(span_x.start).max(1);
                 for x in span_x.start..span_x.end {
                     let tile_x = (((x - span_x.start) as u32 * NATIVE_GLYPH_TILE_WIDTH)
@@ -4870,6 +4894,9 @@ fn native_cell_colors(
     let source_cell_width = width as f64 / cols as f64;
     let source_cell_height = height as f64 / rows as f64;
     let time = frame_index as f64 / params.fps.max(1.0);
+    let mut display = vec![0.0; palette::CONTRACT.max_colors * 4];
+    palette::fill_display(&mut display, &params.palette_colors, &params.palette_cycle_ranges, &params.palette_cycle_mode, params.palette_cycle_amount, params.palette_cycle_transport.time_at(palette::now_ms()));
+    let cycling = params.palette_cycle_mode != "off" && !params.palette_cycle_ranges.is_empty();
     let mut out = Vec::with_capacity(cols as usize * rows as usize);
 
     for row in 0..rows {
@@ -4893,15 +4920,16 @@ fn native_cell_colors(
                 .clamp(0.0, (height - 1) as f64) as u32;
             let index = ((sample_y as usize * width as usize + sample_x as usize) * 3)
                 .min(frame.data.len().saturating_sub(3));
-            let (r, g, b) = process_gpu_cell_color_at(
+            let (r, g, b, luma) = process_gpu_cell_sample_at(
                 frame.data[index],
                 frame.data[index + 1],
                 frame.data[index + 2],
                 params,
                 col,
                 row,
+                if cycling { Some(&display) } else { None },
             );
-            out.push(rgb_u32(r, g, b));
+            out.push(rgb_u32(r, g, b) | if cycling { (luma.round() as u32) << 24 } else { 0 });
         }
     }
 
@@ -4922,6 +4950,12 @@ fn process_gpu_cell_color_at(
     x: u32,
     y: u32,
 ) -> (u8, u8, u8) {
+    let (r, g, b, _) = process_gpu_cell_sample_at(r, g, b, params, x, y, None);
+    (r, g, b)
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, x: u32, y: u32, display: Option<&[f32]>) -> (u8, u8, u8, f64) {
     let mut rr = r as f64 / 255.0;
     let mut gg = g as f64 / 255.0;
     let mut bb = b as f64 / 255.0;
@@ -4976,24 +5010,25 @@ fn process_gpu_cell_color_at(
         ];
         let index = native_palette_index(color, params);
         let mapped = params.palette_colors[index.min(params.palette_colors.len() - 1)];
-        return (mapped[0], mapped[1], mapped[2]);
+        if let Some(display) = display {
+            let slot = index * 4;
+            return ((display[slot] * 255.0).round() as u8, (display[slot + 1] * 255.0).round() as u8,
+                (display[slot + 2] * 255.0).round() as u8, f64::from(display[slot + 3]) * 255.0);
+        }
+        return (mapped[0], mapped[1], mapped[2], native_palette_luma(mapped));
     }
 
     (
         (clamp01(rr) * 255.0).round() as u8,
         (clamp01(gg) * 255.0).round() as u8,
         (clamp01(bb) * 255.0).round() as u8,
+        (rr * 0.2126 + gg * 0.7152 + bb * 0.0722) * 255.0,
     )
 }
 
 fn native_palette_index(color: [u8; 3], params: &NativeRenderParams) -> usize {
     if params.palette_mapping == "luminance" {
-        let mut order = (0..params.palette_colors.len()).collect::<Vec<_>>();
-        order.sort_by(|a, b| {
-            native_palette_luma(params.palette_colors[*a])
-                .total_cmp(&native_palette_luma(params.palette_colors[*b]))
-                .then_with(|| a.cmp(b))
-        });
+        let order = &params.palette_luminance_order;
         let position = ((native_palette_luma(color) / 256.0) * order.len() as f64).floor() as usize;
         return order[position.min(order.len() - 1)];
     }
@@ -5076,7 +5111,7 @@ mod tests {
 
     #[test]
     fn native_output_capabilities_match_platform_ownership() {
-        let capabilities = get_native_output_capabilities();
+        let capabilities = get_native_output_capabilities(None);
         assert_eq!(
             capabilities.native_camera,
             cfg!(any(

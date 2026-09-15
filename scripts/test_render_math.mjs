@@ -96,10 +96,10 @@ for (const characterSet of ASCII_TODAY_CHARACTER_SETS) {
 }
 assert.ok(shaderHash(1, 2) >= 0 && shaderHash(1, 2) < 1);
 
-assert.equal(PALETTES.length, 17);
+assert.equal(PALETTES.length, 21);
 assert.equal(new Set(PALETTES.map(({ id }) => id)).size, PALETTES.length);
 for (const palette of PALETTES) {
-  assert.ok(palette.colors.length >= 3 && palette.colors.length <= 16);
+  assert.ok(palette.colors.length >= 3 && palette.colors.length <= 256);
   assert.equal(palette.luminanceOrder.length, palette.colors.length);
   for (const color of palette.colors) {
     assert.equal(color.length, 3);

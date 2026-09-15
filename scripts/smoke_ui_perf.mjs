@@ -50,9 +50,7 @@ const launch = spawnSync('bash', ['scripts/run_local_desktop_app.sh'], {
   env
 });
 
-if (launch.status !== 0) {
-  process.exit(launch.status || 1);
-}
+if (launch.status !== 0) console.error(`ui-perf-smoke: app exited with status ${launch.status}`);
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let reportLine = null;

@@ -11,6 +11,7 @@ shipped changes. The [documentation index](../README.md) covers current guides.
 
 | Version | Record | Evidence boundary |
 | --- | --- | --- |
+| 1.0.4 | [Cycling and performance release](RELEASE_1.0.4.md) | Tracks source, CI, artifacts and installed/hardware acceptance separately. |
 | 1.0.3 | [Camera Pop Out corrective release](RELEASE_1.0.3.md) | Records Windows owner acceptance and the 2026-09-04 Linux physical camera testing deferral. The current follow-up checklist is linked from [Testing](../TESTING.md#hardware-and-platform-checks). |
 | 1.0.2 | [Native output lifecycle corrective release](RELEASE_1.0.2.md) | Retains the release contract and macOS common-flow acceptance; it does not establish physical Windows/Linux acceptance. |
 | 1.0.1 | [Camera, playlists, screenshots, and Reports](RELEASE_1.0.1.md) | Pre-release snapshot; its Pending CI/public-artifact and hardware rows are preserved as historical evidence. |

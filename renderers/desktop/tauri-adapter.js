@@ -403,9 +403,9 @@ async function listTauriOutputDisplays() {
     return outputDisplaysFromMonitors(monitors);
 }
 
-async function getTauriNativeOutputCapabilities() {
+async function getTauriNativeOutputCapabilities(warmGpu = false) {
     if (!isTauriRuntime()) return { nativeCamera: false, mirror: false };
-    return invokeTauri('get_native_output_capabilities');
+    return invokeTauri('get_native_output_capabilities', { warmGpu });
 }
 
 async function saveTauriScreenshot(pngBytes) {

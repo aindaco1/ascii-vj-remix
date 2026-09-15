@@ -1,3 +1,5 @@
+import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
+import { fillPaletteDisplay, paletteCycleParams } from '../../../../shared/palette-cycling.js';
 /**
  * WebGL2 ASCII Renderer
  * Fallback GPU-accelerated rendering supporting video and image sources.
@@ -8,7 +10,8 @@
 
 import {
     DITHER_MATRICES,
-    buildPaletteLut,
+    MAX_PALETTE_COLORS,
+    getPaletteLut,
     paletteById
 } from '../../../../shared/palettes.js';
 import { syncNativePreviewGeometry } from '../../../../shared/native-preview-geometry.js';
@@ -49,7 +52,7 @@ uniform float u_sampleY;
 uniform float u_time;
 uniform int u_mirrorX;
 uniform sampler2D u_paletteLut;
-uniform vec3 u_paletteColors[16];
+uniform sampler2D u_paletteColors;
 uniform int u_paletteCount;
 uniform float u_ditherValues[64];
 uniform int u_ditherSize;
@@ -118,7 +121,8 @@ void main() {
         ivec3 q = ivec3(clamp(floor(boosted * 255.0 / 8.0), 0.0, 31.0));
         int row = q.r * 32 + q.g;
         int paletteIndex = int(round(texelFetch(u_paletteLut, ivec2(q.b, row), 0).r * 255.0));
-        boosted = u_paletteColors[clamp(paletteIndex, 0, u_paletteCount - 1)];
+        fragColor = texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0);
+        return;
     }
 
     float luma = dot(boosted, vec3(0.2126, 0.7152, 0.0722));
@@ -236,6 +240,11 @@ export class WebGL2Renderer {
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
+        Object.assign(this, paletteCycleParams(options));
+        this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
+        this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
+        this.paletteLutUpdates = 0;
+        this.paletteDisplayUpdates = 0;
         this.paletteId = options.paletteId || 'none';
         this.paletteMapping = options.paletteMapping || 'nearest';
         this.ditherMode = options.ditherMode || 'none';
@@ -343,7 +352,7 @@ export class WebGL2Renderer {
             'u_time',
             'u_mirrorX',
             'u_paletteLut',
-            'u_paletteColors[0]',
+            'u_paletteColors',
             'u_paletteCount',
             'u_ditherValues[0]',
             'u_ditherSize',
@@ -369,8 +378,8 @@ export class WebGL2Renderer {
         // Fullscreen quad VAO
         this.quadVAO = gl.createVertexArray();
         gl.bindVertexArray(this.quadVAO);
-        const buf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        this.quadBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
             -1, -1, -1, 1, 1, 1,
             -1, -1, 1, 1, 1, -1
@@ -389,12 +398,23 @@ export class WebGL2Renderer {
 
         // For images, upload texture once
         if (this.source.isImage) {
-            const sourceEl = this.source.canvas || this.source.element;
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceEl);
+            uploadStaticImage(this.source,
+                source => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source),
+                (pixels, width, height) => {
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                    try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels); }
+                    finally { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); }
+                }, true);
         }
 
         this._createCellTexture();
         this.paletteLutTexture = gl.createTexture();
+        this.paletteDisplayTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, this.paletteDisplayTexture);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, MAX_PALETTE_COLORS, 1);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         this.glyphAtlasTexture = gl.createTexture();
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.glyphAtlasTexture);
@@ -507,55 +527,53 @@ export class WebGL2Renderer {
 
     syncFeatureResources(force = false) {
         if (!this.gl || !this.paletteLutTexture) return;
-        const key = `${this.paletteId}:${this.paletteMapping}:${this.ditherMode}`;
-        if (!force && key === this.featureResourceKey) {
-            this.syncGlyphResources();
-            return;
-        }
-        this.featureResourceKey = key;
-
         const gl = this.gl;
-        const palette = paletteById(this.paletteId);
-        const lut = buildPaletteLut(this.paletteId, this.paletteMapping) || new Uint8Array(32 * 32 * 32);
-        const paletteColors = new Float32Array(16 * 3);
-        for (let index = 0; index < (palette?.colors.length || 0); index++) {
-            const color = palette.colors[index];
-            paletteColors[index * 3] = color[0] / 255;
-            paletteColors[index * 3 + 1] = color[1] / 255;
-            paletteColors[index * 3 + 2] = color[2] / 255;
+        gl.useProgram(this.cellProgram);
+        const key = `${this.paletteId}:${this.paletteMapping}`;
+        if (force || key !== this.featureResourceKey) {
+            this.featureResourceKey = key;
+            const lut = getPaletteLut(this.paletteId, this.paletteMapping) || new Uint8Array(32 * 32 * 32);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
+            const sourceFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+            try {
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 1024, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
+            } finally { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, sourceFlipY); }
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.uniform1i(this.cellUniforms.u_paletteLut, 1);
+            gl.uniform1i(this.cellUniforms.u_paletteColors, 4);
+            gl.uniform1i(this.cellUniforms.u_paletteCount, paletteById(this.paletteId)?.colors.length || 0);
+            this.paletteLutUpdates++;
         }
-        const matrix = DITHER_MATRICES[this.ditherMode];
-        const ditherValues = new Float32Array(64);
-        if (matrix) {
-            const area = matrix.size * matrix.size;
-            for (let index = 0; index < area; index++) {
-                ditherValues[index] = (matrix.values[index] + 0.5) / area - 0.5;
-            }
+        if (force || this.ditherResourceKey !== this.ditherMode) {
+            this.ditherResourceKey = this.ditherMode;
+            const matrix = DITHER_MATRICES[this.ditherMode];
+            const values = new Float32Array(64);
+            if (matrix) matrix.values.forEach((value, i) => { values[i] = (value + 0.5) / matrix.values.length - 0.5; });
+            gl.uniform1fv(this.cellUniforms['u_ditherValues[0]'], values);
+            gl.uniform1i(this.cellUniforms.u_ditherSize, matrix?.size || 0);
         }
+        this.syncPaletteDisplay(force);
+        this.syncGlyphResources(force);
+    }
 
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
-        // LUT rows encode red/green indices; source-image flipping would
-        // reverse that lookup and map dark pixels to unrelated bright colors.
+    syncPaletteDisplay(force = false) {
+        fillPaletteDisplay(this.paletteDisplay, paletteById(this.paletteId), this);
+        if (!force && this.paletteDisplay.every((value, i) => value === this.paletteDisplayLast[i])) return;
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, this.paletteDisplayTexture);
         const sourceFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
         try {
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 1024, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
-        } finally {
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, sourceFlipY);
-        }
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-        gl.useProgram(this.cellProgram);
-        gl.uniform1i(this.cellUniforms.u_paletteLut, 1);
-        gl.uniform3fv(this.cellUniforms['u_paletteColors[0]'], paletteColors);
-        gl.uniform1i(this.cellUniforms.u_paletteCount, palette?.colors.length || 0);
-        gl.uniform1fv(this.cellUniforms['u_ditherValues[0]'], ditherValues);
-        gl.uniform1i(this.cellUniforms.u_ditherSize, matrix?.size || 0);
-        this.syncGlyphResources(force);
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, MAX_PALETTE_COLORS, 1, gl.RGBA, gl.FLOAT, this.paletteDisplay);
+        } finally { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, sourceFlipY); }
+        this.paletteDisplayLast.set(this.paletteDisplay);
+        this.paletteDisplayUpdates++;
     }
 
     syncGlyphResources(force = false) {
@@ -606,12 +624,14 @@ export class WebGL2Renderer {
         if (!this.initialized) return;
         if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
+        this.syncPaletteDisplay();
         this.frameCount++;
         const gl = this.gl;
 
         // For video, update texture every frame
         if (this.source.isVideo) {
             const sourceEl = this.source.canvas || this.source.element;
+            gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
             try {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceEl);
@@ -647,6 +667,8 @@ export class WebGL2Renderer {
 
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.paletteLutTexture);
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, this.paletteDisplayTexture);
 
         gl.bindVertexArray(this.quadVAO);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -748,8 +770,11 @@ export class WebGL2Renderer {
         this.stop();
         const gl = this.gl;
         if (gl) {
+            if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
+            if (this.quadVAO) gl.deleteVertexArray(this.quadVAO);
             if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
             if (this.paletteLutTexture) gl.deleteTexture(this.paletteLutTexture);
+            if (this.paletteDisplayTexture) gl.deleteTexture(this.paletteDisplayTexture);
             if (this.glyphAtlasTexture) gl.deleteTexture(this.glyphAtlasTexture);
             if (this.glyphRampTexture) gl.deleteTexture(this.glyphRampTexture);
             if (this.sourceTexture) gl.deleteTexture(this.sourceTexture);

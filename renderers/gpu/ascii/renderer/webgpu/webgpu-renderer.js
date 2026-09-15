@@ -1,3 +1,7 @@
+import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
+import { cachedGpuPipeline } from '../../../../shared/gpu-pipeline-cache.js';
+import cellColorWGSL from '../../../../shared/cell-color.wgsl.js';
+import { fillPaletteDisplay, paletteCycleParams } from '../../../../shared/palette-cycling.js';
 /**
  * WebGPU ASCII Renderer
  * GPU-accelerated ASCII rendering supporting both video and image sources.
@@ -9,7 +13,8 @@
 import {
     DITHER_MATRICES,
     PALETTE_LUT_SIZE,
-    buildPaletteLut,
+    MAX_PALETTE_COLORS,
+    getPaletteLut,
     paletteById
 } from '../../../../shared/palettes.js';
 import { syncNativePreviewGeometry } from '../../../../shared/native-preview-geometry.js';
@@ -56,7 +61,7 @@ struct Params {
 };
 
 struct FeatureData {
-    paletteColors: array<vec4<f32>, 16>,
+    paletteColors: array<vec4<f32>, ${MAX_PALETTE_COLORS}>,
     ditherValues: array<f32, 64>,
 };
 
@@ -66,44 +71,7 @@ struct FeatureData {
 @group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
-fn hash(p: vec2<f32>) -> f32 {
-    var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-    p3 += dot(p3, vec3<f32>(p3.y + 33.33, p3.z + 33.33, p3.x + 33.33));
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
-    let avg = (c.r + c.g + c.b) * 0.333333333;
-    var outColor = vec3<f32>(
-        clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.g - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.b - avg) * params.saturationBoost, 0.0, 1.0)
-    );
-    outColor = clamp((outColor - vec3<f32>(0.5)) * params.contrastBoost + vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(1.0));
-    outColor = clamp(pow(outColor * params.brightness, vec3<f32>(1.0 / max(0.01, params.gamma))), vec3<f32>(0.0), vec3<f32>(1.0));
-    if (params.quantizeBits > 0u) {
-        let quantum = pow(2.0, f32(params.quantizeBits));
-        outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
-    }
-    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
-    if (params.ditherSize > 0u) {
-        let scale = max(1u, params.ditherScale);
-        let mx = (cx / scale) % params.ditherSize;
-        let my = (cy / scale) % params.ditherSize;
-        var threshold = features.ditherValues[my * params.ditherSize + mx];
-        if (params.ditherInvert != 0u) { threshold = -threshold; }
-        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
-        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
-    }
-    if (params.paletteCount > 0u) {
-        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
-        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
-        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
-        result = features.paletteColors[paletteIndex].rgb;
-    }
-    return result;
-}
-
+${cellColorWGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx = gid.x;
@@ -126,8 +94,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY));
     let boosted = processColor(c.rgb, cx, cy);
 
-    let luma = dot(boosted, vec3<f32>(0.2126, 0.7152, 0.0722));
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, luma));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
 }
 `;
 
@@ -162,7 +129,7 @@ struct Params {
 };
 
 struct FeatureData {
-    paletteColors: array<vec4<f32>, 16>,
+    paletteColors: array<vec4<f32>, ${MAX_PALETTE_COLORS}>,
     ditherValues: array<f32, 64>,
 };
 
@@ -173,44 +140,7 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 // Simple hash for per-cell pseudo-random jitter
-fn hash(p: vec2<f32>) -> f32 {
-    var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-    p3 += dot(p3, vec3<f32>(p3.y + 33.33, p3.z + 33.33, p3.x + 33.33));
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
-    let avg = (c.r + c.g + c.b) * 0.333333333;
-    var outColor = vec3<f32>(
-        clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.g - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.b - avg) * params.saturationBoost, 0.0, 1.0)
-    );
-    outColor = clamp((outColor - vec3<f32>(0.5)) * params.contrastBoost + vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(1.0));
-    outColor = clamp(pow(outColor * params.brightness, vec3<f32>(1.0 / max(0.01, params.gamma))), vec3<f32>(0.0), vec3<f32>(1.0));
-    if (params.quantizeBits > 0u) {
-        let quantum = pow(2.0, f32(params.quantizeBits));
-        outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
-    }
-    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
-    if (params.ditherSize > 0u) {
-        let scale = max(1u, params.ditherScale);
-        let mx = (cx / scale) % params.ditherSize;
-        let my = (cy / scale) % params.ditherSize;
-        var threshold = features.ditherValues[my * params.ditherSize + mx];
-        if (params.ditherInvert != 0u) { threshold = -threshold; }
-        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
-        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
-    }
-    if (params.paletteCount > 0u) {
-        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
-        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
-        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
-        result = features.paletteColors[paletteIndex].rgb;
-    }
-    return result;
-}
-
+${cellColorWGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx = gid.x;
@@ -236,8 +166,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let boosted = processColor(c.rgb, cx, cy);
 
-    let luma = dot(boosted, vec3<f32>(0.2126, 0.7152, 0.0722));
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(boosted, luma));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
 }
 `;
 
@@ -360,6 +289,11 @@ export class WebGPURenderer {
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
+        Object.assign(this, paletteCycleParams(options));
+        this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
+        this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
+        this.paletteLutUpdates = 0;
+        this.paletteDisplayUpdates = 0;
         this.paletteId = options.paletteId || 'none';
         this.paletteMapping = options.paletteMapping || 'nearest';
         this.ditherMode = options.ditherMode || 'none';
@@ -458,32 +392,26 @@ export class WebGPURenderer {
 
         this.usesExternalVideoTexture = Boolean(this.source.isVideo && !this.source.canvas);
 
-        // Create compute pipelines (one for browser video textures, one for image/canvas textures)
-        if (this.usesExternalVideoTexture) {
-            const videoModule = this.device.createShaderModule({ code: CELL_PASS_VIDEO_WGSL });
-            this.videoComputePipeline = this.device.createComputePipeline({
-                layout: 'auto',
-                compute: { module: videoModule, entryPoint: 'main' }
-            });
-        } else {
-            const imageModule = this.device.createShaderModule({ code: CELL_PASS_IMAGE_WGSL });
-            this.imageComputePipeline = this.device.createComputePipeline({
-                layout: 'auto',
-                compute: { module: imageModule, entryPoint: 'main' }
-            });
-
-            // Upload image to GPU texture once
-            await this._uploadImageTexture();
-        }
-
-        // Create render pipeline (shared)
-        const renderModule = this.device.createShaderModule({ code: RENDER_PASS_WGSL });
-        this.renderPipeline = this.device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module: renderModule, entryPoint: 'vertexMain' },
-            fragment: { module: renderModule, entryPoint: 'fragmentMain', targets: [{ format }] },
-            primitive: { topology: 'triangle-list' }
+        // Compile once per device/source kind and presentation format. Driver
+        // compilation runs asynchronously so opening output keeps the UI live.
+        const computeKey = this.usesExternalVideoTexture ? 'video' : 'image';
+        const compute = cachedGpuPipeline(this.device, computeKey, () => {
+            const module = this.device.createShaderModule({code: this.usesExternalVideoTexture ? CELL_PASS_VIDEO_WGSL : CELL_PASS_IMAGE_WGSL});
+            return this.device.createComputePipelineAsync({layout: 'auto', compute: {module, entryPoint: 'main'}});
         });
+        const render = cachedGpuPipeline(this.device, `render:${format}`, () => {
+            const module = this.device.createShaderModule({code: RENDER_PASS_WGSL});
+            return this.device.createRenderPipelineAsync({layout: 'auto',
+                vertex: {module, entryPoint: 'vertexMain'},
+                fragment: {module, entryPoint: 'fragmentMain', targets: [{format}]},
+                primitive: {topology: 'triangle-list'}});
+        });
+        const [computePipeline, renderPipeline] = await Promise.all([
+            compute, render, this.usesExternalVideoTexture ? null : this._uploadImageTexture()
+        ]);
+        if (this.usesExternalVideoTexture) this.videoComputePipeline = computePipeline;
+        else this.imageComputePipeline = computePipeline;
+        this.renderPipeline = renderPipeline;
 
         this._createCellTexture();
 
@@ -503,7 +431,7 @@ export class WebGPURenderer {
         });
 
         this.featureBuffer = this.device.createBuffer({
-            size: 16 * 16 + 64 * Float32Array.BYTES_PER_ELEMENT,
+            size: MAX_PALETTE_COLORS * 16 + 64 * Float32Array.BYTES_PER_ELEMENT,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         });
 
@@ -536,12 +464,10 @@ export class WebGPURenderer {
         this.imageSourceSize = [w, h];
         this.imageComputeBindGroup = null;
 
-        const sourceEl = this.source.canvas || this.source.element;
-        this.device.queue.copyExternalImageToTexture(
-            { source: sourceEl },
-            { texture: this.imageSourceTexture },
-            [w, h]
-        );
+        uploadStaticImage(this.source,
+            source => this.device.queue.copyExternalImageToTexture({source}, {texture: this.imageSourceTexture}, [w, h]),
+            pixels => this.device.queue.writeTexture({texture: this.imageSourceTexture}, pixels,
+                {bytesPerRow: w * 4, rowsPerImage: h}, [w, h]));
 
         console.log(`[WebGPU] Image texture uploaded: ${w}x${h}`);
     }
@@ -629,42 +555,32 @@ export class WebGPURenderer {
 
     syncFeatureResources(force = false, syncGlyphs = true) {
         if (!this.device || !this.paletteLutBuffer || !this.featureBuffer) return;
-        const key = `${this.paletteId}:${this.paletteMapping}:${this.ditherMode}`;
-        if (!force && key === this.featureResourceKey) {
-            if (syncGlyphs) void this.syncGlyphResources();
-            return;
+        const key = `${this.paletteId}:${this.paletteMapping}`;
+        if (force || key !== this.featureResourceKey) {
+            this.featureResourceKey = key;
+            const lut8 = getPaletteLut(this.paletteId, this.paletteMapping);
+            const lut32 = new Uint32Array(PALETTE_LUT_SIZE);
+            if (lut8) lut32.set(lut8);
+            this.device.queue.writeBuffer(this.paletteLutBuffer, 0, lut32);
+            this.paletteLutUpdates++;
         }
-        this.featureResourceKey = key;
-
-        const palette = paletteById(this.paletteId);
-        const lut8 = buildPaletteLut(this.paletteId, this.paletteMapping);
-        const lut32 = new Uint32Array(PALETTE_LUT_SIZE);
-        if (lut8) {
-            for (let index = 0; index < lut8.length; index++) lut32[index] = lut8[index];
+        if (force || this.ditherResourceKey !== this.ditherMode) {
+            this.ditherResourceKey = this.ditherMode;
+            const matrix = DITHER_MATRICES[this.ditherMode];
+            const values = new Float32Array(64);
+            if (matrix) matrix.values.forEach((value, i) => { values[i] = (value + 0.5) / matrix.values.length - 0.5; });
+            this.device.queue.writeBuffer(this.featureBuffer, MAX_PALETTE_COLORS * 16, values);
         }
-        const featureData = new ArrayBuffer(16 * 16 + 64 * Float32Array.BYTES_PER_ELEMENT);
-        const featureFloats = new Float32Array(featureData);
-        for (let index = 0; index < (palette?.colors.length || 0); index++) {
-            const color = palette.colors[index];
-            const offset = index * 4;
-            featureFloats[offset] = color[0] / 255;
-            featureFloats[offset + 1] = color[1] / 255;
-            featureFloats[offset + 2] = color[2] / 255;
-            featureFloats[offset + 3] = 1;
-        }
-        const matrix = DITHER_MATRICES[this.ditherMode];
-        if (matrix) {
-            const area = matrix.size * matrix.size;
-            const base = 16 * 4;
-            for (let index = 0; index < area; index++) {
-                featureFloats[base + index] = (matrix.values[index] + 0.5) / area - 0.5;
-            }
-        }
-        this.device.queue.writeBuffer(this.paletteLutBuffer, 0, lut32);
-        this.device.queue.writeBuffer(this.featureBuffer, 0, featureData);
-        this.imageComputeBindGroup = null;
-        this._createStableBindGroups();
+        this.syncPaletteDisplay(force);
         if (syncGlyphs) void this.syncGlyphResources(force);
+    }
+
+    syncPaletteDisplay(force = false) {
+        fillPaletteDisplay(this.paletteDisplay, paletteById(this.paletteId), this);
+        if (!force && this.paletteDisplay.every((value, i) => value === this.paletteDisplayLast[i])) return;
+        this.device.queue.writeBuffer(this.featureBuffer, 0, this.paletteDisplay);
+        this.paletteDisplayLast.set(this.paletteDisplay);
+        this.paletteDisplayUpdates++;
     }
 
     async syncGlyphResources(force = false) {
@@ -714,6 +630,7 @@ export class WebGPURenderer {
 
         if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
+        this.syncPaletteDisplay();
         this.frameCount++;
 
         const sw = this.source.width || 640;
