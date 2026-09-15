@@ -1,0 +1,95 @@
+{
+  "version": "1.0.4",
+  "tag": "v1.0.4",
+  "commit": "95a82bef9453b7d0bb1ee180f376657d5f46d913",
+  "release": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.0.4",
+  "publishedAt": "2026-09-15T18:41:42Z",
+  "workflow": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/35007023415",
+  "digestSource": "GitHub release asset API",
+  "assets": [
+    {
+      "name": "ASCII.VJ.Remix-1.0.4-1.x86_64.rpm",
+      "size": 57611254,
+      "digest": "sha256:b2191772a522491a01c259b224c65bcd000900f7db04d48c89e7d60cc72d38a4",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix-1.0.4-1.x86_64.rpm"
+    },
+    {
+      "name": "ASCII.VJ.Remix-1.0.4-1.x86_64.rpm.sig",
+      "size": 424,
+      "digest": "sha256:77d4f9fc4c375c29368394d8a229e39b5bed7bbe3078f13e945ef272ba32f672",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix-1.0.4-1.x86_64.rpm.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz",
+      "size": 53324965,
+      "digest": "sha256:e8daa953b19e1add83bea84531a7867646ce05da28149bbfaec0b01436d4f4ab",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix.app.tar.gz"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+      "size": 416,
+      "digest": "sha256:fcc0ef50a3f5a4671f985dd126295395931251f2208fcd510025d45db88ec63d",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix.app.tar.gz.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_aarch64.dmg",
+      "size": 53480347,
+      "digest": "sha256:aed7e8be70030165fedb5096c0008d47857b85ae1a56015c7867ece20a32d124",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_aarch64.dmg"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_amd64.AppImage",
+      "size": 129493496,
+      "digest": "sha256:895a9b5e4189e05fe95ffe5274ebf0e0e77f52b2d1e43c722e3b5591ec2bb56e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_amd64.AppImage"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_amd64.AppImage.sig",
+      "size": 428,
+      "digest": "sha256:ad3a31d4325921982db0992f424a16feb290f924daadb1e3b6d23d6437526e7c",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_amd64.AppImage.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_amd64.deb",
+      "size": 57610314,
+      "digest": "sha256:f9f5306327f46afa750eb14cf19f340a3c47f6b2737818dd6b9e89749611ba37",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_amd64.deb"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_amd64.deb.sig",
+      "size": 420,
+      "digest": "sha256:3825d723fe128a0c77240b55a0701673670a50f9e71b55a153ac878731d4bd85",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_amd64.deb.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_x64-setup.exe",
+      "size": 44418728,
+      "digest": "sha256:1a9e41be859adda6c72aa9ea2690456a502ba899acff09299954f7cb41283d0a",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_x64-setup.exe"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_x64-setup.exe.sig",
+      "size": 428,
+      "digest": "sha256:395f0b8d548a88621c6f3ee7e6f290f3f0442d855ab3599ae98c101ec23cd508",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_x64-setup.exe.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_x64_en-US.msi",
+      "size": 56664064,
+      "digest": "sha256:2cb7c4b0f40016ce77439289e91685949871e72a47d9365a24e1be8e56cfb05e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_x64_en-US.msi"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.0.4_x64_en-US.msi.sig",
+      "size": 428,
+      "digest": "sha256:1b5b0315f2d278bb3ebc66583812c87155bc1bee9f7e3d5cde90feb978573855",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/ASCII.VJ.Remix_1.0.4_x64_en-US.msi.sig"
+    },
+    {
+      "name": "latest.json",
+      "size": 5488,
+      "digest": "sha256:ecaaff546dec198aecd757ebfbf46a1b931ced7bff4b050eab42ac2036660f6e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.0.4/latest.json"
+    }
+  ]
+}

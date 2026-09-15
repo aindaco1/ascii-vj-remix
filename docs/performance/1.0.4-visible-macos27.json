@@ -333,6 +333,83 @@
         ],
         "package_version": "1.0.4"
       }
+    },
+    "windows": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 9153,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 1,
+          "firstPresentMs": 953,
+          "pass": 0
+        },
+        {
+          "commandMs": 1,
+          "firstPresentMs": 426,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.0.4"
+    }
+  },
+  "finalAutomaticStartup": {
+    "commit": "28d66096a545fbab19c25abd06241543c629047c",
+    "launch": "Launch Services via desktop:run-local",
+    "backend": "webgpu",
+    "rendererReadyMs": 246,
+    "manualStartRequired": false
+  },
+  "releaseCandidateCi": {
+    "commit": "28d66096a545fbab19c25abd06241543c629047c",
+    "run": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/35003794477",
+    "linux": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 8670,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 3,
+          "firstPresentMs": 699,
+          "pass": 0
+        },
+        {
+          "commandMs": 4,
+          "firstPresentMs": 191,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.0.4"
+    },
+    "windows": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 10009,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 0,
+          "firstPresentMs": 1907,
+          "pass": 0
+        },
+        {
+          "commandMs": 0,
+          "firstPresentMs": 321,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.0.4"
     }
   }
 }

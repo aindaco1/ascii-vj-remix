@@ -1,7 +1,9 @@
 # 1.0.4 — Color Cycling and Renderer Performance
 
-Stage: implementation and validation in progress, September 15, 2026.
-Public release and hardware acceptance are not implied by this record.
+Stage: [published September 15, 2026](https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.0.4),
+tagged at `95a82bef9453b7d0bb1ee180f376657d5f46d913`.
+All three public install/updater lanes passed. Physical hardware acceptance
+remains bounded by the checks recorded below.
 
 ## Scope
 
@@ -31,10 +33,11 @@ for the complete release scope, including changes since 1.0.3 and shared-relay w
 | macOS host/toolchain | macOS 27.0 (26A428), Xcode 27.0 (27A266a), Apple Silicon. Optimized dev app launches and presents native output. |
 | Performance | Visible 480-column WebGPU run passed at 40.6 / 39.3 / 34.6 FPS (main / Pop Out / transition); native presentation 60 FPS, zero GPU failures. See the measurement record below. |
 | Full local desktop/media gates | Passed `check:desktop`, `check:media`, final 77 Rust tests and Windows lifecycle/geometry tests. Final Chromium smoke passed including preset import/export and MIDI controls. |
-| Exact release-candidate CI | Pending on release branch. |
-| Public signed artifacts/updater | Pending. |
+| Exact release-candidate CI | Final `28d6609`: macOS 26, Xcode 27, Windows and Linux passed, including native GPU presentation and close/reopen on Windows/Linux. [Run](https://github.com/aindaco1/ascii-vj-remix/actions/runs/35003794477). |
+| Exact merged/tagged CI | `95a82be`, tagged `v1.0.4`: macOS 26, Xcode 27, Windows and Linux passed. [Run](https://github.com/aindaco1/ascii-vj-remix/actions/runs/35007006774). |
+| Public artifacts/updater | [Release workflow passed](https://github.com/aindaco1/ascii-vj-remix/actions/runs/35007023415): all platform packages, macOS signing/notarization, and macOS/Windows/Linux published install and 1.0.3 → 1.0.4 updater checks. Windows installers remain unsigned previews; updater packages are signed. |
 | Windows/Linux physical camera/display | Not exercised on this Mac. Existing release ownership contract remains; new CI cannot substitute for device acceptance. |
-| Final Mac dev handoff | Pending final optimized build and visual check. |
+| Final Mac dev handoff | Final optimized build and app-only bundle inspection passed; automatic WebGPU startup took 246 ms. Earlier pixel/glyph visual checks passed. Final foreground handoff awaits the locked Mac. |
 
 ## Windows/Linux Regression Boundary
 
@@ -58,6 +61,22 @@ while output is active using [Testing](../TESTING.md#hardware-and-platform-check
   adds recurring compiler/SDK coverage; signed-artifact/updater and final UI
   acceptance remain separate below.
 - #36: reviewed, all four CI lanes passed, merged as `6edc0d6`; included in this release.
+- #37: release implementation merged after all candidate gates passed. No open
+  PRs remained at the final release review. Issues #30 and #35 remain open for
+  their outstanding physical acceptance and exact-input reproduction.
+
+## Published artifact identity
+
+The [asset record](1.0.4-artifacts.json) captures the 14 published asset names,
+sizes, GitHub SHA-256 digests, and download URLs. The updater manifest reports
+1.0.4, and all nine platform aliases resolve to an uploaded signed updater
+package. The release commit is identical to the final tested candidate tree.
+
+The local download of `latest.json` and the macOS detached updater signature
+matched the published SHA-256 digests. An additional local DMG/archive recheck
+was stopped after sustained transfer rates near 10 KB/s; it is not counted as
+local artifact acceptance. Public artifact trust, identity, and the previous
+version update path passed in the release workflow on all three platforms.
 
 ## Local performance measurements
 
@@ -95,7 +114,7 @@ and live cycling/parameter updates passed at `66b063a` ([CI run](https://github.
 Its legacy command label is `native-softbuffer`, but passing requires the GPU
 presenter event on both opens. Windows also passed on the same app code at `3597017`: first presentation
 1,563 ms, reopen 472 ms ([CI run](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34996977641)).
-The final Windows harness revision is pending.
+Final candidate results for both platforms are recorded below.
 A subsequent clean Mac launch selected WebGPU in 290 ms and native image opens
 responded in 38 ms / 10 ms after close/reopen. The zero-speed still-image control
 was visually checked with audio modulation disabled.
@@ -111,9 +130,20 @@ start independently of device enumeration.
 A covered-window check also reproduced dormant automatic startup when WebKit
 withheld animation frames. Autostart now reuses `scheduleResponsiveFrame`, the
 existing animation-frame/timer race, with a regression test for a missing frame.
+The rebuilt `28d6609` app then started automatically through Launch Services
+without pressing Start: WebGPU ready in 246 ms.
 
 A local macOS 27 camera request stayed pending after native permission reported
 `granted`. The preserved pre-optimization binary showed the same pending WebKit
 `getUserMedia` request. This is unresolved physical-host evidence for #30, not a
 passing camera check or proof of its underlying cause. No capture implementation
 or permission policy was changed to work around it.
+
+The final Linux candidate (`28d6609`) passed native presentation in 699 ms and
+close/reopen in 191 ms on the CI virtual display, including live parameter and
+cycling updates. The installed Mac app-only bundle inspection passed with
+version 1.0.4, the development identifier, and bundled FFmpeg.
+
+Final Windows candidate `28d6609` passed native presentation in 1,907 ms and
+close/reopen in 321 ms, including live cycling/parameter updates. PR #37 was
+merged as `95a82be` after all four candidate CI lanes passed.
