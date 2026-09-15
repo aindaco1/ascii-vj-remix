@@ -1,0 +1,23 @@
+{
+  "events": ["monitoring", "permission", "match", "audio", "database", "lifecycle"],
+  "location": ["always", "whenInUse", "denied", "restricted", "unknown"],
+  "precise": ["yes", "no"],
+  "notifications": ["allowed", "denied", "unknown"],
+  "notificationSound": ["yes", "no", "unknown"],
+  "monitoring": ["requested", "off"],
+  "appState": ["foreground", "background", "inactive"],
+  "lowPower": ["yes", "no"],
+  "refresh": ["available", "denied", "restricted", "unknown"],
+  "fixAge": ["none", "fresh", "recent", "old"],
+  "accuracy": ["unknown", "good", "usable", "poor"],
+  "match": ["invalidFix", "outOfOrder", "notMoving", "noCamera", "tooFar", "oppositeDirection", "behind", "approachUnconfirmed", "cooldown", "expired", "belowSpeedLimit", "warning"],
+  "quiet": ["yes", "no"],
+  "route": ["speaker", "bluetooth", "carPlay", "wired", "other"],
+  "volume": ["muted", "low", "audible"],
+  "audio": ["none", "started", "completed", "interrupted", "sessionFailed", "fileMissing", "decodeFailed", "playFailed", "finishFailed"],
+  "databaseStage": ["idle", "manifest", "download", "validation", "save", "complete"],
+  "databaseResult": ["none", "started", "ok", "network", "invalid", "storage", "cancelled"],
+  "databaseAge": ["unknown", "current", "old"],
+  "eventAge": ["justNow", "lastHour", "today"],
+  "count": ["one", "few", "many"]
+}

@@ -249,3 +249,30 @@ The fingerprint uses:
 That means reports with the same platform and stable error code aggregate even
 when the exact message or stack line changes. Reports with different stable
 error codes create separate issues.
+
+## Fine Me Not 1.0.1 adapter
+
+`POST /v1/fine-me-not/reports` accepts only the reviewed v1 contract. The native
+app and `contract/` carry identical allowlist and golden-fixture files; coordinate
+contract changes in both repos. Reports can include an optional public explanation.
+The automatic projection rejects locations, camera identifiers, driving speeds,
+raw errors, full crash payloads, device IDs and accessory names.
+
+`FineMeNotInbox` serializes the product's ID ledger, rejects edited retries, and
+retains individual receipts for 30 days. A separate object enforces 25 new issues
+per UTC day; per-hour HMAC keys enforce 10 requests per address without storing
+raw IPs. The HMAC is domain-separated from the existing private signing key.
+`FineMeNotReportGroup` extends the existing reviewed group, preserving legacy
+adapters. Same technical failures share an issue. Text-only and ambiguous reports
+get separate needs-triage issues. Counts are submissions, not people.
+
+User explanations are escaped as literal text; the first and four latest distinct
+explanations remain. Maintainer text outside the managed block is preserved.
+`duplicate`, `do-not-reopen` and `fixed-in-build:N` labels control reopening.
+Old crash payloads use their original build for this decision. Pending GitHub
+creation stays guarded after an uncertain response, with marker-search recovery.
+
+Kill switch: `FINE_ME_NOT_REPORTS_ENABLED=false`, redeploy through the existing
+Deploy Crash Relay workflow. The health endpoint `/v1/fine-me-not/health` reports
+bindings/configuration only; synthetic delivery proves GitHub permissions.
+Run `npm test` and `npx wrangler deploy --dry-run` before deployment.

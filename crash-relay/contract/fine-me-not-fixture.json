@@ -1,0 +1,31 @@
+{
+  "schema": "fine-me-not-issue-report-v1",
+  "id": "87d82d7a-dc39-4a08-ac03-9f13f5577261",
+  "createdAt": "2026-09-15T08:00:00Z",
+  "category": "missedWarning",
+  "notes": "Synthetic test — no real trip.\nThe siren was interrupted.",
+  "metadata": {
+    "version": "1.0.1",
+    "build": "9",
+    "os": "27.0",
+    "model": "iPhone17,2",
+    "channel": "development"
+  },
+  "state": {
+    "monitoring": "requested",
+    "location": "always",
+    "precise": "yes"
+  },
+  "events": [
+    {
+      "code": "audio",
+      "values": {
+        "audio": "interrupted",
+        "route": "bluetooth",
+        "appState": "background",
+        "lowPower": "yes"
+      }
+    }
+  ],
+  "evidenceIndex": 0
+}

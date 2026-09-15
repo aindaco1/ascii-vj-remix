@@ -1,65 +1,121 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "ascii-vj-crash-relay",
-	"main": "src/index.js",
-	"build": { "command": "npm run build:review", "watch_dir": ["src/mkv-review-client.js", "src/mkv.js"] },
-	"compatibility_date": "2026-06-25",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"workers_dev": false,
-	"routes": [
-		{
-			"pattern": "crash.dustwave.xyz",
-			"custom_domain": true
-		}
-	],
-	"observability": {
-		"enabled": true,
-		"head_sampling_rate": 1
-	},
-	"vars": {
-		"MKV_REPORTS_ENABLED": "true",
-		"PODCAST_REPORTS_ENABLED": "true",
-		"CUTNOTES_REPORTS_ENABLED": "true",
-		"AUTO_SUBTITLE_REPORTS_ENABLED": "true",
-		"APP_MODE": "production",
-		"WORKER_BASE": "https://crash.dustwave.xyz",
-		"CRASH_REPORTS_ENABLED": "true",
-		"CRASH_ALLOWED_APP_IDENTIFIER": "com.asciline.remix",
-		"CRASH_LABELS": "crash,automated-report,needs-triage",
-		"CRASH_MAX_PAYLOAD_BYTES": "24576",
-		"CRASH_IP_LIMIT": "20",
-		"CRASH_IP_WINDOW_SECONDS": "3600",
-		"CRASH_NEW_ISSUE_DAILY_LIMIT": "25",
-		"CRASH_UPDATE_COOLDOWN_SECONDS": "900",
-		"DEBUG_CONSOLE_LOGGING_ENABLED": "true",
-		"DEBUG_VERBOSE_CONSOLE_LOGGING": "false",
-		"GITHUB_OWNER": "aindaco1",
-		"GITHUB_REPO": "ascii-vj-remix"
-	},
-	"durable_objects": { "bindings": [
-		{ "name": "PODCAST_REPORT_GROUPS", "class_name": "PodcastReportGroup" },
-		{ "name": "MKV_REPORT_GROUPS", "class_name": "MkvReportGroup" },
-		{ "name": "AUTO_SUBTITLE_REPORT_GROUPS", "class_name": "AutoSubtitleReportGroup" },
-		{ "name": "CUTNOTES_REPORT_GROUPS", "class_name": "CutNotesReportGroup" }
-	] },
-	"migrations": [
-		{ "tag": "podcast-reports-v1", "new_sqlite_classes": ["PodcastReportGroup"] },
-		{ "tag": "mkv-reports-v1", "new_sqlite_classes": ["MkvReportGroup"] },
-		{ "tag": "auto-subtitle-reports-v1", "new_sqlite_classes": ["AutoSubtitleReportGroup"] },
-		{ "tag": "cutnotes-reports-v1", "new_sqlite_classes": ["CutNotesReportGroup"] }
-	],
-	"kv_namespaces": [
-		{
-			"binding": "RATELIMIT",
-			"id": "1c5b4f1ac7d847f49c31efdebbb74f88",
-			"preview_id": "aa1fcc6ce08a49d881bbb44227f711de"
-		},
-		{
-			"binding": "CRASH_INDEX",
-			"id": "6810b75b07d84ea2a2e097dac828b2eb",
-			"preview_id": "dc3c6f656bb84806877186de2ff389e0"
-		}
-	]
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ascii-vj-crash-relay",
+  "main": "src/index.js",
+  "build": {
+    "command": "npm run build:review",
+    "watch_dir": [
+      "src/mkv-review-client.js",
+      "src/mkv.js"
+    ]
+  },
+  "compatibility_date": "2026-06-25",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "crash.dustwave.xyz",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "MKV_REPORTS_ENABLED": "true",
+    "PODCAST_REPORTS_ENABLED": "true",
+    "CUTNOTES_REPORTS_ENABLED": "true",
+    "AUTO_SUBTITLE_REPORTS_ENABLED": "true",
+    "APP_MODE": "production",
+    "WORKER_BASE": "https://crash.dustwave.xyz",
+    "CRASH_REPORTS_ENABLED": "true",
+    "CRASH_ALLOWED_APP_IDENTIFIER": "com.asciline.remix",
+    "CRASH_LABELS": "crash,automated-report,needs-triage",
+    "CRASH_MAX_PAYLOAD_BYTES": "24576",
+    "CRASH_IP_LIMIT": "20",
+    "CRASH_IP_WINDOW_SECONDS": "3600",
+    "CRASH_NEW_ISSUE_DAILY_LIMIT": "25",
+    "CRASH_UPDATE_COOLDOWN_SECONDS": "900",
+    "DEBUG_CONSOLE_LOGGING_ENABLED": "true",
+    "DEBUG_VERBOSE_CONSOLE_LOGGING": "false",
+    "GITHUB_OWNER": "aindaco1",
+    "GITHUB_REPO": "ascii-vj-remix",
+    "FINE_ME_NOT_REPORTS_ENABLED": "true"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PODCAST_REPORT_GROUPS",
+        "class_name": "PodcastReportGroup"
+      },
+      {
+        "name": "MKV_REPORT_GROUPS",
+        "class_name": "MkvReportGroup"
+      },
+      {
+        "name": "AUTO_SUBTITLE_REPORT_GROUPS",
+        "class_name": "AutoSubtitleReportGroup"
+      },
+      {
+        "name": "CUTNOTES_REPORT_GROUPS",
+        "class_name": "CutNotesReportGroup"
+      },
+      {
+        "name": "FINE_ME_NOT_REPORT_GROUPS",
+        "class_name": "FineMeNotReportGroup"
+      },
+      {
+        "name": "FINE_ME_NOT_INBOX",
+        "class_name": "FineMeNotInbox"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "podcast-reports-v1",
+      "new_sqlite_classes": [
+        "PodcastReportGroup"
+      ]
+    },
+    {
+      "tag": "mkv-reports-v1",
+      "new_sqlite_classes": [
+        "MkvReportGroup"
+      ]
+    },
+    {
+      "tag": "auto-subtitle-reports-v1",
+      "new_sqlite_classes": [
+        "AutoSubtitleReportGroup"
+      ]
+    },
+    {
+      "tag": "cutnotes-reports-v1",
+      "new_sqlite_classes": [
+        "CutNotesReportGroup"
+      ]
+    },
+    {
+      "tag": "fine-me-not-v1",
+      "new_sqlite_classes": [
+        "FineMeNotReportGroup",
+        "FineMeNotInbox"
+      ]
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "RATELIMIT",
+      "id": "1c5b4f1ac7d847f49c31efdebbb74f88",
+      "preview_id": "aa1fcc6ce08a49d881bbb44227f711de"
+    },
+    {
+      "binding": "CRASH_INDEX",
+      "id": "6810b75b07d84ea2a2e097dac828b2eb",
+      "preview_id": "dc3c6f656bb84806877186de2ff389e0"
+    }
+  ]
 }

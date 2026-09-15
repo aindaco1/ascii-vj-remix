@@ -64,3 +64,14 @@ export async function shouldUpdateIssue(env, fingerprint) {
   });
   return true;
 }
+
+// Domain-separated HMAC, rotating hourly. No raw IP is stored in application KV.
+export async function checkFineMeNotRateLimit(request, env) {
+  if (!env.GITHUB_APP_PRIVATE_KEY || !env.FINE_ME_NOT_INBOX) return { ok: false, status: 503 };
+  const window = Math.floor(Date.now() / 3600000);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.GITHUB_APP_PRIVATE_KEY), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`fine-me-not-rate-v1:${window}:${clientIp(request)}`));
+  const hash = Array.from(new Uint8Array(digest), x => x.toString(16).padStart(2, '0')).join('');
+  const limiter = env.FINE_ME_NOT_INBOX.get(env.FINE_ME_NOT_INBOX.idFromName(`rate:${hash}`));
+  return (await limiter.fetch(new Request("https://internal/rate", { method: "POST" }))).json();
+}

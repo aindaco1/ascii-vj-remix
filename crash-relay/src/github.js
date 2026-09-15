@@ -343,7 +343,7 @@ async function createIssue(env, sanitized, fingerprint, state, request = githubR
     // its exact marker before another issue may be created.
     return { action: 'pending', status: 503, fingerprint };
   }
-  const allowed = await checkDailyIssueLimit(env);
+  const allowed = await (env.REPORT_DAILY_LIMIT ? env.REPORT_DAILY_LIMIT() : checkDailyIssueLimit(env));
   if (!allowed.ok) {
     return {
       action: 'limited',
@@ -355,7 +355,7 @@ async function createIssue(env, sanitized, fingerprint, state, request = githubR
   const { owner, repo } = repoConfig(env);
   const body = {
     title: issueTitle(sanitized, fingerprint),
-    body: issueBody(sanitized, fingerprint, state),
+    body: (env.REPORT_ISSUE_BODY ?? issueBody)(sanitized, fingerprint, state),
     labels: labels(env)
   };
   let issue;
@@ -397,7 +397,7 @@ function issueUpdateBody(sanitized, fingerprint, state, reopen = false) {
   };
 }
 
-async function updateIssue(env, number, sanitized, fingerprint, state, force = false, reopen = false) {
+async function updateIssue(env, number, sanitized, fingerprint, state, force = false, reopen = false, existing = '') {
   if (!force && !await shouldUpdateIssue(env, fingerprint)) {
     return {
       action: 'aggregated',
@@ -408,7 +408,8 @@ async function updateIssue(env, number, sanitized, fingerprint, state, force = f
   const { owner, repo } = repoConfig(env);
   const issue = await githubRequest(env, `/repos/${owner}/${repo}/issues/${number}`, {
     method: 'PATCH',
-    body: JSON.stringify(issueUpdateBody(sanitized, fingerprint, state, reopen))
+    body: JSON.stringify({ ...(env.REPORT_ISSUE_BODY ? (reopen ? { state: "open" } : {}) : issueUpdateBody(sanitized, fingerprint, state, reopen)),
+      ...(env.REPORT_ISSUE_BODY ? { body: env.REPORT_ISSUE_BODY(sanitized, fingerprint, state, existing) } : {}) })
   });
   await indexIssue(env, fingerprint, issue);
   return {
@@ -429,7 +430,7 @@ export async function submitCrashReport(env, sanitized, fingerprint, aggregateSt
     const state = parseState(issue.body, fingerprint);
     return updateIssue(env, issueNumber, sanitized, fingerprint,
       aggregateState ?? updateAggregateState(state, sanitized, fingerprint, now),
-      aggregateState !== null, issue.state === 'closed');
+      aggregateState !== null, env.REPORT_REOPEN ? env.REPORT_REOPEN(issue, sanitized) : issue.state === 'closed', issue.body);
   }
 
   const state = aggregateState ?? updateAggregateState({

@@ -41,6 +41,7 @@ export class ReviewedReportGroup {
         // so a retry after a provider/storage error cannot count it twice.
         saved.state = updateAggregateState(saved.state ?? { fingerprint, count: 0,
           firstSeen: new Date().toISOString(), versions: {}, platforms: {} }, relayReport, fingerprint, new Date().toISOString());
+        this.adapter.aggregate?.(saved.state, report);
         if (this.adapter.groupingSummary) saved.state.grouping = this.adapter.groupingSummary(report);
         for (const field of ['versions', 'platforms']) {
           const entries = Object.entries(saved.state[field]);
@@ -52,6 +53,7 @@ export class ReviewedReportGroup {
         await this.ctx.storage.put('group', saved);
       }
       const result = await this.submit({ ...this.env, GITHUB_OWNER: 'aindaco1', GITHUB_REPO: this.adapter.repository,
+        ...(this.adapter.issueBody ? { REPORT_ISSUE_BODY: this.adapter.issueBody, REPORT_REOPEN: this.adapter.reopen, REPORT_DAILY_LIMIT: this.adapter.dailyLimit } : {}),
         ...(this.adapter.labels ? { CRASH_LABELS: this.adapter.labels(report) } : {}),
         CRASH_CREATION_GUARD: {
           get: key => this.ctx.storage.get(`creation:${key}`),
