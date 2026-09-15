@@ -142,6 +142,15 @@ requested backend.
 
 ### Native Output or Pop Out Changes
 
+`smoke:native-output` requires a real GPU presentation, applies live params and
+palette cycling, closes through the normal window watcher, and requires another
+presentation after reopening. Its report separates command response from first
+presentation time. Windows PR CI runs it against the optimized development
+binary after packaging. This tests the native renderer and window lifecycle;
+the physical camera/display matrix below remains separate. Set
+`ASCILINE_NATIVE_OUTPUT_REPORT_PATH` to retain a JSON report. macOS additionally
+checks display-link pacing with the existing log analyzer.
+
 ```bash
 npm run test:output-display
 npm run smoke:native-output

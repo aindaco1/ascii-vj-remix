@@ -124,6 +124,23 @@ jobs:
         if: runner.os == 'Windows' && github.event_name == 'pull_request'
         run: npm run bundle:test
 
+      - name: Verify Windows native Pop Out first frame and reopen
+        id: native-smoke
+        if: runner.os == 'Windows' && github.event_name == 'pull_request'
+        timeout-minutes: 3
+        env:
+          ASCILINE_NATIVE_OUTPUT_REPORT_PATH: tmp-smoke-native/report.json
+        run: npm run smoke:native-output
+
+      - name: Upload Windows native Pop Out result
+        if: always() && steps.native-smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ascii-vj-remix-native-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp-smoke-native/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload unsigned Windows test installer
         if: runner.os == 'Windows' && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v7

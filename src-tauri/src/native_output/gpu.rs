@@ -17,7 +17,7 @@ use std::ffi::c_void;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::hash::{Hash, Hasher};
-use tauri::{PhysicalSize, Window};
+use tauri::{Emitter, PhysicalSize, Window};
 
 const PALETTE_LUT_EDGE: usize = 32;
 const PALETTE_LUT_SIZE: usize = PALETTE_LUT_EDGE * PALETTE_LUT_EDGE * PALETTE_LUT_EDGE;
@@ -710,6 +710,9 @@ impl NativeGpuPresenter {
         output.present();
         if !self.first_frame_presented {
             self.first_frame_presented = true;
+            if std::env::var_os("ASCILINE_NATIVE_OUTPUT_SMOKE").is_some() {
+                let _ = window.emit("asciline-native-output-first-present", ());
+            }
             eprintln!("[NativeOutputStartup] phase=first-present afterGpuReadyMs={}", self.ready_at.elapsed().as_millis());
         }
         let present_ns = duration_ns_u64(present_started_at.elapsed());

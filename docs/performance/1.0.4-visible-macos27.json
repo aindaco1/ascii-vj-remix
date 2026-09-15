@@ -248,5 +248,35 @@
     "rebuildMedianMs": 19.737041,
     "cachedMedianMs": 0.000129625,
     "notes": "Node v26.8.2; cached samples each average 1000 lookups. Component microbenchmark only."
+  },
+  "nativeFirstPresentation": {
+    "backend": "native-wgpu-displaylink",
+    "elapsed_ms": 8056,
+    "error": null,
+    "kind": "native-output",
+    "media_url": "media/point-click-test-30s.mp4",
+    "mode": "perf",
+    "ok": true,
+    "opens": [
+      {
+        "commandMs": 0,
+        "firstPresentMs": 189,
+        "pass": 0
+      },
+      {
+        "commandMs": 0,
+        "firstPresentMs": 82,
+        "pass": 1
+      }
+    ],
+    "package_version": "1.0.4",
+    "notes": "Smoke helper counts a GPU presentation, exercises the ordinary close watcher, then waits for a fresh presentation after reopening. Uses bundled video, palette cycling and live parameter updates; not physical scanout or camera timing."
+  },
+  "cleanLaunch": {
+    "method": "macOS Launch Services through desktop:run-local",
+    "backend": "webgpu",
+    "rendererSetupMs": 205,
+    "source": "Demo Image",
+    "version": "1.0.4"
   }
 }

@@ -78,3 +78,12 @@ the standard Chromium run passed. During that experiment one native launch
 fell back to WebGL2 after 20.7 seconds and its initial image needed Reload;
 this transient GPU-startup case is not counted as successful startup acceptance.
 Subsequent clean launch checks are recorded separately below.
+
+A clean Launch Services launch (`desktop:run-local`) automatically rendered the
+Demo Image using WebGPU; renderer setup took 205 ms. Tidal Glass pixel and glyph
+looks were reviewed in the native app on both Demo Image and Demo Video, with
+the video advancing through a glyph-to-pixel transition while Pop Out was open.
+Native video remained at 60 FPS without GPU failures. The stronger native smoke
+passed: first GPU presentation 189 ms after open, repeat presentation 82 ms after
+close/reopen, with 59.8 FPS during live parameter/cycling updates and no failures.
+This smoke is now part of Windows PR CI; its Windows result is pending.
