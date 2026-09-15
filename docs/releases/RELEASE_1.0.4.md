@@ -99,3 +99,21 @@ The final Windows harness revision is pending.
 A subsequent clean Mac launch selected WebGPU in 290 ms and native image opens
 responded in 38 ms / 10 ms after close/reopen. The zero-speed still-image control
 was visually checked with audio modulation disabled.
+
+
+## Final startup review
+
+The initial optimization could race default camera ID discovery against capture
+startup. The actual-controller regression test failed before the correction and
+passes with camera-only discovery ordering restored. Images and video still
+start independently of device enumeration.
+
+A covered-window check also reproduced dormant automatic startup when WebKit
+withheld animation frames. Autostart now reuses `scheduleResponsiveFrame`, the
+existing animation-frame/timer race, with a regression test for a missing frame.
+
+A local macOS 27 camera request stayed pending after native permission reported
+`granted`. The preserved pre-optimization binary showed the same pending WebKit
+`getUserMedia` request. This is unresolved physical-host evidence for #30, not a
+passing camera check or proof of its underlying cause. No capture implementation
+or permission policy was changed to work around it.

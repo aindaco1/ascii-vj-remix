@@ -163,3 +163,24 @@ for (const mediaType of ['camera', 'image', 'video']) {
   if (mediaType === 'camera') assert.equal(started[0].cameraDeviceId, 'usb-camera');
 }
 console.log('Camera startup identity and independent media startup ordering passed.');
+
+// A newly opened or covered WebView may not deliver animation frames yet.
+// Startup must use the existing responsive scheduler's bounded timer fallback.
+const schedulerMethod = appSource.slice(appSource.indexOf('function scheduleResponsiveFrame('), appSource.indexOf('function crossfadeOut('));
+const autoStartMethod = appSource.slice(appSource.indexOf('    _autoStart() {'), appSource.indexOf('    _warmBuiltInMedia() {'));
+const pendingTimers = [];
+const AutoStartup = new Function('requestAnimationFrame', 'cancelAnimationFrame', 'window', 'document', 'performance', 'RESPONSIVE_FRAME_MS',
+  `${schedulerMethod} return class { ${autoStartMethod} }`)(
+  () => 1, () => {}, { setTimeout: (callback) => { pendingTimers.push(callback); return 1; }, clearTimeout() {} },
+  { readyState: 'complete' }, { now: () => 0 }, 16
+);
+const hiddenStartup = new AutoStartup();
+let automaticStarts = 0;
+hiddenStartup.start = async () => { automaticStarts++; hiddenStartup.running = true; };
+hiddenStartup._autoStart();
+assert.equal(automaticStarts, 0);
+assert.equal(pendingTimers.length, 1, 'a missing animation frame must not leave automatic startup dormant');
+pendingTimers.shift()();
+await new Promise(setImmediate);
+assert.equal(automaticStarts, 1);
+console.log('Covered-window automatic startup fallback passed.');

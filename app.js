@@ -8063,7 +8063,7 @@ class RendererLabApp {
                 this._startDefaultStaticFallback().catch((error) => console.warn('[Renderer] Default fallback failed:', error));
             });
         };
-        requestAnimationFrame(tryStart);
+        scheduleResponsiveFrame(tryStart);
         if (document.readyState !== 'complete') {
             window.addEventListener('load', () => {
                 if (!this.running && !this.starting) tryStart();
