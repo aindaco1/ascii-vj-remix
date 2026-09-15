@@ -22,12 +22,12 @@ for the complete release scope, including changes since 1.0.3 and shared-relay w
 | Gate | Evidence / state |
 | --- | --- |
 | Shared JS vectors | Passed: classic/blend, reverse/wrap, amount, stable glyph luminance, index 255, validation and speed integral. |
-| Rust | 77 tests passed after cycling and native resource-cache changes; full final gate pending. |
-| Browser rendering | 79 presets passed; all eight new looks animate a still image. Actual WebGL palette swatches passed for base palettes and frozen cycle times. Native-preview geometry/orientation checks passed. |
+| Rust | 77 tests passed, including the final startup-diagnostics build. |
+| Browser rendering | 79 presets passed in Chromium and the installed macOS 27 app (51 WebGPU / 28 Canvas); all eight new looks animate a still image in Chromium. Actual WebGL palette swatches passed for base palettes and frozen cycle times. Native-preview geometry/orientation checks passed. |
 | Resource safety | JS coalesced compilation, retry after failure/device loss, bounded palette eviction, readable-image retry and tainted-image rejection passed. |
 | macOS host/toolchain | macOS 27.0 (26A428), Xcode 27.0 (27A266a), Apple Silicon. Optimized dev app launches and presents native output. |
-| Performance | Initial runs lacked complete UI reports; no before/after claim is accepted from those runs. The harness now waits for a real completion result. Final matched measurements pending. |
-| Full local desktop/media gates | In progress. |
+| Performance | Visible 480-column WebGPU run passed at 40.6 / 39.3 / 34.6 FPS (main / Pop Out / transition); native presentation 60 FPS, zero GPU failures. See the measurement record below. |
+| Full local desktop/media gates | Passed `check:desktop`, `check:media`, final 77 Rust tests and Windows lifecycle/geometry tests. Final Chromium smoke passed including preset import/export and MIDI controls. |
 | Exact release-candidate CI | Pending on release branch. |
 | Public signed artifacts/updater | Pending. |
 | Windows/Linux physical camera/display | Not exercised on this Mac. Existing release ownership contract remains; new CI cannot substitute for device acceptance. |
@@ -54,5 +54,27 @@ while output is active using [Testing](../TESTING.md#hardware-and-platform-check
 - #30: this host provides actual macOS 27/Xcode 27 build/runtime evidence. PR #36
   adds recurring compiler/SDK coverage; signed-artifact/updater and final UI
   acceptance remain separate below.
-- #36: reviewed and included in the release branch; macOS lanes passed when
-  inspected. Windows/Linux checks and merge state must be refreshed before release.
+- #36: reviewed, all four CI lanes passed, merged as `6edc0d6`; included in this release.
+
+## Local performance measurements
+
+See [recorded runs](../performance/1.0.4-visible-macos27.json). The pre-optimization
+reference already included color cycling; it is not the published 1.0.3 binary.
+Visible before/after main, Pop Out and transition averages were 41.3/39.0/36.5
+and 40.6/39.3/34.6 FPS. These are comparable steady-state results, not an FPS
+speedup claim. Native output held 60 FPS without GPU failures.
+
+The main gains remove repeated work: a repeated Tidal Glass lookup reuses the
+32-cube table instead of rebuilding it (19.7 ms median rebuild in the local Node
+component benchmark). Native opening reused the warmed adapter/device/pipelines:
+first command 122 ms, repeat close/reopen 12 ms; surface/presenter setup rounded
+to 0 ms and first presentation followed 4 ms / 1 ms after GPU readiness. These
+intervals have different start points and are not a physical Windows measurement.
+
+Two background/occluded performance runs failed and are retained in the record.
+The harness now reports document visibility/focus and waits for actual measured
+completion. An optional forced-WebGPU Chromium run had no GPU backend available;
+the standard Chromium run passed. During that experiment one native launch
+fell back to WebGL2 after 20.7 seconds and its initial image needed Reload;
+this transient GPU-startup case is not counted as successful startup acceptance.
+Subsequent clean launch checks are recorded separately below.

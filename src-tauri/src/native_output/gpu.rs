@@ -277,6 +277,8 @@ impl Drop for NativeMetalView {
 }
 
 pub(super) struct NativeGpuPresenter {
+    ready_at: Instant,
+    first_frame_presented: bool,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -373,6 +375,7 @@ fn shared_gpu(surface: Option<&wgpu::Surface<'_>>) -> Result<Arc<SharedGpu>, Str
     let mut cache = SHARED.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "GPU cache poisoned")?;
     if let Some(shared) = cache.as_ref().filter(|s| s.alive.load(Ordering::Relaxed) &&
         surface.is_none_or(|surface| s.adapter.is_surface_supported(surface))) {
+        eprintln!("[NativeOutputStartup] phase=shared-gpu-reused");
         return Ok(shared.clone());
     }
     let started_at = Instant::now();
@@ -472,17 +475,15 @@ impl NativeGpuPresenter {
         let (instance, surface) = create_surface_on_main_thread(window)?;
         let surface_ready_at = Instant::now();
         let result = Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync);
-        #[cfg(target_os = "windows")]
         eprintln!("[NativeOutputStartup] phase=gpu-ready surfaceMs={} devicePipelineMs={} totalMs={} ready={}",
             surface_ready_at.duration_since(started_at).as_millis(), surface_ready_at.elapsed().as_millis(),
             started_at.elapsed().as_millis(), result.is_ok());
-        #[cfg(not(target_os = "windows"))]
-        let _ = (started_at, surface_ready_at);
         result
     }
 
     #[cfg(target_os = "macos")]
     pub(super) fn new_with_metal_view_on_current_thread(window: &Window) -> Result<Self, String> {
+        let started_at = Instant::now();
         let metal_view = NativeMetalView::install(window)?;
         let instance = gpu_instance();
         let surface = unsafe {
@@ -494,6 +495,7 @@ impl NativeGpuPresenter {
         let mut presenter =
             Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync)?;
         presenter.metal_view = Some(metal_view);
+        eprintln!("[NativeOutputStartup] phase=gpu-ready totalMs={} ready=true", started_at.elapsed().as_millis());
         Ok(presenter)
     }
 
@@ -576,6 +578,8 @@ impl NativeGpuPresenter {
         });
 
         Ok(Self {
+            ready_at: Instant::now(),
+            first_frame_presented: false,
             surface,
             device,
             queue,
@@ -704,6 +708,10 @@ impl NativeGpuPresenter {
         );
         let present_started_at = Instant::now();
         output.present();
+        if !self.first_frame_presented {
+            self.first_frame_presented = true;
+            eprintln!("[NativeOutputStartup] phase=first-present afterGpuReadyMs={}", self.ready_at.elapsed().as_millis());
+        }
         let present_ns = duration_ns_u64(present_started_at.elapsed());
         // Reclaim completed queue-write staging resources without blocking the
         // display-link callback. Native wgpu devices are not driven by a browser

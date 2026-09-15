@@ -7476,6 +7476,8 @@ class RendererLabApp {
                 backend: stats?.backend || this.params.backend,
                 sourceType: stats?.sourceType || 'unknown',
                 rendererRunning: Boolean(renderer?.running),
+                documentVisible: document.visibilityState === 'visible',
+                documentFocused: document.hasFocus(),
                 rendererAnimationId: Number(renderer?.animationId || renderer?.raf || 0),
                 videoReadyState: Number(this.staticRuntime.source?.element?.readyState ?? -1),
                 videoPaused: Boolean(this.staticRuntime.source?.element?.paused),
@@ -7570,6 +7572,8 @@ class RendererLabApp {
             };
             return {
                 count: samples.length,
+                hiddenSamples: samples.filter((item) => !item.documentVisible).length,
+                unfocusedSamples: samples.filter((item) => !item.documentFocused).length,
                 mainAvgFps: fpsValues.length ? fpsValues.reduce((sum, value) => sum + value, 0) / fpsValues.length : 0,
                 mainP10Fps: percentile(fpsValues, 0.1),
                 mainP50Fps: percentile(fpsValues, 0.5),
@@ -7788,6 +7792,8 @@ class RendererLabApp {
             const compactPhases = Object.fromEntries(Object.entries(report.phases).map(([phase, stats]) => [
                 phase,
                 {
+                    hiddenSamples: stats.hiddenSamples,
+                    unfocusedSamples: stats.unfocusedSamples,
                     mainAvgFps: stats.mainAvgFps,
                     mainMinFps: stats.mainMinFps,
                     mainP95FrameMs: stats.mainP95FrameMs,

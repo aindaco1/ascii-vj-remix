@@ -569,7 +569,7 @@ async function openNativeSurfaceOutput(payload, options = {}) {
             ).catch(() => {});
         }
         void recordTauriMediaDiagnostic(
-            `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} reason=${result?.reason || ''}`
+            `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} elapsedMs=${nativeOpenCommandMs} reason=${result?.reason || ''}`
         ).catch(() => {});
         if (!result?.opened) return false;
         outputBackend = 'native';
