@@ -8,10 +8,10 @@ import worker from '../src/index.js';
 const report = patch => ({ ...structuredClone(fixture), id: crypto.randomUUID(), ...(patch?.events?.length === 0 ? { evidenceIndex: null } : {}), ...patch });
 const request = r => new Request('https://internal/report', { method: 'POST', body: JSON.stringify(r) });
 function context() {
-  const data = new Map();
+  const data = new Map(); let alarm = null;
   return { storage: { get: async key => structuredClone(data.get(key)), put: async (k,v) => data.set(k,structuredClone(v)),
     list: async ({prefix}) => new Map([...data].filter(([k])=>k.startsWith(prefix))),
-    delete: async keys => (Array.isArray(keys)?keys:[keys]).forEach(k=>data.delete(k)), setAlarm: async()=>{} }, data };
+    delete: async keys => (Array.isArray(keys)?keys:[keys]).forEach(k=>data.delete(k)), getAlarm: async()=>alarm, setAlarm: async value=>{alarm=value;} }, data };
 }
 function namespace(make) { const objects = new Map(); return { idFromName: n=>n, get: n=>{ if (!objects.has(n)) objects.set(n,make(n)); return objects.get(n); } }; }
 
@@ -88,9 +88,11 @@ test('group receipt survives the legacy 1000-entry limit and expires after 30 da
   const ctx = context(); let count = 0;
   const group = new FineMeNotReportGroup(ctx, {}, async () => ({ action: 'updated', issueNumber: ++count }));
   const first = report(); await group.fetch(request(first));
+  const firstAlarm = await ctx.storage.getAlarm();
   for (let i = 0; i < 1001; i++) await group.fetch(request(report()));
   const retry = await (await group.fetch(request(first))).json();
   assert.equal(retry.action, 'duplicate'); assert.equal(retry.issueNumber, 1); assert.equal(count, 1002);
+  assert.equal(await ctx.storage.getAlarm(), firstAlarm, 'ongoing reports must not postpone receipt cleanup');
   const receipt = ctx.data.get(`receipt:${first.id}`); receipt.expires = Date.now() - 1;
   await group.alarm(); assert.equal(ctx.data.has(`receipt:${first.id}`), false);
 });
