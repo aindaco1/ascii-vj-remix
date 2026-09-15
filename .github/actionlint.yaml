@@ -1,0 +1,6 @@
+# The hosted Xcode 27 label is newer than actionlint's runner catalog.
+# This lane provides compiler/SDK evidence; physical macOS 27 acceptance is separate.
+paths:
+  .github/workflows/desktop.yml:
+    ignore:
+      - 'label "xcode-27" is unknown'
