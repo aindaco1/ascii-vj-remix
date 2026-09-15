@@ -36,7 +36,9 @@ jobs:
           swift --version
           xcrun --show-sdk-version
           if [[ "${{ matrix.os }}" == "xcode-27" ]]; then
-            xcodebuild -version | head -n 1 | grep -E '^Xcode 27([. ]|$)'
+            xcode_version="$(xcodebuild -version)"
+            xcode_first_line="${xcode_version%%$'\n'*}"
+            [[ "$xcode_first_line" == "Xcode 27" || "$xcode_first_line" == "Xcode 27."* || "$xcode_first_line" == "Xcode 27 "* ]]
           fi
 
       - name: Install Linux Tauri prerequisites
