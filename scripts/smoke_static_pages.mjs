@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { StaticSmokeDiagnostics } from './lib/static_smoke_diagnostics.mjs';
 import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
+import { PALETTE_CONTRACT, fillPaletteDisplay } from '../renderers/shared/palette-cycling.js';
 import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -445,6 +446,41 @@ async function runSmoke() {
     });
     if (JSON.stringify(userPresetSections) !== JSON.stringify(['Amber User', 'Zebra User'])) {
       throw new Error(`My Presets should sort independently: ${JSON.stringify(userPresetSections)}`);
+    }
+
+    const cycleRoundTrip = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const previous = app.userPresets;
+      const originalPrompt = window.prompt;
+      const originalAlert = window.alert;
+      let error = '';
+      try {
+        app.userPresets = [{ id: 'user-cycle', name: 'Cycle Round Trip', params: {
+          paletteId: 'tidal-glass', paletteCycleMode: 'blend', paletteCycleSpeed: -1.5,
+          paletteCycleAmount: 0.6, solidMode: true, glyphMode: false,
+          mediaUrl: 'media/demo.svg', paletteCycleClockMs: 123,
+          paletteCycleTransport: { anchorMs: 123, position: 99, toRate: -1.5 }
+        }}];
+        const exported = app._sanitizedUserPresets();
+        window.prompt = () => JSON.stringify({ presets: exported });
+        window.alert = message => { error = message; };
+        app._importPresets();
+        return { exported: exported[0].params, imported: app.userPresets[0].params, error,
+          midi: app.midiTargetDescriptors().map(target => target.id) };
+      } finally {
+        window.prompt = originalPrompt;
+        window.alert = originalAlert;
+        app.userPresets = previous;
+        app._persistPresets();
+        app._renderPresets();
+      }
+    });
+    if (cycleRoundTrip.error || JSON.stringify(cycleRoundTrip.exported) !== JSON.stringify(cycleRoundTrip.imported) ||
+        cycleRoundTrip.imported.paletteCycleSpeed !== -1.5 || cycleRoundTrip.imported.paletteCycleAmount !== 0.6 ||
+        cycleRoundTrip.imported.paletteCycleMode !== 'blend' || !cycleRoundTrip.imported.solidMode ||
+        ['mediaUrl', 'paletteCycleTransport', 'paletteCycleClockMs'].some(key => key in cycleRoundTrip.exported) ||
+        !['paletteCycleMode', 'paletteCycleSpeed', 'paletteCycleAmount'].every(key => cycleRoundTrip.midi.includes(`visual.${key}`))) {
+      throw new Error(`Cycle presets must round-trip through the existing import/export and MIDI contracts: ${JSON.stringify(cycleRoundTrip)}`);
     }
 
     await page.locator('#more-presets').click();
@@ -1448,7 +1484,7 @@ async function runSmoke() {
           // These looks must keep moving on a still image without audio or a
           // preset transition. Observe normal animation ticks, not forced ones.
           let animation = null;
-          if (['ascii-world-mint', 'ascii-city-nightshift'].includes(preset.id)) {
+          if (preset.id.startsWith('cycle-') || ['ascii-world-mint', 'ascii-city-nightshift'].includes(preset.id)) {
             const firstFrame = renderer.frameCount;
             await new Promise((resolve) => setTimeout(resolve, 500));
             const next = await new Promise((resolve) => requestAnimationFrame(() => resolve(readPixels())));
@@ -1529,6 +1565,14 @@ async function runSmoke() {
       ...PALETTES.flatMap(({ id }) => [[id, 'nearest'], [id, 'luminance']])
     ].map(([id, mapping]) => ({ id, mapping,
       expected: paletteSwatches.map(color => mapColorToPalette(color, id, mapping, buildPaletteLut(id, mapping))) }));
+    for (const palette of PALETTES.filter(p => p.cycleRanges.length)) {
+      for (const mode of ['classic', 'blend']) for (const time of [-2.5, 0, 1.25, 30]) {
+        const display = new Float32Array(PALETTE_CONTRACT.maxColors * 4);
+        fillPaletteDisplay(display, palette, {paletteCycleMode: mode, paletteCycleAmount: 1}, time);
+        paletteCases.push({id: palette.id, mapping: 'nearest', mode, time,
+          expected: paletteSwatches.map(color => mapColorToPalette(color, palette.id, 'nearest', buildPaletteLut(palette.id), display).slice(0, 3))});
+      }
+    }
     await page.evaluate(async ({ swatches, cases }) => {
       const app = window.ascilineRemix;
       app.stop();
@@ -1547,7 +1591,7 @@ async function runSmoke() {
         saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
         solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
-        paletteMapping: cases[0].mapping, ditherMode: 'none' };
+        paletteMapping: cases[0].mapping, paletteCycleMode: 'off', ditherMode: 'none' };
       try {
         await app.start();
         const renderer = app.staticRuntime.renderer;
@@ -1559,7 +1603,13 @@ async function runSmoke() {
             renderer.paletteMapping = test.mapping;
             renderer.syncFeatureResources();
           }
+          renderer.paletteCycleMode = test.mode || 'off';
+          renderer.paletteCycleAmount = 1;
+          renderer.paletteCycleTransport = {anchorMs: 0, position: test.time || 0, fromRate: 0, toRate: 0, durationMs: 0};
+          const lutUpdates = renderer.paletteLutUpdates;
           renderer.renderFrame();
+          renderer.renderFrame();
+          if (renderer.paletteLutUpdates !== lutUpdates) throw new Error('Cycling rebuilt the fixed lookup table');
           const pixels = new Uint8Array(96 * 48 * 4);
           gl.readPixels(0, 0, 96, 48, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
           test.expected.forEach((color, column) => {

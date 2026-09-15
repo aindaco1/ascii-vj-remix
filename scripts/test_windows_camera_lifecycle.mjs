@@ -123,3 +123,64 @@ preview.source.isNativeOutputPreview = false;
 syncNativePreviewGeometry(preview, acid);
 assert.equal(textures, 3, 'ordinary media renderers are untouched');
 console.log('Native preview geometry resize and preset regression passed.');
+
+// Initial enumeration selects a default camera ID. Capture must not open under
+// the empty/default key while that ID is still being assigned (issue-prone on
+// Windows where native Pop Out reuses the same selected camera identity).
+const initStart = appSource.indexOf('    async init() {', appSource.indexOf('class RendererLabApp'));
+const initMethod = appSource.slice(initStart, appSource.indexOf('    _startWebViewKeepalive()', initStart));
+const Startup = new Function('isTauriUpdaterAvailable', 'isTauriRuntime', 'els', 'isCameraParams',
+  `return class { ${initMethod} }`)(async () => false, () => false, {}, (params) => params.mediaType === 'camera');
+for (const mediaType of ['camera', 'image', 'video']) {
+  let finishEnumeration;
+  const cameraReady = new Promise((resolve) => { finishEnumeration = resolve; });
+  const unrelatedDevice = new Promise(() => {});
+  const started = [];
+  const startup = new Startup();
+  Object.assign(startup, {
+    params: { mediaType, cameraDeviceId: '' },
+    desktopUpdater: { setAvailable() {}, checkOnLaunch() {} },
+    midiRuntime: { init: () => unrelatedDevice },
+    _initCrashReporter: async () => {},
+    _refreshOutputDisplays: () => unrelatedDevice,
+    _refreshAudioInputDevices: () => unrelatedDevice,
+    _refreshCameraDevices: async () => { await cameraReady; startup.params.cameraDeviceId = 'usb-camera'; },
+    _autoStart() { started.push({ ...this.params }); },
+    _autoStartAudioReactive() { throw new Error('Audio must wait for its device list'); }
+  });
+  for (const name of ['_startWebViewKeepalive', '_bindTauriSmokeEvents', '_restoreCustomSource', '_buildControls',
+    '_buildAudioReactiveControls', '_bindEvents', '_renderSourceList', '_renderPresets', '_syncInputs',
+    '_applyVisualState', 'updateMeters', '_startMeterTimer', 'setConnection', '_syncDesktopUpdateUi', '_warmBuiltInMedia']) {
+    startup[name] = () => {};
+  }
+  const initializing = startup.init();
+  await new Promise(setImmediate);
+  assert.equal(started.length, mediaType === 'camera' ? 0 : 1,
+    'Only camera startup must wait for camera identity discovery');
+  finishEnumeration();
+  await initializing;
+  assert.equal(started.length, 1);
+  if (mediaType === 'camera') assert.equal(started[0].cameraDeviceId, 'usb-camera');
+}
+console.log('Camera startup identity and independent media startup ordering passed.');
+
+// A newly opened or covered WebView may not deliver animation frames yet.
+// Startup must use the existing responsive scheduler's bounded timer fallback.
+const schedulerMethod = appSource.slice(appSource.indexOf('function scheduleResponsiveFrame('), appSource.indexOf('function crossfadeOut('));
+const autoStartMethod = appSource.slice(appSource.indexOf('    _autoStart() {'), appSource.indexOf('    _warmBuiltInMedia() {'));
+const pendingTimers = [];
+const AutoStartup = new Function('requestAnimationFrame', 'cancelAnimationFrame', 'window', 'document', 'performance', 'RESPONSIVE_FRAME_MS',
+  `${schedulerMethod} return class { ${autoStartMethod} }`)(
+  () => 1, () => {}, { setTimeout: (callback) => { pendingTimers.push(callback); return 1; }, clearTimeout() {} },
+  { readyState: 'complete' }, { now: () => 0 }, 16
+);
+const hiddenStartup = new AutoStartup();
+let automaticStarts = 0;
+hiddenStartup.start = async () => { automaticStarts++; hiddenStartup.running = true; };
+hiddenStartup._autoStart();
+assert.equal(automaticStarts, 0);
+assert.equal(pendingTimers.length, 1, 'a missing animation frame must not leave automatic startup dormant');
+pendingTimers.shift()();
+await new Promise(setImmediate);
+assert.equal(automaticStarts, 1);
+console.log('Covered-window automatic startup fallback passed.');

@@ -533,117 +533,65 @@ fn spawn_native_output_smoke(app: &App) {
     let media_url = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_MEDIA")
         .unwrap_or_else(|_| "media/point-click-test-30s.mp4".to_string());
     let delay_ms = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_DELAY_MS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(750);
+        .ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(750);
     let duration_ms = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_DURATION_MS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(7000);
+        .ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(7000);
+    let reopen = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_REOPEN").as_deref() != Ok("0");
+    let (sender, receiver) = mpsc::channel();
+    let listener = handle.listen("asciline-native-output-first-present", move |_| {
+        let _ = sender.send(());
+    });
 
     tauri::async_runtime::spawn(async move {
         let start = Instant::now();
         thread::sleep(Duration::from_millis(delay_ms));
-        let result =
-            crate::native_output::open_native_output_smoke(handle.clone(), &state, &media_url)
-                .await;
-
-        match result {
-            Ok(output) if output.opened => {
-                let reactive = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_REACTIVE")
-                    .map(|value| value != "0")
-                    .unwrap_or(true);
-                if reactive {
+        let mut opens = Vec::new();
+        let result: Result<String, String> = async {
+            let receiver = receiver;
+            let mut backend = String::new();
+            for pass in 0..if reopen { 2 } else { 1 } {
+                let opening = Instant::now();
+                let output = crate::native_output::open_native_output_smoke(handle.clone(), &state, &media_url).await?;
+                if !output.opened { return Err(output.reason.unwrap_or_else(|| "native output did not open".to_string())); }
+                let command_ms = opening.elapsed().as_millis();
+                receiver.recv_timeout(Duration::from_secs(20))
+                    .map_err(|_| format!("native output pass {pass} produced no GPU presentation"))?;
+                opens.push(json!({"pass": pass, "commandMs": command_ms, "firstPresentMs": opening.elapsed().as_millis()}));
+                backend = output.backend;
+                if pass == 0 {
+                    let reactive = env::var("ASCILINE_NATIVE_OUTPUT_SMOKE_REACTIVE").as_deref() != Ok("0");
                     let deadline = Instant::now() + Duration::from_millis(duration_ms);
                     let mut step = 0u64;
                     while Instant::now() < deadline {
-                        let _ = crate::native_output::update_native_output_smoke_params(
-                            handle.clone(),
-                            &state,
-                            &media_url,
-                            step,
-                        )
-                        .await;
+                        if reactive {
+                            let update = crate::native_output::update_native_output_smoke_params(handle.clone(), &state, &media_url, step).await?;
+                            if !update.opened { return Err("native output rejected a live parameter update".to_string()); }
+                        }
                         step = step.wrapping_add(1);
                         thread::sleep(Duration::from_millis(16));
                     }
-                } else {
-                    thread::sleep(Duration::from_millis(duration_ms));
+                    if reopen {
+                        // Exercise the same close watcher and worker teardown as the user.
+                        let window = handle.get_window("native-output").ok_or("native output window disappeared")?;
+                        window.close().map_err(|error| error.to_string())?;
+                        let deadline = Instant::now() + Duration::from_secs(5);
+                        while handle.get_window("native-output").is_some() {
+                            if Instant::now() >= deadline { return Err("native output close timed out".to_string()); }
+                            thread::sleep(Duration::from_millis(16));
+                        }
+                    }
                 }
-                finish(
-                    SmokeReport {
-                        ok: true,
-                        kind: "native-output".to_string(),
-                        mode: "perf".to_string(),
-                        package_version,
-                        expected_version: None,
-                        found_update: false,
-                        update_version: None,
-                        current_version: None,
-                        target: None,
-                        download_url: None,
-                        downloaded_bytes: None,
-                        install_started: false,
-                        install_finished: false,
-                        forced_update: false,
-                        forced_from_version: None,
-                        backend: Some(output.backend),
-                        media_url: Some(media_url),
-                        elapsed_ms: start.elapsed().as_millis(),
-                        error: None,
-                    },
-                    0,
-                );
             }
-            Ok(output) => finish(
-                SmokeReport {
-                    ok: false,
-                    kind: "native-output".to_string(),
-                    mode: "perf".to_string(),
-                    package_version,
-                    expected_version: None,
-                    found_update: false,
-                    update_version: None,
-                    current_version: None,
-                    target: None,
-                    download_url: None,
-                    downloaded_bytes: None,
-                    install_started: false,
-                    install_finished: false,
-                    forced_update: false,
-                    forced_from_version: None,
-                    backend: Some(output.backend),
-                    media_url: Some(media_url),
-                    elapsed_ms: start.elapsed().as_millis(),
-                    error: output.reason,
-                },
-                1,
-            ),
-            Err(error) => finish(
-                SmokeReport {
-                    ok: false,
-                    kind: "native-output".to_string(),
-                    mode: "perf".to_string(),
-                    package_version,
-                    expected_version: None,
-                    found_update: false,
-                    update_version: None,
-                    current_version: None,
-                    target: None,
-                    download_url: None,
-                    downloaded_bytes: None,
-                    install_started: false,
-                    install_finished: false,
-                    forced_update: false,
-                    forced_from_version: None,
-                    backend: None,
-                    media_url: Some(media_url),
-                    elapsed_ms: start.elapsed().as_millis(),
-                    error: Some(error),
-                },
-                1,
-            ),
-        }
+            Ok(backend)
+        }.await;
+        handle.unlisten(listener);
+        let ok = result.is_ok();
+        let (backend, error) = match result { Ok(backend) => (Some(backend), None), Err(error) => (None, Some(error)) };
+        finish(json!({
+            "ok": ok, "kind": "native-output", "mode": "perf", "package_version": package_version,
+            "backend": backend, "media_url": media_url, "opens": opens,
+            "elapsed_ms": start.elapsed().as_millis(), "error": error
+        }), if ok { 0 } else { 1 });
     });
 }
 
@@ -689,6 +637,10 @@ fn spawn_ui_perf_smoke(app: &App) {
         .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
+    let (sender, receiver) = mpsc::channel();
+    let listener_id = handle.listen("asciline-ui-perf-smoke-result", move |event| {
+        let _ = sender.send(event.payload().to_string());
+    });
     thread::spawn(move || {
         let start = Instant::now();
         if let Some(main_window) = handle.get_webview_window("main") {
@@ -714,12 +666,14 @@ fn spawn_ui_perf_smoke(app: &App) {
             let _ = handle.emit_to("main", "asciline-ui-perf-smoke", payload.clone());
             thread::sleep(Duration::from_millis(250));
         }
-        // Allow source startup, Pop Out creation, backend rebuilds, and a loaded
-        // machine to finish reporting before the CI-smoke process exits.
-        thread::sleep(Duration::from_millis(duration_ms + 15_000));
+        // Completion comes from the measured UI, never a successful timer.
+        let result = receiver.recv_timeout(Duration::from_millis(duration_ms + 120_000))
+            .ok().and_then(|payload| serde_json::from_str::<serde_json::Value>(&payload).ok());
+        handle.unlisten(listener_id);
+        let ok = result.as_ref().and_then(|value| value["ok"].as_bool()).unwrap_or(false);
         finish(
             SmokeReport {
-                ok: true,
+                ok,
                 kind: "ui-perf".to_string(),
                 mode: "perf".to_string(),
                 package_version,
@@ -737,9 +691,9 @@ fn spawn_ui_perf_smoke(app: &App) {
                 backend: None,
                 media_url: Some(media_url),
                 elapsed_ms: start.elapsed().as_millis(),
-                error: None,
+                error: (!ok).then(|| if result.is_none() { "UI performance report timed out" } else { "UI performance criteria failed" }.to_string()),
             },
-            0,
+            if ok { 0 } else { 1 },
         );
     });
 }

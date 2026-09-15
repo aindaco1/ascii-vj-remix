@@ -1,6 +1,9 @@
-const PALETTE_LUT_EDGE = 32;
+import { PALETTE_CONTRACT, validateCycleRanges } from './palette-cycling.js';
+import { CYCLING_PALETTE_DEFINITIONS } from './cycling-palettes.js';
+
+const PALETTE_LUT_EDGE = PALETTE_CONTRACT.lutEdge;
 const PALETTE_LUT_SIZE = PALETTE_LUT_EDGE ** 3;
-const MAX_PALETTE_COLORS = 16;
+const MAX_PALETTE_COLORS = PALETTE_CONTRACT.maxColors;
 
 const RAW_PALETTES = [
     ['signal-court', 'Signal Court', [[28, 24, 20], [46, 38, 28], [72, 58, 40], [60, 96, 72], [150, 44, 38], [190, 70, 48], [40, 52, 110], [60, 84, 170], [176, 140, 60], [206, 170, 72], [220, 202, 160], [240, 232, 210]]],
@@ -26,14 +29,15 @@ function luma(color) {
     return color[0] * 0.2126 + color[1] * 0.7152 + color[2] * 0.0722;
 }
 
-const PALETTES = Object.freeze(RAW_PALETTES.map(([id, label, colors]) => {
+const PALETTES = Object.freeze([...RAW_PALETTES, ...CYCLING_PALETTE_DEFINITIONS.map(({ id, label, colors, cycleRanges }) => [id, label, colors, cycleRanges])].map(([id, label, colors, ranges = []]) => {
+    if (colors.length > MAX_PALETTE_COLORS) throw new Error(`Palette ${id} exceeds capacity`);
     const frozenColors = Object.freeze(colors.map((color) => Object.freeze([...color])));
     const luminanceOrder = Object.freeze(
         frozenColors.map((color, index) => ({ color, index }))
             .sort((a, b) => luma(a.color) - luma(b.color) || a.index - b.index)
             .map(({ index }) => index)
     );
-    return Object.freeze({ id, label, colors: frozenColors, luminanceOrder });
+    return Object.freeze({ id, label, colors: frozenColors, luminanceOrder, cycleRanges: validateCycleRanges(ranges, colors.length) });
 }));
 
 const PALETTE_BY_ID = new Map(PALETTES.map((palette) => [palette.id, palette]));
@@ -152,26 +156,43 @@ function buildPaletteLut(paletteId, mapping = 'nearest') {
     return lut;
 }
 
+// Immutable catalog keys only; 16 tables cap shared retention at 512 KiB.
+// Consumers must treat the returned typed array as read-only.
+const lutCache = new Map();
+function getPaletteLut(paletteId, mapping = 'nearest') {
+    if (!paletteById(paletteId)) return null;
+    mapping = mapping === 'luminance' ? 'luminance' : 'nearest';
+    const key = `${paletteId}:${mapping}`;
+    let lut = lutCache.get(key);
+    if (lut) lutCache.delete(key);
+    else lut = buildPaletteLut(paletteId, mapping);
+    lutCache.set(key, lut);
+    if (lutCache.size > 16) lutCache.delete(lutCache.keys().next().value);
+    return lut;
+}
+
 function paletteLutIndex(color) {
     return ((clampByte(color[0]) >> 3) << 10) |
         ((clampByte(color[1]) >> 3) << 5) |
         (clampByte(color[2]) >> 3);
 }
 
-function mapColorToPalette(color, paletteId, mapping = 'nearest', lut = null) {
+function mapColorToPalette(color, paletteId, mapping = 'nearest', lut = null, display = null) {
     const palette = paletteById(paletteId);
     if (!palette) return color.map(clampByte);
     const index = lut?.length === PALETTE_LUT_SIZE
         ? lut[paletteLutIndex(color)]
         : mappedPaletteIndex(color, palette, mapping);
-    return [...palette.colors[Math.min(index, palette.colors.length - 1)]];
+    const slot = Math.min(index, palette.colors.length - 1);
+    if (display) return [clampByte(display[slot * 4] * 255), clampByte(display[slot * 4 + 1] * 255), clampByte(display[slot * 4 + 2] * 255), display[slot * 4 + 3] * 255];
+    return [...palette.colors[slot]];
 }
 
-function processPaletteDither(color, x, y, params = {}, lut = null) {
+function processPaletteDither(color, x, y, params = {}, lut = null, display = null) {
     const adjusted = params.ditherMode === 'none'
         ? color.map(clampByte)
         : ditheredColor(color, x, y, params);
-    return mapColorToPalette(adjusted, params.paletteId, params.paletteMapping, lut);
+    return mapColorToPalette(adjusted, params.paletteId, params.paletteMapping, lut, display);
 }
 
 export {
@@ -186,6 +207,7 @@ export {
     PALETTE_LUT_SIZE,
     PALETTE_OPTIONS,
     buildPaletteLut,
+    getPaletteLut,
     ditheredColor,
     mapColorToPalette,
     orderedDitherThreshold,

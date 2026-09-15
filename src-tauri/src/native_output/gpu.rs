@@ -1,3 +1,4 @@
+use super::palette;
 use super::{
     native_glyph_atlas_page_bytes, native_glyph_ramp_ids, native_grid_dimensions,
     native_render_uses_glyphs, native_dither_matrix, native_palette_index,
@@ -8,18 +9,19 @@ use super::{
     NATIVE_GLYPH_TILE_HEIGHT, NATIVE_GLYPH_TILE_WIDTH,
 };
 use std::borrow::Cow;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::sync::{Arc, Mutex, OnceLock, atomic::{AtomicBool, Ordering}};
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
 #[cfg(not(target_os = "macos"))]
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::hash::{Hash, Hasher};
-use tauri::{PhysicalSize, Window};
+use tauri::{Emitter, PhysicalSize, Window};
 
 const PALETTE_LUT_EDGE: usize = 32;
 const PALETTE_LUT_SIZE: usize = PALETTE_LUT_EDGE * PALETTE_LUT_EDGE * PALETTE_LUT_EDGE;
-const FEATURE_BUFFER_SIZE: usize = 16 * 16 + 64 * std::mem::size_of::<f32>();
+fn feature_buffer_size() -> usize { palette::CONTRACT.max_colors * 16 + 64 * std::mem::size_of::<f32>() }
 
 fn preferred_surface_format(formats: &[wgpu::TextureFormat]) -> Option<wgpu::TextureFormat> {
     [
@@ -60,7 +62,7 @@ struct Params {
 };
 
 struct FeatureData {
-    paletteColors: array<vec4<f32>, 16>,
+    paletteColors: array<vec4<f32>, __PALETTE_CAPACITY__>,
     ditherValues: array<f32, 64>,
 };
 
@@ -70,44 +72,7 @@ struct FeatureData {
 @group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
-fn hash(p: vec2<f32>) -> f32 {
-    var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-    p3 += dot(p3, vec3<f32>(p3.y + 33.33, p3.z + 33.33, p3.x + 33.33));
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-fn processColor(c: vec3<f32>, cx: u32, cy: u32) -> vec3<f32> {
-    let avg = (c.r + c.g + c.b) * 0.333333333;
-    var outColor = vec3<f32>(
-        clamp(avg + (c.r - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.g - avg) * params.saturationBoost, 0.0, 1.0),
-        clamp(avg + (c.b - avg) * params.saturationBoost, 0.0, 1.0)
-    );
-    outColor = clamp((outColor - vec3<f32>(0.5)) * params.contrastBoost + vec3<f32>(0.5), vec3<f32>(0.0), vec3<f32>(1.0));
-    outColor = clamp(pow(outColor * params.brightness, vec3<f32>(1.0 / max(0.01, params.gamma))), vec3<f32>(0.0), vec3<f32>(1.0));
-    if (params.quantizeBits > 0u) {
-        let quantum = pow(2.0, f32(params.quantizeBits));
-        outColor = floor(outColor * 255.0 / quantum) * quantum / 255.0;
-    }
-    var result = mix(outColor, vec3<f32>(3.0 / 255.0, 4.0 / 255.0, 5.0 / 255.0), clamp(params.bgBlend, 0.0, 1.0));
-    if (params.ditherSize > 0u) {
-        let scale = max(1u, params.ditherScale);
-        let mx = (cx / scale) % params.ditherSize;
-        let my = (cy / scale) % params.ditherSize;
-        var threshold = features.ditherValues[my * params.ditherSize + mx];
-        if (params.ditherInvert != 0u) { threshold = -threshold; }
-        let delta = threshold * params.ditherStrength * (64.0 / 255.0) + params.ditherBias * (32.0 / 255.0);
-        result = clamp(result + vec3<f32>(delta), vec3<f32>(0.0), vec3<f32>(1.0));
-    }
-    if (params.paletteCount > 0u) {
-        let q = vec3<u32>(clamp(floor(result * 255.0 / 8.0), vec3<f32>(0.0), vec3<f32>(31.0)));
-        let lutIndex = (q.r << 10u) | (q.g << 5u) | q.b;
-        let paletteIndex = min(paletteLut[lutIndex], params.paletteCount - 1u);
-        result = features.paletteColors[paletteIndex].rgb;
-    }
-    return result;
-}
-
+__CELL_COLOR__
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx = gid.x;
@@ -129,8 +94,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
     let processed = processColor(c.rgb, cx, cy);
-    let luma = dot(processed, vec3<f32>(0.2126, 0.7152, 0.0722));
-    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), vec4<f32>(processed, luma));
+    textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), processed);
 }
 "#;
 
@@ -313,6 +277,8 @@ impl Drop for NativeMetalView {
 }
 
 pub(super) struct NativeGpuPresenter {
+    ready_at: Instant,
+    first_frame_presented: bool,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -324,6 +290,9 @@ pub(super) struct NativeGpuPresenter {
     palette_lut_buffer: wgpu::Buffer,
     feature_buffer: wgpu::Buffer,
     feature_key: u64,
+    feature_data: Vec<u8>,
+    palette_display: Vec<f32>,
+    dither_key: String,
     glyph_key: u64,
     glyph_ramp_len: u32,
     source_texture: Option<wgpu::Texture>,
@@ -371,53 +340,49 @@ fn source_frame_needs_upload(
     source_frame_version.is_none() || uploaded_source_version != source_frame_version
 }
 
-impl NativeGpuPresenter {
-    #[cfg(not(target_os = "macos"))]
-    pub(super) fn new(window: &Window) -> Result<Self, String> {
-        let started_at = Instant::now();
-        let (instance, surface) = create_surface_on_main_thread(window)?;
-        let surface_ready_at = Instant::now();
-        let result = Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync);
-        #[cfg(target_os = "windows")]
-        eprintln!("[NativeOutputStartup] phase=gpu-ready surfaceMs={} devicePipelineMs={} totalMs={} ready={}",
-            surface_ready_at.duration_since(started_at).as_millis(), surface_ready_at.elapsed().as_millis(),
-            started_at.elapsed().as_millis(), result.is_ok());
-        #[cfg(not(target_os = "windows"))]
-        let _ = (started_at, surface_ready_at);
-        result
-    }
 
-    #[cfg(target_os = "macos")]
-    pub(super) fn new_with_metal_view_on_current_thread(window: &Window) -> Result<Self, String> {
-        let metal_view = NativeMetalView::install(window)?;
-        let instance = wgpu::Instance::default();
-        let surface = unsafe {
-            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::CoreAnimationLayer(
-                metal_view.layer(),
-            ))
+fn gpu_instance() -> wgpu::Instance {
+    static INSTANCE: OnceLock<wgpu::Instance> = OnceLock::new();
+    INSTANCE.get_or_init(wgpu::Instance::default).clone()
+}
+
+struct SharedGpu {
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    compute_pipeline: wgpu::ComputePipeline,
+    render_module: wgpu::ShaderModule,
+    render_pipelines: Mutex<HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>>,
+    alive: Arc<AtomicBool>,
+}
+
+impl SharedGpu {
+    fn render_pipeline(&self, format: wgpu::TextureFormat) -> Result<wgpu::RenderPipeline, String> {
+        let mut pipelines = self.render_pipelines.lock().map_err(|_| "GPU pipeline cache poisoned")?;
+        if let Some(pipeline) = pipelines.get(&format) { return Ok(pipeline.clone()); }
+        let validation = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let pipeline = make_render_pipeline(&self.device, &self.render_module, format);
+        if let Some(error) = pollster::block_on(validation.pop()) {
+            return Err(format!("native GPU render pipeline unavailable: {error}"));
         }
-        .map_err(|error| format!("native Metal layer surface creation failed: {error}"))?;
-        let mut presenter =
-            Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync)?;
-        presenter.metal_view = Some(metal_view);
-        Ok(presenter)
+        pipelines.insert(format, pipeline.clone());
+        Ok(pipeline)
     }
+}
 
-    fn new_with_surface(
-        window: &Window,
-        instance: wgpu::Instance,
-        surface: wgpu::Surface<'static>,
-        present_mode: wgpu::PresentMode,
-    ) -> Result<Self, String> {
-        let size = window
-            .inner_size()
-            .unwrap_or_else(|_| PhysicalSize::new(DEFAULT_OUTPUT_WIDTH, DEFAULT_OUTPUT_HEIGHT));
-        let width = size.width.max(1);
-        let height = size.height.max(1);
-
+fn shared_gpu(surface: Option<&wgpu::Surface<'_>>) -> Result<Arc<SharedGpu>, String> {
+    static SHARED: OnceLock<Mutex<Option<Arc<SharedGpu>>>> = OnceLock::new();
+    let mut cache = SHARED.get_or_init(|| Mutex::new(None)).lock().map_err(|_| "GPU cache poisoned")?;
+    if let Some(shared) = cache.as_ref().filter(|s| s.alive.load(Ordering::Relaxed) &&
+        surface.is_none_or(|surface| s.adapter.is_surface_supported(surface))) {
+        eprintln!("[NativeOutputStartup] phase=shared-gpu-reused");
+        return Ok(shared.clone());
+    }
+    let started_at = Instant::now();
+    let instance = gpu_instance();
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
+            compatible_surface: surface,
             force_fallback_adapter: false,
         }))
         .map_err(|error| format!("native GPU adapter unavailable: {error}"))?;
@@ -427,19 +392,11 @@ impl NativeGpuPresenter {
         }))
         .map_err(|error| format!("native GPU device unavailable: {error}"))?;
 
-        let mut config = surface
-            .get_default_config(&adapter, width, height)
-            .ok_or_else(|| "native GPU surface is not supported by adapter".to_string())?;
-        let surface_formats = surface.get_capabilities(&adapter).formats;
-        config.format = preferred_surface_format(&surface_formats)
-            .ok_or_else(|| "native GPU surface has no supported color format".to_string())?;
-        config.present_mode = present_mode;
-        config.desired_maximum_frame_latency = 1;
-        configure_surface_checked(&surface, &device, &config)?;
 
+    let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let compute_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ASCILINE native GPU cell pass"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(CELL_PASS_WGSL)),
+            source: wgpu::ShaderSource::Wgsl(Cow::Owned(cell_shader())),
         });
         let render_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ASCILINE native GPU render pass"),
@@ -453,11 +410,30 @@ impl NativeGpuPresenter {
             compilation_options: Default::default(),
             cache: None,
         });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+
+    if let Some(error) = pollster::block_on(validation.pop()) {
+        return Err(format!("native GPU pipeline unavailable: {error}"));
+    }
+    let alive = Arc::new(AtomicBool::new(true));
+    let lost = alive.clone();
+    device.set_device_lost_callback(move |_, _| { lost.store(false, Ordering::Relaxed); });
+    let shared = Arc::new(SharedGpu {adapter, device, queue, compute_pipeline, render_module,
+        render_pipelines: Mutex::new(HashMap::new()), alive});
+    // Both normal presentation formats are tiny immutable objects; retaining
+    // them never retains a window, camera, upload, or pending frame.
+    shared.render_pipeline(wgpu::TextureFormat::Bgra8Unorm)?;
+    shared.render_pipeline(wgpu::TextureFormat::Rgba8Unorm)?;
+    eprintln!("[NativeOutputStartup] phase=shared-gpu-ready totalMs={}", started_at.elapsed().as_millis());
+    *cache = Some(shared.clone());
+    Ok(shared)
+}
+
+fn make_render_pipeline(device: &wgpu::Device, render_module: &wgpu::ShaderModule, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("ASCILINE native GPU render pipeline"),
             layout: None,
             vertex: wgpu::VertexState {
-                module: &render_module,
+                module: render_module,
                 entry_point: Some("vertexMain"),
                 buffers: &[],
                 compilation_options: Default::default(),
@@ -466,10 +442,10 @@ impl NativeGpuPresenter {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             fragment: Some(wgpu::FragmentState {
-                module: &render_module,
+                module: render_module,
                 entry_point: Some("fragmentMain"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -477,7 +453,80 @@ impl NativeGpuPresenter {
             }),
             multiview_mask: None,
             cache: None,
+        })
+}
+
+#[cfg(not(test))]
+pub(super) fn prewarm() {
+    static STARTED: OnceLock<()> = OnceLock::new();
+    STARTED.get_or_init(|| {
+        std::thread::spawn(|| {
+            if let Err(error) = shared_gpu(None) {
+                eprintln!("[NativeOutputStartup] prewarm unavailable: {error}");
+            }
         });
+    });
+}
+
+impl NativeGpuPresenter {
+    #[cfg(not(target_os = "macos"))]
+    pub(super) fn new(window: &Window) -> Result<Self, String> {
+        let started_at = Instant::now();
+        let (instance, surface) = create_surface_on_main_thread(window)?;
+        let surface_ready_at = Instant::now();
+        let result = Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync);
+        eprintln!("[NativeOutputStartup] phase=gpu-ready surfaceMs={} devicePipelineMs={} totalMs={} ready={}",
+            surface_ready_at.duration_since(started_at).as_millis(), surface_ready_at.elapsed().as_millis(),
+            started_at.elapsed().as_millis(), result.is_ok());
+        result
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(super) fn new_with_metal_view_on_current_thread(window: &Window) -> Result<Self, String> {
+        let started_at = Instant::now();
+        let metal_view = NativeMetalView::install(window)?;
+        let instance = gpu_instance();
+        let surface = unsafe {
+            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::CoreAnimationLayer(
+                metal_view.layer(),
+            ))
+        }
+        .map_err(|error| format!("native Metal layer surface creation failed: {error}"))?;
+        let mut presenter =
+            Self::new_with_surface(window, instance, surface, wgpu::PresentMode::AutoNoVsync)?;
+        presenter.metal_view = Some(metal_view);
+        eprintln!("[NativeOutputStartup] phase=gpu-ready totalMs={} ready=true", started_at.elapsed().as_millis());
+        Ok(presenter)
+    }
+
+    fn new_with_surface(
+        window: &Window,
+        _instance: wgpu::Instance,
+        surface: wgpu::Surface<'static>,
+        present_mode: wgpu::PresentMode,
+    ) -> Result<Self, String> {
+        let size = window
+            .inner_size()
+            .unwrap_or_else(|_| PhysicalSize::new(DEFAULT_OUTPUT_WIDTH, DEFAULT_OUTPUT_HEIGHT));
+        let width = size.width.max(1);
+        let height = size.height.max(1);
+
+        let shared = shared_gpu(Some(&surface))?;
+        let adapter = &shared.adapter;
+        let device = shared.device.clone();
+        let queue = shared.queue.clone();
+        let mut config = surface
+            .get_default_config(&adapter, width, height)
+            .ok_or_else(|| "native GPU surface is not supported by adapter".to_string())?;
+        let surface_formats = surface.get_capabilities(&adapter).formats;
+        config.format = preferred_surface_format(&surface_formats)
+            .ok_or_else(|| "native GPU surface has no supported color format".to_string())?;
+        config.present_mode = present_mode;
+        config.desired_maximum_frame_latency = 1;
+        configure_surface_checked(&surface, &device, &config)?;
+
+        let compute_pipeline = shared.compute_pipeline.clone();
+        let render_pipeline = shared.render_pipeline(config.format)?;
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU params"),
             size: 96,
@@ -498,7 +547,7 @@ impl NativeGpuPresenter {
         });
         let feature_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU palette and dither features"),
-            size: FEATURE_BUFFER_SIZE as u64,
+            size: feature_buffer_size() as u64,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -529,6 +578,8 @@ impl NativeGpuPresenter {
         });
 
         Ok(Self {
+            ready_at: Instant::now(),
+            first_frame_presented: false,
             surface,
             device,
             queue,
@@ -540,6 +591,9 @@ impl NativeGpuPresenter {
             palette_lut_buffer,
             feature_buffer,
             feature_key: u64::MAX,
+            feature_data: vec![255; feature_buffer_size()],
+            palette_display: vec![0.0; palette::CONTRACT.max_colors * 4],
+            dither_key: String::new(),
             glyph_key: u64::MAX,
             glyph_ramp_len: 0,
             source_texture: None,
@@ -654,6 +708,13 @@ impl NativeGpuPresenter {
         );
         let present_started_at = Instant::now();
         output.present();
+        if !self.first_frame_presented {
+            self.first_frame_presented = true;
+            if std::env::var_os("ASCILINE_NATIVE_OUTPUT_SMOKE").is_some() {
+                let _ = window.emit("asciline-native-output-first-present", ());
+            }
+            eprintln!("[NativeOutputStartup] phase=first-present afterGpuReadyMs={}", self.ready_at.elapsed().as_millis());
+        }
         let present_ns = duration_ns_u64(present_started_at.elapsed());
         // Reclaim completed queue-write staging resources without blocking the
         // display-link callback. Native wgpu devices are not driven by a browser
@@ -938,20 +999,29 @@ impl NativeGpuPresenter {
 
     fn ensure_feature_resources(&mut self, params: &NativeRenderParams) {
         let key = palette_feature_key(params);
-        if self.feature_key == key {
-            return;
+        if self.feature_key != key {
+            self.feature_key = key;
+            self.queue.write_buffer(&self.palette_lut_buffer, 0, &palette_lut_bytes(params));
         }
-        self.feature_key = key;
-        self.queue.write_buffer(
-            &self.palette_lut_buffer,
-            0,
-            &palette_lut_bytes(params),
-        );
-        self.queue.write_buffer(
-            &self.feature_buffer,
-            0,
-            &palette_dither_feature_bytes(params),
-        );
+        if self.dither_key != params.dither_mode {
+            self.dither_key = params.dither_mode.clone();
+            let bytes = palette_dither_feature_bytes(params);
+            let base = palette::CONTRACT.max_colors * 16;
+            self.queue.write_buffer(&self.feature_buffer, base as u64, &bytes[base..]);
+        }
+        palette::fill_display(&mut self.palette_display, &params.palette_colors, &params.palette_cycle_ranges,
+            &params.palette_cycle_mode, params.palette_cycle_amount, params.palette_cycle_transport.time_at(palette::now_ms()));
+        let mut changed = false;
+        for (i, value) in self.palette_display.iter().enumerate() {
+            let bytes = value.to_le_bytes();
+            if self.feature_data[i * 4..i * 4 + 4] != bytes {
+                self.feature_data[i * 4..i * 4 + 4].copy_from_slice(&bytes);
+                changed = true;
+            }
+        }
+        if changed {
+            self.queue.write_buffer(&self.feature_buffer, 0, &self.feature_data[..palette::CONTRACT.max_colors * 16]);
+        }
     }
 
     fn ensure_glyph_resources(&mut self, params: &NativeRenderParams) {
@@ -1093,18 +1163,11 @@ fn create_surface_on_main_thread(
 ) -> Result<(wgpu::Instance, wgpu::Surface<'static>), String> {
     let (tx, rx) = mpsc::sync_channel(1);
     let window_for_surface = window.clone();
-    // Driver discovery can take seconds on Windows. Do it on the worker and
-    // reuse the instance on subsequent opens, never on the UI message loop.
-    #[cfg(target_os = "windows")]
-    let instance = {
-        static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
-        INSTANCE.get_or_init(wgpu::Instance::default).clone()
-    };
+    // Driver discovery stays on the worker for every platform.
+    let instance = gpu_instance();
     window
         .run_on_main_thread(move || {
             let result = (|| {
-                #[cfg(not(target_os = "windows"))]
-                let instance = wgpu::Instance::default();
                 let surface = instance
                     .create_surface(window_for_surface)
                     .map_err(|error| format!("native GPU surface unavailable: {error}"))?;
@@ -1126,7 +1189,6 @@ fn palette_feature_key(params: &NativeRenderParams) -> u64 {
     params.palette_id.hash(&mut hasher);
     params.palette_mapping.hash(&mut hasher);
     params.palette_colors.hash(&mut hasher);
-    params.dither_mode.hash(&mut hasher);
     hasher.finish()
 }
 
@@ -1143,7 +1205,25 @@ fn glyph_feature_key(params: &NativeRenderParams) -> u64 {
     hasher.finish()
 }
 
-fn palette_lut_bytes(params: &NativeRenderParams) -> Vec<u8> {
+fn palette_lut_bytes(params: &NativeRenderParams) -> Arc<Vec<u8>> {
+    type Entry = (Vec<[u8; 3]>, String, Arc<Vec<u8>>);
+    static CACHE: OnceLock<Mutex<std::collections::VecDeque<Entry>>> = OnceLock::new();
+    let mut cache = CACHE.get_or_init(|| Mutex::new(std::collections::VecDeque::new()))
+        .lock().unwrap_or_else(|error| error.into_inner());
+    if let Some(index) = cache.iter().position(|(colors, mapping, _)|
+        colors == &params.palette_colors && mapping == &params.palette_mapping) {
+        let entry = cache.remove(index).unwrap();
+        let bytes = entry.2.clone();
+        cache.push_back(entry);
+        return bytes;
+    }
+    let bytes = Arc::new(build_palette_lut_bytes(params));
+    cache.push_back((params.palette_colors.clone(), params.palette_mapping.clone(), bytes.clone()));
+    if cache.len() > 16 { cache.pop_front(); }
+    bytes
+}
+
+fn build_palette_lut_bytes(params: &NativeRenderParams) -> Vec<u8> {
     let mut bytes = vec![0; PALETTE_LUT_SIZE * std::mem::size_of::<u32>()];
     if params.palette_colors.is_empty() {
         return bytes;
@@ -1164,20 +1244,20 @@ fn palette_lut_bytes(params: &NativeRenderParams) -> Vec<u8> {
 }
 
 fn palette_dither_feature_bytes(params: &NativeRenderParams) -> Vec<u8> {
-    let mut bytes = vec![0; FEATURE_BUFFER_SIZE];
-    for (index, color) in params.palette_colors.iter().copied().take(16).enumerate() {
+    let mut bytes = vec![0; feature_buffer_size()];
+    for (index, color) in params.palette_colors.iter().copied().take(palette::CONTRACT.max_colors).enumerate() {
         let offset = index * 16;
         put_f32(&mut bytes, offset, f32::from(color[0]) / 255.0);
         put_f32(&mut bytes, offset + 4, f32::from(color[1]) / 255.0);
         put_f32(&mut bytes, offset + 8, f32::from(color[2]) / 255.0);
-        put_f32(&mut bytes, offset + 12, 1.0);
+        put_f32(&mut bytes, offset + 12, ((f64::from(color[0]) * 0.2126 + f64::from(color[1]) * 0.7152 + f64::from(color[2]) * 0.0722) / 255.0) as f32);
     }
     let (size, values) = native_dither_matrix(&params.dither_mode);
     let area = size * size;
     if area > 0 {
         for (index, value) in values.iter().copied().enumerate() {
             let threshold = (f32::from(value) + 0.5) / area as f32 - 0.5;
-            put_f32(&mut bytes, 16 * 16 + index * 4, threshold);
+            put_f32(&mut bytes, palette::CONTRACT.max_colors * 16 + index * 4, threshold);
         }
     }
     bytes
@@ -1213,7 +1293,7 @@ fn cell_params_bytes(
         (frame_index as f64 / params.fps.max(1.0)) as f32,
     );
     put_u32(&mut bytes, 68, u32::from(params.mirror_x));
-    put_u32(&mut bytes, 72, params.palette_colors.len().min(16) as u32);
+    put_u32(&mut bytes, 72, params.palette_colors.len().min(palette::CONTRACT.max_colors) as u32);
     put_u32(&mut bytes, 76, native_dither_matrix(&params.dither_mode).0);
     put_f32(&mut bytes, 80, params.dither_strength as f32);
     put_u32(&mut bytes, 84, params.dither_scale);
@@ -1268,8 +1348,8 @@ mod tests {
 
     #[test]
     fn native_shaders_validate_with_coverage_mip_sampling() {
-        for source in [CELL_PASS_WGSL, RENDER_PASS_WGSL] {
-            let module = wgpu::naga::front::wgsl::parse_str(source)
+        for source in [cell_shader(), RENDER_PASS_WGSL.to_string()] {
+            let module = wgpu::naga::front::wgsl::parse_str(&source)
                 .expect("native WGSL must parse on every build host");
             wgpu::naga::valid::Validator::new(
                 wgpu::naga::valid::ValidationFlags::all(),
@@ -1338,6 +1418,11 @@ mod tests {
             palette_id: "none".to_string(),
             palette_mapping: "nearest".to_string(),
             palette_colors: Vec::new(),
+            palette_luminance_order: Vec::new(),
+            palette_cycle_ranges: Vec::new(),
+            palette_cycle_mode: "off".to_string(),
+            palette_cycle_amount: 1.0,
+            palette_cycle_transport: palette::Transport::default(),
             dither_mode: "none".to_string(),
             dither_strength: 0.45,
             dither_scale: 1,
@@ -1420,4 +1505,9 @@ mod tests {
         );
         assert_eq!(render_bytes.len(), 64);
     }
+}
+
+fn cell_shader() -> String {
+    CELL_PASS_WGSL.replace("__PALETTE_CAPACITY__", &palette::CONTRACT.max_colors.to_string())
+        .replace("__CELL_COLOR__", include_str!("../../../renderers/shared/cell-color.wgsl.js").trim().strip_prefix("export default String.raw`").and_then(|text| text.strip_suffix("`;" )).expect("shared WGSL module envelope"))
 }

@@ -403,9 +403,9 @@ async function listTauriOutputDisplays() {
     return outputDisplaysFromMonitors(monitors);
 }
 
-async function getTauriNativeOutputCapabilities() {
+async function getTauriNativeOutputCapabilities(warmGpu = false) {
     if (!isTauriRuntime()) return { nativeCamera: false, mirror: false };
-    return invokeTauri('get_native_output_capabilities');
+    return invokeTauri('get_native_output_capabilities', { warmGpu });
 }
 
 async function saveTauriScreenshot(pngBytes) {
@@ -569,7 +569,7 @@ async function openNativeSurfaceOutput(payload, options = {}) {
             ).catch(() => {});
         }
         void recordTauriMediaDiagnostic(
-            `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} reason=${result?.reason || ''}`
+            `[TauriOutput] native-open result opened=${Boolean(result?.opened)} backend=${result?.backend || 'unknown'} elapsedMs=${nativeOpenCommandMs} reason=${result?.reason || ''}`
         ).catch(() => {});
         if (!result?.opened) return false;
         outputBackend = 'native';

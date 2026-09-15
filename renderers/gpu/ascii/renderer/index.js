@@ -9,11 +9,16 @@ import { WebGL2Renderer } from './webgl2/webgl2-renderer.js?v=20260618-camera-so
 import { selectRendererBackend } from './backend-policy.js';
 
 let capabilities = null;
+let detection = null;
 
-async function detectCapabilities() {
-    if (capabilities) return capabilities;
+function detectCapabilities() {
+    if (capabilities) return Promise.resolve(capabilities);
+    if (!detection) detection = probeCapabilities().catch(error => { detection = null; throw error; });
+    return detection;
+}
 
-    capabilities = {
+async function probeCapabilities() {
+    const result = {
         webgpu: false,
         webgl2: false,
         cpu: true,
@@ -27,9 +32,9 @@ async function detectCapabilities() {
             if (adapter) {
                 const device = await adapter.requestDevice();
                 if (device) {
-                    capabilities.webgpu = true;
-                    capabilities.webgpuAdapter = adapter;
-                    capabilities.webgpuDevice = device;
+                    result.webgpu = true;
+                    result.webgpuAdapter = adapter;
+                    result.webgpuDevice = device;
                     console.log('[Renderer] WebGPU available');
                 }
             }
@@ -42,14 +47,19 @@ async function detectCapabilities() {
         const canvas = document.createElement('canvas');
         const gl = canvas.getContext('webgl2', { antialias: false });
         if (gl) {
-            capabilities.webgl2 = true;
+            result.webgl2 = true;
             console.log('[Renderer] WebGL2 available');
+            gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
     } catch (e) {
         console.warn('[Renderer] WebGL2 init failed:', e.message);
     }
 
-    return capabilities;
+    capabilities = result;
+    result.webgpuDevice?.lost.then(() => {
+        if (capabilities === result) { capabilities = null; detection = null; }
+    });
+    return result;
 }
 
 /**
@@ -65,6 +75,11 @@ async function detectCapabilities() {
  * @param {number} options.cellHeight
  * @param {string} options.preferredBackend - Force: 'webgpu', 'webgl2', 'cpu'
  */
+async function initializeRenderer(renderer) {
+    try { await renderer.init(); return renderer; }
+    catch (error) { renderer.destroy(); throw error; }
+}
+
 async function createRenderer(options = {}) {
     const caps = await detectCapabilities();
     const backend = selectRendererBackend(caps, options);
@@ -79,13 +94,11 @@ async function createRenderer(options = {}) {
                     device: caps.webgpuDevice,
                     adapter: caps.webgpuAdapter
                 });
-                await renderer.init();
-                return renderer;
+                return await initializeRenderer(renderer);
             }
             case 'webgl2': {
                 const renderer = new WebGL2Renderer(options);
-                renderer.init();
-                return renderer;
+                return await initializeRenderer(renderer);
             }
             case 'cpu':
             default:
@@ -98,8 +111,7 @@ async function createRenderer(options = {}) {
         if (backend === 'webgpu' && caps.webgl2) {
             console.log('[Renderer] Falling back to WebGL2');
             const renderer = new WebGL2Renderer(options);
-            renderer.init();
-            return renderer;
+            return await initializeRenderer(renderer);
         }
 
         throw e;

@@ -83,7 +83,7 @@ git diff --check
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 71 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 79 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -122,7 +122,7 @@ choose another parent directory. These fresh browser contexts contain synthetic
 smoke fixtures; diagnostics do not dump storage, environment variables, or the
 full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
-renderer checks, or the 71/43/28 preset ownership contract.
+renderer checks, or the 79/51/28 preset ownership contract.
 
 ### Renderer Backend Changes
 
@@ -141,6 +141,16 @@ the actual backend; a requested backend that falls back is not evidence for the
 requested backend.
 
 ### Native Output or Pop Out Changes
+
+`smoke:native-output` requires a real GPU presentation, applies live params and
+palette cycling, closes through the normal window watcher, and requires another
+presentation after reopening. Its report separates command response from first
+presentation time. Windows and Linux PR CI run it against the optimized
+development binary after packaging, with the verified bundled FFmpeg sidecars.
+Linux uses Xvfb for a virtual display. This tests the native renderer and window lifecycle;
+the physical camera/display matrix below remains separate. Set
+`ASCILINE_NATIVE_OUTPUT_REPORT_PATH` to retain a JSON report. macOS additionally
+checks display-link pacing with the existing log analyzer.
 
 ```bash
 npm run test:output-display
@@ -286,13 +296,13 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 71 total / 43 accelerated / 28 explicit
+separately requires the centralized 79 total / 51 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 43 accelerated
+physical Windows acceptance must additionally confirm the 51 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 The same smoke renders known color swatches through actual WebGL2 and compares
-them with the shared palette mapper for all 17 palettes in nearest and luminance
+them with the shared palette mapper for all 21 palettes in nearest and luminance
 modes, including startup and live palette changes. It also verifies that palette
 uploads preserve the source-image orientation setting.
 

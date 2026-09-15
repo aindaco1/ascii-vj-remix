@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { forbiddenMacosDependencies } from './lib/ffmpeg_resource_policy.mjs';
+import { forbiddenMacosDependencies, hostPlatformId } from './lib/ffmpeg_resource_policy.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const ffmpegRoot = path.join(root, 'src-tauri', 'resources', 'ffmpeg');
@@ -12,18 +12,6 @@ const requireCurrentPlatform = args.has('--require-current-platform');
 const requireAny = args.has('--require-any') || process.env.ASCILINE_REQUIRE_BUNDLED_FFMPEG === '1';
 const issues = [];
 
-function hostPlatformId() {
-  const os = {
-    darwin: 'macos',
-    win32: 'windows',
-    linux: 'linux'
-  }[process.platform] || process.platform;
-  const arch = {
-    x64: 'x86_64',
-    arm64: 'aarch64'
-  }[process.arch] || process.arch;
-  return `${os}-${arch}`;
-}
 
 async function exists(filePath) {
   try {

@@ -106,6 +106,24 @@ Start with the [install guide](../README.md#install-guide) and
   leans into both extreme and traditional ASCII preset families while avoiding
   pure white or pure black output.
 
+### Pixel Art and Color Cycling
+
+Eight original presets pair solid pixels and glyphs in four palettes: Tidal
+Glass, Ember Grotto, Fern After Rain, and Violet Dusk. They transform the active
+camera, video, or image and preserve its playback. Search a family name in Presets.
+
+In the Color panel, choose a cycling palette and set **Color cycling** to
+Classic (stepped) or Blend (smooth). **Cycle speed** runs from −4× to 4×;
+zero freezes the current phase and negative values reverse it. **Cycle amount**
+blends the moving colors with the fixed palette. Start/Stop pauses and resumes
+cycling. Fixed shadows/highlights and glyph shapes remain stable while the
+selected color ranges move. Older presets default to cycling Off.
+
+These original looks are inspired by [Mark Ferrari](https://www.markferrari.com/image-archives),
+[Living Worlds](https://www.effectgames.com/demos/worlds/), and the
+[Amiga color-cycling examples](https://amiga.lychesis.net/specials/ColorCycling.html).
+They do not include those artists' images or authored scene animations.
+
 ### Audio Reactivity
 
 - Audio reactivity is on by default.

@@ -1,0 +1,6 @@
+{
+  "maxColors": 256,
+  "maxCycleRanges": 8,
+  "lutEdge": 32,
+  "maxSpeed": 4
+}

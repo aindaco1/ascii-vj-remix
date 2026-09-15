@@ -57,7 +57,10 @@ jobs:
             patchelf \
             libssl-dev \
             xz-utils \
-            yasm
+            yasm \
+            dbus-x11 \
+            mesa-vulkan-drivers \
+            xvfb
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -150,3 +153,26 @@ jobs:
             src-tauri/target/release/bundle/rpm/*.rpm
           if-no-files-found: error
           retention-days: 14
+
+      - name: Verify native Pop Out first frame and reopen
+        id: native-smoke
+        if: runner.os != 'macOS' && github.event_name == 'pull_request'
+        timeout-minutes: 3
+        shell: bash
+        env:
+          ASCILINE_NATIVE_OUTPUT_REPORT_PATH: tmp-smoke-native/report.json
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run -a npm run smoke:native-output
+          else
+            npm run smoke:native-output
+          fi
+
+      - name: Upload native Pop Out result
+        if: always() && steps.native-smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ascii-vj-remix-native-smoke-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tmp-smoke-native/
+          if-no-files-found: warn
+          retention-days: 7

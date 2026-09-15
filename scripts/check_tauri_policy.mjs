@@ -433,7 +433,7 @@ const releaseSmoke = await readFile(releaseSmokePath, 'utf8');
 const appSource = await readFile(appPath, 'utf8');
 const smokeBindingIndex = appSource.indexOf('await this._bindTauriSmokeEvents();');
 const updaterAvailabilityIndex = appSource.indexOf('await isTauriUpdaterAvailable()');
-const midiInitIndex = appSource.indexOf('await this.midiRuntime.init()');
+const midiInitIndex = appSource.indexOf('this.midiRuntime.init()');
 if (
   smokeBindingIndex < 0 ||
   updaterAvailabilityIndex < 0 ||

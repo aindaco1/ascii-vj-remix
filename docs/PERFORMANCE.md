@@ -504,3 +504,30 @@ Investigate immediately when:
 
 Prospective benchmark, latency-test, texture-sharing, and performance-dashboard
 work is tracked in the [Roadmap](ROADMAP.md).
+
+## 1.0.4 Resource and Startup Work
+
+The first preview no longer waits for independent MIDI/device enumeration or
+crash-report submission. Renderer capability probing overlaps source loading,
+and concurrent requests share one pending probe. Native GPU warming starts after
+the first preview setup, on a worker, so it does not compete with initial driver
+selection on the UI thread.
+
+WebGPU pipelines compile asynchronously and are shared per device/source kind
+and canvas format. Native output shares a compatible adapter/device/queue and
+immutable pipelines across opens; device loss invalidates that cache, and an
+unsupported surface requests a compatible adapter. Windows surface creation
+still dispatches to its required UI thread. Window/surface, camera, textures,
+uploads and frame buffers remain owned by each presenter and are released on
+close. Existing acquire-before-upload and latest-frame safeguards remain active.
+
+Browser palette lookup reuse is capped at 16 tables (512 KiB); native reuse is
+capped at 16 tables (2 MiB plus small keys). Native luminance order is computed
+once per parameter snapshot, and video startup uses one probe for geometry/FPS.
+Live display-table updates reuse buffers and never rebuild these resources.
+Failed renderer initialization now destroys partial resources, and WebGL2 also
+releases its quad buffer/VAO.
+
+The UI performance smoke now reports actual UI completion/failure with a bounded
+timeout. Timer expiry alone is never a passing measurement. Exact local results
+and platform limitations belong in the [1.0.4 release record](releases/RELEASE_1.0.4.md).

@@ -1,11 +1,42 @@
 # Changelog
 
-## Unreleased — shared relay
+## [1.0.4] - 2026-09-15
 
-- Added a separately gated, explicitly reviewed MKV Magic report adapter with
-  strict metadata-only validation and a fixed GitHub destination. Podcast and
-  MKV adapters share bounded intake, serialized issue aggregation, and retry
-  receipts. The existing ASCII and Podcast client contracts are unchanged.
+### Added
+
+- Eight original pixel/glyph presets in Tidal Glass, Ember Grotto, Fern After
+  Rain, and Violet Dusk, inspired by classic indexed-color game art.
+- Classic and smooth color cycling with signed speed, phase-preserving pause,
+  and amount controls. Camera, video, and still-image sources use the existing
+  renderer and preset workflows across all backends.
+- Shared 256-color/eight-range validation, fixed glyph luminance, native/browser
+  transport synchronization, and golden palette/clock vectors.
+- Recurring Xcode 27 compiler/SDK coverage alongside the stable release lane (#36).
+
+### Performance and Fixes
+
+- Move independent device/optional integration startup off the first-frame path;
+  share capability discovery and compile WebGPU pipelines asynchronously.
+- Warm and reuse native GPU devices/pipelines across Pop Out opens with device
+  loss/surface compatibility checks; preserve Windows single-camera ownership,
+  preview bridge, Linux exclusive capture, and bounded fallback behavior.
+- Cache bounded palette lookups, reuse display buffers, compute native luminance
+  order once per snapshot, and avoid duplicate video probing.
+- Retry failed static external-image uploads through browser-authorized pixel
+  readback, preserve row orientation, and release partially initialized renderer
+  resources (#35). Tainted images remain rejected.
+- Require an actual completion result from native UI performance smokes.
+- Include recent FFmpeg executable-mode restoration, Windows checkout-line-ending
+  tolerance, and CI smoke-failure diagnostics.
+
+### Shared Report Relay
+
+- Include reviewed Podcast Visualizer, MKV Magic, Auto Subtitle, CutNotes and
+  Fine Me Not adapters through the existing bounded intake/aggregation path.
+- Include canonical fingerprinting, safe provider-failure classification,
+  reopening only closed groups, bounded GitHub requests, and retry-receipt
+  retention/cleanup fixes. Relay deployment acceptance is recorded separately
+  from desktop artifacts.
 
 ## [1.0.3] - 2026-09-02
 

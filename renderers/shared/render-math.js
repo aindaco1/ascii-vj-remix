@@ -32,7 +32,7 @@ function applyBasicColorAdjustments(r, g, b, params) {
     return [rr, gg, bb];
 }
 
-function processCanvasColorLegacy(r, g, b, params, x = 0, y = 0, paletteLut = null) {
+function processCanvasColorLegacy(r, g, b, params, x = 0, y = 0, paletteLut = null, paletteDisplay = null) {
     const [rr, gg, bb] = applyBasicColorAdjustments(r, g, b, params);
     let color;
     if ((params?.quantizeBits || 0) > 0) {
@@ -48,7 +48,7 @@ function processCanvasColorLegacy(r, g, b, params, x = 0, y = 0, paletteLut = nu
     if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
         return color;
     }
-    return processPaletteDither(color, x, y, params, paletteLut);
+    return processPaletteDither(color, x, y, params, paletteLut, paletteDisplay);
 }
 
 function processStreamColorLegacy(r, g, b, params) {
@@ -66,7 +66,7 @@ function shaderHash(x, y) {
     return fract((p3x + p3y) * p3z);
 }
 
-function processGpuCellColor(r, g, b, params, x = 0, y = 0, paletteLut = null) {
+function processGpuCellColor(r, g, b, params, x = 0, y = 0, paletteLut = null, paletteDisplay = null) {
     let [rr, gg, bb] = applyBasicColorAdjustments(r, g, b, params);
     const quantizeBits = Math.max(0, Math.round(params?.quantizeBits || 0));
     if (quantizeBits > 0) {
@@ -84,7 +84,7 @@ function processGpuCellColor(r, g, b, params, x = 0, y = 0, paletteLut = null) {
     if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
         return color;
     }
-    return processPaletteDither(color, x, y, params, paletteLut);
+    return processPaletteDither(color, x, y, params, paletteLut, paletteDisplay);
 }
 
 function charsetChars(params) {

@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-15",
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "model": "MacBookPro18,2",
+    "chip": "Apple M1 Max",
+    "memory": "64 GB",
+    "os": "macOS 27.0 (26A428)",
+    "xcode": "27.0 (27A266a)"
+  },
+  "durationMs": 9000,
+  "sampleMs": 500,
+  "source": {
+    "before": "Local pre-optimization build including cycling, still versioned 1.0.3; not the published 1.0.3",
+    "beforeBinarySha256": "7b3284fc8a1388d302d79866f4f647dc61401a9e544027b3ecab8970083b42a5",
+    "after": "ee56700"
+  },
+  "notes": [
+    "Visible run is local regression evidence, not a reference-floor or Windows FPS claim.",
+    "The first two candidate runs were occluded/background throttled. Their failed results are retained; they are excluded from visible-window FPS comparison.",
+    "The visible candidate was raised before measurement using the native UI.",
+    "Native presentation was 60 FPS with zero GPU failures in the visible before and after runs.",
+    "The older baseline did not explicitly wait for initial app/audio initialization; both recorded runs used synthetic audio and the same fixed transition targets."
+  ],
+  "runs": [
+    {
+      "stage": "before",
+      "ok": true,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 480,
+      "syntheticAudio": true,
+      "backend": "auto",
+      "paletteId": "none",
+      "ditherMode": "none",
+      "charset": "point-click",
+      "soak": false,
+      "structuralTransitions": false,
+      "phases": {
+        "main": {
+          "mainAvgFps": 41.292,
+          "mainMinFps": 39.92,
+          "mainP95FrameMs": 25.037,
+          "mainP99FrameMs": 25.047,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 38.975,
+          "mainMinFps": 35.928,
+          "mainP95FrameMs": 27.467,
+          "mainP99FrameMs": 27.76,
+          "nativeOkHz": 49.966
+        },
+        "transition": {
+          "mainAvgFps": 36.512,
+          "mainMinFps": 31.746,
+          "mainP95FrameMs": 30.625,
+          "mainP99FrameMs": 31.325,
+          "nativeOkHz": 3.321
+        }
+      },
+      "actualBackends": [
+        "webgpu"
+      ],
+      "nativeFailed": 0,
+      "nativeTransitionArmed": 5,
+      "nativeTransitionFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 393,
+      "hasVisibleSignal": true,
+      "videoTimeAdvanced": true,
+      "error": null,
+      "sampleCount": 18,
+      "mainAvgFps": 38.92633333333333,
+      "mainMinFps": 31.746,
+      "mainP95FrameMs": 30.625,
+      "mainP99FrameMs": 31.325
+    },
+    {
+      "stage": "after",
+      "ok": true,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 480,
+      "syntheticAudio": true,
+      "backend": "auto",
+      "paletteId": "none",
+      "ditherMode": "none",
+      "charset": "point-click",
+      "soak": false,
+      "structuralTransitions": false,
+      "phases": {
+        "main": {
+          "mainAvgFps": 40.638,
+          "mainMinFps": 38,
+          "mainP95FrameMs": 26.316,
+          "mainP99FrameMs": 26.316,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 39.32,
+          "mainMinFps": 38,
+          "mainP95FrameMs": 26.316,
+          "mainP99FrameMs": 26.316,
+          "nativeOkHz": 49.983
+        },
+        "transition": {
+          "mainAvgFps": 34.558,
+          "mainMinFps": 32,
+          "mainP95FrameMs": 30.805,
+          "mainP99FrameMs": 31.161,
+          "nativeOkHz": 2.992
+        }
+      },
+      "actualBackends": [
+        "webgpu"
+      ],
+      "nativeFailed": 0,
+      "nativeTransitionArmed": 5,
+      "nativeTransitionFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 386,
+      "hasVisibleSignal": true,
+      "videoTimeAdvanced": true,
+      "error": null,
+      "sampleCount": 18,
+      "mainAvgFps": 38.172,
+      "mainMinFps": 32,
+      "mainP95FrameMs": 30.805,
+      "mainP99FrameMs": 31.161
+    },
+    {
+      "stage": "occluded-initial",
+      "ok": false,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 480,
+      "syntheticAudio": true,
+      "backend": "auto",
+      "paletteId": "none",
+      "ditherMode": "none",
+      "charset": "point-click",
+      "soak": false,
+      "structuralTransitions": false,
+      "phases": {
+        "main": {
+          "mainAvgFps": 39.627,
+          "mainMinFps": 35.928,
+          "mainP95FrameMs": 27.138,
+          "mainP99FrameMs": 27.694,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 38.975,
+          "mainMinFps": 35.928,
+          "mainP95FrameMs": 27.819,
+          "mainP99FrameMs": 27.831,
+          "nativeOkHz": 49.966
+        },
+        "transition": {
+          "mainAvgFps": 14.471,
+          "mainMinFps": 0.789,
+          "mainP95FrameMs": 1130.8,
+          "mainP99FrameMs": 1239.76,
+          "nativeOkHz": 1.355
+        }
+      },
+      "actualBackends": [
+        "webgpu"
+      ],
+      "nativeFailed": 0,
+      "nativeTransitionArmed": 3,
+      "nativeTransitionFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 315,
+      "hasVisibleSignal": true,
+      "videoTimeAdvanced": true,
+      "error": null,
+      "sampleCount": 17,
+      "mainAvgFps": 31.024333333333335,
+      "mainMinFps": 0.789,
+      "mainP95FrameMs": 1130.8,
+      "mainP99FrameMs": 1239.76
+    },
+    {
+      "stage": "occluded-retry",
+      "ok": false,
+      "mediaUrl": "media/point-click-test-30s.mp4",
+      "columns": 480,
+      "syntheticAudio": true,
+      "backend": "auto",
+      "paletteId": "none",
+      "ditherMode": "none",
+      "charset": "point-click",
+      "soak": false,
+      "structuralTransitions": false,
+      "phases": {
+        "main": {
+          "mainAvgFps": 0.938,
+          "mainMinFps": 0,
+          "mainP95FrameMs": 1349.7,
+          "mainP99FrameMs": 1425.14,
+          "nativeOkHz": 0
+        },
+        "popout": {
+          "mainAvgFps": 19.003,
+          "mainMinFps": 0,
+          "mainP95FrameMs": 3361,
+          "mainP99FrameMs": 3933,
+          "nativeOkHz": 24.285
+        },
+        "transition": {
+          "mainAvgFps": 0.823,
+          "mainMinFps": 0.71,
+          "mainP95FrameMs": 1385.9,
+          "mainP99FrameMs": 1403.58,
+          "nativeOkHz": 1.172
+        }
+      },
+      "actualBackends": [
+        "webgpu"
+      ],
+      "nativeFailed": 0,
+      "nativeTransitionArmed": 2,
+      "nativeTransitionFailed": 0,
+      "outputDisplayCount": 1,
+      "rendererChanges": 1,
+      "frameResetCount": 0,
+      "finalFrameCount": 99,
+      "hasVisibleSignal": true,
+      "videoTimeAdvanced": true,
+      "error": null,
+      "sampleCount": 14,
+      "mainAvgFps": 6.921333333333333,
+      "mainMinFps": 0,
+      "mainP95FrameMs": 3361,
+      "mainP99FrameMs": 3933
+    }
+  ],
+  "paletteLookup": {
+    "workload": "Tidal Glass 32 colors, nearest mapping, 32-cube LUT",
+    "samples": 9,
+    "rebuildMedianMs": 19.737041,
+    "cachedMedianMs": 0.000129625,
+    "notes": "Node v26.8.2; cached samples each average 1000 lookups. Component microbenchmark only."
+  },
+  "nativeFirstPresentation": {
+    "backend": "native-wgpu-displaylink",
+    "elapsed_ms": 8056,
+    "error": null,
+    "kind": "native-output",
+    "media_url": "media/point-click-test-30s.mp4",
+    "mode": "perf",
+    "ok": true,
+    "opens": [
+      {
+        "commandMs": 0,
+        "firstPresentMs": 189,
+        "pass": 0
+      },
+      {
+        "commandMs": 0,
+        "firstPresentMs": 82,
+        "pass": 1
+      }
+    ],
+    "package_version": "1.0.4",
+    "notes": "Smoke helper counts a GPU presentation, exercises the ordinary close watcher, then waits for a fresh presentation after reopening. Uses bundled video, palette cycling and live parameter updates; not physical scanout or camera timing."
+  },
+  "cleanLaunch": {
+    "method": "macOS Launch Services through desktop:run-local",
+    "backend": "webgpu",
+    "rendererSetupMs": 205,
+    "source": "Demo Image",
+    "version": "1.0.4"
+  },
+  "nativeCi": {
+    "commit": "66b063a6ffb949acdc5d4483c79798837d7112d0",
+    "run": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/34998846438",
+    "linux": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 10067,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 2,
+          "firstPresentMs": 2150,
+          "pass": 0
+        },
+        {
+          "commandMs": 0,
+          "firstPresentMs": 149,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.0.4"
+    },
+    "notes": [
+      "Linux uses an Xvfb virtual display. These are CI regression timings, not physical-camera or reference-hardware performance measurements.",
+      "The legacy command backend label native-softbuffer is not the presentation result; this smoke requires the GPU presenter first-frame event on both opens."
+    ],
+    "windowsEarlier": {
+      "commit": "3597017ff004b471755bb23964ab27b64dd9f52c",
+      "run": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/34996977641",
+      "result": {
+        "backend": "native-softbuffer",
+        "elapsed_ms": 9816,
+        "error": null,
+        "kind": "native-output",
+        "media_url": "media/point-click-test-30s.mp4",
+        "mode": "perf",
+        "ok": true,
+        "opens": [
+          {
+            "commandMs": 0,
+            "firstPresentMs": 1563,
+            "pass": 0
+          },
+          {
+            "commandMs": 0,
+            "firstPresentMs": 472,
+            "pass": 1
+          }
+        ],
+        "package_version": "1.0.4"
+      }
+    }
+  }
+}
