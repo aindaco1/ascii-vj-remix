@@ -145,8 +145,9 @@ requested backend.
 `smoke:native-output` requires a real GPU presentation, applies live params and
 palette cycling, closes through the normal window watcher, and requires another
 presentation after reopening. Its report separates command response from first
-presentation time. Windows PR CI runs it against the optimized development
-binary after packaging. This tests the native renderer and window lifecycle;
+presentation time. Windows and Linux PR CI run it against the optimized
+development binary after packaging, with the verified bundled FFmpeg sidecars.
+Linux uses Xvfb for a virtual display. This tests the native renderer and window lifecycle;
 the physical camera/display matrix below remains separate. Set
 `ASCILINE_NATIVE_OUTPUT_REPORT_PATH` to retain a JSON report. macOS additionally
 checks display-link pacing with the existing log analyzer.

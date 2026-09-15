@@ -6008,10 +6008,12 @@ class RendererLabApp {
         this._buildControls();
         this._buildAudioReactiveControls();
         this._bindEvents();
-        // Device enumeration and optional integrations do not gate the first frame.
+        // Images/videos can render while devices are discovered. Camera startup
+        // must retain the selected ID before opening its capture/mixer streams.
+        const cameraDevicesReady = this._refreshCameraDevices();
         const devicesReady = Promise.allSettled([
             this.midiRuntime.init(), this._refreshOutputDisplays(),
-            this._refreshCameraDevices(), this._refreshAudioInputDevices()
+            cameraDevicesReady, this._refreshAudioInputDevices()
         ]);
         this._renderSourceList();
         this._renderPresets();
@@ -6021,6 +6023,7 @@ class RendererLabApp {
         this._startMeterTimer();
         this.setConnection('Disconnected');
         this._syncDesktopUpdateUi();
+        if (isCameraParams(this.params)) await cameraDevicesReady;
         this._autoStart();
         void devicesReady.then(() => this._autoStartAudioReactive());
         this._warmBuiltInMedia();

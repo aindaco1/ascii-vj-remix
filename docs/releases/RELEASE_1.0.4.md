@@ -13,7 +13,10 @@ for the complete release scope, including changes since 1.0.3 and shared-relay w
 - Four original 32-color families, eight pixel/glyph presets; 79/51/28 ownership.
 - Stable base mapping and glyph luminance, independent animated display colors.
 - Shared transport, zero/reverse speed, pause/resume and speed-transition integral.
-- Startup/device/pipeline/lookup reuse with bounded resource ownership.
+- Startup/device/pipeline/lookup reuse with bounded resource ownership. Camera
+  autostart still waits for camera identity discovery; images/video start independently.
+  An actual-controller ordering test reproduced the initial optimization race
+  before the fix and passes afterward.
 - Readback-authorized recovery for static-image upload SecurityError (#35).
 - Xcode 27 CI from reviewed PR #36; stable release lane retained.
 
@@ -86,4 +89,13 @@ the video advancing through a glyph-to-pixel transition while Pop Out was open.
 Native video remained at 60 FPS without GPU failures. The stronger native smoke
 passed: first GPU presentation 189 ms after open, repeat presentation 82 ms after
 close/reopen, with 59.8 FPS during live parameter/cycling updates and no failures.
-This smoke is now part of Windows PR CI; its Windows result is pending.
+This smoke is now part of Windows and Linux PR CI, using verified bundled
+FFmpeg sidecars. Linux uses a virtual display: first GPU presentation 2,150 ms, reopen 149 ms,
+and live cycling/parameter updates passed at `66b063a` ([CI run](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34998846438)).
+Its legacy command label is `native-softbuffer`, but passing requires the GPU
+presenter event on both opens. Windows also passed on the same app code at `3597017`: first presentation
+1,563 ms, reopen 472 ms ([CI run](https://github.com/aindaco1/ascii-vj-remix/actions/runs/34996977641)).
+The final Windows harness revision is pending.
+A subsequent clean Mac launch selected WebGPU in 290 ms and native image opens
+responded in 38 ms / 10 ms after close/reopen. The zero-speed still-image control
+was visually checked with audio modulation disabled.

@@ -278,5 +278,61 @@
     "rendererSetupMs": 205,
     "source": "Demo Image",
     "version": "1.0.4"
+  },
+  "nativeCi": {
+    "commit": "66b063a6ffb949acdc5d4483c79798837d7112d0",
+    "run": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/34998846438",
+    "linux": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 10067,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 2,
+          "firstPresentMs": 2150,
+          "pass": 0
+        },
+        {
+          "commandMs": 0,
+          "firstPresentMs": 149,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.0.4"
+    },
+    "notes": [
+      "Linux uses an Xvfb virtual display. These are CI regression timings, not physical-camera or reference-hardware performance measurements.",
+      "The legacy command backend label native-softbuffer is not the presentation result; this smoke requires the GPU presenter first-frame event on both opens."
+    ],
+    "windowsEarlier": {
+      "commit": "3597017ff004b471755bb23964ab27b64dd9f52c",
+      "run": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/34996977641",
+      "result": {
+        "backend": "native-softbuffer",
+        "elapsed_ms": 9816,
+        "error": null,
+        "kind": "native-output",
+        "media_url": "media/point-click-test-30s.mp4",
+        "mode": "perf",
+        "ok": true,
+        "opens": [
+          {
+            "commandMs": 0,
+            "firstPresentMs": 1563,
+            "pass": 0
+          },
+          {
+            "commandMs": 0,
+            "firstPresentMs": 472,
+            "pass": 1
+          }
+        ],
+        "package_version": "1.0.4"
+      }
+    }
   }
 }

@@ -123,3 +123,43 @@ preview.source.isNativeOutputPreview = false;
 syncNativePreviewGeometry(preview, acid);
 assert.equal(textures, 3, 'ordinary media renderers are untouched');
 console.log('Native preview geometry resize and preset regression passed.');
+
+// Initial enumeration selects a default camera ID. Capture must not open under
+// the empty/default key while that ID is still being assigned (issue-prone on
+// Windows where native Pop Out reuses the same selected camera identity).
+const initStart = appSource.indexOf('    async init() {', appSource.indexOf('class RendererLabApp'));
+const initMethod = appSource.slice(initStart, appSource.indexOf('    _startWebViewKeepalive()', initStart));
+const Startup = new Function('isTauriUpdaterAvailable', 'isTauriRuntime', 'els', 'isCameraParams',
+  `return class { ${initMethod} }`)(async () => false, () => false, {}, (params) => params.mediaType === 'camera');
+for (const mediaType of ['camera', 'image', 'video']) {
+  let finishEnumeration;
+  const cameraReady = new Promise((resolve) => { finishEnumeration = resolve; });
+  const unrelatedDevice = new Promise(() => {});
+  const started = [];
+  const startup = new Startup();
+  Object.assign(startup, {
+    params: { mediaType, cameraDeviceId: '' },
+    desktopUpdater: { setAvailable() {}, checkOnLaunch() {} },
+    midiRuntime: { init: () => unrelatedDevice },
+    _initCrashReporter: async () => {},
+    _refreshOutputDisplays: () => unrelatedDevice,
+    _refreshAudioInputDevices: () => unrelatedDevice,
+    _refreshCameraDevices: async () => { await cameraReady; startup.params.cameraDeviceId = 'usb-camera'; },
+    _autoStart() { started.push({ ...this.params }); },
+    _autoStartAudioReactive() { throw new Error('Audio must wait for its device list'); }
+  });
+  for (const name of ['_startWebViewKeepalive', '_bindTauriSmokeEvents', '_restoreCustomSource', '_buildControls',
+    '_buildAudioReactiveControls', '_bindEvents', '_renderSourceList', '_renderPresets', '_syncInputs',
+    '_applyVisualState', 'updateMeters', '_startMeterTimer', 'setConnection', '_syncDesktopUpdateUi', '_warmBuiltInMedia']) {
+    startup[name] = () => {};
+  }
+  const initializing = startup.init();
+  await new Promise(setImmediate);
+  assert.equal(started.length, mediaType === 'camera' ? 0 : 1,
+    'Only camera startup must wait for camera identity discovery');
+  finishEnumeration();
+  await initializing;
+  assert.equal(started.length, 1);
+  if (mediaType === 'camera') assert.equal(started[0].cameraDeviceId, 'usb-camera');
+}
+console.log('Camera startup identity and independent media startup ordering passed.');
