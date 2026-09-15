@@ -33,8 +33,12 @@ export class ReviewedReportGroup {
       const fingerprint = await this.adapter.fingerprint(report);
       const relayReport = this.adapter.relayReport(report);
       const saved = await this.ctx.storage.get('group') ?? { state: null, receipts: {}, pending: {} };
-      if (saved.receipts[report.id]) {
-        return Response.json({ ok: true, reportId: report.id, action: 'duplicate', issueNumber: saved.receipts[report.id], fingerprint });
+      const retained = this.adapter.receiptRetentionMS ? await this.ctx.storage.get(`receipt:${report.id}`) : null;
+      const previousIssue = this.adapter.receiptRetentionMS
+        ? (retained?.expires > Date.now() ? retained.number : null)
+        : saved.receipts[report.id];
+      if (previousIssue) {
+        return Response.json({ ok: true, reportId: report.id, action: 'duplicate', issueNumber: previousIssue, fingerprint });
       }
       if (!saved.pending[report.id]) {
         // No acknowledgement until GitHub accepts it. Save the increment first
@@ -63,7 +67,11 @@ export class ReviewedReportGroup {
       if (!result.issueNumber || !['created', 'updated'].includes(result.action)) {
         return Response.json({ error: 'Report not accepted' }, { status: result.status ?? 503 });
       }
-      saved.receipts[report.id] = result.issueNumber;
+      if (this.adapter.receiptRetentionMS) {
+        await this.ctx.storage.put(`receipt:${report.id}`, { number: result.issueNumber, expires: Date.now() + this.adapter.receiptRetentionMS });
+        await this.ctx.storage.setAlarm(Date.now() + 86400000);
+        saved.receipts = {};
+      } else { saved.receipts[report.id] = result.issueNumber; }
       delete saved.pending[report.id];
       const keys = Object.keys(saved.receipts);
       for (const key of keys.slice(0, Math.max(0, keys.length - 1000))) delete saved.receipts[key];

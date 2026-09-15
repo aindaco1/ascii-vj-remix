@@ -5,12 +5,23 @@ const retention = 30 * 86400 * 1000;
 export class FineMeNotReportGroup extends ReviewedReportGroup {
   constructor(ctx, env, submit = submitCrashReport) {
     super(ctx, env, { validate: validateFineMeNotReport, fingerprint: fineMeNotFingerprint, relayReport: fineMeNotRelayReport,
+      receiptRetentionMS: retention,
       repository: 'fine-me-not', failureCode: 'fine-me-not-submit-failed', labels: () => 'bug,automated-report,needs-triage',
       aggregate: fineMeNotAggregate, issueBody: fineMeNotIssueBody, reopen: fineMeNotReopen,
       dailyLimit: async () => {
         const quota = env.FINE_ME_NOT_INBOX.get(env.FINE_ME_NOT_INBOX.idFromName('issue-quota'));
         return (await quota.fetch(new Request('https://internal/quota', { method: 'POST' }))).json();
       } }, submit);
+  }
+  alarm() {
+    const operation = this.tail.then(async () => {
+      const entries = await this.ctx.storage.list({ prefix: 'receipt:' });
+      const expired = [...entries].filter(([, entry]) => entry.expires <= Date.now()).map(([key]) => key);
+      for (let i = 0; i < expired.length; i += 128) await this.ctx.storage.delete(expired.slice(i, i + 128));
+      if (entries.size > expired.length) await this.ctx.storage.setAlarm(Date.now() + 86400000);
+    });
+    this.tail = operation.catch(() => {});
+    return operation;
   }
 }
 // A product-scoped ID ledger prevents edited retries from escaping to another

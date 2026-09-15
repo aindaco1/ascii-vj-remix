@@ -82,3 +82,15 @@ test('route rejects disabled, malformed and oversized reports before forwarding'
     assert.equal(response.status,400);
   }
 });
+
+
+test('group receipt survives the legacy 1000-entry limit and expires after 30 days', async () => {
+  const ctx = context(); let count = 0;
+  const group = new FineMeNotReportGroup(ctx, {}, async () => ({ action: 'updated', issueNumber: ++count }));
+  const first = report(); await group.fetch(request(first));
+  for (let i = 0; i < 1001; i++) await group.fetch(request(report()));
+  const retry = await (await group.fetch(request(first))).json();
+  assert.equal(retry.action, 'duplicate'); assert.equal(retry.issueNumber, 1); assert.equal(count, 1002);
+  const receipt = ctx.data.get(`receipt:${first.id}`); receipt.expires = Date.now() - 1;
+  await group.alarm(); assert.equal(ctx.data.has(`receipt:${first.id}`), false);
+});
