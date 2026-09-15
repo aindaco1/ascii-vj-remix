@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { hostPlatformId } from './lib/ffmpeg_resource_policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tempDir = mkdtempSync(path.join(tmpdir(), 'asciline-native-output-smoke-'));
@@ -49,6 +50,16 @@ const launchEnv = {
     process.env.ASCILINE_NATIVE_OUTPUT_SMOKE_DURATION_MS || '7000',
   ASCILINE_DESKTOP_SMOKE_REPORT: reportPath
 };
+
+// The unbundled Windows/Linux executable has no installer resource directory.
+// Use the same verified sidecars that bundle:test just packaged, never PATH.
+if (process.platform !== 'darwin') {
+  run(process.execPath, ['scripts/check_ffmpeg_resources.mjs', '--require-current-platform']);
+  const sidecars = path.join(root, 'src-tauri', 'resources', 'ffmpeg', hostPlatformId(), 'bin');
+  const suffix = process.platform === 'win32' ? '.exe' : '';
+  launchEnv.ASCILINE_FFMPEG = path.join(sidecars, `ffmpeg${suffix}`);
+  launchEnv.ASCILINE_FFPROBE = path.join(sidecars, `ffprobe${suffix}`);
+}
 
 const launch = spawnSync(process.platform === 'darwin' ? 'bash' : sourceApp,
   process.platform === 'darwin' ? ['scripts/run_local_desktop_app.sh'] : [], {

@@ -1,3 +1,16 @@
+function hostPlatformId() {
+  const os = {
+    darwin: 'macos',
+    win32: 'windows',
+    linux: 'linux'
+  }[process.platform] || process.platform;
+  const arch = {
+    x64: 'x86_64',
+    arm64: 'aarch64'
+  }[process.arch] || process.arch;
+  return `${os}-${arch}`;
+}
+
 function parseOtoolDependencies(output) {
   return String(output || '')
     .split(/\r?\n/)
@@ -24,6 +37,7 @@ function forbiddenMacosDependencies(otoolOutput) {
 }
 
 export {
+  hostPlatformId,
   forbiddenMacosDependencies,
   isAllowedMacosDependency,
   parseOtoolDependencies
