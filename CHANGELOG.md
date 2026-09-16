@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [1.0.5] - 2026-09-16
 
 ### Fixed
 
@@ -11,6 +11,10 @@
   fail with an unloadable macro library / `E0463` error on macOS 27 (#30).
 - Clarify this fork's retained license provenance and distinguish upstream's
   later AGPL engine / MIT client split (#38).
+- Add a real WebGL regression for the static-image upload recovery shipped in
+  1.0.4, checking pixel parity, orientation, and cached readback (#35).
+- Use the selected shared Podman engine without restarting VMs that other
+  projects depend on; preserve explicit endpoints and fail with a diagnostic (#39).
 
 ## [1.0.4] - 2026-09-15
 
