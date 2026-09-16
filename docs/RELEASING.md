@@ -115,6 +115,23 @@ notarization credentials are missing.
 
 ## macOS Release Signing
 
+The supported OS floor is `bundle.macOS.minimumSystemVersion` in
+`src-tauri/tauri.conf.json` (13.0). Tauri/Cargo wrappers and the FFmpeg source
+builder use it as `MACOSX_DEPLOYMENT_TARGET`; the sidecar builder also sets
+compiler/linker minimum-version flags. Building with an Xcode 27 SDK must not
+silently raise the runtime minimum to the build host's OS.
+
+`check:ffmpeg-resources` inspects macOS Mach-O minimum-version load commands;
+`check:bundle` checks new bundles' `LSMinimumSystemVersion`, app executable,
+and staged macOS sidecars against the same floor. Rebuild old sidecars when
+these checks fail. Minimum-version metadata is a packaging check; macOS 13
+runtime testing is still required to establish older-OS API compatibility.
+
+The Cargo release build override leaves compile-time dependencies unstripped.
+This avoids the macOS 27 dyld `mis-aligned LINKEDIT string pool` failure when
+loading Rust proc-macros (`E0463` can obscure the loader error). The override
+does not change the shipped executable's optimization or stripping settings.
+
 Developer ID signing and notarization require Apple Developer Program
 membership, a base64 Developer ID Application `.p12`, its password, a CI
 keychain password, and either App Store Connect API credentials or Apple ID

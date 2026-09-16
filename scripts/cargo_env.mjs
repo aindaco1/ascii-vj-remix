@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { applyTauriTargetDir } from './lib/tauri_target_dir.mjs';
+import { applyMacosDeploymentTarget } from './lib/macos_deployment_target.mjs';
 
 function commandWorks(command, args = ['--version'], env = process.env) {
   const result = spawnSync(command, args, {
@@ -25,6 +26,7 @@ function rustupToolchainBin() {
 
 const env = { ...process.env };
 applyTauriTargetDir(process.cwd(), env);
+applyMacosDeploymentTarget(env);
 
 if (!commandWorks('cargo', ['--version'], env)) {
   const toolchainBin = rustupToolchainBin();

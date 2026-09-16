@@ -246,6 +246,10 @@ output windows all increase load.
 
 Notes:
 
+- The published 1.0.4 FFmpeg/ffprobe sidecars were built with a macOS 26
+  minimum, so FFmpeg-dependent media paths do not meet the macOS 13 support
+  target in that release. Version 1.0.5 corrects the build target; older-OS runtime
+  acceptance remains tracked in [#30](https://github.com/aindaco1/ascii-vj-remix/issues/30).
 - Intel Mac support is not the current release target. It may work from source
   if you build a compatible bundle yourself, but it is not the tested path.
 - Camera, microphone, and audio capture require explicit macOS privacy grants.

@@ -67,6 +67,10 @@ while output is active using [Testing](../TESTING.md#hardware-and-platform-check
 
 ## Published artifact identity
 
+See the [September 16 follow-up](#issue-review--2026-09-16) for deployment-target
+findings discovered after publication. The original release evidence below is
+preserved as recorded.
+
 The [asset record](1.0.4-artifacts.json) captures the 14 published asset names,
 sizes, GitHub SHA-256 digests, and download URLs. The updater manifest reports
 1.0.4, and all nine platform aliases resolve to an uploaded signed updater
@@ -147,3 +151,84 @@ version 1.0.4, the development identifier, and bundled FFmpeg.
 Final Windows candidate `28d6609` passed native presentation in 1,907 ms and
 close/reopen in 321 ms, including live cycling/parameter updates. PR #37 was
 merged as `95a82be` after all four candidate CI lanes passed.
+
+## Issue review — 2026-09-16
+
+Reviewed open issues [#30](https://github.com/aindaco1/ascii-vj-remix/issues/30),
+[#35](https://github.com/aindaco1/ascii-vj-remix/issues/35), and
+[#38](https://github.com/aindaco1/ascii-vj-remix/issues/38) against source
+`3075b10` and the published 1.0.4 release. These follow-up changes are unreleased;
+no public artifacts were replaced. Local host: Apple Silicon, macOS 27.0
+(`26A428`), Xcode 27.0 (`27A266a`), SDK 27.0, Rust 1.96.0, Node 26.8.2.
+
+### macOS packaging and compiler findings (#30)
+
+The installed production 1.0.4 bundle advertises `LSMinimumSystemVersion=10.13`;
+its app executable targets 11.0 and both bundled FFmpeg programs target 26.0.
+That does not satisfy the documented macOS 13 support target. The FFmpeg binary
+SHA-256 is `fdc8d107dbec8f20de2de4638aa173e89e653cfca98b64491f9171f6c7611e7d`;
+ffprobe is `09a7ac5c6e16324c7f3790339ad7e45b85c039013f9b1baafe2b9d2bf0b819a9`.
+
+The correction uses the Tauri config's explicit 13.0 floor for app/Cargo and
+FFmpeg builds and validates the resulting Mach-O load commands. The new gate
+rejects both installed 1.0.4 sidecars. Fresh Xcode 27 FFmpeg/ffprobe builds pass
+with `minos=13.0`, and probe/decode the bundled 1080p H.264 fixture successfully.
+The optimized development app also builds with plist minimum and executable
+`minos` both 13.0; bundle identity, signature, resources and minimum-version
+inspection pass. This is local development-artifact evidence, not a signed
+production release or a macOS 13 runtime test.
+
+The corrected development executable SHA-256 is
+`502366497cd73bfb6e29a6fbe575b3800209fea229843474e08ad7b186bfe050`;
+FFmpeg is `4b74c6baf071c3b992c77d4d761ff8f8411442e57fa09411d5d8e8d40dd30ce4`
+and ffprobe is `7cd267c3585ca822cd67823e2f6d28c41242d564da3792c013edb51e230909a0`.
+All 77 Rust tests pass in release mode. The installed development WebKit sweep
+passes **79/79**, with **51 WebGPU / 28 Canvas**, on this candidate. Offline,
+Tauri policy, release-build reuse, macOS identity/layout/deployment, FFmpeg
+policy/source-build/runtime, and documentation link checks pass.
+
+Native output produced a real GPU presentation on initial open and reopen in
+both local runs (863/152 ms and 469/100 ms). Neither timed performance run is
+accepted: the first overlapped Rust compilation and its 18.7 FPS source feed
+missed the 20 FPS gate despite 59.8 FPS presentation; the second reported an
+occluded surface. Preserve these as failed performance checks, not physical
+display or sustained-performance acceptance.
+
+The fresh release build also reproduced Rust `E0463` for `ctor_proc_macro`.
+The library existed and its signature was valid; loading it directly exposed
+`mis-aligned LINKEDIT string pool`. Leaving compile-time dependencies unstripped
+via Cargo's release `build-override` fixes the reproduction and the full app
+build. This matches the independently reported
+[macOS 27 proc-macro loader failure](https://github.com/crynta/terax-ai/issues/1050);
+[Cargo documents](https://doc.rust-lang.org/cargo/reference/profiles.html#build-dependencies)
+the separation between build-dependency and application profiles.
+
+The published release workflow remains successful on all three install/updater
+lanes ([run 35007023415](https://github.com/aindaco1/ascii-vj-remix/actions/runs/35007023415)).
+That earlier result does not prove older-OS sidecar compatibility. Keep #30 open
+for macOS 13 runtime regression, signed Xcode 27 artifact/toolchain promotion,
+production permission/upgrade preservation, physical camera/MIDI/audio/display
+checks, and the remaining soak/performance matrix. The current preset contract
+is **79 total / 51 accelerated / 28 explicit Canvas**, superseding the issue's
+historical 71/43/28 baseline. Use the existing [Testing matrix](../TESTING.md#hardware-and-platform-checks).
+
+### Image upload report (#35)
+
+The two reports are from 1.0.3; authorized pixel-readback recovery already ships
+in 1.0.4. Current readback, renderer fallback, and resource tests pass. A new
+actual-WebGL regression forces the reported external-image `SecurityError`,
+requires WebGL2 to remain active, compares every rendered pixel against the
+normal upload, and checks one cached readback across two constructions. The
+full Chromium 153 smoke passes with all 79 presets and no browser errors.
+Tainted images still fail the browser's readback check. No production renderer
+logic was changed in this follow-up. The reporter's precise input was not
+included in the privacy-preserving report, so that exact-image reproduction
+remains unverified.
+
+### Upstream license notice (#38)
+
+The maintainer selected retention of the existing license. The root README and
+[contributor license section](../CONTRIBUTORS.md#license) now distinguish this
+fork's inherited May 2026 text from upstream's September AGPL/MIT split, with
+pinned upstream revisions and a matching license hash. `LICENSE` is unchanged;
+no new upstream code was imported.

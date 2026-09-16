@@ -63,6 +63,9 @@ if (config?.identifier !== 'com.asciline.remix') {
   issues.push('production Tauri identifier must remain com.asciline.remix');
 }
 const dmgConfig = config?.bundle?.macOS?.dmg;
+if (config?.bundle?.macOS?.minimumSystemVersion !== '13.0') {
+  issues.push('macOS minimumSystemVersion must match the documented macOS 13.0 support floor');
+}
 if (dmgConfig?.windowSize?.width !== 660 || dmgConfig?.windowSize?.height !== 400
     || dmgConfig?.appPosition?.x !== 180 || dmgConfig?.appPosition?.y !== 170
     || dmgConfig?.applicationFolderPosition?.x !== 480

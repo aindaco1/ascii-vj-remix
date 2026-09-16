@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { macosDeploymentTarget } from './lib/macos_deployment_target.mjs';
 
 const result = spawnSync('bash', ['scripts/build_ffmpeg_sidecar.sh', '--print-config'], {
   encoding: 'utf8',
@@ -34,5 +35,9 @@ assert.doesNotMatch(config.flags, /--enable-gpl/);
 assert.doesNotMatch(config.flags, /--enable-nonfree/);
 if (process.platform === 'linux') assert.match(config.flags, /--enable-indev=v4l2/);
 if (process.platform === 'win32') assert.match(config.flags, /--enable-indev=dshow/);
+if (process.platform === 'darwin') {
+  assert.ok(config.flags.includes(`--extra-cflags=-mmacosx-version-min=${macosDeploymentTarget}`));
+  assert.ok(config.flags.includes(`--extra-ldflags=-mmacosx-version-min=${macosDeploymentTarget}`));
+}
 
 console.log('FFmpeg source-build config test passed.');

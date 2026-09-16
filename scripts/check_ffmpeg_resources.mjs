@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { forbiddenMacosDependencies, hostPlatformId } from './lib/ffmpeg_resource_policy.mjs';
+import { inspectMacosDeploymentTarget } from './lib/macos_deployment_target.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const ffmpegRoot = path.join(root, 'src-tauri', 'resources', 'ffmpeg');
@@ -30,6 +31,10 @@ async function sha256(filePath) {
 function checkMacosDependencies(platformId, fileName, filePath) {
   if (!platformId.startsWith('macos-')) return;
   if (process.platform !== 'darwin') return;
+
+  for (const issue of inspectMacosDeploymentTarget(filePath)) {
+    issues.push(`${platformId}: ${fileName} ${issue}`);
+  }
 
   const result = spawnSync('otool', ['-L', filePath], {
     encoding: 'utf8',

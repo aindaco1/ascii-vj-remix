@@ -8,8 +8,8 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.0.4. Public release acceptance is tracked
-in the [1.0.4 release record](docs/releases/RELEASE_1.0.4.md). Release history is recorded in the [Changelog](CHANGELOG.md);
+The current source/package version is 1.0.5. Public release acceptance is tracked
+in the [1.0.5 release record](docs/releases/RELEASE_1.0.5.md). Release history is recorded in the [Changelog](CHANGELOG.md);
 prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 
@@ -162,8 +162,10 @@ Email Alonso at [alonso@dustwave.xyz](mailto:alonso@dustwave.xyz).
 
 ## License
 
-This repository carries the upstream ASCILINE license text: MIT License with an
-Anti-Advertisement Restriction. See [LICENSE](LICENSE) for the full license.
+This fork retains the ASCILINE license text inherited in May 2026: MIT License
+with an Anti-Advertisement Restriction. See [LICENSE](LICENSE) for the full
+license and [license provenance](docs/CONTRIBUTORS.md#license) for the pinned
+source and upstream's later AGPL/MIT split. This fork has not adopted that split.
 
 In plain language: the project is broadly permissive, but the license includes
 an explicit restriction against using the software to serve, deliver, or display
