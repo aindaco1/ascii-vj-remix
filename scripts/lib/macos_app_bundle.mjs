@@ -1,6 +1,7 @@
 import { lstat, readFile, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { inspectMacosDeploymentTarget } from './macos_deployment_target.mjs';
 
 const REQUIRED_USAGE_KEYS = Object.freeze([
   'NSCameraUsageDescription',
@@ -53,6 +54,19 @@ export async function inspectMacosAppBundle(appPath, options = {}) {
   const bundleIdentifier = identifierMatch?.[1] || '';
   const version = versionMatch?.[1] || '';
   const executable = executableMatch?.[1] || '';
+  const minimumSystemVersion = plist.match(/<key>LSMinimumSystemVersion<\/key>\s*<string>([^<]+)<\/string>/)?.[1] || '';
+  // Apply the current source contract only to new bundles, not historical
+  // updater fixtures whose identity/layout still need to be inspected.
+  const expectedMinimum = options.expectedMinimumSystemVersion;
+  if (expectedMinimum) {
+    if (minimumSystemVersion !== expectedMinimum) {
+      issues.push(`macOS bundle minimum ${minimumSystemVersion || '(missing)'} does not match ${expectedMinimum}`);
+    }
+    if (executable) {
+      issues.push(...inspectMacosDeploymentTarget(path.join(macos, executable), expectedMinimum)
+        .map(issue => `macOS app executable ${issue}`));
+    }
+  }
 
   if (expectedBundleId && bundleIdentifier !== expectedBundleId) {
     issues.push(`macOS bundle identifier ${bundleIdentifier || '(missing)'} does not match ${expectedBundleId}`);
@@ -72,6 +86,12 @@ export async function inspectMacosAppBundle(appPath, options = {}) {
   }
   for (const platform of requiredFfmpegPlatforms) {
     const platformDir = path.join(bundledFfmpegRoot, platform);
+    if (expectedMinimum && platform.startsWith('macos-')) {
+      for (const binary of ['ffmpeg', 'ffprobe']) {
+        issues.push(...inspectMacosDeploymentTarget(path.join(platformDir, 'bin', binary), expectedMinimum)
+          .map(issue => `bundled ${platform}/${binary} ${issue}`));
+      }
+    }
     for (const required of ['manifest.json', 'NOTICE.md']) {
       if (!(await fileExists(path.join(platformDir, required)))) {
         issues.push(`macOS bundle is missing resources/ffmpeg/${platform}/${required}`);
@@ -107,6 +127,7 @@ export async function inspectMacosAppBundle(appPath, options = {}) {
     bundleIdentifier,
     version,
     executable,
+    minimumSystemVersion,
     issues
   };
 }

@@ -140,6 +140,13 @@ palette/dither, Braille, CJK/Kana, Hangul, and typed custom-ramp states. Record
 the actual backend; a requested backend that falls back is not evidence for the
 requested backend.
 
+The static smoke also forces `SecurityError` at WebGL2's external-image upload
+boundary (#35), compares recovered pixels/orientation with the direct upload,
+and verifies repeated construction reuses one authorized readback while staying
+on WebGL2. `test:canvas-readback` separately verifies rejection of tainted images
+and exclusion of video from this retry. The original reporter's private image
+is not captured by these synthetic fixtures.
+
 ### Native Output or Pop Out Changes
 
 `smoke:native-output` requires a real GPU presentation, applies live params and

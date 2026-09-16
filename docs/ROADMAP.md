@@ -7,6 +7,12 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Distribution and Platform Validation
 
+- Complete [macOS 27 acceptance (#30)](https://github.com/aindaco1/ascii-vj-remix/issues/30),
+  including macOS 13 runtime regression, physical capture/MIDI/permission and
+  external-display checks, and signed Xcode 27 artifact/toolchain promotion.
+  Current published evidence and remaining boundaries are in the
+  [1.0.4 record](releases/RELEASE_1.0.4.md#issue-review--2026-09-16).
+
 - Add Authenticode signing and timestamping for Windows installers when a
   sustainable signing provider and release policy are in place.
 - Validate Windows SmartScreen behavior on clean machines after signed

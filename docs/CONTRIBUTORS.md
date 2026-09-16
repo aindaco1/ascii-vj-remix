@@ -363,8 +363,28 @@ references; `git diff --check` alone does not check links.
 
 ## License
 
-The repository uses the upstream ASCILINE license text: MIT License with an
-Anti-Advertisement Restriction. See [LICENSE](../LICENSE).
+This fork retains the MIT License with an Anti-Advertisement Restriction in
+[LICENSE](../LICENSE). It is not the standard MIT license. Its text is unchanged
+from upstream commit
+[`95a3029679b0761663171f5b9afcf28a086a8b3c`](https://github.com/YusufB5/ASCILINE/blob/95a3029679b0761663171f5b9afcf28a086a8b3c/LICENSE)
+(May 3, 2026), which is present in this fork's history. The SHA-256 of both files
+is `7fb645f1d4eafa849eaf8332b0e32ab0c9d4f6b4c42a648c45e5edaf783e159b`.
+
+Upstream adopted a different license notice on September 3, 2026 in
+[`9921b0dfddfebdcaa7081cfca918fc668a330e06`](https://github.com/YusufB5/ASCILINE/blob/9921b0dfddfebdcaa7081cfca918fc668a330e06/LICENSE):
+AGPL-3.0-or-later for its Python engine/server and standard MIT for its JavaScript
+client SDK/decoders. Yusuf reported that change in
+[#38](https://github.com/aindaco1/ascii-vj-remix/issues/38). On September 16, 2026,
+the fork maintainer chose to retain the existing license and document this
+provenance; no upstream code or new license text was imported in that review.
+
+Before importing later upstream code, record the exact revision, affected files,
+and their applicable notices and review compatibility with this fork. Do not
+assume the current upstream notice describes this fork, or assign its new SDK
+license to the older copied code without checking provenance. Bundled third-party
+assets and sidecars retain their own notices (including
+[Unifont](../third_party/unifont/README.md) and
+[FFmpeg](../src-tauri/resources/ffmpeg/README.md)).
 
 Contributions must be compatible with that license and with the project's
 local-first runtime policy.

@@ -10,6 +10,7 @@ import {
   withMountedMacosDmg
 } from './lib/macos_dmg.mjs';
 import { tauriTargetDir } from './lib/tauri_target_dir.mjs';
+import { macosDeploymentTarget } from './lib/macos_deployment_target.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const args = parseArgs(process.argv.slice(2));
@@ -89,6 +90,7 @@ async function checkMacosBundle() {
   const requiredFfmpegPlatforms = await stagedFfmpegPlatforms();
   const looseInspection = await inspectMacosAppBundle(appDir, {
     expectedBundleId,
+    expectedMinimumSystemVersion: macosDeploymentTarget,
     requiredFfmpegPlatforms
   });
   issues.push(...looseInspection.issues);
@@ -100,6 +102,7 @@ async function checkMacosBundle() {
         const mountedInspection = assertMacosAppBundleInspection(
           await inspectMacosAppBundle(appPath, {
             expectedBundleId,
+            expectedMinimumSystemVersion: macosDeploymentTarget,
             requiredFfmpegPlatforms
           }),
           'mounted macOS app bundle'

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Pin the app and FFmpeg build target to the documented macOS 13.0 minimum.
+  Reject newly packaged binaries whose Mach-O minimum exceeds that floor;
+  previously published 1.0.4 FFmpeg sidecars targeted macOS 26 (#30).
+- Preserve compile-time Rust macro symbols so Xcode 27 release builds do not
+  fail with an unloadable macro library / `E0463` error on macOS 27 (#30).
+- Clarify this fork's retained license provenance and distinguish upstream's
+  later AGPL engine / MIT client split (#38).
+
 ## [1.0.4] - 2026-09-15
 
 ### Added

@@ -1627,6 +1627,75 @@ async function runSmoke() {
       }
     }, { swatches: paletteSwatches, cases: paletteCases });
 
+    // Reproduce #35 at the actual WebGL external-image boundary. Both initial
+    // construction and a second construction over the same static source must
+    // retain pixels/orientation and stay accelerated after authorized readback.
+    diagnostics.phase = 'static-image SecurityError recovery';
+    await page.evaluate(async () => {
+      const app = window.ascilineRemix;
+      app.stop();
+      const canvas = document.createElement('canvas');
+      canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 32, 16);
+      ctx.fillStyle = '#0000ff'; ctx.fillRect(0, 16, 32, 16);
+      const source = { canvas, element: canvas, isImage: true, type: 'image', ready: true,
+        width: 32, height: 32, destroy() {}, updateParams() {} };
+      app.loadStaticSource = async () => source;
+      app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
+        cols: 32, rows: 32, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
+        solidMode: true, glyphMode: false, pixel: false, paletteId: 'none',
+        paletteCycleMode: 'off', ditherMode: 'none' };
+      const prototype = WebGL2RenderingContext.prototype;
+      const originalUpload = prototype.texImage2D;
+      let denied = 0;
+      let readbacks = 0;
+      const originalReadback = ctx.getImageData;
+      ctx.getImageData = function (...args) {
+        readbacks++;
+        return originalReadback.apply(this, args);
+      };
+      const snapshot = async () => {
+        await app.start();
+        const renderer = app.staticRuntime.renderer;
+        if (renderer.getStats().backend !== 'webgl2') throw new Error('Image recovery fell back from WebGL2');
+        renderer.renderFrame();
+        const gl = renderer.gl;
+        const pixels = new Uint8Array(32 * 32 * 4);
+        gl.readPixels(0, 0, 32, 32, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        if (gl.getError()) throw new Error('Image recovery produced a GL error');
+        if (!gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL)) throw new Error('Image recovery changed unpack orientation');
+        app.stop();
+        return pixels;
+      };
+      try {
+        const baseline = await snapshot();
+        if (!baseline.some((value, index) => index % 4 !== 3 && value > 200)) {
+          throw new Error('Image recovery baseline is blank');
+        }
+        prototype.texImage2D = function (...args) {
+          if (args.length === 6 && args[5] === canvas) {
+            denied++;
+            throw new DOMException('The operation is insecure.', 'SecurityError');
+          }
+          return originalUpload.apply(this, args);
+        };
+        for (let pass = 0; pass < 2; pass++) {
+          const recovered = await snapshot();
+          if (recovered.some((value, index) => value !== baseline[index])) {
+            throw new Error(`Image recovery changed pixels/orientation on pass ${pass}`);
+          }
+        }
+        if (denied !== 2 || readbacks !== 1) throw new Error(`Image recovery retries/cache: ${denied}/${readbacks}`);
+      } finally {
+        prototype.texImage2D = originalUpload;
+        ctx.getImageData = originalReadback;
+        app.stop();
+      }
+    });
+
     // Feed the real renderer a synthetic native-preview canvas. Camera hardware
     // remains a separate acceptance gate, but texture/viewport resize is testable.
     diagnostics.phase = 'native preview geometry';

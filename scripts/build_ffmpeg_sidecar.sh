@@ -54,6 +54,13 @@ CONFIG_FLAGS=(
 )
 
 case "$(uname -s)" in
+  Darwin*)
+    # Use the app's supported OS floor, not the build host's OS version.
+    MACOSX_DEPLOYMENT_TARGET="$(node -p 'require(process.argv[1]).bundle.macOS.minimumSystemVersion' "$ROOT/src-tauri/tauri.conf.json")"
+    export MACOSX_DEPLOYMENT_TARGET
+    CONFIG_FLAGS+=("--extra-cflags=-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
+      "--extra-ldflags=-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET")
+    ;;
   MINGW*|MSYS*|CYGWIN*)
     CONFIG_FLAGS+=("--target-os=mingw32" "--extra-ldflags=-static" "--enable-indev=dshow")
     ;;

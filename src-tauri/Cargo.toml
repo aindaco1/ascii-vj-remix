@@ -5,6 +5,12 @@ description = "ASCII VJ Remix renderer lab desktop shell"
 authors = ["ASCII VJ Remix Contributors"]
 edition = "2021"
 
+# macOS 27 dyld rejects some stripped proc-macro dylibs produced by Xcode 27
+# with a mis-aligned LINKEDIT string pool. These are compiler inputs only;
+# leave the shipped application's release profile unchanged.
+[profile.release.build-override]
+strip = "none"
+
 [lib]
 name = "ascii_vj_remix_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

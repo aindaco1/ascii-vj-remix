@@ -162,8 +162,10 @@ Email Alonso at [alonso@dustwave.xyz](mailto:alonso@dustwave.xyz).
 
 ## License
 
-This repository carries the upstream ASCILINE license text: MIT License with an
-Anti-Advertisement Restriction. See [LICENSE](LICENSE) for the full license.
+This fork retains the ASCILINE license text inherited in May 2026: MIT License
+with an Anti-Advertisement Restriction. See [LICENSE](LICENSE) for the full
+license and [license provenance](docs/CONTRIBUTORS.md#license) for the pinned
+source and upstream's later AGPL/MIT split. This fork has not adopted that split.
 
 In plain language: the project is broadly permissive, but the license includes
 an explicit restriction against using the software to serve, deliver, or display
