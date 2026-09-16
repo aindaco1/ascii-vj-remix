@@ -305,10 +305,15 @@ ASCILINE_FFMPEG=/path/to/ffmpeg
 ASCILINE_FFPROBE=/path/to/ffprobe
 ```
 
-On macOS and Windows, the Podman wrappers reuse a healthy default Podman
-connection before starting `podman-machine-default`. This avoids colliding with
-another checkout's already-running VM. Set `ASCILINE_PODMAN_MACHINE` only when
-the fallback machine has a different name.
+The Podman wrappers use the executable on PATH and the selected default
+engine, preserving `CONTAINER_HOST` and `CONTAINER_CONNECTION`. They never
+start, stop, or restart shared VMs. Start/select one at the host level (or use a
+login service) before launching projects. `ASCILINE_PODMAN_MACHINE` remains an
+optional explicit connection override when neither standard endpoint is set.
+Use distinct `HOST_PORT` values for concurrent services. A busy port fails
+without killing its owner; each runner uses its own process-specific container
+name. VM upgrades/restarts belong to an idle maintenance window across all
+projects. Run `bash scripts/test-podman-env.sh` for safe failure coverage.
 
 Preview the media pipeline:
 
