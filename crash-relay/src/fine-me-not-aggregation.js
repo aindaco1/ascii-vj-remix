@@ -6,7 +6,7 @@ export class FineMeNotReportGroup extends ReviewedReportGroup {
   constructor(ctx, env, submit = submitCrashReport) {
     super(ctx, env, { validate: validateFineMeNotReport, fingerprint: fineMeNotFingerprint, relayReport: fineMeNotRelayReport,
       receiptRetentionMS: retention,
-      repository: 'fine-me-not', failureCode: 'fine-me-not-submit-failed', labels: () => 'bug,automated-report,needs-triage',
+      repository: 'road-notice', failureCode: 'fine-me-not-submit-failed', labels: () => 'bug,automated-report,needs-triage',
       aggregate: fineMeNotAggregate, issueBody: fineMeNotIssueBody, reopen: fineMeNotReopen,
       dailyLimit: async () => {
         const quota = env.FINE_ME_NOT_INBOX.get(env.FINE_ME_NOT_INBOX.idFromName('issue-quota'));

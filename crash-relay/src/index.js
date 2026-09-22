@@ -204,7 +204,7 @@ export default {
       return json({ ok: true, service: 'ascii-vj-crash-relay' });
     }
     if (request.method === 'GET' && url.pathname === '/v1/fine-me-not/health') return json({ ok: env.FINE_ME_NOT_REPORTS_ENABLED === 'true' && Boolean(env.FINE_ME_NOT_INBOX && env.FINE_ME_NOT_REPORT_GROUPS && env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_ID && env.GITHUB_APP_INSTALLATION_ID), service: 'fine-me-not-reports' });
-    if (request.method === 'POST' && url.pathname === '/v1/fine-me-not/reports') return handleReviewedReport(request, env, { name: 'Fine Me Not', enabled: 'FINE_ME_NOT_REPORTS_ENABLED', binding: 'FINE_ME_NOT_REPORT_GROUPS', namespace: 'fine-me-not', maximumBytes: '32768', validate: validateFineMeNotReport, fingerprint: fineMeNotFingerprint });
+    if (request.method === 'POST' && url.pathname === '/v1/fine-me-not/reports') return handleReviewedReport(request, env, { name: 'Road Notice', enabled: 'FINE_ME_NOT_REPORTS_ENABLED', binding: 'FINE_ME_NOT_REPORT_GROUPS', namespace: 'fine-me-not', maximumBytes: '32768', validate: validateFineMeNotReport, fingerprint: fineMeNotFingerprint });
     if (request.method === 'GET' && url.pathname === '/mkv-magic/review') return mkvReviewPage();
     if (request.method === 'POST' && url.pathname === '/v1/mkv-magic/reports') {
       return handleReviewedReport(request, env, { name: 'MKV Magic', enabled: 'MKV_REPORTS_ENABLED',

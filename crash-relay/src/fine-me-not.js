@@ -51,7 +51,7 @@ export function fineMeNotBasis(r) {
 }
 export async function fineMeNotFingerprint(r) { return (await fineMeNotDigest(fineMeNotBasis(r))).slice(0, 24); }
 export function fineMeNotRelayReport(r) {
-  return { app: { name: 'Fine Me Not', identifier: 'xyz.dustwave.fine-me-not', version: r.metadata.version ?? 'not included',
+  return { app: { name: 'Road Notice', identifier: 'xyz.dustwave.fine-me-not', version: r.metadata.version ?? 'not included',
     channel: r.metadata.channel ?? 'not included', buildProfile: r.metadata.build ?? 'not included', os: r.metadata.os ?? 'not included', arch: 'arm64' },
     report: { id: r.id, kind: r.crash ? 'native_crash' : 'current_state', surface: 'ios', capturedAt: r.createdAt,
       message: r.category, stack: '', context: { fineMeNot: r } } };

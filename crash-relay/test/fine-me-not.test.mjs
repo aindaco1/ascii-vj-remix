@@ -47,7 +47,7 @@ test('new reports honor closed issue labels and original crash build', () => {
 });
 test('serialized relay retries count once and concurrent reports aggregate', async () => {
   const calls=[];
-  const group=new FineMeNotReportGroup(context(),{},async(env,r,fp,state)=>{ calls.push(state.count); await new Promise(r=>setTimeout(r,5)); return {action:calls.length===1?'created':'updated',issueNumber:5}; });
+  const group=new FineMeNotReportGroup(context(),{},async(env,r,fp,state)=>{ assert.equal(env.GITHUB_REPO, 'road-notice'); assert.equal(r.app.identifier, 'xyz.dustwave.fine-me-not'); assert.equal(r.app.name, 'Road Notice'); calls.push(state.count); await new Promise(r=>setTimeout(r,5)); return {action:calls.length===1?'created':'updated',issueNumber:5}; });
   const a=report(),b=report({notes:'A second explanation'});
   const responses=await Promise.all([group.fetch(request(a)),group.fetch(request(a)),group.fetch(request(b))]);
   assert.deepEqual(calls,[1,2]);assert.deepEqual(await Promise.all(responses.map(async r=>(await r.json()).action)),['created','duplicate','updated']);

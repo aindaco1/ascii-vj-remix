@@ -250,7 +250,11 @@ That means reports with the same platform and stable error code aggregate even
 when the exact message or stack line changes. Reports with different stable
 error codes create separate issues.
 
-## Fine Me Not 1.0.1 adapter
+## Road Notice adapter (formerly Fine Me Not)
+
+Reports target `aindaco1/road-notice` after the repository rename. The existing
+endpoint, contract, Durable Object identities and receipts remain unchanged so
+older Fine Me Not installations keep working.
 
 `POST /v1/fine-me-not/reports` accepts only the reviewed v1 contract. The native
 app and `contract/` carry identical allowlist and golden-fixture files; coordinate
