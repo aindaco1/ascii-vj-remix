@@ -144,10 +144,15 @@ performance guidance lives in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 The short version:
 
 ```bash
+git submodule update --init shared/dust-wave-platform
 npm ci
 npm run tauri:dev
-npm run check:desktop
+npm test
 ```
+
+Development tests include live Jev review of synthetic behavior evidence.
+Use `npm test -- --offline` to skip hosted evaluation explicitly; setup and
+scope are documented in [Testing](docs/TESTING.md#jev-development-testing).
 
 ## Financial Support
 

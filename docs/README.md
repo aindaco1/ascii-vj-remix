@@ -40,6 +40,8 @@ release records and benchmark evidence.
   and evidence. Historical pending rows are not current release status.
 - [Performance evidence](performance/) contains dated benchmark reports;
   [Performance](PERFORMANCE.md) explains their workloads and limits.
+- [Jev integration verification](testing/JEV_EVALUATION.md) records development
+  test results and their evidence boundaries, without a desktop release.
 - [Crash relay](../crash-relay/README.md) owns Worker setup and aggregation details.
 - [Bundled FFmpeg resources](../src-tauri/resources/ffmpeg/README.md) documents
   sidecar layout and provenance.

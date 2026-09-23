@@ -30,6 +30,8 @@ venv/
 
 # Local tool state
 .wrangler/
+jev-results/
+.ascii-vj-development.json
 
 # Tauri / Rust build output
 src-tauri/target/
