@@ -10,6 +10,10 @@
     "node": ">=24"
   },
   "scripts": {
+    "test": "node scripts/test_development.mjs",
+    "test:offline": "npm test -- --offline",
+    "test:jev": "node scripts/jev_evaluation.mjs",
+    "test:jev-harness": "node --test scripts/test_jev_evaluation.mjs",
     "dev": "vite --host 127.0.0.1 --port 8010",
     "dev:vite": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "vite build && node scripts/copy_static_assets.mjs",

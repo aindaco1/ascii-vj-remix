@@ -10,6 +10,10 @@ release artifacts, and updater manifests.
 ## Quick Reference
 
 ```bash
+npm test                         # Desktop gate, static smoke, live synthetic Jev review
+npm test -- --offline            # Same deterministic checks, explicitly skip Jev
+npm run test:jev -- --dry-run     # Preview requests without credentials or network
+npm run test:jev-harness          # Offline evaluator and workflow regression tests
 npm run build                    # Vite production build plus local asset copy
 npm run check:offline            # Build and verify bundled/offline assets
 npm run smoke:static             # Static UI/renderer smoke harness
@@ -58,6 +62,94 @@ For documentation-only changes:
 ```bash
 git diff --check
 ```
+
+## Jev Development Testing
+
+`npm test` is the standard development entrypoint. It runs the Jev harness tests,
+the existing `check:desktop` gate, `smoke:static`, then live Jev review. A failed
+step stops the workflow; Jev never overrides a deterministic failure. The gate
+builds a development binary but does not package, install, tag, or release it.
+`npm test -- --offline` (also `npm run test:offline`) skips only live Jev.
+It reports that semantic evaluation did not run. Existing focused commands and
+release gates retain their behavior. Hosted Desktop CI checks the harness
+offline and has no Jev credentials.
+
+The evaluator uses the existing renderer fallback/report helpers, smoke-failure
+diagnostics, and updater controller with fixed synthetic inputs. Six captured
+outputs check recovery versus failure, initialization versus document loading,
+missing diagnostic state versus the original failure, and update availability
+versus successful installation or an unsuccessful check. Exact assertions run
+first. Fourteen labeled positive/negative controls precede the six behavior cases.
+These are component simulations; they do not exercise real camera hardware,
+native presentation, image quality, or a real updater transaction. Browser smoke
+still runs separately. No arbitrary report, screenshot, source file, user media,
+camera/audio data, or private log is accepted by the Jev command.
+
+### Setup and commands
+
+```bash
+git submodule update --init shared/dust-wave-platform
+npm ci
+npm run test:jev -- --dry-run
+npm run test:jev
+npm test
+```
+
+Set `CLOUDFLARE_ACCOUNT_ID` in the environment, or put only the account ID in the
+ignored `.ascii-vj-development.json` as
+`{"cloudflare_account_id":"YOUR_ACCOUNT_ID"}`. Set `CLOUDFLARE_API_TOKEN` in the
+environment or use an existing Wrangler login. The adapter uses the repository's
+pinned Wrangler dependency; `--wrangler-auth` explicitly selects that login.
+No token is saved in configuration or reports. Missing authentication is an
+error, never a silent offline pass.
+
+The live command sends at most 20 requests / 20 atomic questions, capped at
+64,000 total request bytes. Requests are sequential with a 45-second timeout,
+stop on the first provider error, and never retry or purchase credits. Review
+the exact preview before expanding the corpus; live usage is billed by the
+configured provider account. Request limits are not a guarantee of a dollar
+price. Jev uses [typed questions](https://docs.typesafe.ai/introduction) through
+Cloudflare, with cache/log-skip request headers; those headers do not establish
+the provider's retention policy.
+
+### Results and shared ownership
+
+Each run creates a new ignored `jev-results/<timestamp>/` directory, or a new
+directory supplied with `--output-dir`. It retains requests, source hashes,
+incremental/raw answers, final `report.json`, and `review.md`. Existing output
+directories are rejected. Dry runs have zero network attempts, remain incomplete,
+and explicitly say `dry-run`. Exit codes are 0 for pass/preview, 1 for fail/review,
+and 2 for setup/provider error. `releaseAccepted` is always false.
+
+Near ties (margin below 0.10), uncertain answers, unrecognized judge versions,
+or incorrect known-answer controls require review and make development testing
+nonzero. Only `jev-1.13.0` is initially recognized. The margin is provisional for
+these engineering-labeled fixtures, not inherited CutNotes calibration or proof
+of general reliability. Do not change prompts or thresholds merely to make a
+run green. Treat observed controls as regressions; use fresh held-out examples
+before claiming calibration after prompt changes.
+
+The first local run caught a false pass on a negative diagnostic-capture control
+and correctly returned review. Its broad "distinguishes failures" question was
+replaced with the explicit requirement to retain renderer startup as failed;
+two fresh phrasings were fixed before the revised run. With the threshold
+unchanged, that run passed all 14 controls and six behavior cases on Jev 1.13.0.
+Both runs remain in local evidence. This is a small local verification, not
+independent calibration or physical-platform acceptance.
+The [integration verification record](testing/JEV_EVALUATION.md) preserves the
+exact results, evidence hashes and cleanup boundaries.
+
+Request construction, Cloudflare transport, response validation, and review
+routing reuse Platform Test Core 0.3.0 at immutable commit
+`60d439b887f1244f82ff232c849d74152b28c776`, through the public `test-core/jev`
+entry. This is the additive package reviewed in
+[Platform PR 46](https://github.com/aindaco1/dust-wave-platform/pull/46).
+The adapter rejects a different or dirty Platform checkout. ASCII VJ owns only
+its corpus, authentication, budgets, reports, and command orchestration. There
+is no sibling-project import or copied model client, new npm dependency, runtime
+model call, or app version change. The shared checkout is not copied into `dist`.
+Rollback removes the four test scripts, commands, submodule, CI harness step,
+and documentation together; no application/data migration is involved.
 
 ## Test Categories
 

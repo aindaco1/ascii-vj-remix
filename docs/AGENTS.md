@@ -161,6 +161,13 @@ When editing:
 
 ## Validation and Packaging
 
+`npm test` runs the existing desktop/static checks plus live Jev on built-in
+synthetic component evidence. Use `-- --offline` explicitly to skip hosted
+evaluation. Keep Jev development-only and reuse the pinned Platform Test Core
+entry; see [Jev development testing](TESTING.md#jev-development-testing).
+Never pass private diagnostics or media to this evaluator or interpret its
+result as visual, native hardware, or release acceptance.
+
 Use [Testing: Recommended Check Sets](TESTING.md#recommended-check-sets) to
 select the smallest checks that cover the change. Documentation-only changes
 require `git diff --check`; moves also require link, anchor, and path-reference

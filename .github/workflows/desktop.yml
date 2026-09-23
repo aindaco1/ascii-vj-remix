@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - name: Record host and toolchain
         if: runner.os == 'macOS'
@@ -76,6 +78,9 @@ jobs:
 
       - name: Verify desktop build
         run: npm run check:desktop
+
+      - name: Verify Jev harness offline
+        run: npm run test:jev-harness
 
       - name: Verify Windows preset renderer matrix
         id: static-smoke
