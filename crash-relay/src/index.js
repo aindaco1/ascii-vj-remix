@@ -1,3 +1,5 @@
+import { validatePaperReport, paperFingerprint } from './paper-contract.mjs';
+export { PaperReportGroup } from './paper-aggregation.js';
 import { validateFineMeNotReport, fineMeNotFingerprint } from './fine-me-not.js';
 import { checkFineMeNotRateLimit } from './rate-limit.js';
 export { FineMeNotReportGroup, FineMeNotInbox } from './fine-me-not-aggregation.js';
@@ -223,6 +225,9 @@ export default {
       return handleReviewedReport(request, env, { name: 'CutNotes', enabled: 'CUTNOTES_REPORTS_ENABLED',
         binding: 'CUTNOTES_REPORT_GROUPS', namespace: 'cutnotes', maximumBytes: '8192',
         validate: validateCutNotesReport, fingerprint: cutNotesFingerprint });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/paper/reports') {
+      return handleReviewedReport(request, env, { name: 'Paper', enabled: 'PAPER_REPORTS_ENABLED', binding: 'PAPER_REPORT_GROUPS', namespace: 'paper', maximumBytes: '8192', validate: validatePaperReport, fingerprint: paperFingerprint });
     }
     if (request.method === 'POST' && url.pathname === '/v1/auto-subtitle/reports') {
       return handleReviewedReport(request, env, { name: 'Auto Subtitle', enabled: 'AUTO_SUBTITLE_REPORTS_ENABLED',

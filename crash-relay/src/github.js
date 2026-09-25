@@ -172,6 +172,7 @@ function summarizeRuntimeDiagnostics(context = {}) {
   if (context.podcastDiagnostics) details.podcastDiagnostics = context.podcastDiagnostics;
   if (context.cutnotesDiagnostics) details.cutnotesDiagnostics = context.cutnotesDiagnostics;
   if (context.mkvDiagnostics) details.mkvDiagnostics = context.mkvDiagnostics;
+  if (context.paperDiagnostics) details.paperDiagnostics = context.paperDiagnostics;
   if (context.autoSubtitleDiagnostics) details.autoSubtitleDiagnostics = context.autoSubtitleDiagnostics;
   if (!Object.keys(details).length) return '_No runtime diagnostics captured._';
   return `\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
