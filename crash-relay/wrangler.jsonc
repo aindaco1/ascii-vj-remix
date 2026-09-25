@@ -44,7 +44,8 @@
     "GITHUB_OWNER": "aindaco1",
     "GITHUB_REPO": "ascii-vj-remix",
     "FINE_ME_NOT_REPORTS_ENABLED": "true",
-    "PAPER_REPORTS_ENABLED": "true"
+    "PAPER_REPORTS_ENABLED": "true",
+    "RECORD_REPORTS_ENABLED": "true"
   },
   "durable_objects": {
     "bindings": [
@@ -75,6 +76,10 @@
       {
         "name": "PAPER_REPORT_GROUPS",
         "class_name": "PaperReportGroup"
+      },
+      {
+        "name": "RECORD_REPORT_GROUPS",
+        "class_name": "RecordReportGroup"
       }
     ]
   },
@@ -114,6 +119,12 @@
       "tag": "paper-reports-v1",
       "new_sqlite_classes": [
         "PaperReportGroup"
+      ]
+    },
+    {
+      "tag": "record-reports-v1",
+      "new_sqlite_classes": [
+        "RecordReportGroup"
       ]
     }
   ],

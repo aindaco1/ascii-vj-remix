@@ -288,3 +288,18 @@ Run `npm test` and `npx wrangler deploy --dry-run` before deployment.
 Paper owns the canonical files in `integrations/crash-relay/`; synchronize them with Paper's `script/sync-crash-relay.mjs`, then run this relay's complete tests and deployment dry-run. Native reports contain numeric app/OS versions, broad overlay state, bounded event categories and optionally filtered crash facts. No paths, display IDs, city, app names, recipe contents, raw logs or stack symbols are accepted.
 
 The GitHub App needs this repository added to its selected repositories; retain its existing permissions and repositories. Source tests and a deployed route alone do not prove delivery. Verify only synthetic reports for create, same-ID duplicate, new-ID aggregation and reopening, then close the synthetic issues.
+
+## Record adapter
+
+`POST /v1/record/reports` validates `record-diagnostic-v1` and uses the existing
+Platform-backed `ReviewedReportGroup` for idempotency, grouping and GitHub delivery.
+The repository is fixed to `aindaco1/record`; payloads are bounded to 8 KiB and
+reject unknown fields. Native crash grouping uses incident versions and filtered
+exception/image facts, never raw logs, paths, symbols, media or transcripts.
+
+Canonical adapter files live in Record's `integrations/crash-relay`; synchronize
+with `node scripts/sync-crash-relay.mjs /path/to/crash-relay` from Record.
+Before release, verify the GitHub App has Issues access to Record, deploy using
+the existing workflow and exercise synthetic create/duplicate/aggregate/reopen.
+Close synthetic issues afterward. Disable `RECORD_REPORTS_ENABLED` for rollback;
+retain the namespace, migration history, existing routes and selected repositories.
