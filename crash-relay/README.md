@@ -280,3 +280,11 @@ Kill switch: `FINE_ME_NOT_REPORTS_ENABLED=false`, redeploy through the existing
 Deploy Crash Relay workflow. The health endpoint `/v1/fine-me-not/health` reports
 bindings/configuration only; synthetic delivery proves GitHub permissions.
 Run `npm test` and `npx wrangler deploy --dry-run` before deployment.
+
+## Paper adapter
+
+`POST /v1/paper/reports` accepts the strict 8 KiB `paper-diagnostic-v1` projection and routes only to `aindaco1/paper`. It reuses `ReviewedReportGroup` for serialized aggregation, same-ID deduplication, uncertain-delivery retry and issue reopening. No existing namespace or migration changes. Disable `PAPER_REPORTS_ENABLED` to roll back intake without deleting stored receipts.
+
+Paper owns the canonical files in `integrations/crash-relay/`; synchronize them with Paper's `script/sync-crash-relay.mjs`, then run this relay's complete tests and deployment dry-run. Native reports contain numeric app/OS versions, broad overlay state, bounded event categories and optionally filtered crash facts. No paths, display IDs, city, app names, recipe contents, raw logs or stack symbols are accepted.
+
+The GitHub App needs this repository added to its selected repositories; retain its existing permissions and repositories. Source tests and a deployed route alone do not prove delivery. Verify only synthetic reports for create, same-ID duplicate, new-ID aggregation and reopening, then close the synthetic issues.

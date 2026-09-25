@@ -43,7 +43,8 @@
     "DEBUG_VERBOSE_CONSOLE_LOGGING": "false",
     "GITHUB_OWNER": "aindaco1",
     "GITHUB_REPO": "ascii-vj-remix",
-    "FINE_ME_NOT_REPORTS_ENABLED": "true"
+    "FINE_ME_NOT_REPORTS_ENABLED": "true",
+    "PAPER_REPORTS_ENABLED": "true"
   },
   "durable_objects": {
     "bindings": [
@@ -70,6 +71,10 @@
       {
         "name": "FINE_ME_NOT_INBOX",
         "class_name": "FineMeNotInbox"
+      },
+      {
+        "name": "PAPER_REPORT_GROUPS",
+        "class_name": "PaperReportGroup"
       }
     ]
   },
@@ -103,6 +108,12 @@
       "new_sqlite_classes": [
         "FineMeNotReportGroup",
         "FineMeNotInbox"
+      ]
+    },
+    {
+      "tag": "paper-reports-v1",
+      "new_sqlite_classes": [
+        "PaperReportGroup"
       ]
     }
   ],
