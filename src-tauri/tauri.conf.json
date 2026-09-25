@@ -69,6 +69,8 @@
       }
     },
     "resources": [
+      "../shared/dust-wave-platform/LICENSE",
+      "../shared/dust-wave-platform/packages/desktop-core/NOTICE",
       "resources/ffmpeg/**/*",
       "../media/**/*"
     ]

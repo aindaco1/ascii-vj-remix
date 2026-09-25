@@ -1,5 +1,9 @@
 # Contributor Guide
 
+The [shared desktop migration](SHARED_DESKTOP_MIGRATION.md) records the pinned
+Platform packages, original Dust Wave relay additions licensed under MIT, and
+independent rollback. Upstream ASCILINE code is excluded from that extraction.
+
 This guide is for people who want to build, test, document, or extend ASCII VJ
 Remix.
 

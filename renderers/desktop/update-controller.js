@@ -1,3 +1,5 @@
+import { createUpdateProgress } from '../../shared/dust-wave-platform/packages/desktop-core/src/update-progress.js';
+
 const DEFAULT_CHECK_TIMEOUT_MS = 15_000;
 const DEFAULT_INSTALL_TIMEOUT_MS = 300_000;
 
@@ -85,19 +87,15 @@ class DesktopUpdateController {
         this.status = 'Downloading...';
         this._emit();
 
-        let received = 0;
-        let total = 0;
+        const progress = createUpdateProgress();
         const updateProgress = (event) => {
             if (!event) return;
+            const { totalBytes: total, percentage } = progress(event);
             if (event.event === 'Started') {
-                received = 0;
-                total = Number(event.data?.contentLength || 0);
                 this.status = total > 0 ? 'Downloading 0%' : 'Downloading...';
             } else if (event.event === 'Progress') {
-                received += Number(event.data?.chunkLength || 0);
                 if (total > 0) {
-                    const percent = Math.min(100, Math.floor((received / total) * 100));
-                    this.status = `Downloading ${percent}%`;
+                    this.status = `Downloading ${percentage}%`;
                 }
             } else if (event.event === 'Finished') {
                 this.status = 'Installing...';

@@ -9,7 +9,7 @@ import { prepareCases } from './jev_cases.mjs';
 import { evaluateJevCases, callCloudflareJev } from '../shared/dust-wave-platform/packages/test-core/src/jev.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-export const PLATFORM_PIN = '60d439b887f1244f82ff232c849d74152b28c776';
+export const PLATFORM_PIN = JSON.parse(readFileSync(path.join(ROOT, 'platform-desktop.json'), 'utf8')).commit;
 export const POLICY = { minimumMargin: 0.10, models: ['jev-1.13.0'] }; // Provisional for this corpus; never auto-tuned.
 export const LIMITS = { requests: 20, questions: 20, totalBytes: 64000 };
 const SOURCES = ['scripts/jev_cases.mjs', 'scripts/jev_evaluation.mjs',
@@ -25,7 +25,7 @@ export function verifyPlatform() {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
   const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { cwd, encoding: 'utf8' }).trim();
   const version = JSON.parse(readFileSync(path.join(cwd, 'packages/test-core/package.json'))).version;
-  if (commit !== PLATFORM_PIN || dirty || version !== '0.3.0') throw new Error('Unexpected Platform pin, version or local changes');
+  if (commit !== PLATFORM_PIN || dirty || version !== '0.3.1') throw new Error('Unexpected Platform pin, version or local changes');
   return commit;
 }
 

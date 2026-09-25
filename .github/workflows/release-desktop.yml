@@ -29,6 +29,7 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
@@ -62,6 +63,7 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 1
           ref: ${{ env.RELEASE_TAG }}
 
@@ -95,6 +97,7 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 1
           ref: ${{ env.RELEASE_TAG }}
 
@@ -176,6 +179,7 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 1
           ref: ${{ env.RELEASE_TAG }}
 
@@ -245,12 +249,14 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Checkout release tooling
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 1
           ref: ${{ github.sha }}
           path: .release-tooling
@@ -521,6 +527,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
@@ -577,12 +584,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Checkout current release acceptance tooling
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           fetch-depth: 1
           ref: ${{ github.sha }}
           path: .release-tooling
