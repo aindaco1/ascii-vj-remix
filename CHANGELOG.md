@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.6] - 2026-09-25
+
+- Share Tauri progress/manifest helpers, reviewed-report sender, serialized aggregation and GitHub issue reconciliation through the pinned Dust Wave Platform dependency. Preserve existing update consent and product-specific diagnostics behavior. See the [migration record](docs/SHARED_DESKTOP_MIGRATION.md).
+
 ## [1.0.5] - 2026-09-16
 
 ### Fixed

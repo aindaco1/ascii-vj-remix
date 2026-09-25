@@ -47,7 +47,21 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create release tag
+      - name: Accept exact main-push Desktop CI before tagging
+        if: steps.tag.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: >-
+          node scripts/require_github_workflow_success.mjs
+          --repository "${{ github.repository }}"
+          --workflow desktop.yml
+          --commit "${{ github.sha }}"
+          --branch main
+          --event push
+          --timeout-ms 14400000
+
+      - name: Tag accepted source
         if: steps.tag.outputs.exists != 'true'
         shell: bash
         run: |

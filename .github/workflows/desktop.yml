@@ -28,8 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          submodules: true
+          submodules: recursive
 
+      - name: Verify shared desktop dependency contract
+        run: node shared/dust-wave-platform/scripts/check-desktop-consumer.mjs
       - name: Record host and toolchain
         if: runner.os == 'macOS'
         run: |

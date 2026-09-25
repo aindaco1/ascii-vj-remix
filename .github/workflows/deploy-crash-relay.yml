@@ -16,7 +16,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
+      - name: Verify shared desktop dependency contract
+        run: node shared/dust-wave-platform/scripts/check-desktop-consumer.mjs
       - name: Install Node
         uses: actions/setup-node@v6
         with:

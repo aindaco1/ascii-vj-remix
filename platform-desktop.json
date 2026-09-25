@@ -1,0 +1,8 @@
+{
+  "commit": "fa7a8b3310819ce7d2c29f18b481966805bf2d1c",
+  "packages": {
+    "test-core": "0.3.1",
+    "desktop-core": "0.1.0",
+    "release-core": "0.5.0"
+  }
+}

@@ -1,3 +1,4 @@
+import { sendReviewedReport } from '@dustwave/desktop-core/report-client';
 import { validateMkvReport } from './mkv.js';
 
 const status = document.querySelector('#status');
@@ -25,23 +26,7 @@ send.addEventListener('click', async () => {
   discard.disabled = true;
   status.textContent = 'Sending reviewed report…';
   try {
-    const response = await fetch('/v1/mkv-magic/reports', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
-      credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(15000) });
-    if (!response.ok || !response.body) throw new Error();
-    const reader = response.body.getReader();
-    let raw = ''; let size = 0;
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read(); if (done) break;
-      size += value.byteLength;
-      if (size > 4096) { await reader.cancel(); throw new Error(); }
-      raw += decoder.decode(value, { stream: true });
-    }
-    raw += decoder.decode();
-    const receipt = JSON.parse(raw);
-    if (receipt.ok !== true || receipt.reportId !== report.id || !Number.isSafeInteger(receipt.issueNumber)
-      || receipt.issueNumber < 1 || !['created', 'updated', 'duplicate'].includes(receipt.action)) throw new Error();
+    const receipt = await sendReviewedReport('/v1/mkv-magic/reports', report);
     sessionStorage.removeItem(storageKey);
     status.textContent = 'Accepted. Similar reports are grouped in ';
     const link = document.createElement('a');

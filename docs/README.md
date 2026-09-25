@@ -19,6 +19,7 @@ release records and benchmark evidence.
 | Guide | Purpose |
 | --- | --- |
 | [Contributor Guide](CONTRIBUTORS.md) | Setup, local development, app identity, FFmpeg, Podman, and contribution workflow. |
+| [Shared desktop migration](SHARED_DESKTOP_MIGRATION.md) | Pinned updater and relay primitives, provenance, validation and rollback. |
 | [LLM Agent Guide](AGENTS.md) | Context-loading order, constraints, source ownership, and safe editing. |
 | [Rendering Engine](RENDERING_ENGINE.md) | Source/parameter flow, renderer backends, native output, audio, and MIDI architecture. |
 | [Release and Updater Guide](RELEASING.md) | Reusable packaging, signing, publication, artifact acceptance, and updater procedures. |

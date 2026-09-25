@@ -1,3 +1,4 @@
+import { createTauriUpdateManifest, githubReleaseAssetName, githubReleaseAssetUrl } from '../../shared/dust-wave-platform/packages/release-core/src/tauri-updater.js';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -108,14 +109,6 @@ function artifactScore(filePath) {
   if (name.endsWith('.rpm')) return 85;
   if (name.endsWith('.dmg')) return 90;
   return 100;
-}
-
-function githubReleaseAssetName(name) {
-  return String(name || '').replace(/\s+/g, '.');
-}
-
-function githubReleaseAssetUrl(baseUrl, artifactName) {
-  return `${baseUrl}/${encodeURIComponent(githubReleaseAssetName(artifactName))}`;
 }
 
 function installerForArtifactName(artifactName) {
@@ -254,13 +247,9 @@ async function createUpdateFragment({
   }
 
   const fragment = {
-    version: finalVersion,
-    notes: notes || `ASCII VJ Remix ${finalVersion}`,
-    pub_date: pubDate || new Date().toISOString(),
-    platforms,
-    _source: {
-      artifacts: selectedArtifacts
-    }
+    ...createTauriUpdateManifest({ version: finalVersion, notes: notes || `ASCII VJ Remix ${finalVersion}`,
+      pubDate: pubDate || new Date().toISOString(), platforms }),
+    _source: { artifacts: selectedArtifacts }
   };
 
   await mkdir(path.dirname(outFile), { recursive: true });
@@ -297,12 +286,8 @@ async function mergeUpdateFragments({ fragmentsDir, outFile, version, notes, pub
     }
   }
 
-  const manifest = {
-    version: finalVersion,
-    notes: finalNotes,
-    pub_date: finalPubDate,
-    platforms
-  };
+  const manifest = createTauriUpdateManifest({ version: finalVersion,
+    notes: finalNotes, pubDate: finalPubDate, platforms });
 
   await mkdir(path.dirname(outFile), { recursive: true });
   await writeFile(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
