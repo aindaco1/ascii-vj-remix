@@ -1,6 +1,9 @@
 # Shared desktop services migration
 
-Source migration only; release and deployment acceptance remain separate.
+The shared desktop migration shipped in
+[v1.0.6](https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.0.6).
+This guide records source ownership and migration evidence; relay deployment
+and installed-app acceptance remain separate.
 
 - Consumer baseline: `a11e7f0c90f22d9ab1ebbaa4a502c0fc3771e534`.
 - Previous Platform pin: `60d439b887f1244f82ff232c849d74152b28c776`.
@@ -8,6 +11,23 @@ Source migration only; release and deployment acceptance remain separate.
 - Shared surface: Tauri progress/manifest helpers, reviewed-report sender, serialized aggregation and GitHub issue reconciliation.
 
 Keep relay routes, product schemas, fingerprints, authentication, issue text, bindings, storage keys, migration classes, rate limits and operator controls local. Existing Road Notice routing is preserved. App startup and install/restart UI stay local.
+
+## Shared-Service Maintenance
+
+The 1.0.6 maintenance context also includes these changes merged on September 25,
+2026 after the desktop tag. They do not add ASCII VJ app features:
+
+- The [Record adapter](../crash-relay/README.md#record-adapter) adds reviewed,
+  bounded diagnostics through the existing relay aggregation path.
+- The Platform pin advances Desktop Core from 0.1.0 to 0.2.0 for compatible
+  legacy adapters. The [consumer manifest](../platform-desktop.json) remains
+  the authority for the exact current revision and package versions.
+
+The published 1.0.6 desktop artifacts retain their tagged dependency revision;
+these later commits do not change those installers. Relay deployment and
+synthetic GitHub delivery have their own acceptance steps in the
+[relay guide](../crash-relay/README.md). A merged commit or desktop release does
+not establish either result.
 
 ## Validation
 

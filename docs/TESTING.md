@@ -140,16 +140,24 @@ The [integration verification record](testing/JEV_EVALUATION.md) preserves the
 exact results, evidence hashes and cleanup boundaries.
 
 Request construction, Cloudflare transport, response validation, and review
-routing reuse Platform Test Core 0.3.0 at immutable commit
-`60d439b887f1244f82ff232c849d74152b28c776`, through the public `test-core/jev`
-entry. This is the additive package reviewed in
-[Platform PR 46](https://github.com/aindaco1/dust-wave-platform/pull/46).
+routing reuse Platform Test Core through the public `test-core/jev` entry.
+[platform-desktop.json](../platform-desktop.json) owns the current immutable
+commit and exact package versions. The original integration used Test Core 0.3.0
+from [Platform PR 46](https://github.com/aindaco1/dust-wave-platform/pull/46);
+its dated results remain in the integration verification record.
 The adapter rejects a different or dirty Platform checkout. ASCII VJ owns only
 its corpus, authentication, budgets, reports, and command orchestration. There
 is no sibling-project import or copied model client, new npm dependency, runtime
 model call, or app version change. The shared checkout is not copied into `dist`.
-Rollback removes the four test scripts, commands, submodule, CI harness step,
-and documentation together; no application/data migration is involved.
+The evaluator currently verifies Test Core 0.3.1 but still writes `0.3.0` to the
+report's `testCoreVersion` field. Use the recorded `platformCommit`, source hashes,
+and manifest for dependency provenance until that metadata field is corrected.
+
+To roll back Jev alone, remove its four test scripts, commands, CI harness step,
+and documentation together. Retain the Platform submodule and manifest: the
+updater and relay also depend on them. Use the
+[shared desktop migration](SHARED_DESKTOP_MIGRATION.md#independent-rollback)
+for that integration's separate rollback. No application/data migration is involved.
 
 ## Test Categories
 

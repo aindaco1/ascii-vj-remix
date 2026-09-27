@@ -39,7 +39,7 @@ Start with the [install guide](../README.md#install-guide) and
   - Vulkan/GLES on Linux.
 - Native Pop Out preserves glyph-mode and character-set params for traditional
   ASCII presets instead of flattening them into solid cells.
-- Seventeen project-native palettes, nearest-color/luminance mapping, and ordered
+- Twenty-one project-native palettes, nearest-color/luminance mapping, and ordered
   Bayer 2x2/4x4/8x8 dithering share one parameter and lookup-table contract
   across browser, Canvas, and native output paths.
 - Glyph controls cover depth, offset, reverse, source/fixed color, background,
@@ -92,7 +92,8 @@ Start with the [install guide](../README.md#install-guide) and
   independently tunable and saved through the existing visual-preset schema.
 - Eleven built-in palette/glyph variants include ASCII City Nightshift, Braille,
   box drawing, CJK marks, Hiragana, Katakana, CJK Unified, and Hangul looks. The
-  other six palettes are incorporated into existing presets.
+  six additional non-cycling palettes are incorporated into existing presets.
+  The four cycling palettes are covered below.
 - User presets can be saved, duplicated, updated, deleted, imported, and
   exported.
 - Multiple named preset playlists can be saved with reordered stable preset
