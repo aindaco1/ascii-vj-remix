@@ -109,6 +109,9 @@ Start with the [install guide](../README.md#install-guide) and
   playback uses the existing Default Transition control, bounded to 1–5 seconds.
 - Preset transitions crossfade instead of fading to black.
 - Transition time is configurable.
+- Editing a visual control during a preset transition stops the transition at
+  the current look and keeps your edit. The interrupted look becomes Custom;
+  the selected media keeps playing. MIDI visual controls follow the same rule.
 - Presets preserve the active media source unless the user explicitly changes
   it.
 - WTF mode continuously transitions through randomized live-safe settings and

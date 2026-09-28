@@ -617,6 +617,8 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
 - `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
   Canvas reference, default-on brightness and live opt-out (RGB and glyph
   luminance), toggle persistence across presets/WTF/native payloads,
+  21 live spatial controls across all six scenes, manual/MIDI edits during
+  preset tweens and crossfades, persisted edits and crossfade-layer cleanup,
   frozen-frame equality, floating-point trail decay, Canvas
   limits and a playing 30-second video through the new presets and back to
   Classic Camera ASCII. All six spatial defaults must respond to two moving

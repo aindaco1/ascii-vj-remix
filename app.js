@@ -8408,7 +8408,8 @@ class RendererLabApp {
         return resumeWtf;
     }
 
-    _cancelActiveTransition() {
+    _cancelActiveTransition({ keepRenderer = false } = {}) {
+        this.retainedTransitionRendererToken = keepRenderer ? this.transitionToken : null;
         this.transitionToken++;
         this.transitioning = false;
         this._hideTransitionLayer();
@@ -8490,6 +8491,14 @@ class RendererLabApp {
     }
 
     _paramChanged(key, structural = false) {
+        // A direct control or MIDI edit owns the current value. Stop any preset
+        // tween before its next frame can overwrite the edit; a live crossfade
+        // keeps the incoming scene instead of restoring the outgoing renderer.
+        if (this.transitioning && !SOURCE_PARAM_KEYS.has(key)) {
+            this._cancelActiveTransition({ keepRenderer: true });
+            this.activePresetId = null;
+            this._renderPresets();
+        }
         if (key === 'sceneSpeed' || key === 'sceneFreeze') setCycleTransportRate(this.sceneTransport, this.running && !this.params.sceneFreeze ? this.params.sceneSpeed : 0);
         if (key === 'paletteCycleSpeed') setCycleTransportRate(this.paletteCycleTransport, this.running ? this.params.paletteCycleSpeed : 0);
         this._persist();
@@ -10865,11 +10874,12 @@ button:hover{background:#202a35}
             return;
         }
         try {
-            await this._transitionTo(target, transitionSeconds, {
+            const completed = await this._transitionTo(target, transitionSeconds, {
                 phase: 'preset-transition',
                 presetId: preset.id,
                 source: options.source || 'direct'
             });
+            if (!completed) return;
             if (!preset.readonly) {
                 preset.params = presetParams;
                 this._persistPresets();
@@ -10945,7 +10955,9 @@ button:hover{background:#202a35}
         );
         if (token !== this.transitionToken) {
             this._finishNativeOutputTransition(token, this.renderParams());
-            if (!options.keepTransitioning) this.transitioning = false;
+            if (this.retainedTransitionRendererToken === token && !this.transitioning) {
+                this._applyEffectiveRendererParams(this.renderParams(), 'transition-interrupted');
+            }
             return false;
         }
         return new Promise((resolve) => {
@@ -10957,7 +10969,7 @@ button:hover{background:#202a35}
             let discreteInputsSynced = false;
             const cancel = () => {
                 this._finishNativeOutputTransition(token, this.renderParams());
-                if (!options.keepTransitioning) this.transitioning = false;
+                if (token === this.transitionToken && !options.keepTransitioning) this.transitioning = false;
                 resolve(false);
             };
             const step = (now) => {
@@ -11126,7 +11138,12 @@ button:hover{background:#202a35}
                 if (finished) return;
                 finished = true;
                 this._finishNativeOutputTransition(token, this.renderParams());
-                runtime.cancelCrossfadeRenderer(prepared);
+                if (this.retainedTransitionRendererToken === token) {
+                    runtime.finishCrossfadeRenderer(prepared);
+                    this._applyEffectiveRendererParams(this.renderParams(), 'transition-interrupted');
+                } else {
+                    runtime.cancelCrossfadeRenderer(prepared);
+                }
                 if (active()) this.transitioning = false;
                 resolve(false);
             };

@@ -154,6 +154,23 @@ try {
         await new Promise(resolve=>setTimeout(resolve,200));
         if(video.paused)throw Error('Video fixture did not start');
         const timeBefore=video.currentTime;
+        const editControl=(key,value)=>{
+            const {input,config}=a.controlInputs.get(key);
+            if(config.type==='checkbox')input.checked=value;
+            else input.value=String(value);
+            input.dispatchEvent(new Event(config.type==='range'?'input':'change',{bubbles:true}));
+        };
+        const assertControl=(key,value)=>{
+            const renderer=a.staticRuntime.renderer;
+            for(const [owner,params] of [['saved',a.params],['renderer',renderer.params||renderer],['native',a._nativeOutputPayload().params]]){
+                if(params[key]!==value)throw Error(`${owner} lost manual ${key}: ${params[key]} != ${value}`);
+            }
+        };
+        const edits={sceneFov:100,scenePitch:13,sceneHeight:1.45,sceneMedia:.42,sceneMediaFit:'crop',
+            sceneRoute:'orbit',sceneSpeed:-.8,sceneFreeze:true,sceneMaterialGlyphs:false,
+            sceneWet:.35,sceneRain:.1,sceneFog:.04,sceneLight:1.4,sceneGlow:.8,sceneRelief:3,
+            sceneSeed:31,sceneOffset:12.5,feedbackAmount:.8,feedbackHalfLife:.5,feedbackZoom:.03,feedbackRotate:.1};
+        let manualControlChecks=0;
         const checkbox=a.controlInputs.get('brightOutput').input;
         checkbox.checked=false;a._handleControlInput('brightOutput');
         for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','brightness-relief','orbital-chamber','edge-etching','phosphor-echo','classic-camera-ascii']){
@@ -162,7 +179,55 @@ try {
             if((a.staticRuntime.renderer.params?.brightOutput??a.staticRuntime.renderer.brightOutput)!==false)throw Error(`Bright output failed to reach renderer: ${id}`);
             if(a.staticRuntime.source!==sourceBefore)throw Error(`Source replaced by ${id}`);
             if(video.paused||video.currentTime<timeBefore-.1)throw Error(`Playback interrupted by ${id}: ${JSON.stringify({paused:video.paused,before:timeBefore,after:video.currentTime,readyState:video.readyState,ended:video.ended,source:a.params.mediaUrl})}`);
+            if(a.params.visualMode!=='flat'){
+                const renderer=a.staticRuntime.renderer;
+                for(const [key,value] of Object.entries(edits)){
+                    editControl(key,value);assertControl(key,value);manualControlChecks++;
+                }
+                await new Promise(resolve=>setTimeout(resolve,80));
+                for(const [key,value] of Object.entries(edits))assertControl(key,value);
+                if(a.staticRuntime.renderer!==renderer)throw Error(`Live spatial controls rebuilt ${id}`);
+            }
         }
+        // A manual edit must survive the rest of a preset tween/crossfade,
+        // including native output parameters and persisted settings.
+        await a.applyPreset('neon-night-drive',{transitionSeconds:.15});
+        for(const kind of ['tween','crossfade','midi']){
+            editControl('sceneFov',97);
+            const pending=a.applyPreset(kind==='crossfade'?'neon-cathedral':(kind==='midi'?'neon-cathedral':'neon-night-drive'),{transitionSeconds:1.2});
+            await new Promise(resolve=>setTimeout(resolve,250));
+            if(!a.transitioning)throw Error(`${kind} regression did not interrupt a live transition`);
+            if(kind==='midi')a._applyMidiVisualValue('sceneFov',105);
+            else editControl('sceneFov',105);
+            await pending;
+            await new Promise(resolve=>setTimeout(resolve,160));
+            assertControl('sceneFov',105);
+            if(a.transitioning||a.activePresetId!==null)throw Error(`${kind} interrupt did not become Custom`);
+            if(a.params.visualMode!==(kind==='tween'?'city':'cathedral'))throw Error(`${kind} changed selected scene`);
+            if(a.staticRuntime.source!==sourceBefore||video.paused)throw Error(`${kind} edit interrupted video`);
+            if(document.querySelectorAll('.renderer-buffer-outgoing,.renderer-buffer-incoming').length)throw Error(`${kind} leaked crossfade layers`);
+            if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).sceneFov!==105)throw Error(`${kind} edit did not persist`);
+        }
+        // Native transition arming is asynchronous. A delayed arm must not
+        // restore the preset's travel rate after the user has interrupted it.
+        const originalArm=a._armNativeOutputTransition;
+        a._armNativeOutputTransition=async function(...args){
+            await new Promise(resolve=>setTimeout(resolve,180));
+            return originalArm.apply(this,args);
+        };
+        try {
+            const pending=a.applyPreset('neon-cathedral',{transitionSeconds:1.2});
+            await new Promise(resolve=>setTimeout(resolve,20));
+            if(!a.transitioning)throw Error('Delayed-arm regression missed the transition');
+            editControl('sceneSpeed',-1.25);
+            await pending;
+            assertControl('sceneSpeed',-1.25);
+            if(a.sceneTransport.toRate!==-1.25)throw Error('Delayed transition arm replaced manual travel speed');
+        } finally {a._armNativeOutputTransition=originalArm;}
+        editControl('visualMode','coast');
+        await new Promise(resolve=>setTimeout(resolve,500));
+        assertControl('visualMode','coast');
+        if(a.staticRuntime.source!==sourceBefore||video.paused)throw Error('Manual scene selection restarted media');
         for(let i=0;i<8;i++)if(a._makeWtfTarget(.1).brightOutput!==false)throw Error('Random visuals changed bright output preference');
         a._persist();
         if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==false)throw Error('Bright output did not persist');
@@ -172,7 +237,7 @@ try {
         for(const key of ['sceneSpeed','sceneFov','sceneMedia','edgeAmount','feedbackAmount'])if(!targets.includes(`visual.${key}`))throw Error(`Missing MIDI ${key}`);
         if(!targets.includes('action.visual.sceneFreeze.toggle')||!targets.includes('action.visual.sceneReset'))throw Error('Missing scene transport MIDI actions');
         if(targets.some(t=>/camera|mediaUrl|popout|sourceMode/i.test(t)))throw Error('Forbidden MIDI target');
-        return {cases,mediaResponse,canvas:cs,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
+        return {cases,mediaResponse,canvas:cs,manualControlChecks,manualTransitionEdits:['tween','crossfade','midi','delayed-arm'],manualSceneSelection:true,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
     });
     assert.deepEqual(errors,[]);
     if(process.env.SPATIAL_SMOKE_REPORT){writeFileSync(process.env.SPATIAL_SMOKE_REPORT,JSON.stringify(result,null,2));}

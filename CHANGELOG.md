@@ -9,6 +9,7 @@
 - Reuse the shared transport and bounded audio features for scene modulation; expose visual controls and transport actions to MIDI without adding source/capture/output actions.
 - Add a global Bright output toggle, on by default, that strongly lifts dark media before color/glyph selection and stays set across presets and launches. Turning it off retains the previous color response.
 - Give spatial presets distinct camera heights/tilts, speeds, framing and glyph styles, plus a narrow corridor, pitched cathedral roof, low shoreline, overhead relief terrain and rotating orbital view.
+- Keep manual visual and MIDI edits made during a preset transition instead of letting the transition overwrite them; retain the current Custom look and playing media.
 - Preserve the default Classic Camera ASCII selection, Auto backend preference and density limits. The preset ownership contract is now 87 total / 59 accelerated / 28 explicit Canvas.
 - Add geometric, transport, CPU/GPU pixel-parity, trail-decay and video-continuity checks. See [release scope and acceptance](docs/releases/RELEASE_1.1.0.md).
 

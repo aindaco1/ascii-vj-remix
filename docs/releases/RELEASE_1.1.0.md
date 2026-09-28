@@ -106,6 +106,17 @@ acceptance.
 
 ## Local validation
 
+A follow-up interaction check reproduced a manual-control race: changing Field
+of view during a numeric preset transition was overwritten by the next tween
+frame. Direct visual controls and MIDI now interrupt the transition and retain
+the edited Custom look. An interrupted crossfade retains its incoming renderer
+and cleans up the outgoing layer. The spatial smoke checks 21 controls across
+all six scenes, edits during numeric transitions and crossfades, MIDI edits,
+persistence, native output parameters and uninterrupted video playback.
+The follow-up browser preset suite passed and the optimized Dev app was rebuilt
+and installed. The new interaction assertions run in Chromium; native slider
+gesture timing remains an owner manual check rather than a claimed pass.
+
 The `npm test` desktop/static stages passed, including desktop/offline checks,
 the 87-preset browser matrix and source/transition/palette checks. The hosted
 Jev call then returned an incomplete-response error; the bounded
