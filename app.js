@@ -1,3 +1,6 @@
+import { renderSpatialCells } from './renderers/shared/spatial-canvas.js';
+import { SPATIAL_PRESETS } from './renderers/shared/spatial-presets.js';
+import { SPATIAL_DEFAULTS, SPATIAL_CONTRACT, SPATIAL_KEYS, SPATIAL_TWEEN_KEYS, SPATIAL_CONTROLS, spatialParams, effectsEnabled, spatialGlyphRamp } from './renderers/shared/spatial.js';
 import { COLOR_CYCLE_PRESETS } from './renderers/shared/color-cycle-presets.js';
 import { PALETTE_CYCLE_DEFAULTS, PALETTE_CONTRACT, paletteCycleParams, fillPaletteDisplay, createCycleTransport, setCycleTransportRate, cycleNowMs } from './renderers/shared/palette-cycling.js';
 import {
@@ -328,6 +331,7 @@ const DEFAULT_PARAMS = {
     fps: 60,
     fpsCap: 30,
     ...PALETTE_CYCLE_DEFAULTS,
+    ...SPATIAL_DEFAULTS,
     paletteId: 'none',
     paletteMapping: 'nearest',
     ditherMode: 'none',
@@ -703,6 +707,7 @@ const BUILTIN_PRESETS = [
     ...ASCII_TODAY_PRESETS,
     ...PALETTE_PRESETS,
     ...COLOR_CYCLE_PRESETS,
+    ...SPATIAL_PRESETS,
     {
         id: 'arcade-rain',
         name: 'Arcade Rain',
@@ -1531,6 +1536,7 @@ const CANVAS_ASCII_JITTER_MIGRATIONS = ASCII_WTF_PRESETS.map((preset) => ({
 }));
 
 const CONTROL_GROUPS = [
+    { title: 'Space / Motion', controls: SPATIAL_CONTROLS },
     {
         title: 'Playback',
         controls: [
@@ -1651,6 +1657,7 @@ function clampParamValue(key, value) {
 }
 
 const CLIENT_TWEEN_KEYS = new Set([
+    ...SPATIAL_TWEEN_KEYS,
     'paletteCycleSpeed', 'paletteCycleAmount',
     'saturationBoost',
     'contrastBoost',
@@ -1670,6 +1677,7 @@ const CLIENT_TWEEN_KEYS = new Set([
 ]);
 
 const STRUCTURAL_KEYS = new Set([
+    'visualMode',
     'sourceMode',
     'backend',
     'mediaUrl',
@@ -1691,6 +1699,7 @@ const STRUCTURAL_KEYS = new Set([
 const STREAM_REINIT_KEYS = new Set(['cols', 'rows', 'autoRows', 'mode', 'pixel', 'fpsCap']);
 const STREAM_CONTROL_KEYS = new Set(['codecQuality', 'codecTolerance', ...STREAM_REINIT_KEYS]);
 const STATIC_REBUILD_KEYS = new Set([
+    'visualMode',
     'backend',
     'mediaUrl',
     'mediaType',
@@ -1716,7 +1725,7 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'paletteCycleTransport', 'paletteCycleClockMs']);
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -1728,6 +1737,10 @@ const STATIC_GPU_BACKENDS = new Set(['auto', 'webgpu', 'webgl2']);
 const STATIC_CANVAS_BACKENDS = new Set(['canvas2d', 'pixel-canvas']);
 
 const CONTROL_APPLIES = {
+    ...Object.fromEntries(SPATIAL_KEYS.map(key => [key, ({ params }) => params.sourceMode === 'static' && (
+        SPATIAL_CONTRACT[key].modes ? SPATIAL_CONTRACT[key].modes.includes(params.visualMode) :
+        key === 'visualMode' || key.startsWith('feedback') || key === 'sceneFreeze' || params.visualMode !== 'flat'
+    )])),
     transitionSeconds: () => true,
     volume: ({ params }) => params.sourceMode === 'stream' || isLikelyVideo(params),
     loop: ({ params }) => isLikelyVideo(params),
@@ -2037,7 +2050,10 @@ function normalColumnLimit(params) {
 
 function normalizeParams(params, options = {}) {
     const { preserveBlob = false } = options;
-    const out = { ...DEFAULT_PARAMS, ...params };
+    const out = { ...DEFAULT_PARAMS, ...params, ...spatialParams(params) };
+    delete out.sceneTransport;
+    delete out.sceneClockMs;
+    delete out.sceneResetId;
     delete out.paletteCycleTransport;
     delete out.paletteCycleClockMs;
     let hasRuntimeCustomMedia = isCustomRuntimeMediaUrl(out.mediaUrl);
@@ -2530,6 +2546,9 @@ function customSourceMetaFromTauriFile(file) {
 
 function persistedParams(params) {
     params = { ...params };
+    delete params.sceneTransport;
+    delete params.sceneClockMs;
+    delete params.sceneResetId;
     delete params.paletteCycleTransport;
     delete params.paletteCycleClockMs;
     if (!isCustomRuntimeMediaUrl(params.mediaUrl) && !isCameraParams(params)) return params;
@@ -2846,7 +2865,12 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     const sampleXOffset = params.sampleX ?? 0.5;
     const sampleYOffset = params.sampleY ?? 0.5;
 
-    for (let row = 0; row < rows; row++) {
+    if (effectsEnabled(params)) {
+        const cells = renderSpatialCells(params, sourcePixels, sampleWidth, sampleHeight, cols, rows,
+            (rgb, x, y) => processGpuCellColor(...rgb, params, x, y, paletteLut, paletteDisplay), {});
+        gridPixels.set(cells);
+        for (let i = 3; i < gridPixels.length; i += 4) gridPixels[i] = 255;
+    } else for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             const seedX = col + time * jitterSpeed * 7.13;
             const seedY = row + time * jitterSpeed * 11.71;
@@ -4246,7 +4270,7 @@ class CanvasStaticRenderer {
         const actualBackend = params.backend === 'pixel-canvas' ? 'pixel-canvas' : 'canvas2d';
         this.params = effectiveGridParams(params, this.source?.width, this.source?.height, actualBackend);
         this._syncPaletteLut();
-        this.glyphRamp = activeGlyphRamp(this.params);
+        this.glyphRamp = spatialGlyphRamp(activeGlyphRamp(this.params), this.params);
         this.canvas = this.document.createElement('canvas');
         this.canvas.className = 'ascii-canvas';
         this.ctx = this.canvas.getContext('2d', { alpha: false });
@@ -4283,7 +4307,7 @@ class CanvasStaticRenderer {
         this.requestedParams = { ...params };
         this.params = next;
         this._syncPaletteLut();
-        this.glyphRamp = activeGlyphRamp(this.params);
+        this.glyphRamp = spatialGlyphRamp(activeGlyphRamp(this.params), this.params);
         if (this.source?.element) {
             this.source.element.volume = params.volume;
             this.source.element.muted = params.muted;
@@ -4402,6 +4426,25 @@ class CanvasStaticRenderer {
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.textBaseline = 'top';
         ctx.font = `bold ${Math.max(1, this.params.cellHeight)}px ${this.params.fontFamily}, monospace`;
+        if (effectsEnabled(this.params)) {
+            const cells = renderSpatialCells(this.params, data, sampleWidth, sampleHeight, cols, this.rows,
+                (rgb, x, y) => processGpuCellColor(...rgb, this.params, x, y, this.paletteLut, this.paletteDisplay),
+                this.spatialState ||= {});
+            const ramp = [...this.glyphRamp];
+            for (let y = 0; y < this.rows; y++) for (let x = 0; x < cols; x++) {
+                const i = (y * cols + x) * 4;
+                ctx.fillStyle = this.params.glyphColorMode === 'fixed' && this.params.glyphMode
+                    ? this.params.glyphColor : this._colorCss(cells[i], cells[i + 1], cells[i + 2]);
+                if (usesPixelCanvas(this.params) || this.params.solidMode || !this.params.glyphMode) {
+                    ctx.fillRect(x * this.params.cellWidth, y * this.params.cellHeight, this.params.cellWidth, this.params.cellHeight);
+                } else {
+                    ctx.fillText(ramp[Math.min(ramp.length - 1, Math.floor(cells[i + 3] / 255 * ramp.length))], x * this.params.cellWidth, y * this.params.cellHeight);
+                }
+            }
+            this.frameCount++;
+            return;
+        }
+        this.spatialState = null;
         for (let y = 0; y < this.rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const seedX = x + time * jitterSpeed * 7.13;
@@ -4509,6 +4552,7 @@ class StaticRuntime {
             bgBlend: params.bgBlend,
             quantizeBits: params.quantizeBits,
             ...paletteCycleParams(params, this.app?.paletteCycleTransport || this.paletteCycleTransport || params.paletteCycleTransport),
+            ...spatialParams(params, this.app?.sceneTransport || this.sceneTransport || params.sceneTransport),
             paletteId: params.paletteId,
             paletteMapping: params.paletteMapping,
             ditherMode: params.ditherMode,
@@ -4543,7 +4587,7 @@ class StaticRuntime {
     _applyRendererParams(renderer, params) {
         if (!renderer) return;
         if (renderer instanceof CanvasStaticRenderer) {
-            renderer.updateParams({ ...params, paletteCycleTransport: this.app.paletteCycleTransport });
+            renderer.updateParams({ ...params, paletteCycleTransport: this.app.paletteCycleTransport, sceneTransport: this.app.sceneTransport });
             return;
         }
         renderer.saturationBoost = params.saturationBoost;
@@ -4552,7 +4596,7 @@ class StaticRuntime {
         renderer.gamma = params.gamma;
         renderer.bgBlend = params.bgBlend;
         renderer.quantizeBits = params.quantizeBits;
-        Object.assign(renderer, paletteCycleParams(params, this.app.paletteCycleTransport));
+        Object.assign(renderer, paletteCycleParams(params, this.app.paletteCycleTransport), spatialParams(params, this.app.sceneTransport));
         renderer.paletteId = params.paletteId;
         renderer.paletteMapping = params.paletteMapping;
         renderer.ditherMode = params.ditherMode;
@@ -5861,6 +5905,8 @@ class RendererLabApp {
         const hasStoredParams = localStorage.getItem(STORAGE_KEY) !== null;
         this.params = startupSafeParams(migrateStoredParams(parseStoredJson(STORAGE_KEY, DEFAULT_PARAMS)));
         this.paletteCycleTransport = createCycleTransport();
+        this.sceneTransport = createCycleTransport();
+        this.sceneResetId = 0;
         this.effectiveParams = null;
         this.audioReactive = { ...AUDIO_REACTIVE_DEFAULTS };
         this.audioReactiveInputs = new Map();
@@ -7031,11 +7077,30 @@ class RendererLabApp {
                 section.appendChild(row);
                 this.controlInputs.set(config.key, { input, value, config, row, section });
             }
+            if (group.title === 'Space / Motion') {
+                const reset = document.createElement('button');
+                reset.type = 'button'; reset.textContent = 'Reset scene / trails';
+                reset.addEventListener('click', () => this._resetScene());
+                section.appendChild(reset);
+            }
             const target = group.title === 'Camera' && els.cameraControlsSlot
                 ? els.cameraControlsSlot
                 : els.controls;
             target.appendChild(section);
         }
+    }
+
+    _resetScene() {
+        Object.assign(this.sceneTransport, createCycleTransport(this.running && !this.params.sceneFreeze ? this.params.sceneSpeed : 0));
+        this.params.sceneOffset = 0;
+        this.sceneResetId++;
+        for (const renderer of [this.staticRuntime?.renderer, this.popoutRenderer]) {
+            if (renderer) renderer.spatialState = renderer instanceof CanvasStaticRenderer ? null : {};
+        }
+        this._syncInputValues(['sceneOffset']);
+        this._persist();
+        this._applyEffectiveRendererParams(this.renderParams());
+        return true;
     }
 
     _buildAudioReactiveControls() {
@@ -7442,6 +7507,7 @@ class RendererLabApp {
         const sampleMs = Math.max(120, Number(payload.sampleMs) || 500);
         const columns = clamp(Math.round(Number(payload.columns) || DEFAULT_PARAMS.cols), 80, 900);
         const syntheticAudio = payload.syntheticAudio === true;
+        const spatial = spatialParams(payload.spatial || {});
         const mediaUrl = String(payload.mediaUrl || DEFAULT_PARAMS.mediaUrl);
         const backend = STATIC_GPU_BACKENDS.has(payload.backend) || STATIC_CANVAS_BACKENDS.has(payload.backend)
             ? payload.backend
@@ -7504,6 +7570,7 @@ class RendererLabApp {
             sampleMs,
             columns,
             syntheticAudio,
+            spatial,
             backend,
             paletteId,
             ditherMode,
@@ -7630,6 +7697,7 @@ class RendererLabApp {
             this._stopWtf();
             this.params = normalizeParams({
                 ...DEFAULT_PARAMS,
+                ...spatial,
                 sourceMode: 'static',
                 backend,
                 mediaUrl,
@@ -7848,10 +7916,10 @@ class RendererLabApp {
     renderParams() {
         if (this.audioReactiveRuntime?.active && this.audioReactiveFeatures) {
             this.effectiveParams = applyAudioReactiveModulation(this.params, this.audioReactiveFeatures, this.audioReactive, { clampParamValue });
-            return { ...this.effectiveParams, paletteCycleTransport: this.paletteCycleTransport };
+            return { ...this.effectiveParams, paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
         }
         this.effectiveParams = null;
-        return { ...this.params, paletteCycleTransport: this.paletteCycleTransport };
+        return { ...this.params, paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
     }
 
     _mainPreviewRenderParams(params = this.renderParams()) {
@@ -7870,10 +7938,11 @@ class RendererLabApp {
 
     _applyEffectiveRendererParams(params = this.renderParams(), key = 'live') {
         if (!this.running) return;
-        if (!this.transitioning && this.paletteCycleTransport.toRate !== params.paletteCycleSpeed) {
+        if (!this.transitioning) {
             setCycleTransportRate(this.paletteCycleTransport, params.paletteCycleSpeed);
+            setCycleTransportRate(this.sceneTransport, (params.sceneFreeze ? 0 : params.sceneSpeed));
         }
-        params = { ...params, paletteCycleTransport: this.paletteCycleTransport };
+        params = { ...params, paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
         this._applyMainPreviewRendererParams(params, key);
         this._updatePopoutRendererParams(params);
         this._syncNativeOutputWindow(params, key === 'audioReactive' ? NATIVE_OUTPUT_REACTIVE_SYNC_MS : 0);
@@ -8416,6 +8485,7 @@ class RendererLabApp {
     }
 
     _paramChanged(key, structural = false) {
+        if (key === 'sceneSpeed' || key === 'sceneFreeze') setCycleTransportRate(this.sceneTransport, this.running && !this.params.sceneFreeze ? this.params.sceneSpeed : 0);
         if (key === 'paletteCycleSpeed') setCycleTransportRate(this.paletteCycleTransport, this.running ? this.params.paletteCycleSpeed : 0);
         this._persist();
         this._applyVisualState();
@@ -8497,6 +8567,7 @@ class RendererLabApp {
         const startedAt = performance.now();
         logMediaDiagnostic('[RendererStartup] begin');
         setCycleTransportRate(this.paletteCycleTransport, this.params.paletteCycleSpeed);
+        setCycleTransportRate(this.sceneTransport, (this.params.sceneFreeze ? 0 : this.params.sceneSpeed));
         const token = ++this.startToken;
         els.overlay.classList.add('hidden');
         els.togglePlay.textContent = 'Stop';
@@ -8521,6 +8592,7 @@ class RendererLabApp {
         } catch (error) {
             logMediaDiagnostic(`[RendererStartup] failed ${diagnosticErrorLabel(error)}`);
             setCycleTransportRate(this.paletteCycleTransport, 0);
+            setCycleTransportRate(this.sceneTransport, 0);
             console.error(error);
             this.setConnection(error.message || 'Start failed');
             this.running = false;
@@ -8537,6 +8609,7 @@ class RendererLabApp {
 
     stop() {
         setCycleTransportRate(this.paletteCycleTransport, 0);
+        setCycleTransportRate(this.sceneTransport, 0);
         if (this.nativeOutputActive) this._syncNativeOutputWindow(this.renderParams(), 0, { force: true });
         this.nativeOutputCameraRestoreToken++;
         this.nativeOutputCameraRestorePending = false;
@@ -8727,6 +8800,7 @@ button:hover{background:#202a35}
 
     _canUseNativeRenderOutputWindow(params = this.params) {
         if (!this._canUseNativeOutputWindow()) return false;
+        if (effectsEnabled(params) && STATIC_CANVAS_BACKENDS.has(params.backend)) return false;
         if (params?.sourceMode !== 'static') return false;
         if (isCameraParams(params)) return false;
         if (String(params?.mediaUrl || '').startsWith('blob:')) return false;
@@ -8735,6 +8809,7 @@ button:hover{background:#202a35}
 
     _canUseNativeCameraOutputWindow(params = this.params) {
         if (!this._canUseNativeOutputWindow()) return false;
+        if (effectsEnabled(params) && STATIC_CANVAS_BACKENDS.has(params.backend)) return false;
         if (!isCameraParams(params)) return false;
         if (this._shouldMirrorNativeCameraOutput(params)) return false;
         return selectedCameraCount(params) === 1;
@@ -8780,6 +8855,9 @@ button:hover{background:#202a35}
         return {
             ...effective,
             ...paletteCycleParams(params, this.paletteCycleTransport),
+            ...spatialParams(params, this.sceneTransport),
+            sceneClockMs: cycleNowMs(),
+            sceneResetId: this.sceneResetId,
             paletteColors: paletteById(params.paletteId)?.colors || [],
             paletteCycleRanges: paletteById(params.paletteId)?.cycleRanges || [],
             paletteCycleClockMs: cycleNowMs(),
@@ -9113,6 +9191,7 @@ button:hover{background:#202a35}
         const localStart = () => {
             const startAtUnixMs = Date.now();
             setCycleTransportRate(this.paletteCycleTransport, this.running ? to.paletteCycleSpeed : 0, cycleNowMs(), durationMs);
+            setCycleTransportRate(this.sceneTransport, this.running ? (to.sceneFreeze ? 0 : to.sceneSpeed) : 0, cycleNowMs(), durationMs);
             return { armed: false, startAtUnixMs };
         };
         if (this.nativeOutputSourceSwitching) return localStart();
@@ -9139,6 +9218,7 @@ button:hover{background:#202a35}
 
         const startAtUnixMs = Date.now() + NATIVE_OUTPUT_TRANSITION_LEAD_MS;
         setCycleTransportRate(this.paletteCycleTransport, this.running ? to.paletteCycleSpeed : 0, cycleNowMs() + NATIVE_OUTPUT_TRANSITION_LEAD_MS, durationMs);
+        setCycleTransportRate(this.sceneTransport, this.running ? (to.sceneFreeze ? 0 : to.sceneSpeed) : 0, cycleNowMs() + NATIVE_OUTPUT_TRANSITION_LEAD_MS, durationMs);
         const payload = this._nativeOutputPayload(to, {
             kind,
             startAtUnixMs,
@@ -9608,7 +9688,8 @@ button:hover{background:#202a35}
                 bgBlend: params.bgBlend,
                 quantizeBits: params.quantizeBits,
                 ...paletteCycleParams(params, this.app?.paletteCycleTransport || this.paletteCycleTransport || params.paletteCycleTransport),
-            paletteId: params.paletteId,
+                ...spatialParams(params, this.app?.sceneTransport || this.sceneTransport || params.sceneTransport),
+                paletteId: params.paletteId,
                 paletteMapping: params.paletteMapping,
                 ditherMode: params.ditherMode,
                 ditherStrength: params.ditherStrength,
@@ -9661,7 +9742,7 @@ button:hover{background:#202a35}
         this.popoutRenderer.gamma = params.gamma;
         this.popoutRenderer.bgBlend = params.bgBlend;
         this.popoutRenderer.quantizeBits = params.quantizeBits;
-        Object.assign(this.popoutRenderer, paletteCycleParams(params, this.paletteCycleTransport));
+        Object.assign(this.popoutRenderer, paletteCycleParams(params, this.paletteCycleTransport), spatialParams(params, this.sceneTransport));
         this.popoutRenderer.paletteId = params.paletteId;
         this.popoutRenderer.paletteMapping = params.paletteMapping;
         this.popoutRenderer.ditherMode = params.ditherMode;
@@ -10818,6 +10899,7 @@ button:hover{background:#202a35}
             const mediaState = this._captureStaticMediaState(target);
             this.params = target;
             setCycleTransportRate(this.paletteCycleTransport, this.running ? target.paletteCycleSpeed : 0);
+            setCycleTransportRate(this.sceneTransport, this.running && !target.sceneFreeze ? target.sceneSpeed : 0);
             this._syncInputs();
             this._persist();
             if (this.running) await this.restart({ mediaState });
@@ -10983,7 +11065,7 @@ button:hover{background:#202a35}
         const source = this._staticMediaSource();
         const frameCount = Number(this.staticRuntime.renderer?.frameCount ?? 0);
         try {
-            const snapshot = renderSoftwareCellSnapshot(source, params, width, height, frameCount, {
+            const snapshot = renderSoftwareCellSnapshot(source, { ...params, sceneTransport: this.sceneTransport }, width, height, frameCount, {
                 maxCells: options.maxCells ?? 35000,
                 sampleLimit: options.sampleLimit ?? 700
             });
@@ -11437,6 +11519,8 @@ button:hover{background:#202a35}
             ['action.preset.enter', 'Action / Apply Preset Entry'],
             ['action.wtf.toggle', 'Action / Toggle WTF'],
             ['action.audio.toggle', 'Action / Toggle Audio Reactivity'],
+            ['action.visual.sceneFreeze.toggle', 'Action / Freeze Scene'],
+            ['action.visual.sceneReset', 'Action / Reset Scene and Trails'],
             ['action.visual.glyphMode.toggle', 'Action / Toggle Glyph Mode'],
             ['action.visual.solidMode.toggle', 'Action / Toggle Solid Mode'],
             ['action.visual.smoothing.toggle', 'Action / Toggle Smoothing'],
@@ -11602,6 +11686,8 @@ button:hover{background:#202a35}
             case 'action.audio.toggle':
                 this._toggleAudioReactive().catch((error) => console.warn('[MIDI] Audio toggle failed:', error));
                 return true;
+            case 'action.visual.sceneFreeze.toggle': return this._applyMidiVisualValue('sceneFreeze', !this.params.sceneFreeze);
+            case 'action.visual.sceneReset': return this._resetScene();
             case 'action.visual.glyphMode.toggle': return this._applyMidiVisualValue('glyphMode', !this.params.glyphMode);
             case 'action.visual.solidMode.toggle': return this._applyMidiVisualValue('solidMode', !this.params.solidMode);
             case 'action.visual.smoothing.toggle': return this._applyMidiVisualValue('smoothing', !this.params.smoothing);

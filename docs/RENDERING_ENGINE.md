@@ -370,7 +370,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 51 accelerated and 28
+route and requires the Windows preset matrix to preserve 59 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -716,7 +716,7 @@ Palettes contain immutable base colors and non-overlapping inclusive ranges.
 The source-to-index LUT always uses base colors; a separate RGBA display table
 animates their RGB entries. Alpha stores base luminance so cycling never changes
 the glyph mask. Off is the compatibility default. The catalog has 21 palettes
-and the preset contract is 79 total, 51 accelerated, 28 explicit Canvas.
+and the preset contract is 87 total, 59 accelerated, 28 explicit Canvas.
 
 `palette-cycling.js` owns range validation, signed modulo, classic/blended lookup,
 amount and the integrated speed transport. `cell-color.wgsl.js` supplies common
@@ -734,3 +734,59 @@ from saved settings, import/export, and preset definitions.
 Lookup tables, pipelines, glyph data and source textures remain independent of
 the cycling display table. Native/browser output receives the same controls;
 mirrored output receives already-rendered pixels and applies no second cycle.
+
+## Spatial stage (1.1.0, unpublished)
+
+`renderers/shared/spatial-contract.json` owns defaults, enumerations, limits and
+control labels. JS normalization, UI and Rust validation consume that contract;
+`spatial-audio.json` owns the additional bounded audio routes. Scene transport
+uses the existing palette transport integrator with its own state, so signed
+speed changes preserve phase, and native output rebases the sender clock.
+Transport/reset state is runtime-only and is excluded from saved presets.
+
+`spatial-shader.wgsl.js` contains original, shared scene and post-color math.
+WebGPU and native wgpu use it directly. `spatial-shader.js` lowers its small,
+explicitly typed syntax subset to GLSL; it is not a general WGSL translator.
+Real shader compilation and pixel comparisons cover both languages.
+`spatial-canvas.js` is the software geometry/effect reference.
+
+The initial engine casts a camera-plane ray per cell with at most 64 DDA steps
+and a 40-unit distance bound. It continues past low blocks, intersects roofs,
+and compares floors/ceilings with wall depth. The map repeats every 32 units of
+travel and bounds lateral geometry. Facade hashes sample just inside the hit
+surface to avoid rounding across a grid boundary. Lighting is directional plus
+an artistic contact term and analytic window glow, not global illumination.
+Wet floors launch one bounded reflected ray with ripple perturbation; rain uses
+four world-space sheets clipped against opaque depth. Orbitals uses at most 48
+sphere-tracing steps. Relief reads source luminance as block height. Surface framing accounts for
+the physical tile aspect (2:1 on walls, square on horizontal surfaces). Larger
+wall panels, roof/ceiling sampling and the orbital backdrop preserve visible
+source structure; current spatial presets blend in 85–95% source media.
+
+Scene RGB enters the existing color/palette/dither stage. The cell alpha channel
+still addresses a glyph; it does not carry depth. Optional material/edge glyphs
+append eight symbols to at most 88 base glyphs. A stable 16-cell coverage mask
+fades the material override as media contribution rises; full media uses source
+luminance for glyph choice. Edge direction uses source
+luminance gradients and the previous glyph near a threshold. Default flat
+processing and its 8-bit cell texture remain unchanged.
+
+Feedback uses two reusable floating-point history textures, separate from the
+existing 8-bit cell output. Retention integrates elapsed time and history zoom/
+rotation uses elapsed time too. WebGL2 uses two render targets; WebGPU/native
+write cell output and history in the same compute pass. Image bind groups are
+cached in both history directions. Canvas reuses two float arrays and one byte
+output. The older WebGL2 byte fallback applies an elapsed-time quantization
+correction so trails cannot become permanent. No per-frame glyph atlas or
+source reconstruction is introduced.
+
+Changing scene mode is a visual crossfade on the existing source. Native output
+receives scene parameters, clock and bounded audio state; it does not need
+screenshot IPC for accelerated scenes. Explicit Canvas spatial output uses the
+existing mirror fallback. Native softbuffer does not silently substitute flat
+media when a GPU scene cannot be presented; it reports the unavailable path.
+The legacy server-stream renderer is unchanged and hides spatial controls.
+
+Per-column geometry caching is a possible future optimization, not a claim of
+this implementation. The measured cell shader is the initial baseline; keep
+geometry parity fixtures and source continuity when changing traversal.

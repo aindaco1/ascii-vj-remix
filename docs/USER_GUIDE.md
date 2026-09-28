@@ -483,3 +483,67 @@ availability gate, so their Update control can flash and then disappear. The
 0.9.8 notarized DMG was the manual recovery release. Install a newer public DMG
 manually using the [install guide](../README.md#install-guide) if the Update
 control is unavailable; see the [Changelog](../CHANGELOG.md) for that fix.
+
+## Spatial visuals and trails (1.1.0)
+
+In **Space / Motion**, choose **Visual mode**, or search for one of the eight
+new presets. The release is currently a local development build for manual
+acceptance; public installers have not been replaced.
+
+| Preset | Look |
+| --- | --- |
+| Neon Night Drive | Variable-height buildings, illuminated windows, wet streets and rain |
+| Media Corridor | Your current media on walls and floor; fitted repeating screens |
+| Wet Coast | Open water on one side, buildings and reflected light on the other |
+| Neon Cathedral | Tall columns, overhead ribs and emissive surfaces |
+| Brightness Relief · Experimental | Media brightness controls column height; this is not recovered scene depth |
+| Orbital Chamber · Experimental | Bounded raymarched sphere and ring, with media color and moving bands |
+| Edge Etching | Directional line glyphs on strong image edges |
+| Phosphor Echo | Decaying trails with gentle zoom and rotation |
+
+**Travel speed** is signed: negative values reverse motion. **Freeze scene**
+stops the scene clock and echo decay/motion; the selected video and audio keep
+running. **Route position** adds an offset. **Reset scene / trails** returns
+the camera clock and offset to their origin and clears stored trails. Forward
+travel wraps through a repeating world; Street weave moves within the clear
+road, and Look around rotates the view while travelling. These are constrained
+2.5D routes, not a free-flying camera or an editable world.
+
+**Media amount** blends the selected source into surfaces. Spatial presets now
+start at 85–95% so your input drives their appearance. Zero uses procedural
+materials. Wall images occupy larger 8×4-unit panels; roofs and ceilings also
+use the source, and Orbital Chamber includes it behind the foreground shapes. **Surface framing** controls repeat, fit or crop within surface
+tiles. The existing source picker, camera mirroring and playback controls still
+own media. Previously saved/custom settings keep their values; reselect a
+spatial preset to load its stronger media defaults. Changing a visual preset does not select a new source or restart it.
+
+**Material glyphs** distinguishes surfaces, water, windows and sky. It reserves
+eight of the 96 glyph slots. As Media amount rises, its glyph override fades
+so the source brightness and shapes remain legible. Disable it and set Edge glyphs to zero to use the
+entire custom ramp unchanged. Edge glyphs works on flat media and chooses
+horizontal, vertical or diagonal strokes with hysteresis near its threshold.
+Palette cycling continues to use stable base luminance for ordinary glyphs.
+
+**Phosphor / echo**, **Trail half-life**, **Echo zoom** and **Echo rotation**
+work on flat and spatial modes. Long trails can hide fine details. History is
+cleared when the source, grid, scene, seed, route offset, palette or glyph layout
+changes, and when a render gap exceeds one second. Native structural crossfades
+also clear history. Floating-point history prevents dim trails from getting
+stuck; older WebGL2 devices without floating-point render attachments use a
+faster-decaying byte fallback.
+
+Existing audio settings add restrained bass movement to field of view and
+camera height, presence to light, beat accents to glow and treble to wet
+shimmer. These use the existing sensitivity, per-feature amounts and density
+dampening. MIDI Learn includes the spatial sliders/selectors, Freeze Scene and
+Reset Scene and Trails actions; it does not add source or camera actions.
+
+Spatial controls apply to local image/video/camera rendering, including camera
+composites. The legacy server-stream renderer keeps its existing behavior.
+WebGPU, WebGL2 and native wgpu render locally. Explicit Canvas retains the
+existing software density limit and uses the output mirror for spatial Pop Out.
+If a native GPU presenter is unavailable, choose Canvas for that fallback.
+Normal and Advanced density limits have not changed. Relief, orbitals, wet
+reflections and dense scenes can require more GPU time; reduce Columns before
+raising other limits. Physical M1/16 GB and Windows/Linux acceptance is still
+pending for this release.

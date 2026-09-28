@@ -1,3 +1,5 @@
+import spatialAudioRoutes from './spatial-audio.json' with { type: 'json' };
+import { SPATIAL_CONTRACT } from './spatial.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export const AUDIO_REACTIVE_DEFAULTS = {
@@ -263,6 +265,13 @@ export function applyAudioReactiveModulation(baseParams, features, audioSettings
         out[key] = clampParamValue(key, Number(baseParams[key] || 0) + amount * scale);
     }
 
+    if (baseParams.visualMode && baseParams.visualMode !== 'flat') {
+        for (const [key, feature, scale] of spatialAudioRoutes) {
+            const rule = SPATIAL_CONTRACT[key];
+            const amount = Number(normalizedFeatures[feature] || 0) * sensitivity * audioFeatureAmount(feature, settings);
+            out[key] = clamp(Number(baseParams[key] ?? rule.default) + amount * scale, rule.min, rule.max);
+        }
+    }
     const swayAmount = sensitivity * (preset.sway || 0);
     if (swayAmount > 0) {
         const motion = Math.max(

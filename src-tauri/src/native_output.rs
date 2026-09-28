@@ -31,6 +31,7 @@ use tauri::{
 mod gpu;
 mod native_camera;
 mod palette;
+mod spatial;
 
 const NATIVE_OUTPUT_LABEL: &str = "native-output";
 const NATIVE_OUTPUT_CLOSED_EVENT: &str = "asciline-native-output-closed";
@@ -137,6 +138,8 @@ pub struct NativeOutputTransition {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeOutputParams {
+    #[serde(flatten)]
+    pub spatial: spatial::Input,
     pub source_mode: Option<String>,
     pub media_url: Option<String>,
     pub media_type: Option<String>,
@@ -457,6 +460,7 @@ struct NativeMirrorFrame {
 #[derive(Debug, Clone)]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 struct NativeRenderParams {
+    spatial: spatial::Params,
     loop_media: bool,
     cols: u32,
     rows: u32,
@@ -607,6 +611,7 @@ fn transition_frame_params(
     tween!(gamma);
     tween!(bg_blend);
     tween!(palette_cycle_amount);
+    frame.spatial.tween(&from.spatial, &to.spatial, eased);
     tween!(dither_strength);
     tween!(dither_bias);
     tween!(jitter_amount);
@@ -1030,6 +1035,7 @@ fn native_glyph_ramp_ids(params: &NativeRenderParams) -> Vec<u32> {
     if params.glyph_reverse {
         active.reverse();
     }
+    if params.spatial.special_glyphs() { active.truncate(88); active.extend(spatial::GLYPHS.chars().map(|c| c as u32)); }
     active
 }
 
@@ -2607,6 +2613,12 @@ fn apply_native_audio_modulation(
         add_native_audio_param(params, base, key, amount * scale);
     }
 
+    if base.spatial.option("visualMode") > 0.0 {
+        for (key, feature, scale) in spatial::AUDIO_ROUTES.iter() {
+            let amount = native_audio_feature_value(params, features, feature) * sensitivity * native_audio_feature_amount(params, feature);
+            params.spatial.add(&base.spatial, key, amount * scale);
+        }
+    }
     let sway_amount = sensitivity * routes.sway;
     if sway_amount > 0.0 {
         let motion = native_audio_feature_value(params, features, "flux")
@@ -3447,6 +3459,7 @@ impl NativeRenderParams {
         palette_luminance_order.sort_by(|a, b| native_palette_luma(palette_colors[*a])
             .total_cmp(&native_palette_luma(palette_colors[*b])).then_with(|| a.cmp(b)));
         Self {
+            spatial: spatial::Params::from_input(&params.spatial),
             loop_media: params.loop_.unwrap_or(true),
             cols: u32_param(params.cols, 480).clamp(1, 4096),
             rows: u32_param(params.rows, 0).min(4096),
@@ -3762,6 +3775,9 @@ impl NativeSoftbufferPresenter {
         frame_index: usize,
         crossfade: Option<(&NativeRenderParams, f64)>,
     ) -> Result<(), String> {
+        if params.spatial.enabled() {
+            return Err("Spatial output needs an accelerated native presenter. Select Canvas to use the preview mirror fallback.".into());
+        }
         let size = window
             .inner_size()
             .unwrap_or_else(|_| PhysicalSize::new(DEFAULT_OUTPUT_WIDTH, DEFAULT_OUTPUT_HEIGHT));

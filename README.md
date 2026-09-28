@@ -8,7 +8,7 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.0.6. Published artifacts are listed in
+The current source/package version is 1.1.0, prepared locally for manual testing and not yet published. See the [Spatial release record](docs/releases/RELEASE_1.1.0.md). Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).
 Release history is recorded in the [Changelog](CHANGELOG.md);
@@ -47,6 +47,7 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU and WebGL2 rendering, with Canvas compatibility fallbacks.
 - ASCII and cell visuals with palettes, ordered dithering, multilingual glyphs,
   and custom character ramps.
+- Spatial city, media corridor, wet coast and vaulted hall scenes, plus experimental brightness relief and orbitals. Edge glyphs and phosphor feedback also work on flat media.
 - Built-in and user presets, saved playlists, smooth crossfades, and continuous
   randomized WTF mode.
 - Local audio reactivity from microphone/input, files, and supported

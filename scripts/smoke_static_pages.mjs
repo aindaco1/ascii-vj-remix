@@ -1,3 +1,4 @@
+import { findChromiumExecutable } from './lib/chromium.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import http from 'node:http';
@@ -15,55 +16,6 @@ const port = Number(process.env.SMOKE_PORT || 4173);
 const baseUrl = `http://${host}:${port}`;
 const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
 
-function findChromiumExecutable() {
-  if (process.env.CHROMIUM_EXECUTABLE && existsSync(process.env.CHROMIUM_EXECUTABLE)) {
-    return process.env.CHROMIUM_EXECUTABLE;
-  }
-
-  const candidates = [];
-  const addCandidate = (...parts) => {
-    if (parts.every(Boolean)) candidates.push(path.join(...parts));
-  };
-  if (process.platform === 'darwin') {
-    addCandidate('/Applications', 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
-    addCandidate('/Applications', 'Microsoft Edge.app', 'Contents', 'MacOS', 'Microsoft Edge');
-  } else if (process.platform === 'win32') {
-    addCandidate(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
-    addCandidate(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe');
-  } else {
-    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
-  }
-
-  const cacheDir = process.platform === 'darwin'
-    ? path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright')
-    : process.platform === 'win32'
-      ? path.join(process.env.LOCALAPPDATA || '', 'ms-playwright')
-      : path.join(process.env.HOME || '', '.cache', 'ms-playwright');
-  if (existsSync(cacheDir)) {
-    const cacheCandidates = readdirSync(cacheDir)
-      .filter((entry) => entry.startsWith('chromium_headless_shell-'))
-      .sort()
-      .reverse()
-      .flatMap((entry) => {
-        const entryRoot = path.join(cacheDir, entry);
-        return [
-          path.join(entryRoot, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'),
-          path.join(entryRoot, 'chrome-headless-shell-mac-x64', 'chrome-headless-shell'),
-          path.join(entryRoot, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe'),
-          path.join(entryRoot, 'chrome-headless-shell-linux64', 'chrome-headless-shell')
-        ];
-      });
-    candidates.unshift(...cacheCandidates);
-  }
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
 
 function assertPresetBackendContract(presetMatrix) {
   const contract = validateBuiltInPresetBackendContract({
@@ -1590,6 +1542,7 @@ async function runSmoke() {
         cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
         saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
+        visualMode: 'flat', edgeAmount: 0, feedbackAmount: 0,
         solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
         paletteMapping: cases[0].mapping, paletteCycleMode: 'off', ditherMode: 'none' };
       try {

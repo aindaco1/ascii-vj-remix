@@ -658,6 +658,7 @@ fn spawn_ui_perf_smoke(app: &App) {
             "paletteId": palette_id,
             "ditherMode": dither_mode,
             "charset": charset,
+            "spatial": env::var("ASCILINE_UI_PERF_SMOKE_SPATIAL").ok().and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()).unwrap_or(json!({})),
             "soak": soak,
             "presetSweep": preset_sweep,
             "structuralTransitions": structural_transitions

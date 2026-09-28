@@ -183,7 +183,7 @@ for that integration's separate rollback. No application/data migration is invol
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 79 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 87 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -222,7 +222,7 @@ choose another parent directory. These fresh browser contexts contain synthetic
 smoke fixtures; diagnostics do not dump storage, environment variables, or the
 full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
-renderer checks, or the 79/51/28 preset ownership contract.
+renderer checks, or the 87/59/28 preset ownership contract.
 
 ### Renderer Backend Changes
 
@@ -403,9 +403,9 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 79 total / 51 accelerated / 28 explicit
+separately requires the centralized 87 total / 59 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 51 accelerated
+physical Windows acceptance must additionally confirm the 59 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 The same smoke renders known color swatches through actual WebGL2 and compares
@@ -606,3 +606,35 @@ separate when reporting validation. Historical per-version evidence lives in
 
 Prospective release, platform, accessibility, localization, and performance
 coverage is tracked in the [Roadmap](ROADMAP.md).
+
+## Spatial renderer changes
+
+- `npm run test:spatial`: variable-height occlusion, roof hits, no-hit/axis/corner
+  rays, rectilinear projection, wrapping, signed transport, finite/clamped
+  controls, audio bounds, long-tail decay and distinct source-shape response. Shared uniform vectors run in JS
+  and Rust; `npm run test:rust` also validates the complete native WGSL.
+- `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
+  Canvas reference, frozen-frame equality, floating-point trail decay, Canvas
+  limits and a playing 30-second video through the new presets and back to
+  Classic Camera ASCII. All six spatial defaults must respond to two moving
+  source frames with identical color/brightness histograms but different shapes,
+  in both RGB output and glyph choices. It requires a GPU-capable installed Chromium for
+  WebGPU; `CHROMIUM_EXECUTABLE` selects one. The default opens an isolated visible browser.
+  `SPATIAL_SMOKE_HEADLESS=1` is optional on drivers with a reliable headless
+  WebGPU swapchain. The numerical WebGPU test uses an offscreen GPU
+  attachment and boots its app fixture on WebGL2 because installed Chromium
+  intermittently reports an invalid startup swapchain with the baseline and
+  candidate WebGPU renderers. GPU diagnostics remain fatal; presentation is
+  covered separately by native/visible checks.
+- `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
+  media/resize paths and JavaScript/GPU errors, including the new presets.
+- Native scene performance can use the maintained UI harness, for example
+  `ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneWet":0.55,"sceneRain":0.2,"sceneMedia":0.85}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 npm run smoke:ui-perf`.
+  This is local-only and must use the development identity. Preserve the normal
+  frame-time and reactive-update gates; a screenshot is not a performance test.
+
+Manual acceptance: compare preview and native output while changing mode,
+source, density, palette and ramp; exercise freeze/reverse/reset, long feedback
+fades, source/video continuity, camera orientation, audio start/stop, MIDI
+pickup and output close/reopen. Verify a physical second display and the
+reference-floor hardware separately. See the [1.1.0 record](releases/RELEASE_1.1.0.md).

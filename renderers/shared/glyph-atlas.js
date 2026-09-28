@@ -1,3 +1,4 @@
+import { spatialGlyphRamp } from './spatial.js';
 import { activeGlyphRamp } from './character-sets.js';
 
 const GLYPH_ATLAS_STYLE = 'neutral';
@@ -19,7 +20,7 @@ const glyphMipCache = new WeakMap();
 
 function glyphRampCodePoints(params = {}) {
     return Uint32Array.from(
-        [...activeGlyphRamp(params)].slice(0, GLYPH_RAMP_LIMIT),
+        [...spatialGlyphRamp(activeGlyphRamp(params), params)].slice(0, GLYPH_RAMP_LIMIT),
         (scalar) => scalar.codePointAt(0)
     );
 }
@@ -36,7 +37,7 @@ function glyphResourceInputKey(params = {}) {
         params.glyphColorMode || '',
         params.glyphColor || '',
         params.backgroundColor || '',
-        params.atlasStyle || GLYPH_ATLAS_STYLE
+        params.atlasStyle || GLYPH_ATLAS_STYLE, params.visualMode, params.sceneMaterialGlyphs, Number(params.edgeAmount) > 0
     ].join(':');
 }
 

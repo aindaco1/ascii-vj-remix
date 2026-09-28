@@ -1,0 +1,7 @@
+[
+  ["sceneFov", "bass", 0.65],
+  ["sceneHeight", "bass", 0.012],
+  ["sceneLight", "presence", 0.045],
+  ["sceneGlow", "beatPulse", 0.08],
+  ["sceneWet", "treble", 0.015]
+]
