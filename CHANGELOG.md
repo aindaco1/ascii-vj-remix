@@ -4,10 +4,12 @@
 
 - Add eight original presets: Neon Night Drive, Media Corridor, Wet Coast, Neon Cathedral, Brightness Relief, Orbital Chamber, Edge Etching and Phosphor Echo. Relief and orbitals are experimental.
 - Add a shared GPU scene shader for WebGPU, WebGL2 and native Pop Out: variable-height grid geometry, roof visibility, floors/ceilings, stable facade textures, fog, directional/contact shading, window emission, wet reflections and depth-tested rain. Canvas has a bounded software reference.
-- Map the selected image, playing video or camera onto larger scene surfaces with aspect-aware repeat/fit/crop controls. Spatial presets use 85–95% media, and material glyphs fade to preserve source shapes. Scene presets retain source identity and playback.
+- Map the selected image, playing video or camera onto larger scene surfaces with aspect-aware repeat/fit/crop controls. Spatial presets use 85–100% media, and material glyphs fade to preserve source shapes. Scene presets retain source identity and playback.
 - Add signed travel speed, freeze/reset, route selection, material glyphs, edge-directed ASCII with hysteresis, and reusable floating-point feedback history with elapsed-time decay, zoom and rotation.
 - Reuse the shared transport and bounded audio features for scene modulation; expose visual controls and transport actions to MIDI without adding source/capture/output actions.
-- Preserve the default Classic Camera ASCII look, existing flat color processing and density limits. The preset ownership contract is now 87 total / 59 accelerated / 28 explicit Canvas.
+- Add a global Bright output toggle, on by default, that strongly lifts dark media before color/glyph selection and stays set across presets and launches. Turning it off retains the previous color response.
+- Give spatial presets distinct camera heights/tilts, speeds, framing and glyph styles, plus a narrow corridor, pitched cathedral roof, low shoreline, overhead relief terrain and rotating orbital view.
+- Preserve the default Classic Camera ASCII selection, Auto backend preference and density limits. The preset ownership contract is now 87 total / 59 accelerated / 28 explicit Canvas.
 - Add geometric, transport, CPU/GPU pixel-parity, trail-decay and video-continuity checks. See [release scope and acceptance](docs/releases/RELEASE_1.1.0.md).
 
 ## [1.0.6] - 2026-09-25

@@ -38,13 +38,13 @@ const source=()=>[.2,.4,.8];source.aspect=16/9;
 const a=createSpatialSampler(p,source,16/9,0),b=createSpatialSampler(p,source,16/9,32);
 for(const uv of [[.1,.2],[.4,.8],[.8,.5]])a(...uv).color.forEach((c,i)=>near(c,b(...uv).color[i]));
 function decay(hz){
-    const state={},out=new Float32Array(36),params={...p,feedbackAmount:.98,feedbackHalfLife:.7};let remaining=1;
+    const state={},out=new Float32Array(40),params={...p,feedbackAmount:.98,feedbackHalfLife:.7};let remaining=1;
     fillSpatialUniforms(out,params,120,45,10,state,1000);
     for(let i=1;i<=hz;i++){fillSpatialUniforms(out,params,120,45,10,state,1000+i*1000/hz);remaining*=out[18];}
     return remaining;
 }
 near(decay(30),decay(60));
-const data=new Float32Array(36),state={};fillSpatialUniforms(data,p,120,45,10,state,1000);assert.equal(data[21],0);
+const data=new Float32Array(40),state={};fillSpatialUniforms(data,p,120,45,10,state,1000);assert.equal(data[21],0);
 fillSpatialUniforms(data,p,120,45,10,state,1017);assert.equal(data[21],1);
 fillSpatialUniforms(data,{...p,sceneSeed:8},120,45,10,state,1034);assert.equal(data[21],0);
 fillSpatialUniforms(data,p,120,45,10,state,3000);assert.equal(data[21],0);
@@ -58,7 +58,7 @@ assert.ok(audio.sceneFov>=p.sceneFov&&audio.sceneFov<=110);assert.ok(audio.scene
 assert.equal(applyAudioReactiveModulation({...p,visualMode:'flat'},{bass:1},{sensitivity:12}).sceneHeight,p.sceneHeight);
 
 for (const fixture of JSON.parse(readFileSync(new URL('../tests/fixtures/spatial-uniforms.json',import.meta.url),'utf8'))) {
-    const p=spatialParams(fixture.input),state={},out=new Float32Array(36);
+    const p=spatialParams(fixture.input),state={},out=new Float32Array(40);
     for(const sample of fixture.samples){fillSpatialUniforms(out,p,fixture.cols,fixture.rows,fixture.baseGlyphCount,state,sample.now);out.forEach((n,i)=>near(n,sample.expected[i]));}
 }
 
@@ -95,3 +95,20 @@ for (const preset of SPATIAL_PRESETS.filter(p => p.params.visualMode !== 'flat')
 }
 console.log('Spatial geometry, projection, wrap seams, transport, bounded audio, presets and floating-point history passed.');
 console.log('Source-content response:', JSON.stringify(mediaResponse));
+
+// Same source, time, and grid: presets must differ in their actual projected
+// content, even before distinct glyph ramps or density make them look different.
+const sceneFrames = SPATIAL_PRESETS.filter(p=>p.params.visualMode!=='flat').map(preset=>{
+    const params={...preset.params,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)};
+    const pixels=new Uint8ClampedArray(64*48*4);
+    for(let y=0;y<48;y++)for(let x=0;x<64;x++)pixels.set([4+x*.3,3+y*.3,2+(x+y)%17,255],(y*64+x)*4);
+    const cells=renderSpatialCells(params,pixels,64,48,96,54,(rgb,x,y)=>processGpuCellColor(...rgb,params,x,y),{},1000);
+    return {id:preset.id,cells};
+});
+let minimumDifference=1;
+for(let i=0;i<sceneFrames.length;i++)for(let j=i+1;j<sceneFrames.length;j++){
+    const difference=spatialMediaDifference(sceneFrames[i].cells,sceneFrames[j].cells);
+    minimumDifference=Math.min(minimumDifference,difference.changedShapeFraction);
+    assert.ok(difference.changedShapeFraction>.2,`Similar compositions: ${sceneFrames[i].id} / ${sceneFrames[j].id}: ${JSON.stringify(difference)}`);
+}
+console.log('Minimum spatial preset difference on one dark source:',minimumDifference);

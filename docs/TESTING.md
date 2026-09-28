@@ -611,10 +611,13 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
 
 - `npm run test:spatial`: variable-height occlusion, roof hits, no-hit/axis/corner
   rays, rectilinear projection, wrapping, signed transport, finite/clamped
-  controls, audio bounds, long-tail decay and distinct source-shape response. Shared uniform vectors run in JS
+  controls, audio bounds, long-tail decay, distinct source-shape response and
+  pairwise differences between preset compositions on one dark input. Shared uniform vectors run in JS
   and Rust; `npm run test:rust` also validates the complete native WGSL.
 - `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
-  Canvas reference, frozen-frame equality, floating-point trail decay, Canvas
+  Canvas reference, default-on brightness and live opt-out (RGB and glyph
+  luminance), toggle persistence across presets/WTF/native payloads,
+  frozen-frame equality, floating-point trail decay, Canvas
   limits and a playing 30-second video through the new presets and back to
   Classic Camera ASCII. All six spatial defaults must respond to two moving
   source frames with identical color/brightness histograms but different shapes,
@@ -628,12 +631,17 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
   covered separately by native/visible checks.
 - `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
   media/resize paths and JavaScript/GPU errors, including the new presets.
+- `node scripts/capture_spatial_review.mjs /tmp/spatial-review.png` captures
+  one dark source, the brightness toggle off/on, and six spatial presets using
+  actual WebGL2 presentation. Glyph atlas loads must finish before capture.
 - Native scene performance can use the maintained UI harness, for example
   `ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneWet":0.55,"sceneRain":0.2,"sceneMedia":0.85}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 npm run smoke:ui-perf`.
   This is local-only and must use the development identity. Preserve the normal
   frame-time and reactive-update gates; a screenshot is not a performance test.
 
-Manual acceptance: compare preview and native output while changing mode,
+Manual acceptance: compare Bright output off/on on dark camera, image and
+video sources, reselect each spatial preset for its revised defaults, and
+compare preview and native output while changing mode,
 source, density, palette and ramp; exercise freeze/reverse/reset, long feedback
 fades, source/video continuity, camera orientation, audio start/stop, MIDI
 pickup and output close/reopen. Verify a physical second display and the

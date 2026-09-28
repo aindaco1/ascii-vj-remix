@@ -57,6 +57,14 @@ Start with the [install guide](../README.md#install-guide) and
 - The renderer exposes live controls for grid, cell size, color, gamma,
   brightness, contrast, saturation, background blend, quantization, jitter,
   sample position, smoothing, FPS, glyph/cell behavior, and performance status.
+- **Color → Bright output** is on by default. It strongly lifts dark colors
+  before glyph selection, so low-light camera,
+  image and video inputs produce brighter colors and denser glyphs. Your choice
+  persists across launches, preset switches, playlists and WTF mode. Turn it
+  off for the previous color response; the Brightness and Gamma sliders still
+  work. Pure black stays black. With a palette, the mapped colors are lifted
+  while its lookup and cycling ranges stay intact; fixed glyph colors keep
+  their chosen color.
 - Stats overlay is enabled by default and remains user-controlled.
 
 ### Presets and Live Controls
@@ -492,12 +500,12 @@ acceptance; public installers have not been replaced.
 
 | Preset | Look |
 | --- | --- |
-| Neon Night Drive | Variable-height buildings, illuminated windows, wet streets and rain |
-| Media Corridor | Your current media on walls and floor; fitted repeating screens |
-| Wet Coast | Open water on one side, buildings and reflected light on the other |
-| Neon Cathedral | Tall columns, overhead ribs and emissive surfaces |
-| Brightness Relief · Experimental | Media brightness controls column height; this is not recovered scene depth |
-| Orbital Chamber · Experimental | Bounded raymarched sphere and ring, with media color and moving bands |
+| Neon Night Drive | Fast, low street weave, tall buildings, wet streets and rain |
+| Media Corridor | Narrow, symmetric screen tunnel, wide lens and block glyphs |
+| Wet Coast | Slow, low waterfront view, open water, short shoreline buildings and Braille texture |
+| Neon Cathedral | Upward-looking nave with tall columns, a pitched roof and fine glyphs |
+| Brightness Relief · Experimental | Overhead solid-cell terrain; media controls block height and color without city streets |
+| Orbital Chamber · Experimental | Camera orbits a media-colored sphere and rotating tilted ring |
 | Edge Etching | Directional line glyphs on strong image edges |
 | Phosphor Echo | Decaying trails with gentle zoom and rotation |
 
@@ -506,11 +514,12 @@ stops the scene clock and echo decay/motion; the selected video and audio keep
 running. **Route position** adds an offset. **Reset scene / trails** returns
 the camera clock and offset to their origin and clears stored trails. Forward
 travel wraps through a repeating world; Street weave moves within the clear
-road, and Look around rotates the view while travelling. These are constrained
+road, and Look around / orbit rotates the travelling view or circles the orbital objects.
+**Camera tilt** looks up or down; Relief uses an elevated camera above its terrain. These are constrained
 2.5D routes, not a free-flying camera or an editable world.
 
 **Media amount** blends the selected source into surfaces. Spatial presets now
-start at 85–95% so your input drives their appearance. Zero uses procedural
+start at 85–100% so your input drives their appearance. Zero uses procedural
 materials. Wall images occupy larger 8×4-unit panels; roofs and ceilings also
 use the source, and Orbital Chamber includes it behind the foreground shapes. **Surface framing** controls repeat, fit or crop within surface
 tiles. The existing source picker, camera mirroring and playback controls still
@@ -526,7 +535,7 @@ Palette cycling continues to use stable base luminance for ordinary glyphs.
 
 **Phosphor / echo**, **Trail half-life**, **Echo zoom** and **Echo rotation**
 work on flat and spatial modes. Long trails can hide fine details. History is
-cleared when the source, grid, scene, seed, route offset, palette or glyph layout
+cleared when Bright output, the source, grid, scene, seed, route offset, palette or glyph layout
 changes, and when a render gap exceeds one second. Native structural crossfades
 also clear history. Floating-point history prevents dim trails from getting
 stuck; older WebGL2 devices without floating-point render attachments use a

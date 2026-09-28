@@ -22,22 +22,23 @@ fn sceneMap(cell: vec2f) -> vec2f {
     let x: f32 = cell.x;
     if (abs(x) > 24.0) { return vec2f(0.0); }
     if (mode == 2.0) {
-        if (x < -2.0 || x > 2.0) { return vec2f(4.0, 2.0); }
+        if (x < -1.0 || x > 1.0) { return vec2f(3.2, 2.0); }
         return vec2f(0.0);
     }
     if (mode == 4.0) {
-        if (abs(x) > 6.0) { return vec2f(7.0, 1.0); }
-        if (abs(x) > 2.0 && sceneMod(z, 5.0) < 1.0) { return vec2f(6.0, 3.0); }
+        if (abs(x) > 6.0) { return vec2f(9.0, 1.0); }
+        if (abs(x) > 2.0 && abs(x) < 5.0 && sceneMod(z, 4.0) < 1.0) { return vec2f(7.5, 3.0); }
         return vec2f(0.0);
     }
-    if (mode == 3.0 && x < 2.0) { return vec2f(0.0); }
+    if (mode == 5.0) {
+        if (x < -8.0 || x >= 8.0) { return vec2f(0.0); }
+        let media: vec3f = sceneMedia(vec2f((x + 8.5) / 16.0, (z + 0.5) / 32.0));
+        return vec2f(0.15 + sqrt(dot(media, vec3f(0.2126, 0.7152, 0.0722))) * effect(8).x, 4.0);
+    }
+    if (mode == 3.0 && x < 3.0) { return vec2f(0.0); }
     if (abs(x) < 3.0 || sceneMod(z, 8.0) < 2.0 || sceneMod(x + 3.0, 8.0) < 2.0) { return vec2f(0.0); }
     let n: f32 = sceneHash(vec2f(x, z));
-    if (mode == 5.0) {
-        let media: vec3f = sceneMedia(fract(vec2f(x * 0.0625, z * 0.03125)));
-        return vec2f(0.15 + dot(media, vec3f(0.2126, 0.7152, 0.0722)) * effect(8).x, 4.0);
-    }
-    return vec2f(1.4 + n * 6.0, 1.0);
+    return vec2f(choose(1.4 + n * 6.0, 0.8 + n * 2.4, mode == 3.0), 1.0);
 }
 fn sceneTrace(ro: vec3f, rd: vec3f, farLimit: f32) -> SceneHit {
     var cell: vec2f = floor(ro.xz);
@@ -107,6 +108,10 @@ fn sceneSurface(hit: SceneHit) -> SceneSample {
     var color: vec3f = vec3f(0.16, 0.2, 0.29) * light * contact + tint * (lit * 0.85 + windowGlow) * effect(2).z * pulse;
     var media: vec3f = sceneMapped(uv, 2.0);
     if (hit.normal.y > 0.5) { media = sceneMapped(p.xz * 0.125, 1.0); }
+    if (hit.material == 4.0) {
+        let block: vec2f = floor(p.xz - hit.normal.xz * 0.001);
+        media = sceneMedia(vec2f((block.x + 8.5) / 16.0, (sceneMod(block.y, 32.0) + 0.5) / 32.0));
+    }
     color = mix(color, media * (0.5 + light), effect(1).z);
     if (hit.material == 3.0) { color = color + tint * 0.25 * effect(2).z; }
     let fog: f32 = 1.0 - exp(-hit.distance * effect(2).x);
@@ -118,14 +123,24 @@ fn orbitalDistance(p: vec3f) -> f32 {
     let t: f32 = effect(0).z * 0.3;
     let center: vec3f = vec3f(sin(t) * 0.9, cos(t * 0.7) * 0.4, 0.0);
     let sphere: f32 = length(p - center) - 0.95;
-    let torus: f32 = length(vec2f(length(p.xz) - 1.65, p.y)) - 0.22;
+    let angle: f32 = 0.65 + t * 0.7;
+    let tilted: vec3f = vec3f(p.x, p.y * cos(angle) - p.z * sin(angle), p.y * sin(angle) + p.z * cos(angle));
+    let torus: f32 = length(vec2f(length(tilted.xz) - 1.65, tilted.y)) - 0.22;
     return min(sphere, torus);
+}
+// Camera-plane rays preserve straight edges and work for every scene.
+fn sceneRay(q: vec2f, yaw: f32, pitch: f32) -> vec3f {
+    let forward: vec3f = vec3f(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch));
+    let right: vec3f = vec3f(cos(yaw), 0.0, -sin(yaw));
+    let up: vec3f = vec3f(-sin(yaw) * sin(pitch), cos(pitch), -cos(yaw) * sin(pitch));
+    return forward + right * q.x + up * q.y;
 }
 fn sceneOrbitals(uv: vec2f) -> SceneSample {
     let plane: f32 = tan(effect(1).x * 0.5);
     let q: vec2f = (uv * 2.0 - 1.0) * vec2f(plane, -plane / max(0.2, effect(4).y));
-    let ro: vec3f = vec3f(0.0, effect(1).y - 0.6, -5.0);
-    let rd: vec3f = normalize(vec3f(q, 1.0));
+    let orbit: f32 = choose(0.0, sin(effect(0).z * 0.22) * 0.35, effect(0).y == 1.0) + choose(0.0, effect(0).z * 0.25, effect(0).y == 2.0);
+    let ro: vec3f = vec3f(sin(orbit) * 4.6, effect(1).y, -cos(orbit) * 4.6);
+    let rd: vec3f = normalize(sceneRay(q, -orbit, effect(9).x));
     var t: f32 = 0.0;
     for (var i: i32 = 0; i < 48; i = i + 1) {
         let p: vec3f = ro + rd * t;
@@ -140,7 +155,7 @@ fn sceneOrbitals(uv: vec2f) -> SceneSample {
         t = t + max(0.004, d);
         if (t > 14.0) { break; }
     }
-    return SceneSample(mix(sceneSky(rd), sceneMedia(uv) * 0.55, effect(1).z), effect(7).w);
+    return SceneSample(mix(sceneSky(rd), sceneMedia(uv) * 0.12, effect(1).z), effect(7).w);
 }
 fn sceneSample(uv: vec2f) -> SceneSample {
     if (effect(0).x == 6.0) { return sceneOrbitals(uv); }
@@ -148,21 +163,24 @@ fn sceneSample(uv: vec2f) -> SceneSample {
     let route: f32 = effect(0).y;
     let cameraX: f32 = 0.5 + choose(0.0, sin(time * 0.22) * 0.85, route == 1.0);
     let angle: f32 = choose(0.0, sin(time * 0.14) * 0.32, route == 1.0) + choose(0.0, time * 0.25, route == 2.0);
-    let ro: vec3f = vec3f(cameraX, effect(1).y, sceneMod(time, 32.0) + 0.5);
+    let ro: vec3f = vec3f(cameraX, effect(1).y + choose(0.0, effect(8).x, effect(0).x == 5.0), sceneMod(time, 32.0) + 0.5);
     let plane: f32 = tan(effect(1).x * 0.5);
     let q: vec2f = vec2f((uv.x * 2.0 - 1.0) * plane, (1.0 - uv.y * 2.0) * plane / max(0.2, effect(4).y));
-    let rd: vec3f = vec3f(sin(angle) + cos(angle) * q.x, q.y, cos(angle) - sin(angle) * q.x);
+    let rd: vec3f = sceneRay(q, angle, effect(9).x);
     var hit: SceneHit = sceneTrace(ro, rd, 40.0);
     var result: SceneSample = SceneSample(sceneSky(rd), effect(7).w);
     var surfaceDistance: f32 = hit.distance;
+    if (effect(0).x == 3.0) {
+        result.color = mix(result.color, sceneMedia(uv) * 0.65, effect(1).z);
+    }
     if (hit.material > 0.0) { result = sceneSurface(hit); }
     if (rd.y < -0.0001) {
         let floorT: f32 = -ro.y / rd.y;
         if (floorT < hit.distance) {
             surfaceDistance = floorT;
             let floorP: vec3f = ro + rd * floorT;
-            let lane: f32 = choose(0.0, 0.25, abs(floorP.x - 0.5) < 0.045 && sceneMod(floorP.z, 4.0) < 1.6);
-            let grid: f32 = choose(0.0, 0.08, fract(floorP.x) < 0.025 || fract(floorP.z) < 0.025);
+            let lane: f32 = choose(0.0, 0.25, effect(0).x == 1.0 && abs(floorP.x - 0.5) < 0.045 && sceneMod(floorP.z, 4.0) < 1.6);
+            let grid: f32 = choose(0.0, 0.08, effect(0).x == 2.0 && (fract(floorP.x) < 0.025 || fract(floorP.z) < 0.025));
             var floorColor: vec3f = vec3f(0.07, 0.10, 0.15) + vec3f(lane, lane * 0.7, grid);
             floorColor = mix(floorColor, sceneMapped(floorP.xz * 0.125, 1.0) * 0.55, effect(1).z);
             if (effect(2).w > 0.0) {
@@ -177,15 +195,24 @@ fn sceneSample(uv: vec2f) -> SceneSample {
             result = SceneSample(mix(floorColor, vec3f(0.065, 0.095, 0.17), 1.0 - exp(-floorT * effect(2).x)), effect(7).x);
         }
     }
-    let ceiling: f32 = choose(4.0, 7.0, effect(0).x == 4.0);
-    if ((effect(0).x == 2.0 || effect(0).x == 4.0) && rd.y > 0.0001) {
-        let ceilingT: f32 = (ceiling - ro.y) / rd.y;
-        if (ceilingT > 0.0 && ceilingT < surfaceDistance) {
-            surfaceDistance = ceilingT;
-            let p: vec3f = ro + rd * ceilingT;
-            let rib: f32 = choose(0.0, 0.45, sceneMod(sceneMod(p.z, 32.0), 5.0) < 0.12);
-            let base: vec3f = vec3f(0.08,0.13,0.2) + vec3f(rib * 0.3, rib * 0.65, rib);
-            result = SceneSample(mix(base, sceneMapped(p.xz * 0.125, 1.0) * 0.8, effect(1).z), effect(7).y);
+    // Cathedral roof: two sloping planes form a tall nave. The tunnel has
+    // a low, flat ceiling. Both reuse the same bounded intersection/shading.
+    if (effect(0).x == 2.0 || effect(0).x == 4.0) {
+        let vaulted: bool = effect(0).x == 4.0;
+        let ceiling: f32 = choose(3.2, 9.0, vaulted);
+        for (var side: i32 = 0; side < 2; side = side + 1) {
+            let slope: f32 = choose(0.0, choose(-0.65, 0.65, side == 1), vaulted);
+            let denominator: f32 = rd.y + slope * rd.x;
+            if (denominator > 0.0001) {
+                let ceilingT: f32 = (ceiling - ro.y - slope * (ro.x - 0.5)) / denominator;
+                let p: vec3f = ro + rd * ceilingT;
+                if (ceilingT > 0.0 && ceilingT < surfaceDistance && (!vaulted || slope * (p.x - 0.5) >= 0.0)) {
+                    surfaceDistance = ceilingT;
+                    let rib: f32 = choose(0.0, 0.45, sceneMod(p.z, 4.0) < 0.16);
+                    let base: vec3f = vec3f(0.08,0.13,0.2) + vec3f(rib * 0.3, rib * 0.65, rib);
+                    result = SceneSample(mix(base, sceneMapped(p.xz * 0.125, 1.0) * 0.8, effect(1).z), effect(7).y);
+                }
+            }
         }
     }
     if (effect(3).x > 0.0) {

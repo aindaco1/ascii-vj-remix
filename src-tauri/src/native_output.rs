@@ -153,6 +153,7 @@ pub struct NativeOutputParams {
     pub saturation_boost: Option<f64>,
     pub contrast_boost: Option<f64>,
     pub brightness: Option<f64>,
+    pub bright_output: Option<bool>,
     pub gamma: Option<f64>,
     pub bg_blend: Option<f64>,
     pub quantize_bits: Option<f64>,
@@ -469,6 +470,7 @@ struct NativeRenderParams {
     saturation_boost: f64,
     contrast_boost: f64,
     brightness: f64,
+    bright_output: bool,
     gamma: f64,
     bg_blend: f64,
     quantize_bits: u32,
@@ -3468,6 +3470,7 @@ impl NativeRenderParams {
             saturation_boost: f64_param(params.saturation_boost, 1.4).clamp(0.0, 8.0),
             contrast_boost: f64_param(params.contrast_boost, 1.0).clamp(0.0, 8.0),
             brightness: f64_param(params.brightness, 1.0).clamp(0.0, 8.0),
+            bright_output: params.bright_output.unwrap_or(true),
             gamma: f64_param(params.gamma, 1.0).clamp(0.01, 8.0),
             bg_blend: f64_param(params.bg_blend, 0.0).clamp(0.0, 1.0),
             quantize_bits: u32_param(params.quantize_bits, 0).min(8),
@@ -4975,6 +4978,18 @@ fn process_gpu_cell_color_at(
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
+fn brighten_rgb(color: [f64; 3]) -> [f64; 3] {
+    let [r, g, b] = color;
+    let luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    if luma <= 0.0 { return color; }
+    let lifted = luma.powf(0.22);
+    let gain = lifted / luma;
+    let peak = r.max(g).max(b) * gain;
+    let chroma = if peak > 1.0 { (1.0 - lifted) / (peak - lifted) } else { 1.0 };
+    color.map(|v| lifted + (v * gain - lifted) * chroma)
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
 fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, x: u32, y: u32, display: Option<&[f32]>) -> (u8, u8, u8, f64) {
     let mut rr = r as f64 / 255.0;
     let mut gg = g as f64 / 255.0;
@@ -4983,6 +4998,9 @@ fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, 
     rr = clamp01(avg + (rr - avg) * params.saturation_boost);
     gg = clamp01(avg + (gg - avg) * params.saturation_boost);
     bb = clamp01(avg + (bb - avg) * params.saturation_boost);
+    if params.bright_output && params.palette_colors.is_empty() {
+        [rr, gg, bb] = brighten_rgb([rr, gg, bb]);
+    }
     rr = clamp01((rr - 0.5) * params.contrast_boost + 0.5);
     gg = clamp01((gg - 0.5) * params.contrast_boost + 0.5);
     bb = clamp01((bb - 0.5) * params.contrast_boost + 0.5);
@@ -5030,12 +5048,15 @@ fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, 
         ];
         let index = native_palette_index(color, params);
         let mapped = params.palette_colors[index.min(params.palette_colors.len() - 1)];
-        if let Some(display) = display {
+        let (mut rgb, mut luma) = if let Some(display) = display {
             let slot = index * 4;
-            return ((display[slot] * 255.0).round() as u8, (display[slot + 1] * 255.0).round() as u8,
-                (display[slot + 2] * 255.0).round() as u8, f64::from(display[slot + 3]) * 255.0);
-        }
-        return (mapped[0], mapped[1], mapped[2], native_palette_luma(mapped));
+            ([f64::from(display[slot]), f64::from(display[slot+1]), f64::from(display[slot+2])], f64::from(display[slot+3]))
+        } else {
+            (mapped.map(|v| f64::from(v)/255.0), native_palette_luma(mapped)/255.0)
+        };
+        if params.bright_output { rgb = brighten_rgb(rgb); luma = luma.powf(0.22); }
+        return ((clamp01(rgb[0])*255.0).round() as u8, (clamp01(rgb[1])*255.0).round() as u8,
+            (clamp01(rgb[2])*255.0).round() as u8, luma*255.0);
     }
 
     (
@@ -5213,6 +5234,7 @@ mod tests {
                 saturation_boost: Some(1.0),
                 contrast_boost: Some(1.0),
                 brightness: Some(1.0),
+                bright_output: Some(false),
                 gamma: Some(1.0),
                 bg_blend: Some(0.0),
                 quantize_bits: Some(0.0),
@@ -5499,6 +5521,7 @@ mod tests {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct RenderMathVectorParams {
+        bright_output: bool,
         saturation_boost: f64,
         contrast_boost: f64,
         brightness: f64,
@@ -5516,6 +5539,7 @@ mod tests {
 
         for vector in vectors.gpu {
             let mut params = params();
+            params.bright_output = vector.params.bright_output;
             params.saturation_boost = vector.params.saturation_boost;
             params.contrast_boost = vector.params.contrast_boost;
             params.brightness = vector.params.brightness;
@@ -5529,6 +5553,34 @@ mod tests {
                 vector.name
             );
         }
+    }
+
+    #[test]
+    fn bright_output_defaults_on_and_accepts_explicit_opt_out() {
+        let mut payload = base_payload();
+        payload.params.bright_output = None;
+        let bright = NativeRenderParams::from_payload(&payload);
+        assert!(bright.bright_output);
+        assert_eq!(process_gpu_cell_color(16, 16, 16, &bright), (139, 139, 139));
+        payload.params.bright_output = Some(false);
+        let original = NativeRenderParams::from_payload(&payload);
+        assert!(!original.bright_output);
+        assert_eq!(process_gpu_cell_color(16, 16, 16, &original), (16, 16, 16));
+    }
+
+    #[test]
+    fn bright_palette_preserves_lookup_and_base_glyph_luminance() {
+        let mut payload = base_payload();
+        payload.params.bright_output = Some(true);
+        payload.params.palette_colors = Some(vec![[8,16,4], [4,8,16], [16,4,8]]);
+        let params = NativeRenderParams::from_payload(&payload);
+        let first = process_gpu_cell_sample_at(8,16,4,&params,0,0,None);
+        assert_eq!((first.0,first.1,first.2), (79,159,40));
+        let base_luma = native_palette_luma([8,16,4]) / 255.0;
+        let display = [4.0/255.0,8.0/255.0,16.0/255.0,base_luma as f32];
+        let rotated = process_gpu_cell_sample_at(8,16,4,&params,0,0,Some(&display));
+        assert_ne!((first.0,first.1,first.2), (rotated.0,rotated.1,rotated.2));
+        assert!((first.3-rotated.3).abs()<0.001);
     }
 
     #[test]

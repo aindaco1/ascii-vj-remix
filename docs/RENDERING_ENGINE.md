@@ -761,15 +761,32 @@ four world-space sheets clipped against opaque depth. Orbitals uses at most 48
 sphere-tracing steps. Relief reads source luminance as block height. Surface framing accounts for
 the physical tile aspect (2:1 on walls, square on horizontal surfaces). Larger
 wall panels, roof/ceiling sampling and the orbital backdrop preserve visible
-source structure; current spatial presets blend in 85–95% source media.
+source structure; current spatial presets blend in 85–100% source media.
+Camera-plane rays include pitch. Corridor uses a narrow, low tunnel; Cathedral
+intersects a two-plane pitched roof; Coast keeps low shoreline blocks and no
+road markings. Relief samples one source-aligned height/color field without
+roads, from an elevated camera. Orbitals rotates its camera and tilts its ring.
+The spatial uniform block is ten vec4s (160 bytes), including camera pitch.
 
 Scene RGB enters the existing color/palette/dither stage. The cell alpha channel
 still addresses a glyph; it does not carry depth. Optional material/edge glyphs
 append eight symbols to at most 88 base glyphs. A stable 16-cell coverage mask
 fades the material override as media contribution rises; full media uses source
 luminance for glyph choice. Edge direction uses source
-luminance gradients and the previous glyph near a threshold. Default flat
-processing and its 8-bit cell texture remain unchanged.
+luminance gradients and the previous glyph near a threshold. Flat
+processing retains its 8-bit cell texture. Bright output is a global persisted
+preference, excluded from presets and preserved by preset/WTF changes. It
+starts on, with an explicit off path retaining the previous color response.
+With source colors, after saturation and before contrast/gamma, luminance L is raised to L^0.22;
+RGB is scaled to that luminance, then chroma is compressed toward it only when
+needed to fit the RGB gamut. This keeps hue and black/white endpoints while
+lifting dark saturated colors as well as greys. For palettes, lookup remains
+unchanged and the mapped RGB is lifted afterwards so cycling ranges are not
+lost. Glyph luminance uses the same lift on stable base-palette luminance,
+independent of the animated color. JS software, WebGL2, shared browser/native WGSL and Rust
+software paths have shared golden vectors; the cell parameter block is 112
+bytes, with the toggle at byte 96. The toggle updates live uniforms and clears
+feedback history, without rebuilding the source or GPU resources.
 
 Feedback uses two reusable floating-point history textures, separate from the
 existing 8-bit cell output. Retention integrates elapsed time and history zoom/

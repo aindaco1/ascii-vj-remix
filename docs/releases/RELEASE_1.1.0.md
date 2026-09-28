@@ -38,7 +38,7 @@ software reference under its existing density limits. Runtime remains offline.
 Manual feedback identified that the first candidate's city/coast/cathedral
 looks defaulted to procedural materials, while material glyphs could conceal
 source structure even after increasing the blend. The revised candidate uses
-85–95% media in all spatial presets, larger wall panels with aspect-aware
+85–100% media in all spatial presets, larger wall panels with aspect-aware
 framing, media on roofs/ceilings, and a media backdrop for Orbital Chamber.
 Material-glyph coverage fades as media contribution rises, leaving source
 brightness to select glyphs. Media amount zero retains the procedural option.
@@ -46,13 +46,44 @@ Existing saved/custom values are preserved; reselect a spatial preset to load
 its revised defaults.
 
 A new regression compares equal-histogram vertical/horizontal source patterns
-at the same seed, camera and time. All six scene presets change 29–52% of output
-cells by more than 24/255 in at least one RGB channel, and 28–51% in glyph
-address. Both WebGPU and WebGL2 pass the actual moving-source upload/readback
+at the same seed, camera and time. With Bright output enabled, all six scene
+presets change 22–60% of output cells by more than 24/255 in at least one RGB
+channel, and 20–60% in glyph address. Both WebGPU and WebGL2 pass the actual moving-source upload/readback
 check. This measures input sensitivity; it does not substitute for judging
 recognizable camera/video content by eye.
 
-![Equal-histogram source comparison in actual WebGL2 output](evidence/1.1.0-source-response.png)
+![Earlier source-visibility comparison, before the brightness and composition revision](evidence/1.1.0-source-response.png)
+
+## Bright output and preset differentiation
+
+The global **Color → Bright output** toggle is on by default, persists across
+launches and remains unchanged by presets, playlists and WTF. It lifts
+luminance before glyph selection, with hue-preserving gamut compression.
+Source colors are lifted before contrast; palettes retain their lookup and
+cycling ranges, then lift the mapped result with stable base glyph luminance.
+Dark neutral RGB 16 becomes 139 at neutral color settings;
+pure black/white keep their endpoints. Off retains the previous response.
+No histogram readback, exposure pumping, extra GPU pass or source restart is
+introduced. CPU spatial sampling retains floating-point color until the final
+cell conversion so the lift does not magnify early rounding errors.
+
+The six scene presets now have distinct heights, lens angles, speeds and glyph
+styles. City drives low and fast; Corridor is narrow and symmetric; Coast has
+low shoreline buildings and open water; Cathedral looks upward through a
+pitched nave; Relief looks down on solid-cell source-driven terrain without
+roads; Orbitals circles a sphere and a tilted rotating ring. Camera tilt is an
+editable shared parameter. Reselect a preset to load the revised composition.
+
+The visual review below uses the same bundled demo image reduced to 7.5%
+brightness in every panel. Classic Camera ASCII's mean displayed luminance
+rises from 3.86 to 18.36 with the toggle (about 4.8×, including black gaps).
+This is one recorded fixture, not a universal exposure guarantee. On a separate
+common dark pattern, every pair of spatial presets changes at least 72% of
+cells by more than 24/255 in RGB at the same grid and time, before glyph style
+and density differences. This measures composition difference, not aesthetic
+acceptance.
+
+![One dark source, bright output off/on, and the six revised spaces](evidence/1.1.0-bright-spatial.png)
 
 ## Deliberate limits
 
@@ -75,15 +106,22 @@ recognizable camera/video content by eye.
 
 ## Local validation
 
-The full `npm test` development suite passed, including desktop/offline checks,
-79 Rust tests, the 87-preset browser matrix, source/transition/palette checks,
-and Jev evaluation of the maintained synthetic fixtures. Jev did not receive
-user media and is not a visual or hardware acceptance result.
+The `npm test` desktop/static stages passed, including desktop/offline checks,
+the 87-preset browser matrix and source/transition/palette checks. The hosted
+Jev call then returned an incomplete-response error; the bounded
+`npm run test:jev` retry passed. Jev received only the maintained synthetic
+fixtures, not user media, and is not a visual or hardware acceptance result.
+The native Rust suite was rerun after adding the palette regression (81/81).
 
 The optimized macOS development bundle also passed the native WebView
 preset sweep: **87/87**, with 59 WebGPU and 28 Canvas presets, no ownership
 fallbacks and no failures. Rust/shader, GPU source-response, browser preset and
 native performance checks were repeated after the source-visibility correction.
+The brightness revision also checks all palette swatches with the toggle on
+and off, cycling animation, stable palette glyph luminance and live preference
+propagation. The static harness now tests glyph gaps without downsampling and
+starts its playback-continuity check away from the 2.5-second demo's loop boundary.
+The optimized build passed the 87/87 native sweep again after this revision.
 Native trail appearance and preview/Pop Out alignment remain on the owner
 manual checklist.
 
@@ -103,20 +141,21 @@ claim that Chromium's startup warning has been fixed. The native WebView sweep
 and native output measurements cover the actual desktop presentation paths.
 
 The optimized native macOS city workload used the bundled 30-second video,
-640 columns, 85% source media, wet reflections, rain and synthetic audio on **Apple M1 Max,
-64 GB**, with one physical display. Existing gates were not relaxed:
+640 columns, Bright output on, 85% source media, wet reflections, rain and
+synthetic audio on **Apple M1 Max, 64 GB**, with one physical display.
+Existing gates were not relaxed:
 
 | Observation | Result |
 | --- | --- |
-| Main preview before Pop Out | 40.6 FPS average, 26.41 ms P95 |
-| Main preview with Pop Out | 39.1 FPS average, 33.15 ms P95 |
-| Main preview during numeric transitions | 36.7 FPS average, 29.44 ms P95 |
+| Main preview before Pop Out | 39.2 FPS average, 27.80 ms P95 |
+| Main preview with Pop Out | 38.6 FPS average, 27.80 ms P95 |
+| Main preview during numeric transitions | 36.6 FPS average, 29.65 ms P95 |
 | Native presentation, phased run | 60.1 FPS average; zero GPU failures |
 | Armed native transitions | 10; zero failures |
 
 The maintained performance smoke passed. The full phased run averaged
-38.8 FPS in the preview, with 33.15 ms P95 and 37.40 ms P99. Its minimum sample
-was 26.0 FPS, so this is not a guarantee of uninterrupted frame pacing.
+38.1 FPS in the preview, with 29.65 ms P95 and 29.65 ms P99. Its minimum sample
+was 33.7 FPS, so this is not a guarantee of uninterrupted frame pacing.
 These measurements are not acceptance on the M1/16 GB reference floor,
 Windows/Linux hardware, a projector, physical cameras or a MIDI controller.
 
@@ -127,7 +166,7 @@ npm test
 npm run smoke:spatial
 npm run tauri:build:dev -- --bundles app
 npm run smoke:primary-presets
-ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneMedia":0.85,"sceneWet":0.55,"sceneRain":0.2}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 ASCILINE_UI_PERF_SMOKE_DURATION_MS=18000 npm run smoke:ui-perf
+ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","brightOutput":true,"sceneMedia":0.85,"sceneWet":0.55,"sceneRain":0.2}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 ASCILINE_UI_PERF_SMOKE_DURATION_MS=18000 npm run smoke:ui-perf
 ```
 
 Set `ASCILINE_UI_PERF_SMOKE_SOAK=1` for the separate steady workload. Full
@@ -143,6 +182,8 @@ optimized development bundle through the maintained signing/launch harness.
 
 Before publication, the owner should review:
 
+- Bright output off/on on dark camera, image and video inputs; verify its saved
+  preference and compare native Pop Out with the main preview.
 - The eight new presets on a selected video and camera, including close walls,
   height changes, reverse travel, pause/reset, and transitions back to old looks.
 - Pop Out alignment, external-display fullscreen, reopen/resize and the chosen

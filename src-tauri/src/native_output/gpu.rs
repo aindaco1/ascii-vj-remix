@@ -60,6 +60,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -74,7 +75,7 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 
-struct SpatialParams { data: array<vec4f, 9>, };
+struct SpatialParams { data: array<vec4f, 10>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
@@ -561,7 +562,7 @@ impl NativeGpuPresenter {
         let render_pipeline = shared.render_pipeline(config.format)?;
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU params"),
-            size: 96,
+            size: 112,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -577,7 +578,7 @@ impl NativeGpuPresenter {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let spatial_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Spatial visual parameters"), size: 144, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let spatial_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Spatial visual parameters"), size: 160, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let feature_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU palette and dither features"),
             size: feature_buffer_size() as u64,
@@ -878,8 +879,8 @@ impl NativeGpuPresenter {
             ),
         );
         if !clear { self.spatial_history = spatial::History::default(); }
-        let effects = params.spatial.uniforms(cols, rows, params.cell_width, params.cell_height, self.glyph_ramp_len, &mut self.spatial_history, self.glyph_key ^ self.feature_key, palette::now_ms());
-        let mut effects_bytes = [0_u8; 144];
+        let effects = params.spatial.uniforms(cols, rows, params.cell_width, params.cell_height, self.glyph_ramp_len, &mut self.spatial_history, self.glyph_key ^ self.feature_key ^ u64::from(params.bright_output), palette::now_ms());
+        let mut effects_bytes = [0_u8; 160];
         for (bytes, value) in effects_bytes.chunks_exact_mut(4).zip(effects) {
             bytes.copy_from_slice(&value.to_le_bytes());
         }
@@ -1336,8 +1337,8 @@ fn cell_params_bytes(
     cols: u32,
     rows: u32,
     frame_index: usize,
-) -> [u8; 96] {
-    let mut bytes = [0u8; 96];
+) -> [u8; 112] {
+    let mut bytes = [0u8; 112];
     put_u32(&mut bytes, 0, frame.width);
     put_u32(&mut bytes, 4, frame.height);
     put_u32(&mut bytes, 8, cols);
@@ -1366,6 +1367,7 @@ fn cell_params_bytes(
     put_u32(&mut bytes, 84, params.dither_scale);
     put_f32(&mut bytes, 88, params.dither_bias as f32);
     put_u32(&mut bytes, 92, u32::from(params.dither_invert));
+    put_u32(&mut bytes, 96, u32::from(params.bright_output));
     bytes
 }
 
@@ -1479,6 +1481,7 @@ mod tests {
             saturation_boost: 1.4,
             contrast_boost: 1.2,
             brightness: 1.0,
+            bright_output: true,
             gamma: 1.0,
             bg_blend: 0.3,
             quantize_bits: 2,
@@ -1544,7 +1547,8 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[8..12].try_into().unwrap()), 80);
         assert_eq!(u32::from_le_bytes(bytes[44..48].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(bytes[68..72].try_into().unwrap()), 1);
-        assert_eq!(bytes.len(), 96);
+        assert_eq!(bytes.len(), 112);
+        assert_eq!(u32::from_le_bytes(bytes[96..100].try_into().unwrap()), 1);
 
         let glyph_ramp_len = native_glyph_ramp_ids(&params).len() as u32;
         let glyph_key = glyph_feature_key(&params);

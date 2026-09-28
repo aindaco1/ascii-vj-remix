@@ -72,6 +72,17 @@ for (const vector of vectors.canvasLegacy) {
   );
 }
 
+// The global default lifts dark footage substantially without reversing tonal
+// order, clipping the neutral ramp, or changing the opt-out legacy curve.
+let previous = -1;
+for (let value = 0; value <= 255; value++) {
+  const [lifted] = processGpuCellColor(value, value, value, {});
+  assert.ok(lifted >= previous && lifted <= 255);
+  assert.deepEqual(processGpuCellColor(value, value, value, { brightOutput: false }), [value,value,value]);
+  if (value >= 1 && value <= 32) assert.ok(lifted >= value * 4);
+  previous = lifted;
+}
+
 assert.equal(charsetChars({ charset: 'blocks' }), ' ░▒▓█');
 assert.equal(charsetChars({ charset: 'asciline' }), ' .:-=+*#%@');
 assert.equal(glyphForLuma(255, { charset: 'asciline' }), '@');

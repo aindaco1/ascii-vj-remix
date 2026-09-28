@@ -45,6 +45,7 @@ uniform vec2 u_gridSize;
 uniform float u_saturationBoost;
 uniform float u_contrastBoost;
 uniform float u_brightness;
+uniform int u_brightOutput;
 uniform float u_gamma;
 uniform float u_bgBlend;
 uniform int u_quantizeBits;
@@ -68,7 +69,7 @@ layout(location=0) out vec4 fragColor;
 layout(location=1) out vec4 historyColor;
 
 
-uniform vec4 u_spatial[9];
+uniform vec4 u_spatial[10];
 uniform sampler2D u_history;
 vec4 effect(int index) { return u_spatial[index]; }
 float choose(float a, float b, bool condition) { return condition ? b : a; }
@@ -101,6 +102,16 @@ float orderedThreshold(ivec2 cellCoord) {
     return u_ditherInvert == 1 ? -threshold : threshold;
 }
 
+vec3 brightenRgb(vec3 color) {
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    if (luma <= 0.0) return color;
+    float lifted = pow(luma, 0.22);
+    vec3 scaled = color * (lifted / luma);
+    float peak = max(scaled.r, max(scaled.g, scaled.b));
+    float chroma = peak > 1.0 ? (1.0 - lifted) / (peak - lifted) : 1.0;
+    return vec3(lifted) + (scaled - vec3(lifted)) * chroma;
+}
+
 void main() {
     vec2 cellCoord = floor(v_texCoord * u_gridSize);
     vec2 cellCenter = (cellCoord + vec2(u_sampleX, u_sampleY)) / u_gridSize;
@@ -121,12 +132,14 @@ void main() {
     if (effect(0).x > 0.0) scene = sceneSample(sceneUV);
     c = vec4(scene.color, c.a);
 
+    c.rgb = clamp(c.rgb, 0.0, 1.0);
     float avg = (c.r + c.g + c.b) * 0.333333333;
     vec3 boosted = clamp(vec3(
         avg + (c.r - avg) * u_saturationBoost,
         avg + (c.g - avg) * u_saturationBoost,
         avg + (c.b - avg) * u_saturationBoost
     ), 0.0, 1.0);
+    if (u_brightOutput == 1 && u_paletteCount == 0) boosted = brightenRgb(boosted);
     boosted = clamp((boosted - 0.5) * u_contrastBoost + 0.5, 0.0, 1.0);
     boosted = clamp(pow(boosted * u_brightness, vec3(1.0 / max(0.01, u_gamma))), 0.0, 1.0);
 
@@ -147,7 +160,9 @@ void main() {
         ivec3 q = ivec3(clamp(floor(boosted * 255.0 / 8.0), 0.0, 31.0));
         int row = q.r * 32 + q.g;
         int paletteIndex = int(round(texelFetch(u_paletteLut, ivec2(q.b, row), 0).r * 255.0));
-        fragColor = sceneFinish(texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0), sceneUV, scene.glyph);
+        vec4 mapped = texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0);
+        if (u_brightOutput == 1) mapped = vec4(brightenRgb(mapped.rgb), pow(mapped.a, 0.22));
+        fragColor = sceneFinish(mapped, sceneUV, scene.glyph);
         historyColor = fragColor;
         return;
     }
@@ -262,14 +277,15 @@ export class WebGL2Renderer {
         this.cols = options.cols || 120;
         this.fps = options.fps || 24;
         this.frameInterval = 1000 / this.fps;
-        this.saturationBoost = options.saturationBoost || 1.4;
-        this.contrastBoost = options.contrastBoost || 1.0;
-        this.brightness = options.brightness || 1.0;
+        this.saturationBoost = options.saturationBoost ?? 1.4;
+        this.contrastBoost = options.contrastBoost ?? 1.0;
+        this.brightness = options.brightness ?? 1.0;
+        this.brightOutput = options.brightOutput !== false;
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
         Object.assign(this, paletteCycleParams(options), spatialParams(options));
-        this.spatialData = new Float32Array(36);
+        this.spatialData = new Float32Array(40);
         this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
@@ -371,7 +387,7 @@ export class WebGL2Renderer {
             'u_gridSize',
             'u_saturationBoost',
             'u_contrastBoost',
-            'u_brightness',
+            'u_brightness', 'u_brightOutput',
             'u_gamma',
             'u_bgBlend',
             'u_quantizeBits',
@@ -704,6 +720,7 @@ export class WebGL2Renderer {
         gl.uniform1f(cellUniforms.u_saturationBoost, this.saturationBoost);
         gl.uniform1f(cellUniforms.u_contrastBoost, this.contrastBoost);
         gl.uniform1f(cellUniforms.u_brightness, this.brightness);
+        gl.uniform1i(cellUniforms.u_brightOutput, this.brightOutput ? 1 : 0);
         gl.uniform1f(cellUniforms.u_gamma, this.gamma);
         gl.uniform1f(cellUniforms.u_bgBlend, this.bgBlend);
         gl.uniform1i(cellUniforms.u_quantizeBits, this.quantizeBits);

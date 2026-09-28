@@ -47,7 +47,8 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU and WebGL2 rendering, with Canvas compatibility fallbacks.
 - ASCII and cell visuals with palettes, ordered dithering, multilingual glyphs,
   and custom character ramps.
-- Spatial city, media corridor, wet coast and vaulted hall scenes, plus experimental brightness relief and orbitals. Edge glyphs and phosphor feedback also work on flat media.
+- Distinct spatial city, media tunnel, waterfront and pitched-hall scenes, plus overhead relief and orbiting objects. Edge glyphs and phosphor feedback also work on flat media.
+- An on-by-default Bright output toggle lifts dark camera, image and video output; its setting persists across presets and launches.
 - Built-in and user presets, saved playlists, smooth crossfades, and continuous
   randomized WTF mode.
 - Local audio reactivity from microphone/input, files, and supported

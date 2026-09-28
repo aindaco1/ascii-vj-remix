@@ -33,6 +33,7 @@ try {
         const {createRenderer}=await import('/renderers/gpu/ascii/renderer/index.js');
         const a=window.ascilineRemix;await a.stop();
         const initial={...a.params},sourceCanvas=document.createElement('canvas');
+        if(initial.brightOutput!==true||!a.controlInputs.get('brightOutput')?.input.checked)throw Error('Bright output must default on');
         sourceCanvas.width=64;sourceCanvas.height=48;
         const sourceCtx=sourceCanvas.getContext('2d'),image=sourceCtx.createImageData(64,48);
         for(let y=0;y<48;y++)for(let x=0;x<64;x++)image.data.set([x*4,y*5,(x+y)*2,255],(y*64+x)*4);
@@ -86,6 +87,24 @@ try {
             // Frozen input/time must be bit-identical across renders.
             r.renderFrame();const again=await read(r);if(pixels.some((n,i)=>n!==again[i]))throw Error(`Freeze drift ${backend}/${visualMode}`);
             if(visualMode==='flat') {
+                // Toggle the live uniform on a dark moving source. Verify both
+                // RGB and glyph luminance, plus opt-out parity with the old path.
+                const dark=new ImageData(64,48);
+                for(let i=0;i<dark.data.length;i+=4)dark.data.set([8,16,4,255],i);
+                sourceCtx.putImageData(dark,0,0);source.isVideo=true;source.isImage=false;
+                const levels=[];
+                for(const enabled of [false,true]){
+                    r.brightOutput=enabled;r.renderFrame();const actual=await read(r);
+                    const expected=processGpuCellColor(8,16,4,{...a.params,brightOutput:enabled});
+                    const luma=expected[0]*.2126+expected[1]*.7152+expected[2]*.0722;
+                    for(let i=0;i<actual.length;i+=4)for(let c=0;c<4;c++){
+                        if(Math.abs(actual[i+c]-(c===3?luma:expected[c]))>1)throw Error(`Bright output parity ${backend}/${enabled}`);
+                    }
+                    levels.push(actual[3]);
+                }
+                if(levels[1]<levels[0]*4)throw Error(`Dark input lift too weak: ${levels}`);
+                cases.push({backend,effect:'bright output',offLuma:levels[0],onLuma:levels[1]});
+                sourceCtx.putImageData(image,0,0);r.renderFrame();source.isVideo=false;source.isImage=true;
                 r.sceneFreeze=false;r.feedbackAmount=1;r.feedbackHalfLife=3;
                 r.renderFrame();const flash=await read(r);r.brightness=0;
                 for(let frame=0;frame<120;frame++){r.spatialState.lastMs=cycleNowMs()-100;r.renderFrame();}
@@ -103,8 +122,14 @@ try {
                 source.isVideo=true;source.isImage=false;
                 const outputs=[];
                 for(const horizontal of [false,true]) {
-                    sourceCtx.putImageData(new ImageData(spatialMediaFixture(64,48,horizontal),64,48),0,0);
-                    r.spatialState={};r.renderFrame();outputs.push(await read(r));
+                    const fixture=spatialMediaFixture(64,48,horizontal);
+                    sourceCtx.putImageData(new ImageData(fixture,64,48),0,0);
+                    r.spatialState={};r.renderFrame();const actual=await read(r);outputs.push(actual);
+                    const params={...a.params,...preset.params,cols:96,rows:54,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)};
+                    const cpu=renderSpatialCells(params,fixture,64,48,96,54,(rgb,x,y)=>processGpuCellColor(...rgb,params,x,y),{},0);
+                    let error=0,bad=0;
+                    for(let i=0;i<actual.length;i++)if(i%4<3){const d=Math.abs(actual[i]-cpu[i]);error+=d;if(d>8)bad++;}
+                    if(error/(96*54*3)>2||bad/(96*54*3)>.02)throw Error(`Preset camera/geometry parity ${backend}/${preset.id}: ${JSON.stringify({avg:error/(96*54*3),badFraction:bad/(96*54*3)})}`);
                 }
                 const response=spatialMediaDifference(...outputs);
                 if(response.meanRgbDifference<=10||response.changedShapeFraction<=.15||response.changedGlyphFraction<=.1) {
@@ -129,11 +154,18 @@ try {
         await new Promise(resolve=>setTimeout(resolve,200));
         if(video.paused)throw Error('Video fixture did not start');
         const timeBefore=video.currentTime;
+        const checkbox=a.controlInputs.get('brightOutput').input;
+        checkbox.checked=false;a._handleControlInput('brightOutput');
         for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','brightness-relief','orbital-chamber','edge-etching','phosphor-echo','classic-camera-ascii']){
             await a.applyPreset(id,{transitionSeconds:.15});
+            if(a.params.brightOutput!==false||a._nativeOutputPayload().params.brightOutput!==false)throw Error(`Bright output preference changed by ${id}`);
+            if((a.staticRuntime.renderer.params?.brightOutput??a.staticRuntime.renderer.brightOutput)!==false)throw Error(`Bright output failed to reach renderer: ${id}`);
             if(a.staticRuntime.source!==sourceBefore)throw Error(`Source replaced by ${id}`);
             if(video.paused||video.currentTime<timeBefore-.1)throw Error(`Playback interrupted by ${id}: ${JSON.stringify({paused:video.paused,before:timeBefore,after:video.currentTime,readyState:video.readyState,ended:video.ended,source:a.params.mediaUrl})}`);
         }
+        for(let i=0;i<8;i++)if(a._makeWtfTarget(.1).brightOutput!==false)throw Error('Random visuals changed bright output preference');
+        a._persist();
+        if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==false)throw Error('Bright output did not persist');
         await a.stop();
         // New visual MIDI targets remain controls, never source/capture/output actions.
         const targets=a.midiTargetDescriptors().map(t=>t.id);

@@ -9,6 +9,7 @@ import { StaticSmokeDiagnostics } from './lib/static_smoke_diagnostics.mjs';
 import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 import { PALETTE_CONTRACT, fillPaletteDisplay } from '../renderers/shared/palette-cycling.js';
 import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
+import { processGpuCellColor } from '../renderers/shared/render-math.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -910,6 +911,13 @@ async function runSmoke() {
           transitionSeconds: app.params.transitionSeconds
         };
         await app._transitionTo(solidTarget, 0.15);
+        // The bundled demo is only 2.5 seconds long. Start this continuity
+        // assertion away from its natural loop boundary, which otherwise
+        // looks exactly like a decoder restart in a currentTime comparison.
+        await new Promise((resolve) => {
+          video.addEventListener('seeked', resolve, { once: true });
+          video.currentTime = 0.5;
+        });
         const beforeGlyph = video.currentTime || 0;
         const glyphTarget = {
           ...app.params,
@@ -931,6 +939,7 @@ async function runSmoke() {
         await transition;
         await new Promise((resolve) => setTimeout(resolve, 120));
         const after = {
+          sourcePreserved: app._staticMediaSource() === source,
           paused: video.paused,
           currentTime: video.currentTime || 0,
           backend: app.params.backend,
@@ -953,6 +962,7 @@ async function runSmoke() {
       liveFamilyTransition.skipped ||
       liveFamilyTransition.during.paused ||
       liveFamilyTransition.after.paused ||
+      !liveFamilyTransition.after.sourcePreserved ||
       liveFamilyTransition.after.currentTime <= liveFamilyTransition.beforeGlyph + 0.08 ||
       liveFamilyTransition.after.backend !== 'canvas2d' ||
       liveFamilyTransition.after.solidMode ||
@@ -1107,12 +1117,16 @@ async function runSmoke() {
         if (!canvas?.width || !canvas?.height) return { visible: false, reason: 'missing canvas' };
 
         const sample = document.createElement('canvas');
-        sample.width = Math.min(120, canvas.width);
-        sample.height = Math.min(90, canvas.height);
+        sample.width = Math.min(512, canvas.width);
+        sample.height = Math.min(512, canvas.height);
         const ctx = sample.getContext('2d', { willReadFrequently: true });
         if (!ctx) return { visible: false, reason: 'missing context' };
 
-        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        // Inspect actual glyph pixels. Shrinking dense bright text to 120px
+        // averages its black gaps into the ink and falsely reports solid cells.
+        ctx.drawImage(canvas, Math.floor((canvas.width-sample.width)/2),
+          Math.floor((canvas.height-sample.height)/2), sample.width, sample.height,
+          0, 0, sample.width, sample.height);
         const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
         let foreground = 0;
         let background = 0;
@@ -1525,6 +1539,13 @@ async function runSmoke() {
           expected: paletteSwatches.map(color => mapColorToPalette(color, palette.id, 'nearest', buildPaletteLut(palette.id), display).slice(0, 3))});
       }
     }
+    paletteCases.push(...paletteCases.map(test => {
+      const palette=PALETTES.find(p=>p.id===test.id);
+      const display=new Float32Array(PALETTE_CONTRACT.maxColors*4);
+      fillPaletteDisplay(display,palette,{paletteCycleMode:test.mode||'off',paletteCycleAmount:1},test.time||0);
+      return {...test,brightOutput:true,expected:paletteSwatches.map(color=>processGpuCellColor(...color,
+        {paletteId:test.id,paletteMapping:test.mapping,brightOutput:true},0,0,buildPaletteLut(test.id,test.mapping),display).slice(0,3))};
+    }));
     await page.evaluate(async ({ swatches, cases }) => {
       const app = window.ascilineRemix;
       app.stop();
@@ -1540,7 +1561,7 @@ async function runSmoke() {
       app.loadStaticSource = async () => source;
       app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
         cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
-        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, brightOutput: false, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
         visualMode: 'flat', edgeAmount: 0, feedbackAmount: 0,
         solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
@@ -1557,6 +1578,7 @@ async function runSmoke() {
             renderer.syncFeatureResources();
           }
           renderer.paletteCycleMode = test.mode || 'off';
+          renderer.brightOutput = test.brightOutput === true;
           renderer.paletteCycleAmount = 1;
           renderer.paletteCycleTransport = {anchorMs: 0, position: test.time || 0, fromRate: 0, toRate: 0, durationMs: 0};
           const lutUpdates = renderer.paletteLutUpdates;
@@ -1597,7 +1619,7 @@ async function runSmoke() {
       app.loadStaticSource = async () => source;
       app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
         cols: 32, rows: 32, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
-        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, brightOutput: false, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
         solidMode: true, glyphMode: false, pixel: false, paletteId: 'none',
         paletteCycleMode: 'off', ditherMode: 'none' };

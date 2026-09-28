@@ -61,6 +61,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -75,7 +76,7 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 
-struct SpatialParams { data: array<vec4f, 9>, };
+struct SpatialParams { data: array<vec4f, 10>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
@@ -153,6 +154,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -168,7 +170,7 @@ struct FeatureData {
 
 // Simple hash for per-cell pseudo-random jitter
 
-struct SpatialParams { data: array<vec4f, 9>, };
+struct SpatialParams { data: array<vec4f, 10>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
@@ -334,14 +336,15 @@ export class WebGPURenderer {
         this.cols = options.cols || 120;
         this.fps = options.fps || 24;
         this.frameInterval = 1000 / this.fps;
-        this.saturationBoost = options.saturationBoost || 1.4;
-        this.contrastBoost = options.contrastBoost || 1.0;
-        this.brightness = options.brightness || 1.0;
+        this.saturationBoost = options.saturationBoost ?? 1.4;
+        this.contrastBoost = options.contrastBoost ?? 1.0;
+        this.brightness = options.brightness ?? 1.0;
+        this.brightOutput = options.brightOutput !== false;
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
         Object.assign(this, paletteCycleParams(options), spatialParams(options));
-        this.spatialData = new Float32Array(36);
+        this.spatialData = new Float32Array(40);
         this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
@@ -401,7 +404,7 @@ export class WebGPURenderer {
         this.featureBuffer = null;
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
-        this.paramsData = new ArrayBuffer(96);
+        this.paramsData = new ArrayBuffer(112);
         this.paramsView = new DataView(this.paramsData);
         this.renderData = new ArrayBuffer(64);
         this.renderView = new DataView(this.renderData);
@@ -468,9 +471,9 @@ export class WebGPURenderer {
 
         this._createCellTexture();
 
-        this.spatialBuffer = this.device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        this.spatialBuffer = this.device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         this.paramsBuffer = this.device.createBuffer({
-            size: 96,
+            size: 112,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
@@ -732,6 +735,7 @@ export class WebGPURenderer {
         pv.setUint32(84, Math.max(1, Math.round(this.ditherScale)), true);
         pv.setFloat32(88, this.ditherBias, true);
         pv.setUint32(92, this.ditherInvert ? 1 : 0, true);
+        pv.setUint32(96, this.brightOutput ? 1 : 0, true);
         this.device.queue.writeBuffer(this.paramsBuffer, 0, this.paramsData);
 
         // Render params

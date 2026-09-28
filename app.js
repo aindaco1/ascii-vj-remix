@@ -323,6 +323,7 @@ const DEFAULT_PARAMS = {
     muted: true,
     volume: 1,
     ...CLASSIC_CAMERA_ASCII_PARAMS,
+    brightOutput: true,
     // The clean-profile look is Classic Camera ASCII, but renderer selection
     // remains a global capability decision. Individual presets can still opt
     // into a specific compatibility backend.
@@ -1562,6 +1563,7 @@ const CONTROL_GROUPS = [
     {
         title: 'Color',
         controls: [
+            { key: 'brightOutput', label: 'Bright output', type: 'checkbox' },
             { key: 'saturationBoost', label: 'Saturation', type: 'range', min: 0, max: 3, step: 0.01 },
             { key: 'contrastBoost', label: 'Contrast', type: 'range', min: 0, max: 3, step: 0.01 },
             { key: 'brightness', label: 'Brightness', type: 'range', min: 0, max: 2, step: 0.01 },
@@ -1725,7 +1727,7 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'brightOutput', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -1757,6 +1759,7 @@ const CONTROL_APPLIES = {
 
     saturationBoost: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     contrastBoost: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
+    brightOutput: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     brightness: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     gamma: ({ params }) => params.sourceMode === 'static' || params.mode > 1 || params.pixel,
     bgBlend: ({ params }) => params.sourceMode === 'static',
@@ -4548,6 +4551,7 @@ class StaticRuntime {
             saturationBoost: params.saturationBoost,
             contrastBoost: params.contrastBoost,
             brightness: params.brightness,
+            brightOutput: params.brightOutput,
             gamma: params.gamma,
             bgBlend: params.bgBlend,
             quantizeBits: params.quantizeBits,
@@ -4593,6 +4597,7 @@ class StaticRuntime {
         renderer.saturationBoost = params.saturationBoost;
         renderer.contrastBoost = params.contrastBoost;
         renderer.brightness = params.brightness;
+        renderer.brightOutput = params.brightOutput;
         renderer.gamma = params.gamma;
         renderer.bgBlend = params.bgBlend;
         renderer.quantizeBits = params.quantizeBits;
@@ -9684,6 +9689,7 @@ button:hover{background:#202a35}
                 saturationBoost: params.saturationBoost,
                 contrastBoost: params.contrastBoost,
                 brightness: params.brightness,
+                brightOutput: params.brightOutput,
                 gamma: params.gamma,
                 bgBlend: params.bgBlend,
                 quantizeBits: params.quantizeBits,
@@ -9739,6 +9745,7 @@ button:hover{background:#202a35}
         this.popoutRenderer.saturationBoost = params.saturationBoost;
         this.popoutRenderer.contrastBoost = params.contrastBoost;
         this.popoutRenderer.brightness = params.brightness;
+        this.popoutRenderer.brightOutput = params.brightOutput;
         this.popoutRenderer.gamma = params.gamma;
         this.popoutRenderer.bgBlend = params.bgBlend;
         this.popoutRenderer.quantizeBits = params.quantizeBits;
@@ -10548,7 +10555,8 @@ button:hover{background:#202a35}
         return {
             ...DEFAULT_PARAMS,
             ...this._currentSourceParams(),
-            statsOverlay: this.params.statsOverlay
+            statsOverlay: this.params.statsOverlay,
+            brightOutput: this.params.brightOutput
         };
     }
 

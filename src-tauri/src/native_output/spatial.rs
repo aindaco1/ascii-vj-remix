@@ -64,7 +64,7 @@ impl Params {
         let rule = &CONTRACT[key];
         self.values.insert(key.to_string(), Value::from((base.number(key) + amount).clamp(rule["min"].as_f64().unwrap(), rule["max"].as_f64().unwrap())));
     }
-    pub fn uniforms(&self, cols: u32, rows: u32, cell_w: u32, cell_h: u32, glyph_count: u32, history: &mut History, resource_key: u64, now: f64) -> [f32; 36] {
+    pub fn uniforms(&self, cols: u32, rows: u32, cell_w: u32, cell_h: u32, glyph_count: u32, history: &mut History, resource_key: u64, now: f64) -> [f32; 40] {
         let key = format!("{}:{cols}:{rows}:{resource_key}:{}:{}:{}:{}:{}:{}:{}", self.reset_id, self.option("visualMode"), self.number("sceneSeed"), self.option("sceneRoute"), self.number("sceneOffset"), self.special_glyphs(), self.number("edgeAmount") > 0.0, self.number("feedbackAmount") > 0.0);
         let valid = history.key == key && history.last_ms > 0.0 && now - history.last_ms < 1000.0;
         let dt = if self.flag("sceneFreeze") || history.last_ms <= 0.0 { 0.0 } else { ((now - history.last_ms) / 1000.0).clamp(0.0, 0.25) };
@@ -73,7 +73,7 @@ impl Params {
         let special = self.special_glyphs();
         let base = glyph_count.saturating_sub(if special { 8 } else { 0 });
         let n = |key| self.number(key) as f32;
-        let mut data = [0.0_f32; 36];
+        let mut data = [0.0_f32; 40];
         data[..24].copy_from_slice(&[
             self.option("visualMode"), self.option("sceneRoute"), (self.transport.time_at(now) + self.number("sceneOffset")) as f32, n("sceneSeed"),
             n("sceneFov").to_radians(), n("sceneHeight"), n("sceneMedia"), self.option("sceneMediaFit"),
@@ -85,6 +85,7 @@ impl Params {
         ]);
         for i in 0..8 { data[24 + i] = (base as f32 + i as f32 + 0.5) / glyph_count.max(1) as f32; }
         data[32] = n("sceneRelief"); data[33] = 0.0; data[34] = dt as f32; data[35] = if special {1.0} else {0.0};
+        data[36] = n("scenePitch").to_radians();
         data
     }
 }

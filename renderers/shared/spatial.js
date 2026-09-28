@@ -35,7 +35,7 @@ export function spatialGlyphRamp(base, params) {
 export function spatialHistoryKey(p, cols, rows) {
     return [cols, rows, p.visualMode, p.sceneSeed, p.sceneRoute, p.sceneOffset, p.mediaUrl,
         p.sourceMode, p.paletteId, p.charset, p.customGlyphRamp, p.glyphDepth, p.glyphOffset,
-        p.glyphReverse, p.sceneMaterialGlyphs, p.edgeAmount > 0, p.feedbackAmount > 0].join(':');
+        p.glyphReverse, p.brightOutput, p.sceneMaterialGlyphs, p.edgeAmount > 0, p.feedbackAmount > 0].join(':');
 }
 export function fillSpatialUniforms(out, p, cols, rows, baseLength, state, now = cycleNowMs()) {
     const dt = p.sceneFreeze ? 0 : Math.min(0.25, Math.max(0, (now - (state.lastMs ?? now)) / 1000));
@@ -60,7 +60,8 @@ export function fillSpatialUniforms(out, p, cols, rows, baseLength, state, now =
         p.feedbackZoom * dt,
         p.feedbackRotate * dt, valid ? 1 : 0, base, total,
         ...Array.from({length:8}, (_, i) => (base + i + 0.5) / Math.max(1, total)),
-        p.sceneRelief, 0, dt, special ? 1 : 0
+        p.sceneRelief, 0, dt, special ? 1 : 0,
+        p.scenePitch * Math.PI / 180, 0, 0, 0
     ]);
     return out;
 }
