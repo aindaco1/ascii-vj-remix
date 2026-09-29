@@ -1416,6 +1416,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn shared_shader_modules_accept_windows_line_endings() {
+        for source in [
+            include_str!("../../../renderers/shared/spatial-shader.wgsl.js"),
+            include_str!("../../../renderers/shared/cell-color.wgsl.js"),
+        ] {
+            let unix = source.replace("\r\n", "\n");
+            let windows = unix.replace('\n', "\r\n");
+            assert_eq!(
+                shared_wgsl_module(&windows).replace("\r\n", "\n"),
+                shared_wgsl_module(&unix)
+            );
+        }
+    }
+
+    #[test]
     fn native_shaders_validate_with_coverage_mip_sampling() {
         for source in [cell_shader(), RENDER_PASS_WGSL.to_string()] {
             let module = wgpu::naga::front::wgsl::parse_str(&source)
@@ -1580,7 +1595,13 @@ mod tests {
 }
 
 fn cell_shader() -> String {
-    CELL_PASS_WGSL.replace("__SPATIAL__", include_str!("../../../renderers/shared/spatial-shader.wgsl.js").split_once("`\n").unwrap().1.strip_suffix("`;\n").expect("shared spatial shader envelope"))
+    CELL_PASS_WGSL.replace("__SPATIAL__", shared_wgsl_module(include_str!("../../../renderers/shared/spatial-shader.wgsl.js")))
         .replace("__PALETTE_CAPACITY__", &palette::CONTRACT.max_colors.to_string())
-        .replace("__CELL_COLOR__", include_str!("../../../renderers/shared/cell-color.wgsl.js").trim().strip_prefix("export default String.raw`").and_then(|text| text.strip_suffix("`;" )).expect("shared WGSL module envelope"))
+        .replace("__CELL_COLOR__", shared_wgsl_module(include_str!("../../../renderers/shared/cell-color.wgsl.js")))
+}
+
+fn shared_wgsl_module(source: &str) -> &str {
+    source.trim().split_once('`')
+        .and_then(|(_, body)| body.strip_suffix("`;"))
+        .expect("shared WGSL module envelope")
 }

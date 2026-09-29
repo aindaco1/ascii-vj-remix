@@ -6,6 +6,11 @@ Version 1.1.0 is synchronized across npm and Tauri.
 
 ## Release decision — 2026-09-29
 
+The first release PR CI run caught a Windows CRLF checkout failure in native
+spatial shader extraction. The loader now shares a line-ending-independent
+module extractor with the cell-color shader, with LF/CRLF regression coverage.
+Publication requires the corrected source to pass the full platform matrix.
+
 The owner explicitly approved documentation updates, merging to main, deployment
 and cleanup. This supersedes the earlier manual-testing hold recorded below.
 It authorizes the established signed desktop release and updater publication

@@ -2,6 +2,7 @@
 
 ## [1.1.0] - 2026-09-29
 
+- Accept Windows and Unix line endings when loading shared native shaders, preventing a Windows Pop Out shader initialization panic.
 - Hold decoded video frames through WebGPU submission to avoid transient external-texture bind failures. Keep the render loop recoverable after errors and count only submitted frames.
 - Make Audio Reactivity Stop cancel unfinished capture requests and serialize native Stop/Start. Restore audio slider tuning when selecting a preset, show custom tuning explicitly, and apply audio changes during Pop Out transitions.
 - Add eleven original presets: Neon Night Drive, Media Corridor, Wet Coast, Neon Cathedral, Orbital Chamber, Ashen Ruins, Fractal Dive, Mandelbulb Bloom, Mandelbox Passage, Edge Etching and Phosphor Echo. Brightness Relief is removed from the built-in catalog; its visual mode remains compatible with saved looks. Orbital Chamber no longer has an Experimental label.
