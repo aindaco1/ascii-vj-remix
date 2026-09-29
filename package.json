@@ -79,7 +79,7 @@
     "test:macos-artifacts": "npm run test:macos-identity && npm run test:macos-dmg-layout && node scripts/test_macos_deployment_target.mjs",
     "test:macos-secret-args": "node scripts/test_macos_notarization_secret_args.mjs",
     "test:windows-secret-args": "node scripts/test_windows_artifact_signing_secret_args.mjs",
-    "test:audio-reactive": "node scripts/test_audio_reactive.mjs",
+    "test:audio-reactive": "node scripts/test_audio_reactive.mjs && node scripts/test_audio_lifecycle.mjs",
     "test:midi": "node scripts/test_midi_mapping.mjs",
     "test:media-source-policy": "node scripts/test_media_source_policy.mjs",
     "test:native-output-log": "node scripts/analyze_native_output_log.mjs",
@@ -99,7 +99,7 @@
     "tauri:build": "node scripts/tauri_env.mjs build",
     "tauri:build:dev": "node scripts/tauri_env.mjs build --config src-tauri/tauri.dev.conf.json",
     "test:palette-cycling": "node scripts/test_palette_cycling.mjs",
-    "test:renderer-resources": "node scripts/test_renderer_resources.mjs",
+    "test:renderer-resources": "node scripts/test_renderer_resources.mjs && node scripts/test_webgpu_video_lifecycle.mjs",
     "test:spatial": "node scripts/test_spatial.mjs",
     "smoke:spatial": "node scripts/smoke_spatial.mjs"
   },

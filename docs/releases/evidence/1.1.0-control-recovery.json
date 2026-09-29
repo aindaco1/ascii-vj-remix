@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "mediaUrl": "media/point-click-test-30s.mp4",
+  "columns": 640,
+  "syntheticAudio": false,
+  "nativeAudio": true,
+  "backend": "auto",
+  "paletteId": "none",
+  "ditherMode": "none",
+  "charset": "point-click",
+  "soak": false,
+  "structuralTransitions": false,
+  "actualBackends": [
+    "webgpu"
+  ],
+  "nativeFailed": 0,
+  "nativeTransitionArmed": 8,
+  "nativeTransitionFailed": 0,
+  "outputDisplayCount": 1,
+  "rendererChanges": 1,
+  "frameResetCount": 0,
+  "finalFrameCount": 598,
+  "hasVisibleSignal": true,
+  "videoTimeAdvanced": true,
+  "frontendErrors": 0,
+  "videoFrameSupported": true,
+  "error": null,
+  "sampleCount": 30,
+  "phases": {
+    "main": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 0,
+      "mainAvgFps": 38.77764471057885,
+      "mainMinFps": 35.92814371257485,
+      "mainP95FrameMs": 27.833333333333332,
+      "mainP99FrameMs": 27.833333333333332,
+      "nativeOkHz": 0
+    },
+    "popout": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 0,
+      "mainAvgFps": 38.1712861130329,
+      "mainMinFps": 33.93213572854292,
+      "mainP95FrameMs": 28.758823529411764,
+      "mainP99FrameMs": 29.328235294117647,
+      "nativeOkHz": 90.92781608098544
+    },
+    "transition": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 0,
+      "mainAvgFps": 34.530289573140294,
+      "mainMinFps": 29.702970297029704,
+      "mainP95FrameMs": 33.60666666666666,
+      "mainP99FrameMs": 33.654666666666664,
+      "nativeOkHz": 3.5722362354155495
+    }
+  },
+  "audioCaptureTiming": {
+    "analysisWindowMs": {
+      "samples": 30,
+      "p50": 2.6666667,
+      "p95": 2.6666667,
+      "max": 2.6666667
+    },
+    "ipcMs": {
+      "samples": 30,
+      "p50": 1,
+      "p95": 3,
+      "max": 4
+    },
+    "featureAgeUpperBoundMs": {
+      "samples": 30,
+      "p50": 2.9264580000017304,
+      "p95": 5.544499999999971,
+      "max": 6.287209000001894
+    }
+  },
+  "mainAvgFps": 37.15974013225068,
+  "mainMinFps": 29.702970297029704,
+  "mainP95FrameMs": 33.60666666666666,
+  "mainP99FrameMs": 33.654666666666664
+}

@@ -332,7 +332,14 @@ images can animate without changing source media.
 Uniform ArrayBuffers/DataViews, texture views, and bind groups whose resources
 do not change are created once and reused. Browser video still imports an
 external texture and creates its source-dependent compute binding per frame;
-that resource is frame-scoped by WebGPU. Grid/source rebuilds create a new
+when supported, a `VideoFrame` holds the decoded image through `queue.submit`
+and closes in `finally`. This avoids WebKit's cached HTML-video texture
+lifetime during decoder and window transitions. The
+[WebGPU external-texture contract](https://www.w3.org/TR/webgpu/#external-texture-creation)
+keeps a VideoFrame-backed texture valid until its frame closes. Decoder gaps
+skip a frame; other GPU failures remain reportable. Failed submissions do not
+advance frame counters or feedback history, and the animation loop reschedules
+even after an error. Grid/source rebuilds create a new
 renderer and therefore a new complete resource set.
 
 The glyph renderer decodes only atlas pages needed by the active ramp, then
@@ -632,6 +639,15 @@ Features:
 
 Dense-mix dampening uses the density feature to reduce beat/flux-heavy
 modulation during crowded broadband passages without muting sparse transients.
+
+Capture startup and feature reads share a generation guard. Stop invalidates
+pending work, releases late browser streams, and serializes native start/stop
+commands so an old stop cannot terminate a new session. Only the current
+generation can change error/status state. Audio preset selection shares one
+tuning helper between UI and MIDI, restores all audio sliders, and preserves
+source/device/enabled state. Custom tuning is shown explicitly in the selector.
+Audio edits or Stop hand an autonomous native transition back to app-driven
+updates, including when an arm acknowledgement arrives after the edit.
 
 Modulation targets are live-safe visual controls:
 

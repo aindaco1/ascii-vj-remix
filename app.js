@@ -49,6 +49,8 @@ import {
     AUDIO_REACTIVE_DEFAULTS,
     AUDIO_REACTIVE_PRESETS,
     applyAudioReactiveModulation,
+    audioReactivePresetTuning,
+    audioReactivePresetIsCustom,
     audioReactivePrecision,
     audioReactiveSourceOptions,
     emptyAudioReactiveFeatures,
@@ -3013,6 +3015,8 @@ class AudioReactiveRuntime {
         this.nativeDisplayAudio = false;
         this.nativeFeaturePending = false;
         this.captureGeneration = 0;
+        this.nativeCaptureQueue = Promise.resolve();
+        this.nativeCaptureSource = '';
         this.lastNativeFrame = null;
         this.captureTiming = null;
         this.raf = null;
@@ -3032,48 +3036,51 @@ class AudioReactiveRuntime {
         this._loop = this._loop.bind(this);
     }
 
+    _isCurrentCapture(generation) {
+        return this.active && generation === this.captureGeneration;
+    }
+
+    _queueNativeCapture(operation) {
+        const task = this.nativeCaptureQueue.then(operation);
+        this.nativeCaptureQueue = task.catch(() => {});
+        return task;
+    }
+
     async start() {
         this.stop({ keepStatus: true });
+        const generation = this.captureGeneration;
         this.active = true;
         this.status = 'Starting';
         this.app._syncAudioReactiveUi();
+        let pendingStream = null;
 
         try {
             const source = this.app.audioReactive.source;
-            let pendingStream = null;
             let pendingLabel = '';
-
-            if (source === 'input') {
-                if (await this._startNativeInputAudio()) {
-                    pendingLabel = this.sourceLabel || 'Microphone';
-                } else {
-                    pendingStream = await this._requestInputStream();
-                    pendingLabel = this.app._audioInputStreamLabel?.(pendingStream) || 'Mic / input';
-                }
-            } else if (source === 'display') {
-                if (await this._startNativeDisplayAudio()) {
-                    pendingLabel = this.sourceLabel || 'System audio';
-                } else {
-                    pendingStream = await this._requestDisplayStream();
-                    pendingLabel = 'Display audio';
+            if (source === 'input' || source === 'display') {
+                const native = source === 'input'
+                    ? await this._startNativeInputAudio(generation)
+                    : await this._startNativeDisplayAudio(generation);
+                if (!this._isCurrentCapture(generation)) return false;
+                if (!native) {
+                    pendingStream = source === 'input'
+                        ? await this._requestInputStream(generation)
+                        : await this._requestDisplayStream();
+                    if (!this._isCurrentCapture(generation)) return false;
+                    pendingLabel = source === 'input'
+                        ? this.app._audioInputStreamLabel?.(pendingStream) || 'Mic / input'
+                        : 'Display audio';
                 }
             } else if (source !== 'file') {
                 throw new Error(`Unsupported audio source: ${source}`);
             }
 
-            if (!this.nativeDisplayAudio) {
-                if (this.nativeInputAudio) {
-                    this.status = `Listening: ${this.sourceLabel || source}`;
-                    this._emitCurrentFrame(performance.now());
-                    this.raf = scheduleResponsiveFrame(this._loop, AUDIO_REACTIVE_FRAME_MS);
-                    this.app._syncNativeOutputWindow(this.app.renderParams());
-                    this.app._syncAudioReactiveUi();
-                    return;
-                }
+            if (!this.nativeInputAudio && !this.nativeDisplayAudio) {
                 await this._ensureContext();
+                if (!this._isCurrentCapture(generation)) return false;
                 if (source === 'file') await this._startFileSource();
                 else this._startStreamSource(pendingStream, pendingLabel);
-
+                if (!this._isCurrentCapture(generation)) return false;
                 this._configureAnalyser();
             }
             this.status = `Listening: ${this.sourceLabel || source}`;
@@ -3081,11 +3088,19 @@ class AudioReactiveRuntime {
             this.raf = scheduleResponsiveFrame(this._loop, AUDIO_REACTIVE_FRAME_MS);
             this.app._syncNativeOutputWindow(this.app.renderParams());
             this.app._syncAudioReactiveUi();
+            return true;
         } catch (error) {
+            // A cancelled request must not disable or overwrite a newer session.
+            if (!this._isCurrentCapture(generation)) return false;
+            this.app.audioReactive.enabled = false;
             this.stop({ keepStatus: true });
             this.status = friendlyAudioErrorMessage(error, this.app.audioReactive.source);
             this.app._syncAudioReactiveUi();
             throw error;
+        } finally {
+            if (pendingStream && pendingStream !== this.stream) {
+                pendingStream.getTracks?.().forEach(track => track.stop());
+            }
         }
     }
 
@@ -3132,7 +3147,6 @@ class AudioReactiveRuntime {
 
     async _startFileSource() {
         if (!this.file) {
-            this.active = false;
             this.status = 'Choose audio file';
             this.app._syncAudioReactiveUi();
             throw new Error('Choose an audio file');
@@ -3154,9 +3168,10 @@ class AudioReactiveRuntime {
         await this.mediaElement.play();
     }
 
-    async _requestInputStream() {
+    async _requestInputStream(generation = this.captureGeneration) {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('Audio input unavailable');
         await requestNativeCapturePermission('microphone');
+        if (!this._isCurrentCapture(generation)) return null;
         const inputDeviceId = String(this.app.audioReactive.inputDeviceId || '').trim();
         const audio = {
             echoCancellation: false,
@@ -3172,6 +3187,7 @@ class AudioReactiveRuntime {
         try {
             return await getUserMediaWithTauriRecovery('microphone', preferredConstraints);
         } catch (error) {
+            if (!this._isCurrentCapture(generation)) return null;
             if (isPermissionOrMissingDeviceError(error)) throw error;
             console.warn('[AudioReactive] Preferred mic constraints failed; retrying simple mic capture:', error);
             return getUserMediaWithTauriRecovery('microphone', {
@@ -3189,13 +3205,16 @@ class AudioReactiveRuntime {
         this.sourceLabel = label;
     }
 
-    async _startNativeInputAudio() {
+    async _startNativeInputAudio(generation = this.captureGeneration) {
         if (!isTauriRuntime()) return false;
         try {
             await requestNativeCapturePermission('microphone');
+            if (!this._isCurrentCapture(generation)) return false;
             const deviceLabel = this.app._audioInputDeviceLabel?.() || '';
             logMediaDiagnostic(`native-input-audio start input ${deviceLabel || 'default'}`);
-            const response = await startTauriInputAudioCapture(deviceLabel);
+            this.nativeCaptureSource = 'input';
+            const response = await this._queueNativeCapture(() => this._isCurrentCapture(generation) ? startTauriInputAudioCapture(deviceLabel) : null);
+            if (!this._isCurrentCapture(generation)) return false;
             logMediaDiagnostic(`native-input-audio result input ${JSON.stringify(response)}`);
             if (!response?.available) return false;
             if (!response.active) throw new Error(response.message || 'Native microphone audio did not start');
@@ -3204,17 +3223,20 @@ class AudioReactiveRuntime {
             this.sourceLabel = response.sourceLabel || deviceLabel || 'Microphone';
             return true;
         } catch (error) {
+            if (!this._isCurrentCapture(generation)) return false;
             logMediaDiagnostic(`native-input-audio error input ${diagnosticErrorLabel(error)}`);
             error.nativeInputAudioFailure = true;
             throw error;
         }
     }
 
-    async _startNativeDisplayAudio() {
+    async _startNativeDisplayAudio(generation = this.captureGeneration) {
         if (!isTauriRuntime()) return false;
         try {
             logMediaDiagnostic('native-system-audio start display');
-            const response = await startTauriSystemAudioCapture();
+            this.nativeCaptureSource = 'display';
+            const response = await this._queueNativeCapture(() => this._isCurrentCapture(generation) ? startTauriSystemAudioCapture() : null);
+            if (!this._isCurrentCapture(generation)) return false;
             logMediaDiagnostic(`native-system-audio result display ${JSON.stringify(response)}`);
             if (!response?.available) return false;
             if (!response.active) throw new Error(response.message || 'Native system audio did not start');
@@ -3223,6 +3245,7 @@ class AudioReactiveRuntime {
             this.sourceLabel = response.sourceLabel || 'System audio';
             return true;
         } catch (error) {
+            if (!this._isCurrentCapture(generation)) return false;
             logMediaDiagnostic(`native-system-audio error display ${diagnosticErrorLabel(error)}`);
             error.nativeSystemAudioFailure = true;
             throw error;
@@ -3264,6 +3287,7 @@ class AudioReactiveRuntime {
     }
 
     updateSettings() {
+        this.app._audioReactiveSettingsChanged();
         if (this.active) this._emitCurrentFrame();
         if (this.active) this.app._syncNativeOutputWindow(this.app.renderParams());
     }
@@ -3275,6 +3299,7 @@ class AudioReactiveRuntime {
     }
 
     _emitCurrentFrame(now = performance.now()) {
+        if (!this.active) return;
         if (this.nativeDisplayAudio || this.nativeInputAudio) {
             this._emitNativeFrame(now);
             return;
@@ -3461,8 +3486,9 @@ class AudioReactiveRuntime {
         this.captureGeneration++;
         this.lastNativeFrame = null;
         this.captureTiming = null;
-        const hadNativeInputAudio = this.nativeInputAudio;
-        const hadNativeDisplayAudio = this.nativeDisplayAudio;
+        const hadNativeInputAudio = this.nativeInputAudio || this.nativeCaptureSource === 'input';
+        const hadNativeDisplayAudio = this.nativeDisplayAudio || this.nativeCaptureSource === 'display';
+        this.nativeCaptureSource = '';
         this.nativeInputAudio = false;
         this.nativeDisplayAudio = false;
         this.nativeFeaturePending = false;
@@ -3493,10 +3519,10 @@ class AudioReactiveRuntime {
             this.fileUrl = null;
         }
         if (hadNativeDisplayAudio) {
-            stopTauriSystemAudioCapture().catch((error) => console.warn('[AudioReactive] Native system audio stop failed:', error));
+            this._queueNativeCapture(stopTauriSystemAudioCapture).catch((error) => console.warn('[AudioReactive] Native system audio stop failed:', error));
         }
         if (hadNativeInputAudio) {
-            stopTauriInputAudioCapture().catch((error) => console.warn('[AudioReactive] Native microphone stop failed:', error));
+            this._queueNativeCapture(stopTauriInputAudioCapture).catch((error) => console.warn('[AudioReactive] Native microphone stop failed:', error));
         }
         this.frequencyData = null;
         this.timeData = null;
@@ -5881,6 +5907,7 @@ class RendererLabApp {
         this.audioInputDeviceSignature = '';
         this.audioReactiveFeatures = null;
         this.audioReactiveLastUi = 0;
+        this.audioReactiveRevision = 0;
         this.audioReactiveRuntime = new AudioReactiveRuntime(this);
         this.midiRuntime = new MidiControllerRuntime(this);
         this._midiTargetDescriptors = null;
@@ -7075,6 +7102,12 @@ class RendererLabApp {
         els.audioReactiveControls.innerHTML = '';
         els.audioReactiveSource.innerHTML = '';
         els.audioReactivePreset.innerHTML = '';
+        const customOption = document.createElement('option');
+        customOption.value = '__custom';
+        customOption.textContent = 'Custom';
+        customOption.disabled = true;
+        customOption.hidden = true;
+        els.audioReactivePreset.appendChild(customOption);
         this.audioReactiveInputs.clear();
 
         for (const [value, label] of AUDIO_REACTIVE_SOURCE_OPTIONS) {
@@ -7250,12 +7283,7 @@ class RendererLabApp {
                 .catch((error) => console.warn('[AudioReactive] Input switch failed:', error));
         });
         els.audioReactivePreset?.addEventListener('change', () => {
-            this.audioReactive.preset = els.audioReactivePreset.value;
-            this.audioReactiveRuntime.updateSettings();
-            if (this.audioReactive.enabled && !this.audioReactiveRuntime.active) {
-                this._restartAudioReactive().catch((error) => console.warn('[AudioReactive] Preset restart failed:', error));
-            }
-            this._syncAudioReactiveUi();
+            this._selectAudioReactivePreset(els.audioReactivePreset.value);
         });
         els.audioReactiveToggle?.addEventListener('click', () => this._toggleAudioReactive());
         els.audioReactivePickFile?.addEventListener('click', () => els.audioReactiveFile?.click());
@@ -7575,8 +7603,13 @@ class RendererLabApp {
             finalFrameCount: 0,
             hasVisibleSignal: false,
             videoTimeAdvanced: false,
+            frontendErrors: 0,
+            videoFrameSupported: typeof window.VideoFrame === 'function',
             error: null
         };
+        const onFrontendError = () => { report.frontendErrors++; };
+        window.addEventListener('error', onFrontendError);
+        window.addEventListener('unhandledrejection', onFrontendError);
 
         const collectPhase = async (phase, phaseDurationMs) => {
             logMediaDiagnostic(`[ASCILINE_UI_PERF_PHASE] ${phase}`);
@@ -7850,6 +7883,9 @@ class RendererLabApp {
             if (nativeAudio) this.audioReactiveRuntime.stop({keepStatus:true});
             this._stopWtf();
             this.uiPerfSmokeActive = false;
+            window.removeEventListener('error', onFrontendError);
+            window.removeEventListener('unhandledrejection', onFrontendError);
+            report.ok = report.ok && report.frontendErrors === 0;
             const compactPhases = Object.fromEntries(Object.entries(report.phases).map(([phase, stats]) => [
                 phase,
                 {
@@ -7884,6 +7920,8 @@ class RendererLabApp {
                 finalFrameCount: report.finalFrameCount,
                 hasVisibleSignal: report.hasVisibleSignal,
                 videoTimeAdvanced: report.videoTimeAdvanced,
+                frontendErrors: report.frontendErrors,
+                videoFrameSupported: report.videoFrameSupported,
                 error: report.error,
                 sampleCount: report.samples.length
             }, (_key, value) => (
@@ -7962,8 +8000,27 @@ class RendererLabApp {
         const hadEffectiveParams = Boolean(this.effectiveParams || this.audioReactiveFeatures);
         this.effectiveParams = null;
         this.audioReactiveFeatures = null;
+        this._audioReactiveSettingsChanged();
         if (hadEffectiveParams) this._applyEffectiveRendererParams(this.params, 'audioReactive');
         this._syncAudioReactiveUi(true);
+    }
+
+    _audioReactiveSettingsChanged() {
+        this.audioReactiveRevision = (this.audioReactiveRevision || 0) + 1;
+        // Control edits, including Stop, take effect during an autonomous
+        // native transition. The remaining tween continues from the app.
+        if (this.nativeOutputTransition) {
+            this._finishNativeOutputTransition(this.nativeOutputTransition.token, this.renderParams());
+        }
+    }
+
+    _selectAudioReactivePreset(id) {
+        const tuning = audioReactivePresetTuning(id);
+        if (!tuning) return false;
+        this.audioReactive = { ...this.audioReactive, ...tuning, preset: id };
+        this.audioReactiveRuntime.updateSettings();
+        this._syncAudioReactiveUi(true);
+        return true;
     }
 
     async _setAudioReactiveSource(source) {
@@ -8030,20 +8087,7 @@ class RendererLabApp {
             return;
         }
 
-        try {
-            await this.audioReactiveRuntime.start();
-        } catch (error) {
-            this._handleAudioReactiveStartFailure(error);
-            throw error;
-        }
-    }
-
-    _handleAudioReactiveStartFailure(error) {
-        const source = this.audioReactive.source;
-        this.audioReactive.enabled = false;
-        this.audioReactiveRuntime.stop({ keepStatus: true });
-        this.audioReactiveRuntime.status = friendlyAudioErrorMessage(error, source);
-        this._syncAudioReactiveUi(true);
+        await this.audioReactiveRuntime.start();
     }
 
     async _toggleAudioReactive() {
@@ -8065,7 +8109,19 @@ class RendererLabApp {
         if (!els.audioReactiveControls) return;
 
         if (els.audioReactiveSource) els.audioReactiveSource.value = this.audioReactive.source;
-        if (els.audioReactivePreset) els.audioReactivePreset.value = this.audioReactive.preset;
+        if (els.audioReactivePreset) {
+            const custom = audioReactivePresetIsCustom(this.audioReactive);
+            const option = els.audioReactivePreset.querySelector('option[value="__custom"]');
+            if (option) {
+                const name = AUDIO_REACTIVE_PRESETS.find(p => p.id === this.audioReactive.preset)?.name || 'Audio';
+                const label = `${name} (Custom)`;
+                if (option.textContent !== label) option.textContent = label;
+                option.hidden = !custom;
+            }
+            if (force || document.activeElement !== els.audioReactivePreset) {
+                els.audioReactivePreset.value = custom ? '__custom' : this.audioReactive.preset;
+            }
+        }
         if (els.audioReactiveInput) {
             els.audioReactiveInput.value = this.audioReactive.inputDeviceId || '';
             els.audioReactiveInput.disabled = this.audioReactive.source !== 'input';
@@ -9199,6 +9255,7 @@ button:hover{background:#202a35}
     }
 
     async _armNativeOutputTransition(from, to, durationMs, kind, token) {
+        const audioRevision = this.audioReactiveRevision;
         const localStart = () => {
             const startAtUnixMs = Date.now();
             setCycleTransportRate(this.paletteCycleTransport, this.running ? to.paletteCycleSpeed : 0, cycleNowMs(), durationMs);
@@ -9275,6 +9332,9 @@ button:hover{background:#202a35}
         }
 
         this.nativeOutputTransition = { token, kind, startAtUnixMs, durationMs };
+        if (audioRevision !== this.audioReactiveRevision) {
+            this._finishNativeOutputTransition(token, this.renderParams());
+        }
         return { armed: true, startAtUnixMs };
     }
 
@@ -11604,8 +11664,7 @@ button:hover{background:#202a35}
 
     _applyMidiAudioValue(key, value) {
         if (key === 'preset') {
-            if (!AUDIO_REACTIVE_PRESETS.some((preset) => preset.id === value)) return false;
-            this.audioReactive.preset = value;
+            return this._selectAudioReactivePreset(value);
         } else {
             const config = AUDIO_REACTIVE_CONTROLS.find((control) => control.key === key);
             if (!config) return false;

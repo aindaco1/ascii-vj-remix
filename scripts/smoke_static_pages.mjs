@@ -160,6 +160,25 @@ async function runSmoke() {
       null,
       { timeout: 15000 }
     );
+    diagnostics.phase = 'audio preset custom tuning';
+    const audioPresetRegression = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const runtime = app.audioReactiveRuntime;
+      const sourceNode = runtime.sourceNode;
+      const captures = window.__smokeAudioCapture.mic;
+      const slider = document.querySelector('#audio-reactive-sensitivity');
+      const preset = document.querySelector('#audio-reactive-preset');
+      slider.value = '0'; slider.dispatchEvent(new Event('input', {bubbles:true}));
+      const custom = preset.value === '__custom' && preset.selectedOptions[0].textContent.includes('(Custom)');
+      preset.value = 'dense-mix-control'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      const dense = app.audioReactive.sensitivity === 9 && app.audioReactive.densityDampening === .7 && preset.value === 'dense-mix-control';
+      slider.value = '0'; slider.dispatchEvent(new Event('input', {bubbles:true}));
+      preset.value = 'dense-mix-control'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      const reselected = app.audioReactive.sensitivity === 9 && preset.value === 'dense-mix-control';
+      preset.value = 'pulse-reactor'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      return {custom, dense, reselected, capturePreserved:runtime.active && runtime.sourceNode === sourceNode && window.__smokeAudioCapture.mic === captures};
+    });
+    if (Object.values(audioPresetRegression).some(value => !value)) throw new Error(`Audio preset regression: ${JSON.stringify(audioPresetRegression)}`);
     diagnostics.phase = 'brand image readiness';
     await page.waitForFunction(() => {
       const mark = document.querySelector('.brand-mark');

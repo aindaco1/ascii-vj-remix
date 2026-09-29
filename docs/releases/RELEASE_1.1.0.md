@@ -101,6 +101,57 @@ background/occlusion recovery still needs manual review. Reproduction is in
 Physical listening, system-audio timing and other-platform hardware acceptance
 remain manual. Publication is still held.
 
+## Video-frame and audio-control recovery (2026-09-29)
+
+The six local `GPUDevice.createBindGroup` reports map to the per-frame video
+external-texture binding. The WebGPU path now holds an explicit decoded
+`VideoFrame` until queue submission, then closes it even on failure. This
+avoids WebKit's cached HTML-video texture lifetime. Decoder import retries are
+retained, failed frames no longer advance feedback/history counters, and an
+exception cannot permanently break the animation-frame loop.
+
+Audio Stop invalidates unfinished capture startup and releases late browser
+streams. Native start/stop commands run in order, and cancelled errors cannot
+disable a newer session. Selecting an audio preset restores all audio sliders;
+custom tuning is labeled in the selector, so reselecting the same preset works.
+UI and MIDI share this behavior without restarting capture or changing media.
+Audio changes also interrupt autonomous native modulation during a transition,
+including when its acknowledgement arrives after Stop.
+
+Regression checks cover delayed browser capture, context resume and file play;
+native input/display Stop/Start ordering; current versus stale failures; preset
+reset; and edits during native transition arming. The full static UI suite
+passes, including Custom labeling/reselection and capture continuity. Renderer
+resource/lifetime, fallback, MIDI, spatial CPU/GPU/source/control/WTF, media
+policy and offline bundle checks pass. The optimized Dev app builds locally.
+
+Two initially obscured native performance runs failed the unchanged throughput
+gates, but produced no new frontend reports. Revealing
+the app restored rendering. An exploratory Chromium external-video seek fixture
+failed to import both explicit VideoFrame and original HTML-video textures;
+this driver limitation is not claimed as a passing video test. An exploratory
+WebKit seek fixture timed out, so seek behavior is not claimed as verified.
+The retained native performance probe exercises playing video and now fails
+on new frontend errors. The six historical local reports remain preserved.
+
+The final [native video/audio recovery probe](evidence/1.1.0-control-recovery.json)
+passed at 640 columns with all windows visible: preview averaged 38.8 FPS alone,
+38.2 FPS with Pop Out and 34.5 FPS during eight native transitions. Pop Out
+presented at 60.0 FPS with zero GPU failures or presentation backlog. There were
+zero frontend errors, failed state updates or failed transition arms. Native
+audio retained 2.67 ms capture windows, 1 ms median / 3 ms p95 IPC, and 5.54 ms
+p95 feature-age bounds at delivery. These are software timing observations,
+not physical sound-to-display latency.
+
+Installed-app UI verification confirmed Stop changes to Start/Idle and clears
+all meters, Start reconnects the microphone, slider edits show Custom, and
+Dense Mix Control restores Sensitivity 9.00 / Density Dampening 0.70. The app
+was returned to Demo Image / Ashen Ruins / Flat Media / Bright Output off with
+Pulse Reactor selected. Background window throttling remains an OS behavior;
+the visible performance run above is the throughput acceptance result.
+
+Publication remains held for owner testing.
+
 ## Fractal follow-up (before Flat Media defaults)
 
 Bright Output now starts **off**. An existing saved choice is retained, and

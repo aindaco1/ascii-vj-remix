@@ -155,6 +155,11 @@ They do not include those artists' images or authored scene animations.
   Capture hardware and the display still contribute some delay.
 - Dense-mix dampening and noise-floor controls help busy songs stay reactive
   without pinning jitter and beat response at maximum.
+- Changing an audio slider labels the audio preset **Custom**. Selecting any
+  audio preset, including the same one again, restores its slider tuning.
+  The selected audio source, input device and visual look stay in place.
+- Stop cancels pending capture startup as well as active reactivity. Audio
+  control changes also take effect during Pop Out preset transitions.
 - Audio modulation is non-persistent: it affects live effective render params
   without rewriting saved presets.
 - Safe clamps prevent high sensitivity from driving the renderer into pure

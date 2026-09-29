@@ -137,6 +137,19 @@ export const AUDIO_REACTIVE_FEATURE_KEYS = [
     'beatPulse'
 ];
 
+export function audioReactivePresetTuning(id) {
+    const preset = AUDIO_REACTIVE_PRESETS.find(preset => preset.id === id);
+    if (!preset) return null;
+    return Object.fromEntries(AUDIO_REACTIVE_CONTROLS.map(({key}) => [
+        key, preset[key] ?? AUDIO_REACTIVE_DEFAULTS[key]
+    ]));
+}
+
+export function audioReactivePresetIsCustom(settings) {
+    const tuning = audioReactivePresetTuning(settings.preset);
+    return Boolean(tuning && Object.entries(tuning).some(([key, value]) => settings[key] !== value));
+}
+
 export const AUDIO_REACTIVE_SAFE_LIMITS = {
     saturationBoost: [0, 3],
     contrastBoost: [0.45, 2.85],

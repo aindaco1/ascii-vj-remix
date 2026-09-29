@@ -697,12 +697,29 @@ export class WebGPURenderer {
     _renderFrame() {
         if (!this.initialized) return;
 
+        const video = this.usesExternalVideoTexture ? this.source.element : null;
+        if (video && video.readyState < 2) return;
+        // Hold the decoded frame through submission. Importing an HTML video
+        // directly gives WebKit ownership of a short-lived, cached texture.
+        let frame = null;
+        if (video && typeof this.window.VideoFrame === 'function') {
+            try { frame = new this.window.VideoFrame(video); }
+            catch (error) {
+                if (error?.name === 'InvalidStateError') return; // Decoder is between frames.
+                throw error;
+            }
+        }
+        try { this._renderSourceFrame(frame || video); }
+        finally { frame?.close(); }
+    }
+
+    _renderSourceFrame(videoSource) {
+
         if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
         this.syncPaletteDisplay();
         fillSpatialUniforms(this.spatialData, this, this.cols, this.rows, [...activeGlyphRamp(this)].length, this.spatialState);
         this.device.queue.writeBuffer(this.spatialBuffer, 0, this.spatialData);
-        this.frameCount++;
 
         const sw = this.source.width || 640;
         const sh = this.source.height || 480;
@@ -727,7 +744,7 @@ export class WebGPURenderer {
         pv.setFloat32(52, this.jitterSpeed, true);
         pv.setFloat32(56, this.sampleX, true);
         pv.setFloat32(60, this.sampleY, true);
-        pv.setFloat32(64, this.frameCount / Math.max(1, this.fps), true);
+        pv.setFloat32(64, (this.frameCount + 1) / Math.max(1, this.fps), true);
         pv.setUint32(68, this.mirrorX ? 1 : 0, true);
         pv.setUint32(72, paletteById(this.paletteId)?.colors.length || 0, true);
         pv.setUint32(76, DITHER_MATRICES[this.ditherMode]?.size || 0, true);
@@ -764,8 +781,13 @@ export class WebGPURenderer {
         if (this.usesExternalVideoTexture) {
             let externalTexture;
             try {
-                externalTexture = this.device.importExternalTexture({ source: this.source.element });
-            } catch (e) { return; }
+                externalTexture = this.device.importExternalTexture({ source: videoSource });
+            } catch (error) {
+                // Preserve decoder-import retries on browsers that temporarily
+                // cannot expose the decoded frame as a GPU texture.
+                if (error?.name === 'InvalidStateError' || error?.name === 'OperationError') return;
+                throw error;
+            }
 
             computePipeline = this.videoComputePipeline;
             computeBG = this.device.createBindGroup({
@@ -811,6 +833,7 @@ export class WebGPURenderer {
 
 
         this.device.queue.submit([encoder.finish()]);
+        this.frameCount++;
         [this.historyTexture, this.nextHistoryTexture] = [this.nextHistoryTexture, this.historyTexture];
         [this.historyView, this.nextHistoryView] = [this.nextHistoryView, this.historyView];
         [this.imageComputeBindGroup, this.nextImageComputeBindGroup] = [this.nextImageComputeBindGroup, this.imageComputeBindGroup];
@@ -832,9 +855,10 @@ export class WebGPURenderer {
         };
         const loop = (ts) => {
             this.lastRafAt = this.window.performance?.now?.() ?? performance.now();
-            tick(ts);
-            if (!this.running) return;
-            this.animationId = this.window.requestAnimationFrame(loop);
+            try { tick(ts); }
+            finally {
+                if (this.running) this.animationId = this.window.requestAnimationFrame(loop);
+            }
         };
         this.animationId = this.window.requestAnimationFrame(loop);
         const fallbackInterval = Math.max(8, Math.min(50, this.frameInterval));

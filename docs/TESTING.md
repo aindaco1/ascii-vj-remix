@@ -230,8 +230,14 @@ Run `npm run test:audio-reactive` for bounded modulation, immediate attacks,
 frame-rate-independent release, zero smoothing, single-flight native reads,
 duplicate capture frames and stop/restart races. `npm run test:rust` also checks
 native buffer selection, onset detection and beat decay across buffer sizes.
+Startup tests delay browser permissions, AudioContext resume, file playback and
+native commands to verify cancellation, track cleanup and rapid Stop/Start.
+They cover preset tuning reset and audio edits during native transition arming.
 The static smoke covers capture source/device switching, live settings and
-effective-parameter ownership in steady versus transitioning Pop Out output.
+effective-parameter ownership in steady versus transitioning Pop Out output,
+plus Custom labeling and reselection through the actual audio controls.
+`npm run test:renderer-resources` checks decoded-frame lifetime through GPU
+submission, failure cleanup and animation-loop recovery.
 
 After building the optimized Dev app, a local native-input timing probe runs
 alongside the existing video, Pop Out and transition performance gates:
@@ -247,6 +253,7 @@ npm run smoke:ui-perf
 
 Keep both app and Pop Out visible during the probe. It uses the selected native
 microphone/input and its normal OS permission.
+New frontend errors fail the probe. Existing saved reports remain untouched.
 It reports analysis-window duration, feature-read IPC round trip and a bound on
 feature age at delivery (age at the native snapshot plus the full round trip).
 It does not record raw audio or measure physical sound-to-display delay.
