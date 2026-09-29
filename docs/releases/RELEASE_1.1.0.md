@@ -1,9 +1,28 @@
 # 1.1.0 — Spatial ASCII
 
-Date: 2026-09-29. Status: **local candidate, held for owner manual testing**.
-Branch: `release/1.1.0`, based on `caefa8ec9708ff782af9a6a1a4b7946a8953046c`.
-No release tag, push, GitHub release, deployment or updater publication is
-authorized by this record. Version 1.1.0 is synchronized across npm and Tauri.
+Date: 2026-09-29. Status: **owner approved for publication; release gates in progress**.
+Source branch: `release/1.1.0`, based on `caefa8ec9708ff782af9a6a1a4b7946a8953046c`.
+Version 1.1.0 is synchronized across npm and Tauri.
+
+## Release decision — 2026-09-29
+
+The owner explicitly approved documentation updates, merging to main, deployment
+and cleanup. This supersedes the earlier manual-testing hold recorded below.
+It authorizes the established signed desktop release and updater publication
+workflow; it does not turn unrecorded manual or physical checks into passes.
+
+The final implementation is `38beda3`. The release will use the exact main-push
+commit accepted by Desktop CI, immutable `v1.1.0` artifacts, and the existing
+macOS/Windows/Linux installed-artifact and updater-hop checks. Public macOS
+packages require Developer ID signing and notarization; Windows installers
+retain their documented unsigned-preview status.
+
+Remaining physical coverage includes M1/16 GB reference-floor performance,
+macOS 13 runtime, representative Windows/Linux camera/audio/GPU behavior,
+external-projector alignment, physical MIDI and sound-to-display latency.
+These follow-ups remain tracked in [Testing](../TESTING.md#hardware-and-platform-checks)
+and the [Roadmap](../ROADMAP.md#distribution-and-platform-validation).
+Earlier pending rows and local test limitations are historical evidence.
 
 ## Scope
 
@@ -99,7 +118,7 @@ unchanged gates without new reports. Those local diagnostics are preserved;
 background/occlusion recovery still needs manual review. Reproduction is in
 [Testing](../TESTING.md#audio-response).
 Physical listening, system-audio timing and other-platform hardware acceptance
-remain manual. Publication is still held.
+remained manual at this checkpoint. Publication was held at that time.
 
 ## Video-frame and audio-control recovery (2026-09-29)
 
@@ -150,7 +169,7 @@ was returned to Demo Image / Ashen Ruins / Flat Media / Bright Output off with
 Pulse Reactor selected. Background window throttling remains an OS behavior;
 the visible performance run above is the throughput acceptance result.
 
-Publication remains held for owner testing.
+Publication was held for owner testing at this checkpoint; see the later release decision above.
 
 ## Fractal follow-up (before Flat Media defaults)
 
@@ -377,7 +396,7 @@ development identity. Production installation and public updater are untouched.
 Launch it normally, or run `npm run desktop:run-local` to reinstall the current
 optimized development bundle through the maintained signing/launch harness.
 
-Before publication, the owner should review:
+The original owner-review checklist was:
 
 - Bright output off/on on dark camera, image and video inputs; verify its saved
   preference and compare native Pop Out with the main preview.
@@ -390,5 +409,6 @@ Before publication, the owner should review:
   edits after a preset transition on representative footage.
 
 Public signing/notarization, Windows/Linux packages, updater installation and
-physical reference-floor acceptance remain separate release gates. This record
-does not authorize proceeding past the manual testing hold.
+physical reference-floor acceptance are distinct evidence stages. The release
+decision above supersedes the original publication hold; pending physical checks
+remain follow-up work.

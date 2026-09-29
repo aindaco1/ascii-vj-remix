@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0] - Unreleased · manual testing
+## [1.1.0] - 2026-09-29
 
 - Hold decoded video frames through WebGPU submission to avoid transient external-texture bind failures. Keep the render loop recoverable after errors and count only submitted frames.
 - Make Audio Reactivity Stop cancel unfinished capture requests and serialize native Stop/Start. Restore audio slider tuning when selecting a preset, show custom tuning explicitly, and apply audio changes during Pop Out transitions.

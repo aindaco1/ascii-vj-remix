@@ -8,7 +8,11 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.1.0, prepared locally for manual testing and not yet published. See the [Spatial release record](docs/releases/RELEASE_1.1.0.md). Published artifacts are listed in
+The current source/package version is **1.1.0 — Spatial ASCII**. It adds optional
+source-driven spatial and fractal looks, brighter output controls, faster audio
+response, and fixes for live control and video-frame handling. See the
+[release record](docs/releases/RELEASE_1.1.0.md) for validation and platform limits.
+Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).
 Release history is recorded in the [Changelog](CHANGELOG.md);

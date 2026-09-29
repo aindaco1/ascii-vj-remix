@@ -11,7 +11,7 @@ shipped changes. The [documentation index](../README.md) covers current guides.
 
 | Version | Record | Evidence boundary |
 | --- | --- | --- |
-| 1.1.0 | [Spatial ASCII](RELEASE_1.1.0.md) | Local development build; publication held for owner manual testing. |
+| 1.1.0 | [Spatial ASCII](RELEASE_1.1.0.md) | Owner approved publication on 2026-09-29; source, artifact/updater and physical acceptance are tracked separately. |
 | 1.0.5 | [macOS compatibility and issue follow-ups](RELEASE_1.0.5.md) | Records deployment-target and compiler corrections, public artifacts and remaining physical acceptance. |
 | 1.0.4 | [Cycling and performance release](RELEASE_1.0.4.md) | Tracks source, CI, artifacts and installed/hardware acceptance separately. |
 | 1.0.3 | [Camera Pop Out corrective release](RELEASE_1.0.3.md) | Records Windows owner acceptance and the 2026-09-04 Linux physical camera testing deferral. The current follow-up checklist is linked from [Testing](../TESTING.md#hardware-and-platform-checks). |
