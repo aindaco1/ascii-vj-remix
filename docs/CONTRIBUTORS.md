@@ -101,6 +101,22 @@ target output to `/private/tmp/ascii-vj-remix-tauri-target` so iCloud extended
 attributes do not break app signing. You can override the build directory with
 `ASCILINE_TAURI_TARGET_DIR` or `CARGO_TARGET_DIR`.
 
+## Build cleanup
+
+Keep the current installed Dev app, its optimized `release` build cache,
+`node_modules`, the current `dist` bundle, and staged FFmpeg resources for local
+development and testing. Once build/test processes have stopped, the generated
+`debug` tree and obsolete smoke outputs can be removed. The next debug build
+recreates its cache; `npm run tauri:dev` and `npm run check:desktop` remain the
+normal development commands.
+
+After a published release passes installer/updater acceptance, remove obsolete
+CI package copies and merged release branches. Retain the current development
+installers, tracked release evidence, signing identities, local configuration,
+user media/preferences/reports, and published release assets used for updater
+baselines. Other managed worktrees require their own lifecycle check before
+archiving.
+
 ## Common Commands
 
 | Command | Use |

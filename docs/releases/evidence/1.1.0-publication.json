@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-29T19:54:27+00:00",
+  "release": {
+    "version": "1.1.0",
+    "tag": "v1.1.0",
+    "source_commit": "19f9350a505c379cfc2302f484373dbd9467e25a",
+    "pull_request": "https://github.com/aindaco1/ascii-vj-remix/pull/47",
+    "published_at": "2026-09-29T19:49:27Z",
+    "url": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.1.0"
+  },
+  "source_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631",
+    "source_commit": "19f9350a505c379cfc2302f484373dbd9467e25a",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631/job/109576307723"
+      },
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631/job/109576307951"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631/job/109576308045"
+      },
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631/job/109576308051"
+      }
+    ]
+  },
+  "release_and_published_acceptance": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437",
+    "source_commit": "19f9350a505c379cfc2302f484373dbd9467e25a",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "Resolve immutable release context",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582409851"
+      },
+      {
+        "name": "Build linux-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529357"
+      },
+      {
+        "name": "Build windows-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529371"
+      },
+      {
+        "name": "Build macos-aarch64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529383"
+      },
+      {
+        "name": "Build linux-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529398"
+      },
+      {
+        "name": "Build windows-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529421"
+      },
+      {
+        "name": "Require exact Desktop CI success",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529581"
+      },
+      {
+        "name": "Build macos-aarch64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109582529605"
+      },
+      {
+        "name": "Bundle windows-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109587220872"
+      },
+      {
+        "name": "Bundle linux-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109587220925"
+      },
+      {
+        "name": "Bundle macos-aarch64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109587221046"
+      },
+      {
+        "name": "Publish GitHub Release",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109589165591"
+      },
+      {
+        "name": "macos-26 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109589391042"
+      },
+      {
+        "name": "windows-latest install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109589391186"
+      },
+      {
+        "name": "ubuntu-24.04 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437/job/109589391189"
+      }
+    ]
+  },
+  "local_macos_acceptance": {
+    "result": "passed",
+    "previous_version": "1.0.6",
+    "installed_version_verified": "1.1.0",
+    "dmg_layout_and_trust_verified": true,
+    "developer_id_notarization_and_designated_requirement_verified": true,
+    "updater_reports": [
+      {
+        "ok": true,
+        "kind": "updater-ui",
+        "package_version": "1.1.0"
+      },
+      {
+        "ok": true,
+        "kind": "updater",
+        "package_version": "1.0.6",
+        "found_update": true,
+        "update_version": "1.1.0",
+        "downloaded_bytes": 53372802,
+        "install_started": true
+      }
+    ],
+    "locally_verified_sha256": {
+      "ASCII.VJ.Remix.app.tar.gz": "59f1bdb7f6af37451d360f0f44ee3c3315e83048cc0ea7a128fb46e6644848aa",
+      "ASCII.VJ.Remix.app.tar.gz.sig": "2a2811adc6619fe1a2ff4300f755b93644a8ec168c89afeb29b120a8a27dd30e",
+      "ASCII.VJ.Remix_1.1.0_aarch64.dmg": "5fe7714beb2e121b91b46adb44bd7b0e7022601ca0a78dcdbdd1599ccfec5a7a",
+      "latest.json": "ac7e3077dbb7bd5d3fc8be9a78481d4f52d8bfb7d8569f3e0e00d4ee606db181"
+    }
+  },
+  "published_assets": [
+    {
+      "name": "ASCII.VJ.Remix-1.1.0-1.x86_64.rpm",
+      "size_in_bytes": 57678140,
+      "digest": "sha256:390f3e6dae593fcf6eba5e4c5e830e6e2218184fe97a0a2794be7568aed9428d",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix-1.1.0-1.x86_64.rpm"
+    },
+    {
+      "name": "ASCII.VJ.Remix-1.1.0-1.x86_64.rpm.sig",
+      "size_in_bytes": 424,
+      "digest": "sha256:69052353d59e5cf6a523cf710709c3451fe19c92ca156129ecbc77f09f007125",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix-1.1.0-1.x86_64.rpm.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz",
+      "size_in_bytes": 53372802,
+      "digest": "sha256:59f1bdb7f6af37451d360f0f44ee3c3315e83048cc0ea7a128fb46e6644848aa",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix.app.tar.gz"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+      "size_in_bytes": 416,
+      "digest": "sha256:2a2811adc6619fe1a2ff4300f755b93644a8ec168c89afeb29b120a8a27dd30e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix.app.tar.gz.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_aarch64.dmg",
+      "size_in_bytes": 53538714,
+      "digest": "sha256:5fe7714beb2e121b91b46adb44bd7b0e7022601ca0a78dcdbdd1599ccfec5a7a",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_aarch64.dmg"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_amd64.AppImage",
+      "size_in_bytes": 130218488,
+      "digest": "sha256:c677131af5db284bf361d52b1d0c89791c8443a655deedaf273861d8364a98e0",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.AppImage"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_amd64.AppImage.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:8a4b11e11ee577dc657134ebbc5a71b8e3ecd3fe719819ad10f60308badbb6ab",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.AppImage.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_amd64.deb",
+      "size_in_bytes": 57677250,
+      "digest": "sha256:a5110451baac361555781919505a84ac96660652c896b16984b21b09501ce853",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.deb"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_amd64.deb.sig",
+      "size_in_bytes": 420,
+      "digest": "sha256:ac59066561baeeb9570a751b2a9639c786cdfe73e5248639a617e91743f06e66",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.deb.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_x64-setup.exe",
+      "size_in_bytes": 43977526,
+      "digest": "sha256:a78bceaa39f52570a6e5f1a457fcc1024ddd8948a16cd49c4bd552a8dde17aac",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64-setup.exe"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_x64-setup.exe.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:ef0e0e06cffa18476dfac9d3ea8cbcd1171ff96192eaf9fddc018af1c4ce68c8",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64-setup.exe.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_x64_en-US.msi",
+      "size_in_bytes": 56705024,
+      "digest": "sha256:1ef49b39fca246e7d58bedfc217ad16f31cfa8465bd39015542f7fe1c2115d2e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64_en-US.msi"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.1.0_x64_en-US.msi.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:8df31955579bdbacc3682f7717059c888e2fd3168aa82b647cfc4a213117caba",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64_en-US.msi.sig"
+    },
+    {
+      "name": "latest.json",
+      "size_in_bytes": 5488,
+      "digest": "sha256:ac7e3077dbb7bd5d3fc8be9a78481d4f52d8bfb7d8569f3e0e00d4ee606db181",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/latest.json"
+    }
+  ],
+  "updater_manifest": {
+    "version": "1.1.0",
+    "platforms": {
+      "linux-x86_64-appimage": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.AppImage",
+        "signature_present": true
+      },
+      "linux-x86_64-deb": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.deb",
+        "signature_present": true
+      },
+      "linux-x86_64-rpm": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix-1.1.0-1.x86_64.rpm",
+        "signature_present": true
+      },
+      "linux-x86_64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_amd64.AppImage",
+        "signature_present": true
+      },
+      "darwin-aarch64-app": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix.app.tar.gz",
+        "signature_present": true
+      },
+      "darwin-aarch64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix.app.tar.gz",
+        "signature_present": true
+      },
+      "windows-x86_64-msi": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64_en-US.msi",
+        "signature_present": true
+      },
+      "windows-x86_64-nsis": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64-setup.exe",
+        "signature_present": true
+      },
+      "windows-x86_64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.1.0/ASCII.VJ.Remix_1.1.0_x64_en-US.msi",
+        "signature_present": true
+      }
+    }
+  },
+  "cleanup": {
+    "local": {
+      "removed_directories": 20,
+      "allocated_bytes_removed": 6836224000,
+      "retained": [
+        "Current installed Dev app and optimized release build cache",
+        "Current frontend bundle, node_modules and staged FFmpeg",
+        "Current macOS published packages and updater manifest",
+        "Latest Jev run, publication evidence and tracked release evidence",
+        "Production app, user media, preferences, crash reports and signing identities",
+        "Other managed worktrees"
+      ]
+    },
+    "github_actions": {
+      "removed_count": 21,
+      "bytes_removed": 2664497102,
+      "artifacts": [
+        {
+          "id": 10870144206,
+          "name": "ascii-vj-remix-windows-test-576ec7917d96ac97dd4f3b819222cd30305555a6",
+          "size_in_bytes": 100343093
+        },
+        {
+          "id": 10870090910,
+          "name": "ascii-vj-remix-linux-test-576ec7917d96ac97dd4f3b819222cd30305555a6",
+          "size_in_bytes": 244575347
+        },
+        {
+          "id": 10861814356,
+          "name": "ascii-vj-remix-Linux-X64",
+          "size_in_bytes": 244589494
+        },
+        {
+          "id": 10861802658,
+          "name": "ascii-vj-remix-linux-test-7baad67325b12269bb73ebb0179214b26015b98a",
+          "size_in_bytes": 244575261
+        },
+        {
+          "id": 10861624539,
+          "name": "ascii-vj-remix-macOS-ARM64",
+          "size_in_bytes": 106593242
+        },
+        {
+          "id": 10861434948,
+          "name": "ascii-vj-remix-windows-test-7baad67325b12269bb73ebb0179214b26015b98a",
+          "size_in_bytes": 100353264
+        },
+        {
+          "id": 10861264742,
+          "name": "ascii-vj-remix-Windows-X64",
+          "size_in_bytes": 100359277
+        },
+        {
+          "id": 10856548381,
+          "name": "ascii-vj-remix-windows-test-48428abae572cb9d09c78438161eb7ab68f2c88e",
+          "size_in_bytes": 100834935
+        },
+        {
+          "id": 10856065666,
+          "name": "ascii-vj-remix-linux-test-48428abae572cb9d09c78438161eb7ab68f2c88e",
+          "size_in_bytes": 244564510
+        },
+        {
+          "id": 10457089063,
+          "name": "ascii-vj-remix-macOS-ARM64",
+          "size_in_bytes": 106594601
+        },
+        {
+          "id": 10457014519,
+          "name": "ascii-vj-remix-Linux-X64",
+          "size_in_bytes": 243927615
+        },
+        {
+          "id": 10455973704,
+          "name": "ascii-vj-remix-Windows-X64",
+          "size_in_bytes": 100817175
+        },
+        {
+          "id": 11058755825,
+          "name": "ascii-vj-remix-macOS-ARM64",
+          "size_in_bytes": 106711802
+        },
+        {
+          "id": 11058675513,
+          "name": "release-runtime-windows-x86_64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 59296848
+        },
+        {
+          "id": 11058451426,
+          "name": "ascii-vj-remix-Linux-X64",
+          "size_in_bytes": 244787648
+        },
+        {
+          "id": 11058354490,
+          "name": "ascii-vj-remix-Windows-X64",
+          "size_in_bytes": 100432744
+        },
+        {
+          "id": 11058338943,
+          "name": "release-binary-windows-x86_64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 35960361
+        },
+        {
+          "id": 11058277802,
+          "name": "release-binary-linux-x86_64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 42321483
+        },
+        {
+          "id": 11057993078,
+          "name": "release-runtime-macos-aarch64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 42346150
+        },
+        {
+          "id": 11057713497,
+          "name": "release-runtime-linux-x86_64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 57703728
+        },
+        {
+          "id": 11056894527,
+          "name": "release-binary-macos-aarch64-19f9350a505c379cfc2302f484373dbd9467e25a",
+          "size_in_bytes": 36808524
+        }
+      ],
+      "retained": "Current Windows/Linux development installers, small smoke reports, all published GitHub Release assets"
+    },
+    "removed_merged_branch": "release/1.1.0",
+    "retained_branch": "main"
+  },
+  "physical_hardware_acceptance": "See remaining physical coverage in RELEASE_1.1.0.md; automated checks do not establish physical acceptance."
+}

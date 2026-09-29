@@ -1,7 +1,7 @@
 # 1.1.0 — Spatial ASCII
 
-Date: 2026-09-29. Status: **owner approved for publication; release gates in progress**.
-Source branch: `release/1.1.0`, based on `caefa8ec9708ff782af9a6a1a4b7946a8953046c`.
+Date: 2026-09-29. Status: **published; source, installer and updater gates passed**.
+Source: `v1.1.0` at `19f9350a505c379cfc2302f484373dbd9467e25a`, merged through [PR #47](https://github.com/aindaco1/ascii-vj-remix/pull/47).
 Version 1.1.0 is synchronized across npm and Tauri.
 
 ## Release decision — 2026-09-29
@@ -9,18 +9,18 @@ Version 1.1.0 is synchronized across npm and Tauri.
 The first release PR CI run caught a Windows CRLF checkout failure in native
 spatial shader extraction. The loader now shares a line-ending-independent
 module extractor with the cell-color shader, with LF/CRLF regression coverage.
-Publication requires the corrected source to pass the full platform matrix.
+The corrected source passed the full platform matrix before publication.
 
 The owner explicitly approved documentation updates, merging to main, deployment
 and cleanup. This supersedes the earlier manual-testing hold recorded below.
 It authorizes the established signed desktop release and updater publication
 workflow; it does not turn unrecorded manual or physical checks into passes.
 
-The final implementation is `38beda3`. The release will use the exact main-push
-commit accepted by Desktop CI, immutable `v1.1.0` artifacts, and the existing
-macOS/Windows/Linux installed-artifact and updater-hop checks. Public macOS
-packages require Developer ID signing and notarization; Windows installers
-retain their documented unsigned-preview status.
+The final implementation includes the control fixes in `38beda3` and Windows
+shader extraction fix in `e1ff97c`. The release uses the exact main-push commit
+accepted by Desktop CI and immutable `v1.1.0` artifacts. Public macOS packages
+are Developer ID signed and notarized; Windows installers retain their
+documented unsigned-preview status.
 
 Remaining physical coverage includes M1/16 GB reference-floor performance,
 macOS 13 runtime, representative Windows/Linux camera/audio/GPU behavior,
@@ -29,9 +29,38 @@ These follow-ups remain tracked in [Testing](../TESTING.md#hardware-and-platform
 and the [Roadmap](../ROADMAP.md#distribution-and-platform-validation).
 Earlier pending rows and local test limitations are historical evidence.
 
+## Published artifacts and acceptance
+
+[Version 1.1.0](https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.1.0)
+was published at 19:49 UTC on 2026-09-29 with fourteen assets. The public
+`latest.json` resolves all nine updater entries to signed 1.1.0 packages.
+
+- [Exact-main Desktop CI](https://github.com/aindaco1/ascii-vj-remix/actions/runs/36618128631) passed on macOS 26, Xcode 27, Windows and Linux, including the Windows preset renderer matrix.
+- [Release and published-artifact checks](https://github.com/aindaco1/ascii-vj-remix/actions/runs/36619922437) passed all fifteen jobs, including installed-package and real 1.0.6 → 1.1.0 updater hops on macOS, Windows and Linux.
+- Local macOS validation independently downloaded the published DMG, updater archive/signature and manifest, matched their SHA-256 digests, verified DMG layout, signing/notarization and stable app identity, checked the updater/reports controls, and completed the same updater hop in a temporary installation.
+
+The [publication evidence](evidence/1.1.0-publication.json) records exact commit,
+CI links, public asset sizes/digests, updater targets and cleanup totals. The
+current local Dev app was rebuilt and installed with its stable development
+signing identity after the Windows shader fix.
+
+## Post-release cleanup
+
+Removed 6.84 GB of local generated output: the old debug build tree, obsolete
+smoke/Jev outputs and temporary baseline downloads. Removed twenty-one obsolete
+or redundant CI package artifacts totaling 2.66 GB, and deleted the merged
+`release/1.1.0` branch locally and remotely. `main` remains the local branch.
+
+Retained the current Dev app, optimized release cache, dependencies, frontend
+bundle, staged FFmpeg, current Windows/Linux development installers, current
+Mac release downloads, release evidence and published release history. User
+media, settings, crash reports, signing identities and other managed worktrees
+were excluded from cleanup. The next debug build recreates its cache; see
+[Build cleanup](../CONTRIBUTORS.md#build-cleanup).
+
 ## Scope
 
-The candidate adds eleven source-preserving looks: Neon Night Drive, Media
+The release adds eleven source-preserving looks: Neon Night Drive, Media
 Corridor, Wet Coast, Neon Cathedral, Orbital Chamber, Ashen Ruins, Fractal Dive,
 Mandelbulb Bloom, Mandelbox Passage, Edge Etching and Phosphor Echo. Brightness
 Relief has been removed from the built-in preset catalog; its mode remains
