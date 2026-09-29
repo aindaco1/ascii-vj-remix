@@ -57,6 +57,14 @@ Start with the [install guide](../README.md#install-guide) and
 - The renderer exposes live controls for grid, cell size, color, gamma,
   brightness, contrast, saturation, background blend, quantization, jitter,
   sample position, smoothing, FPS, glyph/cell behavior, and performance status.
+- **Color → Bright output** is off by default. Enable it to lift dark footage; existing saved choices are retained. It strongly lifts dark colors
+  before glyph selection, so low-light camera,
+  image and video inputs produce brighter colors and denser glyphs. Your choice
+  persists across launches, preset switches, playlists and WTF mode. Leave it
+  off for the original color response; the Brightness and Gamma sliders still
+  work. Pure black stays black. With a palette, the mapped colors are lifted
+  while its lookup and cycling ranges stay intact; fixed glyph colors keep
+  their chosen color.
 - Stats overlay is enabled by default and remains user-controlled.
 
 ### Presets and Live Controls
@@ -101,11 +109,17 @@ Start with the [install guide](../README.md#install-guide) and
   playback uses the existing Default Transition control, bounded to 1–5 seconds.
 - Preset transitions crossfade instead of fading to black.
 - Transition time is configurable.
+- Editing a visual control during a preset transition stops the transition at
+  the current look and keeps your edit. The interrupted look becomes Custom;
+  the selected media keeps playing. MIDI visual controls follow the same rule.
 - Presets preserve the active media source unless the user explicitly changes
   it.
 - WTF mode continuously transitions through randomized live-safe settings and
   leans into both extreme and traditional ASCII preset families while avoiding
-  pure white or pure black output.
+  pure white or pure black output. Each transition independently chooses Flat
+  Media with 80% probability; the other 20% is shared equally among the ten
+  spatial modes (2% each). This is a probability per transition, so runs can
+  include consecutive flat or spatial looks.
 
 ### Pixel Art and Color Cycling
 
@@ -136,8 +150,16 @@ They do not include those artists' images or authored scene animations.
   audio features.
 - Audio analysis tracks RMS, bass, low-mid, mid, high-mid, treble, presence,
   brightness, density, transient energy, beat pulse, and spectral movement.
+- Attacks follow each fresh audio reading immediately. Smoothing controls how
+  quickly the response falls away; set it to zero for the sharpest response.
+  Capture hardware and the display still contribute some delay.
 - Dense-mix dampening and noise-floor controls help busy songs stay reactive
   without pinning jitter and beat response at maximum.
+- Changing an audio slider labels the audio preset **Custom**. Selecting any
+  audio preset, including the same one again, restores its slider tuning.
+  The selected audio source, input device and visual look stay in place.
+- Stop cancels pending capture startup as well as active reactivity. Audio
+  control changes also take effect during Pop Out preset transitions.
 - Audio modulation is non-persistent: it affects live effective render params
   without rewriting saved presets.
 - Safe clamps prevent high sensitivity from driving the renderer into pure
@@ -483,3 +505,80 @@ availability gate, so their Update control can flash and then disappear. The
 0.9.8 notarized DMG was the manual recovery release. Install a newer public DMG
 manually using the [install guide](../README.md#install-guide) if the Update
 control is unavailable; see the [Changelog](../CHANGELOG.md) for that fix.
+
+## Spatial visuals and trails (1.1.0)
+
+All built-in presets start with **Space / Motion → Visual mode → Flat media**,
+including Ashen Ruins. They apply their color, glyph or solid-cell treatment
+directly to your input. Ashen Ruins starts as a pale monochrome, solid-cell look.
+The eleven new presets remain available; their camera and scene settings are
+loaded but only take effect when you choose a spatial Visual mode manually.
+Reselecting a built-in preset restores Flat Media. Saved custom presets retain
+their chosen mode, and existing saved settings are not migrated.
+The release is currently a local development build for manual acceptance;
+public installers have not been replaced.
+
+| Preset | Optional Visual mode | Scene after opting in |
+| --- | --- | --- |
+| Neon Night Drive | City streets | Fast, low street weave, tall buildings, wet streets and rain |
+| Media Corridor | Media corridor | Narrow, symmetric screen tunnel, wide lens and block glyphs |
+| Wet Coast | Wet coast | Slow waterfront view, open water, short shoreline buildings and Braille texture |
+| Neon Cathedral | Vaulted hall | Upward-looking nave with tall columns, a pitched roof and fine glyphs |
+| Orbital Chamber | Orbitals | Media-colored sphere and rotating tilted ring |
+| Ashen Ruins | Recursive ruins | Monochrome architecture, open passages and pale distance fog |
+| Fractal Dive | Mandelbrot dive | Rotating Mandelbrot zoom with source-driven color and contour distortion |
+| Mandelbulb Bloom | Mandelbulb | Orbiting organic fractal with Braille surface texture |
+| Mandelbox Passage | Mandelbox | Recursive cube forms and folded architecture |
+| Edge Etching | Flat media | Directional line glyphs on strong image edges |
+| Phosphor Echo | Flat media | Decaying trails with gentle zoom and rotation |
+
+**Travel speed** is signed: negative values reverse motion. **Freeze scene**
+stops the scene clock and echo decay/motion; the selected video and audio keep
+running. **Route position** adds an offset. **Reset scene / trails** returns
+the camera clock and offset to their origin and clears stored trails. Forward
+travel wraps through a repeating world; Street weave moves within the clear
+road, and Look around / orbit rotates the travelling view or circles the orbital objects.
+**Camera tilt** looks up or down; Relief uses an elevated camera above its terrain. These are constrained
+camera routes, not free flight or an editable world.
+
+**Media amount** blends the selected source into surfaces. The optional scene
+recipes use 80–95% so your input drives their appearance. Zero uses procedural
+materials. Wall images occupy larger 8×4-unit panels; roofs and ceilings also
+use the source, and Orbital Chamber includes it behind the foreground shapes. **Surface framing** controls repeat, fit or crop within surface
+tiles. The existing source picker, camera mirroring and playback controls still
+own media. Previously saved/custom settings keep their values; reselect a
+related preset and then enable its spatial Visual mode to load its scene recipe.
+Changing a visual preset does not select a new source or restart it.
+
+**Fractal zoom**, **Fractal detail** and **Fractal shape** appear when you enable one of the four fractal modes. Zoom changes scale; Detail changes the bounded iteration count; Shape changes carving, bulb power, box folding or media-driven contour distortion. Travel speed, freeze, camera controls and media blending remain live and editable. Ashen Ruins, Fractal Dive and Mandelbox Passage use solid cells; turn Glyph mode on and Solid mode off for ASCII texture. The removed Brightness Relief preset remains available as a visual mode for existing custom looks.
+
+**Material glyphs** distinguishes surfaces, water, windows and sky. It reserves
+eight of the 96 glyph slots. As Media amount rises, its glyph override fades
+so the source brightness and shapes remain legible. Disable it and set Edge glyphs to zero to use the
+entire custom ramp unchanged. Edge glyphs works on flat media and chooses
+horizontal, vertical or diagonal strokes with hysteresis near its threshold.
+Palette cycling continues to use stable base luminance for ordinary glyphs.
+
+**Phosphor / echo**, **Trail half-life**, **Echo zoom** and **Echo rotation**
+work on flat and spatial modes. Long trails can hide fine details. History is
+cleared when Bright output, the source, grid, scene, seed, route offset, palette or glyph layout
+changes, and when a render gap exceeds one second. Native structural crossfades
+also clear history. Floating-point history prevents dim trails from getting
+stuck; older WebGL2 devices without floating-point render attachments use a
+faster-decaying byte fallback.
+
+Existing audio settings add restrained bass movement to field of view and
+camera height, presence to light, beat accents to glow and treble to wet
+shimmer. These use the existing sensitivity, per-feature amounts and density
+dampening. MIDI Learn includes the spatial sliders/selectors, Freeze Scene and
+Reset Scene and Trails actions; it does not add source or camera actions.
+
+Spatial controls apply to local image/video/camera rendering, including camera
+composites. The legacy server-stream renderer keeps its existing behavior.
+WebGPU, WebGL2 and native wgpu render locally. Explicit Canvas retains the
+existing software density limit and uses the output mirror for spatial Pop Out.
+If a native GPU presenter is unavailable, choose Canvas for that fallback.
+Normal and Advanced density limits have not changed. Relief, orbitals, wet
+reflections and dense scenes can require more GPU time; reduce Columns before
+raising other limits. Physical M1/16 GB and Windows/Linux acceptance is still
+pending for this release.

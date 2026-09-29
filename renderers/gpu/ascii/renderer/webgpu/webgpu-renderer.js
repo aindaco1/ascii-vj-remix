@@ -1,3 +1,6 @@
+import { spatialWGSL } from '../../../../shared/spatial-shader.js';
+import { spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
+import { activeGlyphRamp } from '../../../../shared/character-sets.js';
 import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
 import { cachedGpuPipeline } from '../../../../shared/gpu-pipeline-cache.js';
 import cellColorWGSL from '../../../../shared/cell-color.wgsl.js';
@@ -58,6 +61,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -71,6 +75,26 @@ struct FeatureData {
 @group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
+
+struct SpatialParams { data: array<vec4f, 10>, };
+@group(0) @binding(5) var<uniform> spatial: SpatialParams;
+@group(0) @binding(6) var historyTex: texture_2d<f32>;
+@group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+fn effect(index: i32) -> vec4f { return spatial.data[index]; }
+fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
+fn sceneMedia(uv: vec2f) -> vec3f {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at).rgb;
+}
+fn sceneHistory(uv: vec2f) -> vec4f {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
+    return textureLoad(historyTex, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0);
+}
+
+${spatialWGSL}
 ${cellColorWGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -92,9 +116,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let sampleY = clamp(i32(cellCenterY + jitterY), 0, i32(params.srcH) - 1);
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY));
-    let boosted = processColor(c.rgb, cx, cy);
+    let uv = (vec2f(f32(cx), f32(cy)) + 0.5) / vec2f(f32(params.cols), f32(params.rows));
+    var sample = SceneSample(c.rgb, 0.0);
+    if (effect(0).x > 0.0) { sample = sceneSample(uv); }
+    let boosted = sceneFinish(processColor(sample.color, cx, cy), uv, sample.glyph);
 
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
+    textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), boosted);
 }
 `;
 
@@ -126,6 +154,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -140,6 +169,26 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 // Simple hash for per-cell pseudo-random jitter
+
+struct SpatialParams { data: array<vec4f, 10>, };
+@group(0) @binding(5) var<uniform> spatial: SpatialParams;
+@group(0) @binding(6) var historyTex: texture_2d<f32>;
+@group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+fn effect(index: i32) -> vec4f { return spatial.data[index]; }
+fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
+fn sceneMedia(uv: vec2f) -> vec3f {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at, 0).rgb;
+}
+fn sceneHistory(uv: vec2f) -> vec4f {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
+    return textureLoad(historyTex, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0);
+}
+
+${spatialWGSL}
 ${cellColorWGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -164,9 +213,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
 
-    let boosted = processColor(c.rgb, cx, cy);
+    let uv = (vec2f(f32(cx), f32(cy)) + 0.5) / vec2f(f32(params.cols), f32(params.rows));
+    var sample = SceneSample(c.rgb, 0.0);
+    if (effect(0).x > 0.0) { sample = sceneSample(uv); }
+    let boosted = sceneFinish(processColor(sample.color, cx, cy), uv, sample.glyph);
 
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
+    textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), boosted);
 }
 `;
 
@@ -283,13 +336,16 @@ export class WebGPURenderer {
         this.cols = options.cols || 120;
         this.fps = options.fps || 24;
         this.frameInterval = 1000 / this.fps;
-        this.saturationBoost = options.saturationBoost || 1.4;
-        this.contrastBoost = options.contrastBoost || 1.0;
-        this.brightness = options.brightness || 1.0;
+        this.saturationBoost = options.saturationBoost ?? 1.4;
+        this.contrastBoost = options.contrastBoost ?? 1.0;
+        this.brightness = options.brightness ?? 1.0;
+        this.brightOutput = options.brightOutput === true;
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
-        Object.assign(this, paletteCycleParams(options));
+        Object.assign(this, paletteCycleParams(options), spatialParams(options));
+        this.spatialData = new Float32Array(40);
+        this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
         this.paletteLutUpdates = 0;
@@ -348,7 +404,7 @@ export class WebGPURenderer {
         this.featureBuffer = null;
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
-        this.paramsData = new ArrayBuffer(96);
+        this.paramsData = new ArrayBuffer(112);
         this.paramsView = new DataView(this.paramsData);
         this.renderData = new ArrayBuffer(64);
         this.renderView = new DataView(this.renderData);
@@ -394,7 +450,7 @@ export class WebGPURenderer {
 
         // Compile once per device/source kind and presentation format. Driver
         // compilation runs asynchronously so opening output keeps the UI live.
-        const computeKey = this.usesExternalVideoTexture ? 'video' : 'image';
+        const computeKey = this.usesExternalVideoTexture ? 'spatial-video' : 'spatial-image';
         const compute = cachedGpuPipeline(this.device, computeKey, () => {
             const module = this.device.createShaderModule({code: this.usesExternalVideoTexture ? CELL_PASS_VIDEO_WGSL : CELL_PASS_IMAGE_WGSL});
             return this.device.createComputePipelineAsync({layout: 'auto', compute: {module, entryPoint: 'main'}});
@@ -415,8 +471,9 @@ export class WebGPURenderer {
 
         this._createCellTexture();
 
+        this.spatialBuffer = this.device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         this.paramsBuffer = this.device.createBuffer({
-            size: 96,
+            size: 112,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
 
@@ -522,9 +579,16 @@ export class WebGPURenderer {
         this.cellColorTexture = this.device.createTexture({
             size: [this.cols, this.rows],
             format: 'rgba8unorm',
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
         });
         this.cellColorView = this.cellColorTexture.createView();
+        this.historyTexture?.destroy();
+        this.historyTexture = this.device.createTexture({size: [this.cols, this.rows], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING});
+        this.historyView = this.historyTexture.createView();
+        this.nextHistoryTexture?.destroy();
+        this.nextHistoryTexture = this.device.createTexture({size: [this.cols, this.rows], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING});
+        this.nextHistoryView = this.nextHistoryTexture.createView();
+        this.spatialState = {};
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
     }
@@ -540,16 +604,21 @@ export class WebGPURenderer {
             ]
         });
         if (!this.usesExternalVideoTexture && this.imageComputePipeline && this.imageSourceView) {
-            this.imageComputeBindGroup = this.device.createBindGroup({
+            const bind = (read, write) => this.device.createBindGroup({
                 layout: this.imageComputePipeline.getBindGroupLayout(0),
                 entries: [
                     { binding: 0, resource: this.imageSourceView },
                     { binding: 1, resource: this.cellColorView },
                     { binding: 2, resource: { buffer: this.paramsBuffer } },
                     { binding: 3, resource: { buffer: this.paletteLutBuffer } },
-                    { binding: 4, resource: { buffer: this.featureBuffer } }
+                    { binding: 4, resource: { buffer: this.featureBuffer } },
+                    { binding: 5, resource: { buffer: this.spatialBuffer } },
+                    { binding: 6, resource: read },
+                    { binding: 7, resource: write }
                 ]
             });
+            this.imageComputeBindGroup = bind(this.historyView, this.nextHistoryView);
+            this.nextImageComputeBindGroup = bind(this.nextHistoryView, this.historyView);
         }
     }
 
@@ -628,10 +697,29 @@ export class WebGPURenderer {
     _renderFrame() {
         if (!this.initialized) return;
 
+        const video = this.usesExternalVideoTexture ? this.source.element : null;
+        if (video && video.readyState < 2) return;
+        // Hold the decoded frame through submission. Importing an HTML video
+        // directly gives WebKit ownership of a short-lived, cached texture.
+        let frame = null;
+        if (video && typeof this.window.VideoFrame === 'function') {
+            try { frame = new this.window.VideoFrame(video); }
+            catch (error) {
+                if (error?.name === 'InvalidStateError') return; // Decoder is between frames.
+                throw error;
+            }
+        }
+        try { this._renderSourceFrame(frame || video); }
+        finally { frame?.close(); }
+    }
+
+    _renderSourceFrame(videoSource) {
+
         if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
 
         this.syncPaletteDisplay();
-        this.frameCount++;
+        fillSpatialUniforms(this.spatialData, this, this.cols, this.rows, [...activeGlyphRamp(this)].length, this.spatialState);
+        this.device.queue.writeBuffer(this.spatialBuffer, 0, this.spatialData);
 
         const sw = this.source.width || 640;
         const sh = this.source.height || 480;
@@ -656,7 +744,7 @@ export class WebGPURenderer {
         pv.setFloat32(52, this.jitterSpeed, true);
         pv.setFloat32(56, this.sampleX, true);
         pv.setFloat32(60, this.sampleY, true);
-        pv.setFloat32(64, this.frameCount / Math.max(1, this.fps), true);
+        pv.setFloat32(64, (this.frameCount + 1) / Math.max(1, this.fps), true);
         pv.setUint32(68, this.mirrorX ? 1 : 0, true);
         pv.setUint32(72, paletteById(this.paletteId)?.colors.length || 0, true);
         pv.setUint32(76, DITHER_MATRICES[this.ditherMode]?.size || 0, true);
@@ -664,6 +752,7 @@ export class WebGPURenderer {
         pv.setUint32(84, Math.max(1, Math.round(this.ditherScale)), true);
         pv.setFloat32(88, this.ditherBias, true);
         pv.setUint32(92, this.ditherInvert ? 1 : 0, true);
+        pv.setUint32(96, this.brightOutput ? 1 : 0, true);
         this.device.queue.writeBuffer(this.paramsBuffer, 0, this.paramsData);
 
         // Render params
@@ -692,8 +781,13 @@ export class WebGPURenderer {
         if (this.usesExternalVideoTexture) {
             let externalTexture;
             try {
-                externalTexture = this.device.importExternalTexture({ source: this.source.element });
-            } catch (e) { return; }
+                externalTexture = this.device.importExternalTexture({ source: videoSource });
+            } catch (error) {
+                // Preserve decoder-import retries on browsers that temporarily
+                // cannot expose the decoded frame as a GPU texture.
+                if (error?.name === 'InvalidStateError' || error?.name === 'OperationError') return;
+                throw error;
+            }
 
             computePipeline = this.videoComputePipeline;
             computeBG = this.device.createBindGroup({
@@ -703,7 +797,10 @@ export class WebGPURenderer {
                     { binding: 1, resource: this.cellColorView },
                     { binding: 2, resource: { buffer: this.paramsBuffer } },
                     { binding: 3, resource: { buffer: this.paletteLutBuffer } },
-                    { binding: 4, resource: { buffer: this.featureBuffer } }
+                    { binding: 4, resource: { buffer: this.featureBuffer } },
+                    { binding: 5, resource: { buffer: this.spatialBuffer } },
+                    { binding: 6, resource: this.historyView },
+                    { binding: 7, resource: this.nextHistoryView }
                 ]
             });
         } else {
@@ -734,7 +831,12 @@ export class WebGPURenderer {
         renderPass.draw(3);
         renderPass.end();
 
+
         this.device.queue.submit([encoder.finish()]);
+        this.frameCount++;
+        [this.historyTexture, this.nextHistoryTexture] = [this.nextHistoryTexture, this.historyTexture];
+        [this.historyView, this.nextHistoryView] = [this.nextHistoryView, this.historyView];
+        [this.imageComputeBindGroup, this.nextImageComputeBindGroup] = [this.nextImageComputeBindGroup, this.imageComputeBindGroup];
     }
 
     start() {
@@ -753,9 +855,10 @@ export class WebGPURenderer {
         };
         const loop = (ts) => {
             this.lastRafAt = this.window.performance?.now?.() ?? performance.now();
-            tick(ts);
-            if (!this.running) return;
-            this.animationId = this.window.requestAnimationFrame(loop);
+            try { tick(ts); }
+            finally {
+                if (this.running) this.animationId = this.window.requestAnimationFrame(loop);
+            }
         };
         this.animationId = this.window.requestAnimationFrame(loop);
         const fallbackInterval = Math.max(8, Math.min(50, this.frameInterval));
@@ -810,6 +913,9 @@ export class WebGPURenderer {
         if (this.renderParamsBuffer) this.renderParamsBuffer.destroy();
         if (this.paletteLutBuffer) this.paletteLutBuffer.destroy();
         if (this.featureBuffer) this.featureBuffer.destroy();
+        this.spatialBuffer?.destroy();
+        this.historyTexture?.destroy();
+        this.nextHistoryTexture?.destroy();
         if (this.glyphAtlasTexture) this.glyphAtlasTexture.destroy();
         this.cellColorView = null;
         this.imageSourceView = null;

@@ -183,7 +183,7 @@ for that integration's separate rollback. No application/data migration is invol
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 79 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 87 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -222,7 +222,44 @@ choose another parent directory. These fresh browser contexts contain synthetic
 smoke fixtures; diagnostics do not dump storage, environment variables, or the
 full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
-renderer checks, or the 79/51/28 preset ownership contract.
+renderer checks, or the 87/59/28 preset ownership contract.
+
+### Audio response
+
+Run `npm run test:audio-reactive` for bounded modulation, immediate attacks,
+frame-rate-independent release, zero smoothing, single-flight native reads,
+duplicate capture frames and stop/restart races. `npm run test:rust` also checks
+native buffer selection, onset detection and beat decay across buffer sizes.
+Startup tests delay browser permissions, AudioContext resume, file playback and
+native commands to verify cancellation, track cleanup and rapid Stop/Start.
+They cover preset tuning reset and audio edits during native transition arming.
+The static smoke covers capture source/device switching, live settings and
+effective-parameter ownership in steady versus transitioning Pop Out output,
+plus Custom labeling and reselection through the actual audio controls.
+`npm run test:renderer-resources` checks decoded-frame lifetime through GPU
+submission, failure cleanup and animation-loop recovery.
+
+After building the optimized Dev app, a local native-input timing probe runs
+alongside the existing video, Pop Out and transition performance gates:
+
+```bash
+ASCILINE_UI_PERF_SMOKE_NATIVE_AUDIO=1 \
+ASCILINE_UI_PERF_SMOKE_FOREGROUND=1 \
+ASCILINE_UI_PERF_SMOKE_COLUMNS=640 \
+ASCILINE_UI_PERF_SMOKE_DURATION_MS=15000 \
+ASCILINE_UI_PERF_REPORT_PATH=/tmp/ascii-native-audio.json \
+npm run smoke:ui-perf
+```
+
+Keep both app and Pop Out visible during the probe. It uses the selected native
+microphone/input and its normal OS permission.
+New frontend errors fail the probe. Existing saved reports remain untouched.
+It reports analysis-window duration, feature-read IPC round trip and a bound on
+feature age at delivery (age at the native snapshot plus the full round trip).
+It does not record raw audio or measure physical sound-to-display delay.
+Compare rendering against the existing performance gates; do not lower them to
+obtain a latency result. Physical listening, audio-interface/loopback timing,
+system-audio capture and Windows/Linux hardware remain separate manual checks.
 
 ### Renderer Backend Changes
 
@@ -403,9 +440,9 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 79 total / 51 accelerated / 28 explicit
+separately requires the centralized 90 total / 62 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 51 accelerated
+physical Windows acceptance must additionally confirm the 62 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 The same smoke renders known color swatches through actual WebGL2 and compares
@@ -606,3 +643,56 @@ separate when reporting validation. Historical per-version evidence lives in
 
 Prospective release, platform, accessibility, localization, and performance
 coverage is tracked in the [Roadmap](ROADMAP.md).
+
+## Spatial renderer changes
+
+- `npm run test:spatial`: variable-height occlusion, roof hits, no-hit/axis/corner
+  rays, rectilinear projection, wrapping, signed transport, finite/clamped
+  controls, audio bounds, long-tail decay, distinct source-shape response and
+  pairwise differences between manually enabled scene compositions on one dark input,
+  Flat Media preset defaults and exact WTF probability boundaries for every mode. Shared uniform vectors run in JS
+  and Rust; `npm run test:rust` also validates the complete native WGSL.
+- `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
+  Canvas reference, default-off brightness and live opt-in/out (RGB and glyph
+  luminance), toggle persistence across presets/WTF/native payloads,
+  Flat Media after each built-in preset switch, 24 live spatial controls across
+  all nine manually enabled scenes, manual/MIDI edits during saved spatial
+  preset tweens and crossfades, persisted edits and crossfade-layer cleanup,
+  WTF's independent scene choice through anchor generation, safety retries and fallback,
+  frozen-frame equality, floating-point trail decay, Canvas
+  limits and a playing 30-second video through the new presets and back to
+  Classic Camera ASCII. All nine scene recipes and the legacy relief mode must respond to two moving
+  source frames with identical color/brightness histograms but different shapes,
+  in both RGB output and glyph choices. It requires a GPU-capable installed Chromium for
+  WebGPU; `CHROMIUM_EXECUTABLE` selects one. The default opens an isolated visible browser.
+  `SPATIAL_SMOKE_HEADLESS=1` is optional on drivers with a reliable headless
+  WebGPU swapchain. The numerical WebGPU test uses an offscreen GPU
+  attachment and boots its app fixture on WebGL2 because installed Chromium
+  intermittently reports an invalid startup swapchain with the baseline and
+  candidate WebGPU renderers. GPU diagnostics remain fatal; presentation is
+  covered separately by native/visible checks.
+- `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
+  media/resize paths and JavaScript/GPU errors, including Flat Media defaults
+  across the full built-in catalog. The native preset sweep checks the same
+  defaults in app, renderer and native-output params (`flatMediaPassed`).
+- `node scripts/capture_spatial_review.mjs /tmp/spatial-review.png` captures
+  one dark source, the brightness toggle off/on, and all nine manually enabled
+  spatial scenes using actual WebGL2 presentation. Add `--fractals` for the four
+  fractal looks on the unmodified demo source with Bright Output off; add
+  `--flat-presets` to capture their built-in Flat Media defaults. Glyph atlas loads must
+  finish before capture.
+- Native scene performance can use the maintained UI harness, for example
+  `ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneWet":0.55,"sceneRain":0.2,"sceneMedia":0.85}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 npm run smoke:ui-perf`.
+  This is local-only and must use the development identity. Preserve the normal
+  frame-time and reactive-update gates; a screenshot is not a performance test.
+
+Manual acceptance: confirm Bright Output starts off on a clean profile and
+retains an explicitly saved choice; compare Bright output off/on on dark camera, image and
+video sources, reselect each built-in preset to confirm Flat Media, manually
+enable its related spatial mode, and
+compare preview and native output while changing mode,
+source, density, palette and ramp; adjust fractal zoom/detail/shape after selecting
+a preset and during its transition; exercise freeze/reverse/reset, long feedback
+fades, source/video continuity, camera orientation, audio start/stop, MIDI
+pickup and output close/reopen. Verify a physical second display and the
+reference-floor hardware separately. See the [1.1.0 record](releases/RELEASE_1.1.0.md).

@@ -259,6 +259,17 @@ base params
 Effective params must not persist back into user presets unless the user
 explicitly saves the current state as a preset.
 
+Audio feature polling and reactive output synchronization target 120 Hz, with
+at most one native feature read in flight. Duplicate capture frames and replies
+from stopped sessions are ignored. Browser FFT analyzers do not add smoothing;
+both capture paths use the shared immediate-attack, elapsed-time release
+envelope. Smoothing zero bypasses the envelope. Native input requests 128-frame
+buffers within the device's supported range and retains the default-buffer
+fallback. Beat history and decay follow time rather than callback count.
+Steady Pop Out updates consume these effective parameters without applying audio
+a second time. Armed native transitions receive unmodulated endpoints and keep
+their direct native audio response while parameter synchronization is suspended.
+
 ## Backend Selection
 
 Backend `auto` attempts the highest-quality viable path first.
@@ -321,7 +332,14 @@ images can animate without changing source media.
 Uniform ArrayBuffers/DataViews, texture views, and bind groups whose resources
 do not change are created once and reused. Browser video still imports an
 external texture and creates its source-dependent compute binding per frame;
-that resource is frame-scoped by WebGPU. Grid/source rebuilds create a new
+when supported, a `VideoFrame` holds the decoded image through `queue.submit`
+and closes in `finally`. This avoids WebKit's cached HTML-video texture
+lifetime during decoder and window transitions. The
+[WebGPU external-texture contract](https://www.w3.org/TR/webgpu/#external-texture-creation)
+keeps a VideoFrame-backed texture valid until its frame closes. Decoder gaps
+skip a frame; other GPU failures remain reportable. Failed submissions do not
+advance frame counters or feedback history, and the animation loop reschedules
+even after an error. Grid/source rebuilds create a new
 renderer and therefore a new complete resource set.
 
 The glyph renderer decodes only atlas pages needed by the active ramp, then
@@ -370,7 +388,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 51 accelerated and 28
+route and requires the Windows preset matrix to preserve 62 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -622,6 +640,15 @@ Features:
 Dense-mix dampening uses the density feature to reduce beat/flux-heavy
 modulation during crowded broadband passages without muting sparse transients.
 
+Capture startup and feature reads share a generation guard. Stop invalidates
+pending work, releases late browser streams, and serializes native start/stop
+commands so an old stop cannot terminate a new session. Only the current
+generation can change error/status state. Audio preset selection shares one
+tuning helper between UI and MIDI, restores all audio sliders, and preserves
+source/device/enabled state. Custom tuning is shown explicitly in the selector.
+Audio edits or Stop hand an autonomous native transition back to app-driven
+updates, including when an arm acknowledgement arrives after the edit.
+
 Modulation targets are live-safe visual controls:
 
 - brightness.
@@ -643,6 +670,8 @@ These are all control layers over the same parameter model.
 Presets:
 
 - apply known parameter sets.
+- start in Flat Media for every built-in look; saved custom looks retain their
+  selected visual mode. Scene recipes remain available for manual opt-in.
 - may specify transition duration.
 - can be saved/imported/exported by users.
 
@@ -651,6 +680,11 @@ WTF mode:
 - creates randomized target params.
 - anchors some random states around extreme preset families and traditional
   ASCII presets.
+- independently selects Flat Media with 80% probability, otherwise selecting
+  evenly from the canonical non-flat visual modes. The choice is made once
+  before visual-safety retries and retained by the fallback. Spatial targets use
+  the matching recipe's camera settings and Auto backend; normal renderer
+  fallback still applies. Anchor color/glyph styles remain randomized.
 - transitions indefinitely until stopped.
 - avoids unsafe all-white/all-black states.
 
@@ -716,7 +750,7 @@ Palettes contain immutable base colors and non-overlapping inclusive ranges.
 The source-to-index LUT always uses base colors; a separate RGBA display table
 animates their RGB entries. Alpha stores base luminance so cycling never changes
 the glyph mask. Off is the compatibility default. The catalog has 21 palettes
-and the preset contract is 79 total, 51 accelerated, 28 explicit Canvas.
+and the preset contract is 90 total, 62 accelerated, 28 explicit Canvas.
 
 `palette-cycling.js` owns range validation, signed modulo, classic/blended lookup,
 amount and the integrated speed transport. `cell-color.wgsl.js` supplies common
@@ -734,3 +768,80 @@ from saved settings, import/export, and preset definitions.
 Lookup tables, pipelines, glyph data and source textures remain independent of
 the cycling display table. Native/browser output receives the same controls;
 mirrored output receives already-rendered pixels and applies no second cycle.
+
+## Spatial stage (1.1.0, unpublished)
+
+`renderers/shared/spatial-contract.json` owns defaults, enumerations, limits and
+control labels. JS normalization, UI and Rust validation consume that contract;
+`spatial-audio.json` owns the additional bounded audio routes. Scene transport
+uses the existing palette transport integrator with its own state, so signed
+speed changes preserve phase, and native output rebases the sender clock.
+Transport/reset state is runtime-only and is excluded from saved presets.
+
+`spatial-shader.wgsl.js` contains original, shared scene and post-color math.
+WebGPU and native wgpu use it directly. `spatial-shader.js` lowers its small,
+explicitly typed syntax subset to GLSL; it is not a general WGSL translator.
+Real shader compilation and pixel comparisons cover both languages.
+`spatial-canvas.js` is the software geometry/effect reference.
+
+The initial engine casts a camera-plane ray per cell with at most 64 DDA steps
+and a 40-unit distance bound. It continues past low blocks, intersects roofs,
+and compares floors/ceilings with wall depth. The map repeats every 32 units of
+travel and bounds lateral geometry. Facade hashes sample just inside the hit
+surface to avoid rounding across a grid boundary. Lighting is directional plus
+an artistic contact term and analytic window glow, not global illumination.
+Wet floors launch one bounded reflected ray with ripple perturbation; rain uses
+four world-space sheets clipped against opaque depth. Orbitals uses at most 48
+sphere-tracing steps. Relief reads source luminance as block height. Surface framing accounts for
+the physical tile aspect (2:1 on walls, square on horizontal surfaces). Larger
+wall panels, roof/ceiling sampling and the orbital backdrop preserve visible
+source structure; optional scene recipes blend in 80–95% source media.
+Camera-plane rays include pitch. Corridor uses a narrow, low tunnel; Cathedral
+intersects a two-plane pitched roof; Coast keeps low shoreline blocks and no
+road markings. Relief samples one source-aligned height/color field without
+roads, from an elevated camera. Orbitals rotates its camera and tilts its ring.
+The spatial uniform block is ten vec4s (160 bytes), including camera pitch and fractal zoom/detail/shape in the final vec4.
+
+Recursive ruins, Mandelbulb and Mandelbox share a 64-step, 32-unit sphere tracer with up to eight estimator iterations. The Mandelbulb first intersects its
+containing sphere to skip empty rays and travel; its shared radial power is
+computed once per estimator iteration. Mandelbrot uses at most 128 iterations, smooth escape color and a bounded zoom cycle that stays within useful float32 precision. Slow-escaping boundary color fades into the interior to reduce numerical shimmer. Ruins use a periodic box field with recursive cross-shaped cuts; the bulb uses spherical power iteration, and the box uses box/sphere folds. Source media controls surface color, glyph luminance and Mandelbrot contour distortion. No external code or runtime assets are fetched.
+
+Scene RGB enters the existing color/palette/dither stage. The cell alpha channel
+still addresses a glyph; it does not carry depth. Optional material/edge glyphs
+append eight symbols to at most 88 base glyphs. A stable 16-cell coverage mask
+fades the material override as media contribution rises; full media uses source
+luminance for glyph choice. Edge direction uses source
+luminance gradients and the previous glyph near a threshold. Flat
+processing retains its 8-bit cell texture. Bright output is a global persisted
+preference, excluded from presets and preserved by preset/WTF changes. It
+starts off; opting in enables the lift. Existing saved preferences are retained.
+With source colors, after saturation and before contrast/gamma, luminance L is raised to L^0.22;
+RGB is scaled to that luminance, then chroma is compressed toward it only when
+needed to fit the RGB gamut. This keeps hue and black/white endpoints while
+lifting dark saturated colors as well as greys. For palettes, lookup remains
+unchanged and the mapped RGB is lifted afterwards so cycling ranges are not
+lost. Glyph luminance uses the same lift on stable base-palette luminance,
+independent of the animated color. JS software, WebGL2, shared browser/native WGSL and Rust
+software paths have shared golden vectors; the cell parameter block is 112
+bytes, with the toggle at byte 96. The toggle updates live uniforms and clears
+feedback history, without rebuilding the source or GPU resources.
+
+Feedback uses two reusable floating-point history textures, separate from the
+existing 8-bit cell output. Retention integrates elapsed time and history zoom/
+rotation uses elapsed time too. WebGL2 uses two render targets; WebGPU/native
+write cell output and history in the same compute pass. Image bind groups are
+cached in both history directions. Canvas reuses two float arrays and one byte
+output. The older WebGL2 byte fallback applies an elapsed-time quantization
+correction so trails cannot become permanent. No per-frame glyph atlas or
+source reconstruction is introduced.
+
+Changing scene mode is a visual crossfade on the existing source. Native output
+receives scene parameters, clock and bounded audio state; it does not need
+screenshot IPC for accelerated scenes. Explicit Canvas spatial output uses the
+existing mirror fallback. Native softbuffer does not silently substitute flat
+media when a GPU scene cannot be presented; it reports the unavailable path.
+The legacy server-stream renderer is unchanged and hides spatial controls.
+
+Per-column geometry caching is a possible future optimization, not a claim of
+this implementation. The measured cell shader is the initial baseline; keep
+geometry parity fixtures and source continuity when changing traversal.

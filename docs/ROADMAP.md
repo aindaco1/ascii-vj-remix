@@ -7,6 +7,11 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Distribution and Platform Validation
 
+- Complete the remaining physical checks for the owner-approved
+  [1.1.0 Spatial ASCII release](releases/RELEASE_1.1.0.md#release-decision--2026-09-29):
+  reference-floor performance, camera/audio/GPU behavior on Windows/Linux,
+  external-display alignment, physical MIDI and sound-to-display latency.
+
 - Complete [macOS 27 acceptance (#30)](https://github.com/aindaco1/ascii-vj-remix/issues/30),
   including macOS 13 runtime regression, physical capture/MIDI/permission and
   external-display checks, and signed Xcode 27 artifact/toolchain promotion.

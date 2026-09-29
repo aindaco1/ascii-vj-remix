@@ -31,6 +31,7 @@ use tauri::{
 mod gpu;
 mod native_camera;
 mod palette;
+mod spatial;
 
 const NATIVE_OUTPUT_LABEL: &str = "native-output";
 const NATIVE_OUTPUT_CLOSED_EVENT: &str = "asciline-native-output-closed";
@@ -137,6 +138,8 @@ pub struct NativeOutputTransition {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeOutputParams {
+    #[serde(flatten)]
+    pub spatial: spatial::Input,
     pub source_mode: Option<String>,
     pub media_url: Option<String>,
     pub media_type: Option<String>,
@@ -150,6 +153,7 @@ pub struct NativeOutputParams {
     pub saturation_boost: Option<f64>,
     pub contrast_boost: Option<f64>,
     pub brightness: Option<f64>,
+    pub bright_output: Option<bool>,
     pub gamma: Option<f64>,
     pub bg_blend: Option<f64>,
     pub quantize_bits: Option<f64>,
@@ -457,6 +461,7 @@ struct NativeMirrorFrame {
 #[derive(Debug, Clone)]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 struct NativeRenderParams {
+    spatial: spatial::Params,
     loop_media: bool,
     cols: u32,
     rows: u32,
@@ -465,6 +470,7 @@ struct NativeRenderParams {
     saturation_boost: f64,
     contrast_boost: f64,
     brightness: f64,
+    bright_output: bool,
     gamma: f64,
     bg_blend: f64,
     quantize_bits: u32,
@@ -607,6 +613,7 @@ fn transition_frame_params(
     tween!(gamma);
     tween!(bg_blend);
     tween!(palette_cycle_amount);
+    frame.spatial.tween(&from.spatial, &to.spatial, eased);
     tween!(dither_strength);
     tween!(dither_bias);
     tween!(jitter_amount);
@@ -1030,6 +1037,7 @@ fn native_glyph_ramp_ids(params: &NativeRenderParams) -> Vec<u32> {
     if params.glyph_reverse {
         active.reverse();
     }
+    if params.spatial.special_glyphs() { active.truncate(88); active.extend(spatial::GLYPHS.chars().map(|c| c as u32)); }
     active
 }
 
@@ -2607,6 +2615,12 @@ fn apply_native_audio_modulation(
         add_native_audio_param(params, base, key, amount * scale);
     }
 
+    if base.spatial.option("visualMode") > 0.0 {
+        for (key, feature, scale) in spatial::AUDIO_ROUTES.iter() {
+            let amount = native_audio_feature_value(params, features, feature) * sensitivity * native_audio_feature_amount(params, feature);
+            params.spatial.add(&base.spatial, key, amount * scale);
+        }
+    }
     let sway_amount = sensitivity * routes.sway;
     if sway_amount > 0.0 {
         let motion = native_audio_feature_value(params, features, "flux")
@@ -3447,6 +3461,7 @@ impl NativeRenderParams {
         palette_luminance_order.sort_by(|a, b| native_palette_luma(palette_colors[*a])
             .total_cmp(&native_palette_luma(palette_colors[*b])).then_with(|| a.cmp(b)));
         Self {
+            spatial: spatial::Params::from_input(&params.spatial),
             loop_media: params.loop_.unwrap_or(true),
             cols: u32_param(params.cols, 480).clamp(1, 4096),
             rows: u32_param(params.rows, 0).min(4096),
@@ -3455,6 +3470,7 @@ impl NativeRenderParams {
             saturation_boost: f64_param(params.saturation_boost, 1.4).clamp(0.0, 8.0),
             contrast_boost: f64_param(params.contrast_boost, 1.0).clamp(0.0, 8.0),
             brightness: f64_param(params.brightness, 1.0).clamp(0.0, 8.0),
+            bright_output: params.bright_output.unwrap_or(false),
             gamma: f64_param(params.gamma, 1.0).clamp(0.01, 8.0),
             bg_blend: f64_param(params.bg_blend, 0.0).clamp(0.0, 1.0),
             quantize_bits: u32_param(params.quantize_bits, 0).min(8),
@@ -3762,6 +3778,9 @@ impl NativeSoftbufferPresenter {
         frame_index: usize,
         crossfade: Option<(&NativeRenderParams, f64)>,
     ) -> Result<(), String> {
+        if params.spatial.enabled() {
+            return Err("Spatial output needs an accelerated native presenter. Select Canvas to use the preview mirror fallback.".into());
+        }
         let size = window
             .inner_size()
             .unwrap_or_else(|_| PhysicalSize::new(DEFAULT_OUTPUT_WIDTH, DEFAULT_OUTPUT_HEIGHT));
@@ -4959,6 +4978,18 @@ fn process_gpu_cell_color_at(
 }
 
 #[cfg(any(not(target_os = "macos"), test))]
+fn brighten_rgb(color: [f64; 3]) -> [f64; 3] {
+    let [r, g, b] = color;
+    let luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    if luma <= 0.0 { return color; }
+    let lifted = luma.powf(0.22);
+    let gain = lifted / luma;
+    let peak = r.max(g).max(b) * gain;
+    let chroma = if peak > 1.0 { (1.0 - lifted) / (peak - lifted) } else { 1.0 };
+    color.map(|v| lifted + (v * gain - lifted) * chroma)
+}
+
+#[cfg(any(not(target_os = "macos"), test))]
 fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, x: u32, y: u32, display: Option<&[f32]>) -> (u8, u8, u8, f64) {
     let mut rr = r as f64 / 255.0;
     let mut gg = g as f64 / 255.0;
@@ -4967,6 +4998,9 @@ fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, 
     rr = clamp01(avg + (rr - avg) * params.saturation_boost);
     gg = clamp01(avg + (gg - avg) * params.saturation_boost);
     bb = clamp01(avg + (bb - avg) * params.saturation_boost);
+    if params.bright_output && params.palette_colors.is_empty() {
+        [rr, gg, bb] = brighten_rgb([rr, gg, bb]);
+    }
     rr = clamp01((rr - 0.5) * params.contrast_boost + 0.5);
     gg = clamp01((gg - 0.5) * params.contrast_boost + 0.5);
     bb = clamp01((bb - 0.5) * params.contrast_boost + 0.5);
@@ -5014,12 +5048,15 @@ fn process_gpu_cell_sample_at(r: u8, g: u8, b: u8, params: &NativeRenderParams, 
         ];
         let index = native_palette_index(color, params);
         let mapped = params.palette_colors[index.min(params.palette_colors.len() - 1)];
-        if let Some(display) = display {
+        let (mut rgb, mut luma) = if let Some(display) = display {
             let slot = index * 4;
-            return ((display[slot] * 255.0).round() as u8, (display[slot + 1] * 255.0).round() as u8,
-                (display[slot + 2] * 255.0).round() as u8, f64::from(display[slot + 3]) * 255.0);
-        }
-        return (mapped[0], mapped[1], mapped[2], native_palette_luma(mapped));
+            ([f64::from(display[slot]), f64::from(display[slot+1]), f64::from(display[slot+2])], f64::from(display[slot+3]))
+        } else {
+            (mapped.map(|v| f64::from(v)/255.0), native_palette_luma(mapped)/255.0)
+        };
+        if params.bright_output { rgb = brighten_rgb(rgb); luma = luma.powf(0.22); }
+        return ((clamp01(rgb[0])*255.0).round() as u8, (clamp01(rgb[1])*255.0).round() as u8,
+            (clamp01(rgb[2])*255.0).round() as u8, luma*255.0);
     }
 
     (
@@ -5197,6 +5234,7 @@ mod tests {
                 saturation_boost: Some(1.0),
                 contrast_boost: Some(1.0),
                 brightness: Some(1.0),
+                bright_output: Some(false),
                 gamma: Some(1.0),
                 bg_blend: Some(0.0),
                 quantize_bits: Some(0.0),
@@ -5483,6 +5521,7 @@ mod tests {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct RenderMathVectorParams {
+        bright_output: bool,
         saturation_boost: f64,
         contrast_boost: f64,
         brightness: f64,
@@ -5500,6 +5539,7 @@ mod tests {
 
         for vector in vectors.gpu {
             let mut params = params();
+            params.bright_output = vector.params.bright_output;
             params.saturation_boost = vector.params.saturation_boost;
             params.contrast_boost = vector.params.contrast_boost;
             params.brightness = vector.params.brightness;
@@ -5513,6 +5553,34 @@ mod tests {
                 vector.name
             );
         }
+    }
+
+    #[test]
+    fn bright_output_defaults_off_and_accepts_explicit_opt_in() {
+        let mut payload = base_payload();
+        payload.params.bright_output = None;
+        let original = NativeRenderParams::from_payload(&payload);
+        assert!(!original.bright_output);
+        assert_eq!(process_gpu_cell_color(16, 16, 16, &original), (16, 16, 16));
+        payload.params.bright_output = Some(true);
+        let bright = NativeRenderParams::from_payload(&payload);
+        assert!(bright.bright_output);
+        assert_eq!(process_gpu_cell_color(16, 16, 16, &bright), (139, 139, 139));
+    }
+
+    #[test]
+    fn bright_palette_preserves_lookup_and_base_glyph_luminance() {
+        let mut payload = base_payload();
+        payload.params.bright_output = Some(true);
+        payload.params.palette_colors = Some(vec![[8,16,4], [4,8,16], [16,4,8]]);
+        let params = NativeRenderParams::from_payload(&payload);
+        let first = process_gpu_cell_sample_at(8,16,4,&params,0,0,None);
+        assert_eq!((first.0,first.1,first.2), (79,159,40));
+        let base_luma = native_palette_luma([8,16,4]) / 255.0;
+        let display = [4.0/255.0,8.0/255.0,16.0/255.0,base_luma as f32];
+        let rotated = process_gpu_cell_sample_at(8,16,4,&params,0,0,Some(&display));
+        assert_ne!((first.0,first.1,first.2), (rotated.0,rotated.1,rotated.2));
+        assert!((first.3-rotated.3).abs()<0.001);
     }
 
     #[test]

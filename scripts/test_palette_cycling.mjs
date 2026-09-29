@@ -3,6 +3,7 @@ import vectors from '../renderers/shared/palette-cycle-vectors.json' with { type
 import { PALETTE_CONTRACT, validateCycleRanges, fillPaletteDisplay, createCycleTransport, setCycleTransportRate, cycleTimeAt } from '../renderers/shared/palette-cycling.js';
 import { PALETTES, buildPaletteLut } from '../renderers/shared/palettes.js';
 import { COLOR_CYCLE_PRESETS } from '../renderers/shared/color-cycle-presets.js';
+import { processGpuCellColor } from '../renderers/shared/render-math.js';
 
 const palette = { colors: vectors.colors, cycleRanges: validateCycleRanges(vectors.ranges, vectors.colors.length) };
 const display = new Float32Array(PALETTE_CONTRACT.maxColors * 4);
@@ -41,5 +42,13 @@ for (const p of PALETTES.filter(p => p.cycleRanges.length)) {
     const before = new Uint8Array(lut);
     for (const time of [0, .5, 1, 45]) fillPaletteDisplay(display, p, {paletteCycleMode:'blend',paletteCycleAmount:1}, time);
     assert.deepEqual(lut, before);
+    const params={paletteId:p.id,paletteCycleMode:'classic',paletteCycleAmount:1,brightOutput:true};
+    const samples=p.colors;
+    fillPaletteDisplay(display,p,params,0);
+    const first=samples.map(rgb=>processGpuCellColor(...rgb,params,0,0,lut,display));
+    fillPaletteDisplay(display,p,params,.5);
+    const second=samples.map(rgb=>processGpuCellColor(...rgb,params,0,0,lut,display));
+    assert.ok(first.some((color,i)=>color.slice(0,3).some((v,c)=>Math.abs(v-second[i][c])>12)),`${p.id}: brightness must preserve cycling`);
+    first.forEach((color,i)=>assert.equal(color[3],second[i][3],`${p.id}: brightness must preserve stable glyph luma`));
 }
 console.log('palette-cycling: shared vectors, phase continuity, stable luma, range validation and index 255 passed');

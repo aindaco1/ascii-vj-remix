@@ -64,3 +64,5 @@ and proposals in the Roadmap. Preserve evidence boundaries when reorganizing.
 
 For moves, update relative links, heading anchors, and workflow/script path
 references together. Validate local links and run `git diff --check`.
+
+The [1.1.0 Spatial ASCII release record](releases/RELEASE_1.1.0.md) covers implementation, release approval, validation evidence and remaining platform checks.

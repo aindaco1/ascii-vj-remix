@@ -2,44 +2,291 @@
   "gpu": [
     {
       "name": "identity",
-      "rgb": [0, 128, 255],
+      "rgb": [
+        0,
+        128,
+        255
+      ],
       "params": {
         "saturationBoost": 1,
         "contrastBoost": 1,
         "brightness": 1,
         "gamma": 1,
         "quantizeBits": 0,
-        "bgBlend": 0
+        "bgBlend": 0,
+        "brightOutput": false
       },
-      "expected": [0, 128, 255]
+      "expected": [
+        0,
+        128,
+        255
+      ]
     },
     {
       "name": "quantize-and-background-blend",
-      "rgb": [255, 129, 3],
+      "rgb": [
+        255,
+        129,
+        3
+      ],
       "params": {
         "saturationBoost": 1,
         "contrastBoost": 1,
         "brightness": 1,
         "gamma": 1,
         "quantizeBits": 2,
-        "bgBlend": 0.5
+        "bgBlend": 0.5,
+        "brightOutput": false
       },
-      "expected": [128, 66, 3]
+      "expected": [
+        128,
+        66,
+        3
+      ]
+    },
+    {
+      "name": "dark-neutral-lift",
+      "rgb": [
+        16,
+        16,
+        16
+      ],
+      "expected": [
+        139,
+        139,
+        139
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "dark-hue-preserved",
+      "rgb": [
+        8,
+        16,
+        4
+      ],
+      "expected": [
+        79,
+        159,
+        40
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "black-endpoint",
+      "rgb": [
+        0,
+        0,
+        0
+      ],
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "white-endpoint",
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "expected": [
+        255,
+        255,
+        255
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "dark-blue-gamut-compression",
+      "rgb": [
+        0,
+        0,
+        16
+      ],
+      "expected": [
+        64,
+        64,
+        255
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
     }
   ],
   "canvasLegacy": [
     {
       "name": "legacy-quantize-without-background-blend",
-      "rgb": [255, 129, 3],
+      "rgb": [
+        255,
+        129,
+        3
+      ],
       "params": {
         "saturationBoost": 1,
         "contrastBoost": 1,
         "brightness": 1,
         "gamma": 1,
         "quantizeBits": 2,
-        "bgBlend": 0.5
+        "bgBlend": 0.5,
+        "brightOutput": false
       },
-      "expected": [252, 128, 0]
+      "expected": [
+        252,
+        128,
+        0
+      ]
+    },
+    {
+      "name": "dark-neutral-lift",
+      "rgb": [
+        16,
+        16,
+        16
+      ],
+      "expected": [
+        139,
+        139,
+        139
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "dark-hue-preserved",
+      "rgb": [
+        8,
+        16,
+        4
+      ],
+      "expected": [
+        79,
+        159,
+        40
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "black-endpoint",
+      "rgb": [
+        0,
+        0,
+        0
+      ],
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "white-endpoint",
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "expected": [
+        255,
+        255,
+        255
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
+    },
+    {
+      "name": "dark-blue-gamut-compression",
+      "rgb": [
+        0,
+        0,
+        16
+      ],
+      "expected": [
+        64,
+        64,
+        255
+      ],
+      "params": {
+        "saturationBoost": 1,
+        "contrastBoost": 1,
+        "brightness": 1,
+        "gamma": 1,
+        "quantizeBits": 0,
+        "bgBlend": 0,
+        "brightOutput": true
+      }
     }
   ]
 }

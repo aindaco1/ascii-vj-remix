@@ -1,3 +1,6 @@
+import { spatialGLSL } from '../../../../shared/spatial-shader.js';
+import { spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
+import { activeGlyphRamp } from '../../../../shared/character-sets.js';
 import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
 import { fillPaletteDisplay, paletteCycleParams } from '../../../../shared/palette-cycling.js';
 /**
@@ -42,6 +45,7 @@ uniform vec2 u_gridSize;
 uniform float u_saturationBoost;
 uniform float u_contrastBoost;
 uniform float u_brightness;
+uniform int u_brightOutput;
 uniform float u_gamma;
 uniform float u_bgBlend;
 uniform int u_quantizeBits;
@@ -61,7 +65,26 @@ uniform int u_ditherScale;
 uniform float u_ditherBias;
 uniform int u_ditherInvert;
 in vec2 v_texCoord;
-out vec4 fragColor;
+layout(location=0) out vec4 fragColor;
+layout(location=1) out vec4 historyColor;
+
+
+uniform vec4 u_spatial[10];
+uniform sampler2D u_history;
+vec4 effect(int index) { return u_spatial[index]; }
+float choose(float a, float b, bool condition) { return condition ? b : a; }
+float sceneSourceAspect() { ivec2 size = textureSize(u_source, 0); return float(size.x) / float(size.y); }
+vec3 sceneMedia(vec2 uv) {
+    if (u_mirrorX == 1) uv.x = 1.0 - uv.x;
+    ivec2 size = textureSize(u_source, 0);
+    ivec2 at = clamp(ivec2(clamp(uv, vec2(0.0), vec2(0.999999)) * vec2(size)), ivec2(0), size - 1);
+    return texelFetch(u_source, ivec2(at.x, size.y - 1 - at.y), 0).rgb;
+}
+vec4 sceneHistory(vec2 uv) {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return vec4(0.0);
+    return texture(u_history, vec2(uv.x, 1.0 - uv.y));
+}
+${spatialGLSL()}
 
 // Hash for per-cell jitter
 float hash(vec2 p) {
@@ -79,6 +102,16 @@ float orderedThreshold(ivec2 cellCoord) {
     return u_ditherInvert == 1 ? -threshold : threshold;
 }
 
+vec3 brightenRgb(vec3 color) {
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    if (luma <= 0.0) return color;
+    float lifted = pow(luma, 0.22);
+    vec3 scaled = color * (lifted / luma);
+    float peak = max(scaled.r, max(scaled.g, scaled.b));
+    float chroma = peak > 1.0 ? (1.0 - lifted) / (peak - lifted) : 1.0;
+    return vec3(lifted) + (scaled - vec3(lifted)) * chroma;
+}
+
 void main() {
     vec2 cellCoord = floor(v_texCoord * u_gridSize);
     vec2 cellCenter = (cellCoord + vec2(u_sampleX, u_sampleY)) / u_gridSize;
@@ -94,13 +127,19 @@ void main() {
     }
 
     vec4 c = texture(u_source, sampleUV);
+    vec2 sceneUV = vec2((cellCoord.x + 0.5) / u_gridSize.x, 1.0 - (cellCoord.y + 0.5) / u_gridSize.y);
+    SceneSample scene = SceneSample(c.rgb, 0.0);
+    if (effect(0).x > 0.0) scene = sceneSample(sceneUV);
+    c = vec4(scene.color, c.a);
 
+    c.rgb = clamp(c.rgb, 0.0, 1.0);
     float avg = (c.r + c.g + c.b) * 0.333333333;
     vec3 boosted = clamp(vec3(
         avg + (c.r - avg) * u_saturationBoost,
         avg + (c.g - avg) * u_saturationBoost,
         avg + (c.b - avg) * u_saturationBoost
     ), 0.0, 1.0);
+    if (u_brightOutput == 1 && u_paletteCount == 0) boosted = brightenRgb(boosted);
     boosted = clamp((boosted - 0.5) * u_contrastBoost + 0.5, 0.0, 1.0);
     boosted = clamp(pow(boosted * u_brightness, vec3(1.0 / max(0.01, u_gamma))), 0.0, 1.0);
 
@@ -121,12 +160,16 @@ void main() {
         ivec3 q = ivec3(clamp(floor(boosted * 255.0 / 8.0), 0.0, 31.0));
         int row = q.r * 32 + q.g;
         int paletteIndex = int(round(texelFetch(u_paletteLut, ivec2(q.b, row), 0).r * 255.0));
-        fragColor = texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0);
+        vec4 mapped = texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0);
+        if (u_brightOutput == 1) mapped = vec4(brightenRgb(mapped.rgb), pow(mapped.a, 0.22));
+        fragColor = sceneFinish(mapped, sceneUV, scene.glyph);
+        historyColor = fragColor;
         return;
     }
 
     float luma = dot(boosted, vec3(0.2126, 0.7152, 0.0722));
-    fragColor = vec4(boosted, luma);
+    fragColor = sceneFinish(vec4(boosted, luma), sceneUV, scene.glyph);
+    historyColor = fragColor;
 }`;
 
 const RENDER_PASS_VERT = `#version 300 es
@@ -234,13 +277,16 @@ export class WebGL2Renderer {
         this.cols = options.cols || 120;
         this.fps = options.fps || 24;
         this.frameInterval = 1000 / this.fps;
-        this.saturationBoost = options.saturationBoost || 1.4;
-        this.contrastBoost = options.contrastBoost || 1.0;
-        this.brightness = options.brightness || 1.0;
+        this.saturationBoost = options.saturationBoost ?? 1.4;
+        this.contrastBoost = options.contrastBoost ?? 1.0;
+        this.brightness = options.brightness ?? 1.0;
+        this.brightOutput = options.brightOutput === true;
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
-        Object.assign(this, paletteCycleParams(options));
+        Object.assign(this, paletteCycleParams(options), spatialParams(options));
+        this.spatialData = new Float32Array(40);
+        this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
         this.paletteLutUpdates = 0;
@@ -337,11 +383,11 @@ export class WebGL2Renderer {
         this.cellProgram = this._createProgram(CELL_PASS_VERT, CELL_PASS_FRAG);
         this.renderProgram = this._createProgram(RENDER_PASS_VERT, RENDER_PASS_FRAG);
         this.cellUniforms = this._uniformLocations(this.cellProgram, [
-            'u_source',
+            'u_spatial[0]', 'u_history', 'u_source',
             'u_gridSize',
             'u_saturationBoost',
             'u_contrastBoost',
-            'u_brightness',
+            'u_brightness', 'u_brightOutput',
             'u_gamma',
             'u_bgBlend',
             'u_quantizeBits',
@@ -502,6 +548,21 @@ export class WebGL2Renderer {
         if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
         if (this.cellFramebuffer) gl.deleteFramebuffer(this.cellFramebuffer);
 
+        if (this.historyTexture) gl.deleteTexture(this.historyTexture);
+        if (this.nextHistoryTexture) gl.deleteTexture(this.nextHistoryTexture);
+        this.floatHistory = Boolean(gl.getExtension('EXT_color_buffer_float'));
+        const history = () => {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, this.floatHistory ? gl.RGBA16F : gl.RGBA8, this.cols, this.rows, 0, gl.RGBA, this.floatHistory ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            return texture;
+        };
+        this.historyTexture = history(); this.nextHistoryTexture = history();
+        this.spatialState = {};
         this.cellColorTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.cellColorTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, this.cols, this.rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -640,9 +701,17 @@ export class WebGL2Renderer {
 
         // Pass 1: cell colors
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.cellFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.nextHistoryTexture, 0);
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
         gl.viewport(0, 0, this.cols, this.rows);
         gl.useProgram(this.cellProgram);
         const cellUniforms = this.cellUniforms;
+        fillSpatialUniforms(this.spatialData, this, this.cols, this.rows, [...activeGlyphRamp(this)].length, this.spatialState);
+        this.spatialData[33] = this.floatHistory ? 0 : 1;
+        gl.uniform4fv(cellUniforms['u_spatial[0]'], this.spatialData);
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, this.historyTexture);
+        gl.uniform1i(cellUniforms.u_history, 5);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
@@ -651,6 +720,7 @@ export class WebGL2Renderer {
         gl.uniform1f(cellUniforms.u_saturationBoost, this.saturationBoost);
         gl.uniform1f(cellUniforms.u_contrastBoost, this.contrastBoost);
         gl.uniform1f(cellUniforms.u_brightness, this.brightness);
+        gl.uniform1i(cellUniforms.u_brightOutput, this.brightOutput ? 1 : 0);
         gl.uniform1f(cellUniforms.u_gamma, this.gamma);
         gl.uniform1f(cellUniforms.u_bgBlend, this.bgBlend);
         gl.uniform1i(cellUniforms.u_quantizeBits, this.quantizeBits);
@@ -673,6 +743,7 @@ export class WebGL2Renderer {
         gl.bindVertexArray(this.quadVAO);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+        [this.historyTexture, this.nextHistoryTexture] = [this.nextHistoryTexture, this.historyTexture];
         // Pass 2: render to canvas
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
@@ -772,6 +843,8 @@ export class WebGL2Renderer {
         if (gl) {
             if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
             if (this.quadVAO) gl.deleteVertexArray(this.quadVAO);
+            if (this.historyTexture) gl.deleteTexture(this.historyTexture);
+            if (this.nextHistoryTexture) gl.deleteTexture(this.nextHistoryTexture);
             if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);
             if (this.paletteLutTexture) gl.deleteTexture(this.paletteLutTexture);
             if (this.paletteDisplayTexture) gl.deleteTexture(this.paletteDisplayTexture);

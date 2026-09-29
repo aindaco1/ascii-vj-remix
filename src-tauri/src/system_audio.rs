@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const DEFAULT_AUDIO_SAMPLE_RATE: f32 = 48_000.0;
-const BEAT_HISTORY: usize = 36;
+const BEAT_HISTORY_SECONDS: f64 = 0.3;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +25,8 @@ pub struct SystemAudioFeatures {
     pub beat_pulse: f32,
     pub phase: f32,
     pub frames: u64,
+    pub analysis_window_ms: f32,
+    pub age_ms: f64,
     pub last_error: Option<String>,
 }
 
@@ -47,6 +49,8 @@ impl SystemAudioFeatures {
             beat_pulse: 0.0,
             phase: 0.0,
             frames: 0,
+            analysis_window_ms: 0.0,
+            age_ms: 0.0,
             last_error: Some(message.into()),
         }
     }
@@ -74,6 +78,8 @@ impl SystemAudioFeatures {
             beat_pulse: 0.0,
             phase: 0.0,
             frames: 0,
+            analysis_window_ms: 0.0,
+            age_ms: 0.0,
             last_error: None,
         }
     }
@@ -89,9 +95,11 @@ struct AudioFeatureAnalyzer {
     low_3000: f32,
     low_6200: f32,
     previous_sample: f32,
-    energy_history: VecDeque<f32>,
+    energy_history: VecDeque<(f64, f32)>,
     beat_pulse: f32,
-    beat_cooldown_until: Instant,
+    beat_cooldown_until: f64,
+    elapsed_seconds: f64,
+    last_capture_at: Instant,
     phase: f32,
     frames: u64,
     features: SystemAudioFeatures,
@@ -117,6 +125,8 @@ impl AudioFeatureAnalyzer {
                 beat_pulse: 0.0,
                 phase: 0.0,
                 frames: 0,
+                analysis_window_ms: 0.0,
+                age_ms: 0.0,
                 last_error: None,
             },
             source_label,
@@ -128,16 +138,21 @@ impl AudioFeatureAnalyzer {
             low_3000: 0.0,
             low_6200: 0.0,
             previous_sample: 0.0,
-            energy_history: VecDeque::with_capacity(BEAT_HISTORY),
+            energy_history: VecDeque::with_capacity(128),
             beat_pulse: 0.0,
-            beat_cooldown_until: Instant::now(),
+            beat_cooldown_until: 0.0,
+            elapsed_seconds: 0.0,
+            last_capture_at: Instant::now(),
             phase: 0.0,
             frames: 0,
         }
     }
 
     fn process(&mut self, samples: &[f32], sample_rate: f32) {
+        if samples.is_empty() { return; }
         let sample_rate = sample_rate.max(1.0);
+        let dt = samples.len() as f64 / sample_rate as f64;
+        self.elapsed_seconds += dt;
         let alpha_160 = filter_alpha(160.0, sample_rate);
         let alpha_250 = filter_alpha(250.0, sample_rate);
         let alpha_650 = filter_alpha(650.0, sample_rate);
@@ -198,10 +213,11 @@ impl AudioFeatureAnalyzer {
         let brightness = (treble * 0.52 + presence * 0.38 + high_mid * 0.1).clamp(0.0, 1.0);
         let density = ((active_samples as f32 / n) * 1.25 + rms * 0.25 + flux * 0.22)
             .clamp(0.0, 1.0);
-        let beat_pulse = self.detect_beat(rms, flux, density);
+        let beat_pulse = self.detect_beat(rms, flux, density, dt);
 
         self.phase += (samples.len() as f32 / sample_rate) * 14.0;
         self.frames = self.frames.saturating_add(1);
+        self.last_capture_at = Instant::now();
         self.features = SystemAudioFeatures {
             available: true,
             active: true,
@@ -219,39 +235,51 @@ impl AudioFeatureAnalyzer {
             beat_pulse,
             phase: self.phase,
             frames: self.frames,
+            analysis_window_ms: (dt * 1000.0) as f32,
+            age_ms: 0.0,
             last_error: None,
         };
     }
 
-    fn detect_beat(&mut self, rms: f32, flux: f32, density: f32) -> f32 {
-        self.energy_history.push_back(rms);
-        if self.energy_history.len() > BEAT_HISTORY {
+    fn detect_beat(&mut self, rms: f32, flux: f32, density: f32, dt: f64) -> f32 {
+        let now = self.elapsed_seconds;
+        self.energy_history.push_back((now, rms));
+        while self.energy_history.len() > 512 || (self.energy_history.len() > 1 && self.energy_history.front().is_some_and(|(time, _)| *time < now - BEAT_HISTORY_SECONDS)) {
             self.energy_history.pop_front();
         }
-        let avg = self.energy_history.iter().copied().sum::<f32>()
+        let avg = self.energy_history.iter().map(|(_, rms)| *rms).sum::<f32>()
             / self.energy_history.len().max(1) as f32;
         let dense = density.clamp(0.0, 1.0);
         let threshold = (avg * (1.22 + dense * 0.3)).max(0.035);
-        let now = Instant::now();
         let beat = now > self.beat_cooldown_until
             && rms > threshold
             && (flux > 0.08 + dense * 0.08 || rms > avg * (1.55 + dense * 0.35));
         if beat {
             self.beat_pulse = 1.0;
-            self.beat_cooldown_until = now + Duration::from_millis((135.0 + dense * 65.0) as u64);
+            self.beat_cooldown_until = now + (0.135 + dense as f64 * 0.065);
         } else {
-            self.beat_pulse *= 0.82 - dense * 0.05;
+            self.beat_pulse *= (0.82 - dense * 0.05).powf((dt * 60.0) as f32);
         }
         self.beat_pulse.clamp(0.0, 1.0)
     }
 
     fn features(&self) -> SystemAudioFeatures {
-        self.features.clone()
+        let mut features = self.features.clone();
+        features.age_ms = self.last_capture_at.elapsed().as_secs_f64() * 1000.0;
+        features
     }
 }
 
 fn filter_alpha(cutoff_hz: f32, sample_rate: f32) -> f32 {
     1.0 - (-2.0 * std::f32::consts::PI * cutoff_hz / sample_rate.max(1.0)).exp()
+}
+
+fn input_buffer_size(supported: &cpal::SupportedBufferSize) -> cpal::BufferSize {
+    match *supported {
+        cpal::SupportedBufferSize::Range { min, max } if min <= max && max > 0 =>
+            cpal::BufferSize::Fixed(128_u32.clamp(min.max(1), max)),
+        _ => cpal::BufferSize::Default,
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -500,53 +528,61 @@ mod input {
             let sample_rate = config.sample_rate() as f32;
             let channels = usize::from(config.channels().max(1));
             let analyzer = Arc::new(Mutex::new(AudioFeatureAnalyzer::new(source_label.clone())));
-            let stream_config: cpal::StreamConfig = config.clone().into();
+            let mut stream_config: cpal::StreamConfig = config.clone().into();
+            stream_config.buffer_size = super::input_buffer_size(config.buffer_size());
 
-            let stream = match config.sample_format() {
+            let build_stream = |stream_config: &cpal::StreamConfig| match config.sample_format() {
                 cpal::SampleFormat::F32 => build_input_stream_f32(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 cpal::SampleFormat::F64 => build_input_stream_f64(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 cpal::SampleFormat::I16 => build_input_stream_i16(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 cpal::SampleFormat::I32 => build_input_stream_i32(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 cpal::SampleFormat::U16 => build_input_stream_u16(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 cpal::SampleFormat::U32 => build_input_stream_u32(
                     &device,
-                    &stream_config,
+                    stream_config,
                     channels,
                     sample_rate,
                     analyzer.clone(),
                 ),
                 format => Err(format!("Unsupported microphone sample format: {format:?}")),
-            }?;
+            };
+            // Some drivers advertise ranges but reject a fixed size. Retain
+            // the working default-buffer path on those devices.
+            let stream = build_stream(&stream_config).or_else(|error| {
+                if stream_config.buffer_size == cpal::BufferSize::Default { return Err(error); }
+                stream_config.buffer_size = cpal::BufferSize::Default;
+                build_stream(&stream_config)
+            })?;
 
             stream
                 .play()
@@ -970,7 +1006,49 @@ mod macos {
 
 #[cfg(test)]
 mod tests {
-    use super::is_expected_input_device_unavailable;
+    use super::{is_expected_input_device_unavailable, AudioFeatureAnalyzer, input_buffer_size};
+
+    #[test]
+    fn low_latency_buffer_respects_device_limits() {
+        use cpal::{BufferSize, SupportedBufferSize};
+        assert_eq!(input_buffer_size(&SupportedBufferSize::Range { min: 32, max: 1024 }), BufferSize::Fixed(128));
+        assert_eq!(input_buffer_size(&SupportedBufferSize::Range { min: 512, max: 4096 }), BufferSize::Fixed(512));
+        assert_eq!(input_buffer_size(&SupportedBufferSize::Range { min: 16, max: 64 }), BufferSize::Fixed(64));
+        assert_eq!(input_buffer_size(&SupportedBufferSize::Unknown), BufferSize::Default);
+    }
+
+    #[test]
+    fn beat_release_does_not_depend_on_capture_buffer_size() {
+        for size in [128, 256, 512, 1024] {
+            let mut analyzer = AudioFeatureAnalyzer::new("fixture".into());
+            analyzer.beat_pulse = 1.0;
+            let mut remaining = 4800;
+            while remaining > 0 {
+                let frames = size.min(remaining);
+                analyzer.process(&vec![0.0; frames], 48_000.0);
+                remaining -= frames;
+            }
+            assert!((analyzer.features().beat_pulse - 0.82_f32.powf(6.0)).abs() < 0.00001);
+        }
+    }
+
+    #[test]
+    fn short_capture_windows_detect_onsets_and_remain_bounded() {
+        for sample_rate in [44_100.0, 48_000.0, 96_000.0] {
+            let mut analyzer = AudioFeatureAnalyzer::new("fixture".into());
+            for _ in 0..128 { analyzer.process(&[0.0; 128], sample_rate); }
+            let burst: Vec<f32> = (0..128).map(|i| 0.4 * (i as f32 * 1000.0 * std::f32::consts::TAU / sample_rate).sin()).collect();
+            analyzer.process(&burst, sample_rate);
+            let features = analyzer.features();
+            assert!(features.rms > 0.5 && features.beat_pulse > 0.99);
+            assert!(features.analysis_window_ms < 3.0);
+            for value in [features.rms, features.bass, features.mid, features.treble, features.flux, features.density] {
+                assert!(value.is_finite() && (0.0..=1.0).contains(&value));
+            }
+            for _ in 0..2000 { analyzer.process(&[0.0], sample_rate); }
+            assert!(analyzer.energy_history.len() <= 512);
+        }
+    }
 
     #[test]
     fn expected_input_hardware_errors_are_not_crashes() {

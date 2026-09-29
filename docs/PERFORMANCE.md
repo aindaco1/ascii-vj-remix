@@ -76,6 +76,21 @@ Rules:
 - Preserve active media playback time when visual presets change.
 - Keep discrete changes controlled and predictable during transitions.
 
+## 1.1.0 Local Spatial Baseline
+
+The spatial stage retains the existing density limits. Geometry runs once per
+cell, bounded to 64 grid steps (48 sphere-tracing steps for orbitals); wet
+reflections add one bounded reflected ray. Feedback reuses two float history
+textures, and native output retains source-version upload caching. A shared
+per-column visibility cache is still a future optimization, not current behavior.
+
+The optimized city/video/synthetic-audio workload at 640 columns measured
+39.1 FPS / 33.15 ms P95 in the preview with Pop Out open and 60.1 FPS native
+presentation on M1 Max/64 GB, with 85% source media. The maintained phased
+smoke passed its existing gates; occasional spikes remain. Exact scope, the frame-time
+tails and manual/reference-floor limitations are recorded in the
+[1.1.0 candidate record](releases/RELEASE_1.1.0.md#local-validation).
+
 ## 0.9.6 Measured Optimization Pass
 
 The 0.9.6 pass removes repeated setup/copy work from measured hot paths without
@@ -196,7 +211,7 @@ use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
 the normal software density ceiling. The earlier 71-preset installed sweep resolved
 43 built-ins to WebGPU and 28 to Canvas2D, kept all 71 visible, and confirmed
 every GPU-eligible preset was accelerated. These are historical measurements;
-the current 79/51/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
+the current 87/59/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
 Native Pop Out remains independently
 GPU-rendered. An earlier 30-second structural run held the primary view at 30.0 FPS,
 native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS
@@ -326,6 +341,21 @@ Rules:
 ### Audio Reactivity
 
 Audio analysis is tuned for stable live response.
+
+Feature reads target 120 Hz without queuing overlapping native requests. Input
+capture requests 128-frame buffers within the advertised device limits (2.67 ms
+at 48 kHz), falling back to the device default if unsupported. This is a buffer
+request, not a guarantee of hardware latency. Attacks are immediate on delivery;
+Smoothing controls a time-based release, with zero bypassing it. The default
+0.36 setting has a 25.92 ms release time constant. Beat history and decay also
+use elapsed time so smaller buffers do not shorten beat pulses.
+
+`npm run test:audio-reactive` includes a deterministic sampling/envelope step
+comparison: reaching 90% of an attack takes 8.33 ms with the new 120 Hz model,
+versus 33.33 ms previously; falling to 10% takes 66.67 ms versus 150 ms at the
+default smoothing. These are software model results, excluding device, driver,
+IPC, render scheduling and display latency. For actual capture timing under
+render load, use the native-input probe in [Testing](TESTING.md#audio-response).
 
 Rules:
 

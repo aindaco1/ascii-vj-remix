@@ -1,5 +1,5 @@
 import { ASCII_CHARS, activeGlyphRamp } from './character-sets.js';
-import { processPaletteDither } from './palettes.js';
+import { processPaletteDither, paletteById } from './palettes.js';
 
 const GPU_BACKGROUND = [3 / 255, 4 / 255, 5 / 255];
 
@@ -9,6 +9,24 @@ function clamp(value, min, max) {
 
 function fract(value) {
     return value - Math.floor(value);
+}
+
+// Keep hue while fitting the brighter luminance into the RGB gamut.
+function brightenRgb([r, g, b]) {
+    const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    if (luma <= 0) return [r, g, b];
+    const lifted = Math.pow(luma, 0.22), gain = lifted / luma;
+    const peak = Math.max(r, g, b) * gain;
+    const chroma = peak > 1 ? (1 - lifted) / (peak - lifted) : 1;
+    return [r, g, b].map(v => lifted + (v * gain - lifted) * chroma);
+}
+
+function finishPalette(color, x, y, params, lut, display) {
+    const mapped = processPaletteDither(color, x, y, params, lut, display);
+    if (params?.brightOutput !== true || !paletteById(params?.paletteId)) return mapped;
+    const baseLuma = mapped[3] ?? (mapped[0] * .2126 + mapped[1] * .7152 + mapped[2] * .0722);
+    return [...brightenRgb(mapped.slice(0,3).map(v=>v/255)).map(v=>Math.round(clamp(v,0,1)*255)),
+        Math.pow(baseLuma / 255, .22) * 255];
 }
 
 function applyBasicColorAdjustments(r, g, b, params) {
@@ -23,6 +41,11 @@ function applyBasicColorAdjustments(r, g, b, params) {
     rr = clamp(avg + (rr - avg) * saturationBoost, 0, 1);
     gg = clamp(avg + (gg - avg) * saturationBoost, 0, 1);
     bb = clamp(avg + (bb - avg) * saturationBoost, 0, 1);
+    // Palette lookup keeps its authored color ranges, including animated
+    // ranges. Those colors are lifted afterwards with stable base glyph luma.
+    if (params?.brightOutput === true && !paletteById(params?.paletteId)) {
+        [rr, gg, bb] = brightenRgb([rr, gg, bb]);
+    }
     rr = clamp((rr - 0.5) * contrastBoost + 0.5, 0, 1);
     gg = clamp((gg - 0.5) * contrastBoost + 0.5, 0, 1);
     bb = clamp((bb - 0.5) * contrastBoost + 0.5, 0, 1);
@@ -48,7 +71,7 @@ function processCanvasColorLegacy(r, g, b, params, x = 0, y = 0, paletteLut = nu
     if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
         return color;
     }
-    return processPaletteDither(color, x, y, params, paletteLut, paletteDisplay);
+    return finishPalette(color, x, y, params, paletteLut, paletteDisplay);
 }
 
 function processStreamColorLegacy(r, g, b, params) {
@@ -84,7 +107,7 @@ function processGpuCellColor(r, g, b, params, x = 0, y = 0, paletteLut = null, p
     if ((!params?.paletteId || params.paletteId === 'none') && (!params?.ditherMode || params.ditherMode === 'none')) {
         return color;
     }
-    return processPaletteDither(color, x, y, params, paletteLut, paletteDisplay);
+    return finishPalette(color, x, y, params, paletteLut, paletteDisplay);
 }
 
 function charsetChars(params) {

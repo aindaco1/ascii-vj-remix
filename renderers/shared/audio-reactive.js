@@ -1,3 +1,5 @@
+import spatialAudioRoutes from './spatial-audio.json' with { type: 'json' };
+import { SPATIAL_CONTRACT } from './spatial.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export const AUDIO_REACTIVE_DEFAULTS = {
@@ -135,6 +137,19 @@ export const AUDIO_REACTIVE_FEATURE_KEYS = [
     'beatPulse'
 ];
 
+export function audioReactivePresetTuning(id) {
+    const preset = AUDIO_REACTIVE_PRESETS.find(preset => preset.id === id);
+    if (!preset) return null;
+    return Object.fromEntries(AUDIO_REACTIVE_CONTROLS.map(({key}) => [
+        key, preset[key] ?? AUDIO_REACTIVE_DEFAULTS[key]
+    ]));
+}
+
+export function audioReactivePresetIsCustom(settings) {
+    const tuning = audioReactivePresetTuning(settings.preset);
+    return Boolean(tuning && Object.entries(tuning).some(([key, value]) => settings[key] !== value));
+}
+
 export const AUDIO_REACTIVE_SAFE_LIMITS = {
     saturationBoost: [0, 3],
     contrastBoost: [0.45, 2.85],
@@ -166,6 +181,28 @@ export function emptyAudioReactiveFeatures() {
         beatPulse: 0,
         phase: 0
     };
+}
+
+// Attacks follow the newest measurement immediately. Smoothing controls only
+// the release, in elapsed time, so a slower preview cannot stretch the envelope.
+export function smoothAudioReactiveFeatures(state, raw, smoothing, now) {
+    const amount = clamp(Number(smoothing) || 0, 0, 0.98);
+    const dt = Math.max(0, now - (state.lastMs ?? now));
+    const release = amount === 0 ? 1 : -Math.expm1(-dt / (200 * amount * amount));
+    const previous = state.features;
+    const next = {};
+    for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
+        const fallback = key === 'lowMid' || key === 'highMid' ? raw.mid :
+            key === 'presence' || key === 'brightness' ? raw.treble : 0;
+        const value = Number(raw[key] ?? fallback ?? 0);
+        const target = Number.isFinite(value) ? clamp(value, 0, 1) : 0;
+        next[key] = !previous || target >= previous[key]
+            ? target : previous[key] + (target - previous[key]) * release;
+    }
+    next.phase = Number.isFinite(raw.phase) ? raw.phase : now * 0.012;
+    state.features = next;
+    state.lastMs = now;
+    return next;
 }
 
 export function audioReactivePrecision(config) {
@@ -263,6 +300,13 @@ export function applyAudioReactiveModulation(baseParams, features, audioSettings
         out[key] = clampParamValue(key, Number(baseParams[key] || 0) + amount * scale);
     }
 
+    if (baseParams.visualMode && baseParams.visualMode !== 'flat') {
+        for (const [key, feature, scale] of spatialAudioRoutes) {
+            const rule = SPATIAL_CONTRACT[key];
+            const amount = Number(normalizedFeatures[feature] || 0) * sensitivity * audioFeatureAmount(feature, settings);
+            out[key] = clamp(Number(baseParams[key] ?? rule.default) + amount * scale, rule.min, rule.max);
+        }
+    }
     const swayAmount = sensitivity * (preset.sway || 0);
     if (swayAmount > 0) {
         const motion = Math.max(

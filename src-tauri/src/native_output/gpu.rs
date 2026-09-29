@@ -1,3 +1,4 @@
+use super::spatial;
 use super::palette;
 use super::{
     native_glyph_atlas_page_bytes, native_glyph_ramp_ids, native_grid_dimensions,
@@ -59,6 +60,7 @@ struct Params {
     ditherScale: u32,
     ditherBias: f32,
     ditherInvert: u32,
+    brightOutput: u32,
 };
 
 struct FeatureData {
@@ -72,6 +74,26 @@ struct FeatureData {
 @group(0) @binding(3) var<storage, read> paletteLut: array<u32>;
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
+
+struct SpatialParams { data: array<vec4f, 10>, };
+@group(0) @binding(5) var<uniform> spatial: SpatialParams;
+@group(0) @binding(6) var historyTex: texture_2d<f32>;
+@group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+fn effect(index: i32) -> vec4f { return spatial.data[index]; }
+fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
+fn sceneMedia(uv: vec2f) -> vec3f {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at, 0).rgb;
+}
+fn sceneHistory(uv: vec2f) -> vec4f {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
+    return textureLoad(historyTex, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0);
+}
+
+__SPATIAL__
 __CELL_COLOR__
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -93,8 +115,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let sampleY = clamp(i32(cellCenterY + jitterY), 0, i32(params.srcH) - 1);
 
     let c = textureLoad(srcTex, vec2<i32>(sampleX, sampleY), 0);
-    let processed = processColor(c.rgb, cx, cy);
+    let uv = (vec2f(f32(cx), f32(cy)) + 0.5) / vec2f(f32(params.cols), f32(params.rows));
+    var sample = SceneSample(c.rgb, 0.0);
+    if (effect(0).x > 0.0) { sample = sceneSample(uv); }
+    let processed = sceneFinish(processColor(sample.color, cx, cy), uv, sample.glyph);
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), processed);
+    textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), processed);
 }
 "#;
 
@@ -285,6 +311,13 @@ pub(super) struct NativeGpuPresenter {
     config: wgpu::SurfaceConfiguration,
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
+    spatial_buffer: wgpu::Buffer,
+    spatial_history: spatial::History,
+    next_history_texture: Option<wgpu::Texture>,
+    next_history_view: Option<wgpu::TextureView>,
+    next_compute_bind_group: Option<wgpu::BindGroup>,
+    history_texture: Option<wgpu::Texture>,
+    history_view: Option<wgpu::TextureView>,
     params_buffer: wgpu::Buffer,
     render_params_buffer: wgpu::Buffer,
     palette_lut_buffer: wgpu::Buffer,
@@ -529,7 +562,7 @@ impl NativeGpuPresenter {
         let render_pipeline = shared.render_pipeline(config.format)?;
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU params"),
-            size: 96,
+            size: 112,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -545,6 +578,7 @@ impl NativeGpuPresenter {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let spatial_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Spatial visual parameters"), size: 160, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let feature_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU palette and dither features"),
             size: feature_buffer_size() as u64,
@@ -586,6 +620,13 @@ impl NativeGpuPresenter {
             config,
             compute_pipeline,
             render_pipeline,
+            spatial_buffer,
+            spatial_history: spatial::History::default(),
+            next_history_texture: None,
+            next_history_view: None,
+            next_compute_bind_group: None,
+            history_texture: None,
+            history_view: None,
             params_buffer,
             render_params_buffer,
             palette_lut_buffer,
@@ -759,7 +800,7 @@ impl NativeGpuPresenter {
             .as_ref()
             .ok_or_else(|| "native GPU cell texture is unavailable".to_string())?;
         if self.compute_bind_group.is_none() {
-            self.compute_bind_group = Some(self.device.create_bind_group(
+            let bind = |read: &wgpu::TextureView, write: &wgpu::TextureView| self.device.create_bind_group(
                 &wgpu::BindGroupDescriptor {
                     label: Some("ASCILINE native GPU compute bind group"),
                     layout: &self.compute_pipeline.get_bind_group_layout(0),
@@ -784,9 +825,14 @@ impl NativeGpuPresenter {
                             binding: 4,
                             resource: self.feature_buffer.as_entire_binding(),
                         },
+                        wgpu::BindGroupEntry { binding: 5, resource: self.spatial_buffer.as_entire_binding() },
+                        wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(read) },
+                        wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::TextureView(write) },
                     ],
                 },
-            ));
+            );
+            self.compute_bind_group = Some(bind(self.history_view.as_ref().unwrap(), self.next_history_view.as_ref().unwrap()));
+            self.next_compute_bind_group = Some(bind(self.next_history_view.as_ref().unwrap(), self.history_view.as_ref().unwrap()));
         }
         if self.render_bind_group.is_none() {
             self.render_bind_group = Some(self.device.create_bind_group(
@@ -832,6 +878,13 @@ impl NativeGpuPresenter {
                 opacity,
             ),
         );
+        if !clear { self.spatial_history = spatial::History::default(); }
+        let effects = params.spatial.uniforms(cols, rows, params.cell_width, params.cell_height, self.glyph_ramp_len, &mut self.spatial_history, self.glyph_key ^ self.feature_key ^ u64::from(params.bright_output), palette::now_ms());
+        let mut effects_bytes = [0_u8; 160];
+        for (bytes, value) in effects_bytes.chunks_exact_mut(4).zip(effects) {
+            bytes.copy_from_slice(&value.to_le_bytes());
+        }
+        self.queue.write_buffer(&self.spatial_buffer, 0, &effects_bytes);
         let prep_ns = duration_ns_u64(prep_started_at.elapsed());
 
         let encode_started_at = Instant::now();
@@ -883,6 +936,9 @@ impl NativeGpuPresenter {
         let encode_ns = duration_ns_u64(encode_started_at.elapsed());
         let submit_started_at = Instant::now();
         self.queue.submit(Some(encoder.finish()));
+        std::mem::swap(&mut self.history_texture, &mut self.next_history_texture);
+        std::mem::swap(&mut self.history_view, &mut self.next_history_view);
+        std::mem::swap(&mut self.compute_bind_group, &mut self.next_compute_bind_group);
         let submit_ns = duration_ns_u64(submit_started_at.elapsed());
         Ok((prep_ns, encode_ns, submit_ns))
     }
@@ -1110,11 +1166,23 @@ impl NativeGpuPresenter {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         self.cell_view = Some(texture.create_view(&wgpu::TextureViewDescriptor::default()));
         self.cell_texture = Some(texture);
+        let create_history = || self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Spatial cell history"), size: wgpu::Extent3d {width: cols, height: rows, depth_or_array_layers: 1}, mip_level_count: 1, sample_count: 1,
+            dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING, view_formats: &[],
+        });
+        let history = create_history();
+        let next = create_history();
+        self.next_history_view = Some(next.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.next_history_texture = Some(next);
+        self.history_view = Some(history.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.history_texture = Some(history);
+        self.spatial_history = spatial::History::default();
         self.cell_size = (cols, rows);
         self.compute_bind_group = None;
         self.render_bind_group = None;
@@ -1269,8 +1337,8 @@ fn cell_params_bytes(
     cols: u32,
     rows: u32,
     frame_index: usize,
-) -> [u8; 96] {
-    let mut bytes = [0u8; 96];
+) -> [u8; 112] {
+    let mut bytes = [0u8; 112];
     put_u32(&mut bytes, 0, frame.width);
     put_u32(&mut bytes, 4, frame.height);
     put_u32(&mut bytes, 8, cols);
@@ -1299,6 +1367,7 @@ fn cell_params_bytes(
     put_u32(&mut bytes, 84, params.dither_scale);
     put_f32(&mut bytes, 88, params.dither_bias as f32);
     put_u32(&mut bytes, 92, u32::from(params.dither_invert));
+    put_u32(&mut bytes, 96, u32::from(params.bright_output));
     bytes
 }
 
@@ -1345,6 +1414,21 @@ fn put_f32(bytes: &mut [u8], offset: usize, value: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_shader_modules_accept_windows_line_endings() {
+        for source in [
+            include_str!("../../../renderers/shared/spatial-shader.wgsl.js"),
+            include_str!("../../../renderers/shared/cell-color.wgsl.js"),
+        ] {
+            let unix = source.replace("\r\n", "\n");
+            let windows = unix.replace('\n', "\r\n");
+            assert_eq!(
+                shared_wgsl_module(&windows).replace("\r\n", "\n"),
+                shared_wgsl_module(&unix)
+            );
+        }
+    }
 
     #[test]
     fn native_shaders_validate_with_coverage_mip_sampling() {
@@ -1412,6 +1496,7 @@ mod tests {
             saturation_boost: 1.4,
             contrast_boost: 1.2,
             brightness: 1.0,
+            bright_output: true,
             gamma: 1.0,
             bg_blend: 0.3,
             quantize_bits: 2,
@@ -1423,6 +1508,7 @@ mod tests {
             palette_cycle_mode: "off".to_string(),
             palette_cycle_amount: 1.0,
             palette_cycle_transport: palette::Transport::default(),
+            spatial: spatial::Params::default(),
             dither_mode: "none".to_string(),
             dither_strength: 0.45,
             dither_scale: 1,
@@ -1476,7 +1562,8 @@ mod tests {
         assert_eq!(u32::from_le_bytes(bytes[8..12].try_into().unwrap()), 80);
         assert_eq!(u32::from_le_bytes(bytes[44..48].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(bytes[68..72].try_into().unwrap()), 1);
-        assert_eq!(bytes.len(), 96);
+        assert_eq!(bytes.len(), 112);
+        assert_eq!(u32::from_le_bytes(bytes[96..100].try_into().unwrap()), 1);
 
         let glyph_ramp_len = native_glyph_ramp_ids(&params).len() as u32;
         let glyph_key = glyph_feature_key(&params);
@@ -1508,6 +1595,13 @@ mod tests {
 }
 
 fn cell_shader() -> String {
-    CELL_PASS_WGSL.replace("__PALETTE_CAPACITY__", &palette::CONTRACT.max_colors.to_string())
-        .replace("__CELL_COLOR__", include_str!("../../../renderers/shared/cell-color.wgsl.js").trim().strip_prefix("export default String.raw`").and_then(|text| text.strip_suffix("`;" )).expect("shared WGSL module envelope"))
+    CELL_PASS_WGSL.replace("__SPATIAL__", shared_wgsl_module(include_str!("../../../renderers/shared/spatial-shader.wgsl.js")))
+        .replace("__PALETTE_CAPACITY__", &palette::CONTRACT.max_colors.to_string())
+        .replace("__CELL_COLOR__", shared_wgsl_module(include_str!("../../../renderers/shared/cell-color.wgsl.js")))
+}
+
+fn shared_wgsl_module(source: &str) -> &str {
+    source.trim().split_once('`')
+        .and_then(|(_, body)| body.strip_suffix("`;"))
+        .expect("shared WGSL module envelope")
 }

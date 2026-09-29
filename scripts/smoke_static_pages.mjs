@@ -1,3 +1,4 @@
+import { findChromiumExecutable } from './lib/chromium.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import http from 'node:http';
@@ -8,6 +9,7 @@ import { StaticSmokeDiagnostics } from './lib/static_smoke_diagnostics.mjs';
 import { BUILTIN_PRESET_BACKEND_BASELINE, validateBuiltInPresetBackendContract } from '../renderers/shared/preset-backend-contract.js';
 import { PALETTE_CONTRACT, fillPaletteDisplay } from '../renderers/shared/palette-cycling.js';
 import { PALETTES, buildPaletteLut, mapColorToPalette } from '../renderers/shared/palettes.js';
+import { processGpuCellColor } from '../renderers/shared/render-math.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.SMOKE_HOST || '127.0.0.1';
@@ -15,55 +17,6 @@ const port = Number(process.env.SMOKE_PORT || 4173);
 const baseUrl = `http://${host}:${port}`;
 const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
 
-function findChromiumExecutable() {
-  if (process.env.CHROMIUM_EXECUTABLE && existsSync(process.env.CHROMIUM_EXECUTABLE)) {
-    return process.env.CHROMIUM_EXECUTABLE;
-  }
-
-  const candidates = [];
-  const addCandidate = (...parts) => {
-    if (parts.every(Boolean)) candidates.push(path.join(...parts));
-  };
-  if (process.platform === 'darwin') {
-    addCandidate('/Applications', 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
-    addCandidate('/Applications', 'Microsoft Edge.app', 'Contents', 'MacOS', 'Microsoft Edge');
-  } else if (process.platform === 'win32') {
-    addCandidate(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe');
-    addCandidate(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe');
-    addCandidate(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe');
-  } else {
-    candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
-  }
-
-  const cacheDir = process.platform === 'darwin'
-    ? path.join(process.env.HOME || '', 'Library', 'Caches', 'ms-playwright')
-    : process.platform === 'win32'
-      ? path.join(process.env.LOCALAPPDATA || '', 'ms-playwright')
-      : path.join(process.env.HOME || '', '.cache', 'ms-playwright');
-  if (existsSync(cacheDir)) {
-    const cacheCandidates = readdirSync(cacheDir)
-      .filter((entry) => entry.startsWith('chromium_headless_shell-'))
-      .sort()
-      .reverse()
-      .flatMap((entry) => {
-        const entryRoot = path.join(cacheDir, entry);
-        return [
-          path.join(entryRoot, 'chrome-headless-shell-mac-arm64', 'chrome-headless-shell'),
-          path.join(entryRoot, 'chrome-headless-shell-mac-x64', 'chrome-headless-shell'),
-          path.join(entryRoot, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe'),
-          path.join(entryRoot, 'chrome-headless-shell-linux64', 'chrome-headless-shell')
-        ];
-      });
-    candidates.unshift(...cacheCandidates);
-  }
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
 
 function assertPresetBackendContract(presetMatrix) {
   const contract = validateBuiltInPresetBackendContract({
@@ -207,6 +160,25 @@ async function runSmoke() {
       null,
       { timeout: 15000 }
     );
+    diagnostics.phase = 'audio preset custom tuning';
+    const audioPresetRegression = await page.evaluate(() => {
+      const app = window.ascilineRemix;
+      const runtime = app.audioReactiveRuntime;
+      const sourceNode = runtime.sourceNode;
+      const captures = window.__smokeAudioCapture.mic;
+      const slider = document.querySelector('#audio-reactive-sensitivity');
+      const preset = document.querySelector('#audio-reactive-preset');
+      slider.value = '0'; slider.dispatchEvent(new Event('input', {bubbles:true}));
+      const custom = preset.value === '__custom' && preset.selectedOptions[0].textContent.includes('(Custom)');
+      preset.value = 'dense-mix-control'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      const dense = app.audioReactive.sensitivity === 9 && app.audioReactive.densityDampening === .7 && preset.value === 'dense-mix-control';
+      slider.value = '0'; slider.dispatchEvent(new Event('input', {bubbles:true}));
+      preset.value = 'dense-mix-control'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      const reselected = app.audioReactive.sensitivity === 9 && preset.value === 'dense-mix-control';
+      preset.value = 'pulse-reactor'; preset.dispatchEvent(new Event('change', {bubbles:true}));
+      return {custom, dense, reselected, capturePreserved:runtime.active && runtime.sourceNode === sourceNode && window.__smokeAudioCapture.mic === captures};
+    });
+    if (Object.values(audioPresetRegression).some(value => !value)) throw new Error(`Audio preset regression: ${JSON.stringify(audioPresetRegression)}`);
     diagnostics.phase = 'brand image readiness';
     await page.waitForFunction(() => {
       const mark = document.querySelector('.brand-mark');
@@ -958,6 +930,13 @@ async function runSmoke() {
           transitionSeconds: app.params.transitionSeconds
         };
         await app._transitionTo(solidTarget, 0.15);
+        // The bundled demo is only 2.5 seconds long. Start this continuity
+        // assertion away from its natural loop boundary, which otherwise
+        // looks exactly like a decoder restart in a currentTime comparison.
+        await new Promise((resolve) => {
+          video.addEventListener('seeked', resolve, { once: true });
+          video.currentTime = 0.5;
+        });
         const beforeGlyph = video.currentTime || 0;
         const glyphTarget = {
           ...app.params,
@@ -979,6 +958,7 @@ async function runSmoke() {
         await transition;
         await new Promise((resolve) => setTimeout(resolve, 120));
         const after = {
+          sourcePreserved: app._staticMediaSource() === source,
           paused: video.paused,
           currentTime: video.currentTime || 0,
           backend: app.params.backend,
@@ -1001,6 +981,7 @@ async function runSmoke() {
       liveFamilyTransition.skipped ||
       liveFamilyTransition.during.paused ||
       liveFamilyTransition.after.paused ||
+      !liveFamilyTransition.after.sourcePreserved ||
       liveFamilyTransition.after.currentTime <= liveFamilyTransition.beforeGlyph + 0.08 ||
       liveFamilyTransition.after.backend !== 'canvas2d' ||
       liveFamilyTransition.after.solidMode ||
@@ -1079,9 +1060,13 @@ async function runSmoke() {
       const pointClick = { ...app.params, backend: 'auto', ...presetParams('point-click-default'), ...cameraBase };
       const neon = { ...app.params, ...presetParams('neon-sledgehammer'), ...cameraBase };
       const previousWtfActive = app.wtfActive;
+      const previousAudioActive = app.audioReactiveRuntime.active;
       app.wtfActive = true;
+      app.audioReactiveRuntime.active = true;
       const wtfPayload = app._nativeOutputPayload?.(classic);
+      const transitionPayload = app._nativeOutputPayload(classic, {fromParams:classic, kind:'tween', durationMs:1000, startAtUnixMs:Date.now()});
       app.wtfActive = previousWtfActive;
+      app.audioReactiveRuntime.active = previousAudioActive;
       return {
         classicMirrors: app?._shouldMirrorNativeCameraOutput?.(classic) ?? null,
         classicNativeGlyphs: app?._nativeOutputGlyphMode?.(classic) ?? null,
@@ -1089,6 +1074,10 @@ async function runSmoke() {
         neonMirrors: app?._shouldMirrorNativeCameraOutput?.(neon) ?? null,
         neonNativeGlyphs: app?._nativeOutputGlyphMode?.(neon) ?? null,
         nativeWtfActive: wtfPayload?.params?.nativeWtfActive,
+        nativeAudioActive: wtfPayload?.params?.audioReactiveActive,
+        nativeBrightness: wtfPayload?.params?.brightness,
+        effectiveBrightness: classic.brightness,
+        transitionAudioActive: transitionPayload.params.audioReactiveActive && transitionPayload.transition.fromParams.audioReactiveActive,
         classic: {
           glyphMode: classic.glyphMode,
           solidMode: classic.solidMode,
@@ -1117,6 +1106,9 @@ async function runSmoke() {
     }
     if (cameraNativeParity.nativeWtfActive !== false) {
       throw new Error(`Native output should consume app-resolved WTF params instead of double-modulating: ${JSON.stringify(cameraNativeParity)}`);
+    }
+    if (cameraNativeParity.nativeAudioActive !== false || cameraNativeParity.nativeBrightness !== cameraNativeParity.effectiveBrightness || !cameraNativeParity.transitionAudioActive) {
+      throw new Error(`Native output should consume app-resolved audio params without a second envelope or modulation: ${JSON.stringify(cameraNativeParity)}`);
     }
     await page.click('#source-list [data-source-id="demo-image"]');
     await page.waitForFunction(
@@ -1155,12 +1147,16 @@ async function runSmoke() {
         if (!canvas?.width || !canvas?.height) return { visible: false, reason: 'missing canvas' };
 
         const sample = document.createElement('canvas');
-        sample.width = Math.min(120, canvas.width);
-        sample.height = Math.min(90, canvas.height);
+        sample.width = Math.min(512, canvas.width);
+        sample.height = Math.min(512, canvas.height);
         const ctx = sample.getContext('2d', { willReadFrequently: true });
         if (!ctx) return { visible: false, reason: 'missing context' };
 
-        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        // Inspect actual glyph pixels. Shrinking dense bright text to 120px
+        // averages its black gaps into the ink and falsely reports solid cells.
+        ctx.drawImage(canvas, Math.floor((canvas.width-sample.width)/2),
+          Math.floor((canvas.height-sample.height)/2), sample.width, sample.height,
+          0, 0, sample.width, sample.height);
         const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
         let foreground = 0;
         let background = 0;
@@ -1515,6 +1511,7 @@ async function runSmoke() {
           results.push({
             id: preset.id,
             active: app.activePresetId === preset.id,
+            visualMode: app.params.visualMode,
             requestedBackend: app.params.backend,
             resolvedBackend: app.staticRuntime?.getStats?.()?.backend || '',
             hasSignal: nonBackground >= 5,
@@ -1532,6 +1529,7 @@ async function runSmoke() {
     });
     const presetFailures = presetMatrix.filter((preset) =>
       !preset.active ||
+      preset.visualMode !== 'flat' ||
       !preset.hasSignal ||
       preset.aspectError > 0.03 ||
       preset.glError !== 0 ||
@@ -1573,6 +1571,13 @@ async function runSmoke() {
           expected: paletteSwatches.map(color => mapColorToPalette(color, palette.id, 'nearest', buildPaletteLut(palette.id), display).slice(0, 3))});
       }
     }
+    paletteCases.push(...paletteCases.map(test => {
+      const palette=PALETTES.find(p=>p.id===test.id);
+      const display=new Float32Array(PALETTE_CONTRACT.maxColors*4);
+      fillPaletteDisplay(display,palette,{paletteCycleMode:test.mode||'off',paletteCycleAmount:1},test.time||0);
+      return {...test,brightOutput:true,expected:paletteSwatches.map(color=>processGpuCellColor(...color,
+        {paletteId:test.id,paletteMapping:test.mapping,brightOutput:true},0,0,buildPaletteLut(test.id,test.mapping),display).slice(0,3))};
+    }));
     await page.evaluate(async ({ swatches, cases }) => {
       const app = window.ascilineRemix;
       app.stop();
@@ -1588,8 +1593,9 @@ async function runSmoke() {
       app.loadStaticSource = async () => source;
       app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
         cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
-        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, brightOutput: false, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
+        visualMode: 'flat', edgeAmount: 0, feedbackAmount: 0,
         solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
         paletteMapping: cases[0].mapping, paletteCycleMode: 'off', ditherMode: 'none' };
       try {
@@ -1604,6 +1610,7 @@ async function runSmoke() {
             renderer.syncFeatureResources();
           }
           renderer.paletteCycleMode = test.mode || 'off';
+          renderer.brightOutput = test.brightOutput === true;
           renderer.paletteCycleAmount = 1;
           renderer.paletteCycleTransport = {anchorMs: 0, position: test.time || 0, fromRate: 0, toRate: 0, durationMs: 0};
           const lutUpdates = renderer.paletteLutUpdates;
@@ -1644,7 +1651,7 @@ async function runSmoke() {
       app.loadStaticSource = async () => source;
       app.params = { ...app.params, sourceMode: 'static', mediaType: 'image', backend: 'webgl2',
         cols: 32, rows: 32, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
-        saturationBoost: 1, contrastBoost: 1, brightness: 1, gamma: 1, bgBlend: 0,
+        saturationBoost: 1, contrastBoost: 1, brightness: 1, brightOutput: false, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
         solidMode: true, glyphMode: false, pixel: false, paletteId: 'none',
         paletteCycleMode: 'off', ditherMode: 'none' };

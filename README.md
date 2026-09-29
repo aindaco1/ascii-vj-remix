@@ -8,7 +8,11 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is 1.0.6. Published artifacts are listed in
+The current source/package version is **1.1.0 — Spatial ASCII**. It adds optional
+source-driven spatial and fractal looks, brighter output controls, faster audio
+response, and fixes for live control and video-frame handling. See the
+[release record](docs/releases/RELEASE_1.1.0.md) for validation and platform limits.
+Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).
 Release history is recorded in the [Changelog](CHANGELOG.md);
@@ -47,8 +51,12 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - WebGPU and WebGL2 rendering, with Canvas compatibility fallbacks.
 - ASCII and cell visuals with palettes, ordered dithering, multilingual glyphs,
   and custom character ramps.
+- Distinct spatial city, media tunnel, waterfront, pitched-hall, orbiting objects and recursive ruins, plus Mandelbrot, Mandelbulb and Mandelbox fractals. Edge glyphs and phosphor feedback also work on flat media.
+- An optional Bright output toggle (off by default) lifts dark camera, image and video output; its setting persists across presets and launches.
 - Built-in and user presets, saved playlists, smooth crossfades, and continuous
-  randomized WTF mode.
+  randomized WTF mode. Built-in presets start in Flat Media; spatial modes are
+  optional. Each WTF target has an 80% chance of Flat Media and a 20% chance
+  shared equally among the other visual modes.
 - Local audio reactivity from microphone/input, files, and supported
   system/display audio paths.
 - Native Pop Out for another display and PNG capture of the main renderer.
@@ -129,7 +137,7 @@ portal packages are installed for your distribution.
    audio.
 7. Use Pop Out to create a separate output window for another screen.
 8. Use WTF when you want the app to keep generating extreme or traditional
-   ASCII-flavored transitions.
+   ASCII-flavored transitions, with a 80/20 chance of flat or spatial visuals.
 
 If the renderer does not start, press Start once. If it still does not start,
 try a lower backend such as WebGL2 or Canvas2D.
