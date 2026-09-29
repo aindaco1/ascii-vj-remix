@@ -1,4 +1,4 @@
-// Reproducible visual review: one deliberately dark source, actual WebGL output.
+// Reproducible visual review of actual WebGL output; --fractals selects the new scenes.
 // Run with an output PNG path; no user media or native profile is read.
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
@@ -10,14 +10,14 @@ let browser;
 try {
     await server.listen();
     browser = await chromium.launch({ executablePath: findChromiumExecutable({ preferInstalled: true }), headless: true });
-    const page = await browser.newPage({ viewport: { width: 1680, height: 1150 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: 1680, height: process.argv.includes('--fractals') ? 825 : 1150 }, deviceScaleFactor: 1 });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => localStorage.setItem('asciline-remix-state-v1', JSON.stringify({ backend: 'webgl2' })));
     await page.goto('http://127.0.0.1:4177');
     await page.waitForFunction(() => window.ascilineRemix?.running);
-    const results = await page.evaluate(async () => {
+    const results = await page.evaluate(async (fractals) => {
         const { SPATIAL_PRESETS } = await import('/renderers/shared/spatial-presets.js');
         const { createRenderer } = await import('/renderers/gpu/ascii/renderer/index.js');
         const { createCycleTransport } = await import('/renderers/shared/palette-cycling.js');
@@ -30,7 +30,7 @@ try {
           figcaption{padding:10px 12px;font-size:15px}figure img{width:100%;aspect-ratio:16/9;object-fit:contain;display:block}
           .stage{position:fixed;left:-3000px;top:0;width:1280px;height:720px}
         </style>`);
-        document.body.innerHTML = '<h1>Bright output + six distinct spaces</h1><p>The same dark source in every view. Actual renderer output, frozen at route position 2.137. No audio modulation.</p><main id="review"></main>';
+        document.body.innerHTML = `<h1>${fractals?'Fractal scenes · Bright Output off':'Bright Output + spatial scenes'}</h1><p>The same source in every view. Actual renderer output with each preset’s own composition, frozen for comparison. No audio modulation.</p><main id="review"></main>`;
         const gallery = document.querySelector('#review');
         const add = (name, url) => {
             const figure = document.createElement('figure');
@@ -42,20 +42,20 @@ try {
         const ctx = canvas.getContext('2d'), picture = new Image();picture.src = '/media/demo.svg';await picture.decode();
         ctx.drawImage(picture,0,0,640,360);
         const pixels = ctx.getImageData(0,0,640,360);
-        for(let i=0;i<pixels.data.length;i+=4)for(let c=0;c<3;c++)pixels.data[i+c]=Math.round(pixels.data[i+c]*.075);
+        for(let i=0;i<pixels.data.length;i+=4)for(let c=0;c<3;c++)pixels.data[i+c]=Math.round(pixels.data[i+c]*(fractals?1:.075));
         ctx.putImageData(pixels,0,0);
-        add('Input · 7.5% source brightness',canvas.toDataURL());
+        add(fractals?'Input · Demo image':'Input · 7.5% source brightness',canvas.toDataURL());
         const source = {element:canvas,canvas,isImage:true,isVideo:false,width:640,height:360,ready:true,type:'image',destroy(){},updateParams(){}};
-        const scenes = SPATIAL_PRESETS.filter(p=>p.params.visualMode!=='flat');
+        const scenes = SPATIAL_PRESETS.filter(p=>fractals?['ruins','mandelbrot','mandelbulb','mandelbox'].includes(p.params.visualMode):p.params.visualMode!=='flat');
         const views = [
             {name:'Classic Camera ASCII · Bright output OFF', params:{...app._allPresets().find(p=>p.id==='classic-camera-ascii').params,brightOutput:false}},
-            {name:'Classic Camera ASCII · Bright output ON', params:{...app._allPresets().find(p=>p.id==='classic-camera-ascii').params,brightOutput:true}},
-            ...scenes
+            ...(!fractals?[{name:'Classic Camera ASCII · Bright output ON', params:{...app._allPresets().find(p=>p.id==='classic-camera-ascii').params,brightOutput:true}}]:[]),
+            ...scenes.map(p=>({...p,params:{...p.params,brightOutput:!fractals}}))
         ];
         const results=[];
         for(const view of views){
             const stage=document.createElement('div');stage.className='stage';document.body.appendChild(stage);
-            const params={...app.params,...view.params,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0),sampleX:.5,sampleY:.5,jitterAmount:0};
+            const params={...app.params,...view.params,sceneFreeze:true,sceneOffset:(view.params.sceneOffset||0)+2.137,sceneTransport:createCycleTransport(0,0),sampleX:.5,sampleY:.5,jitterAmount:0};
             const renderer=await createRenderer({...params,source,targetElement:stage,preferredBackend:'webgl2',preserveDrawingBuffer:true});
             // Glyph pages load asynchronously; capture only after the actual
             // ramp is present (otherwise non-Latin/block presets look blank).
@@ -74,7 +74,7 @@ try {
         }
         await Promise.all([...gallery.querySelectorAll('img')].map(img=>img.decode()));
         return results;
-    });
+    }, process.argv.includes('--fractals'));
     assert.deepEqual(errors, []);
     await page.screenshot({ path: process.argv[2] || '/tmp/ascii-bright-spatial-review.png', fullPage: true });
     console.log(JSON.stringify(results,null,2));

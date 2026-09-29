@@ -280,7 +280,7 @@ export class WebGL2Renderer {
         this.saturationBoost = options.saturationBoost ?? 1.4;
         this.contrastBoost = options.contrastBoost ?? 1.0;
         this.brightness = options.brightness ?? 1.0;
-        this.brightOutput = options.brightOutput !== false;
+        this.brightOutput = options.brightOutput === true;
         this.gamma = options.gamma || 1.0;
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;

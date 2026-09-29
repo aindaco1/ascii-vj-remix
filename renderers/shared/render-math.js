@@ -23,7 +23,7 @@ function brightenRgb([r, g, b]) {
 
 function finishPalette(color, x, y, params, lut, display) {
     const mapped = processPaletteDither(color, x, y, params, lut, display);
-    if (params?.brightOutput === false || !paletteById(params?.paletteId)) return mapped;
+    if (params?.brightOutput !== true || !paletteById(params?.paletteId)) return mapped;
     const baseLuma = mapped[3] ?? (mapped[0] * .2126 + mapped[1] * .7152 + mapped[2] * .0722);
     return [...brightenRgb(mapped.slice(0,3).map(v=>v/255)).map(v=>Math.round(clamp(v,0,1)*255)),
         Math.pow(baseLuma / 255, .22) * 255];
@@ -43,7 +43,7 @@ function applyBasicColorAdjustments(r, g, b, params) {
     bb = clamp(avg + (bb - avg) * saturationBoost, 0, 1);
     // Palette lookup keeps its authored color ranges, including animated
     // ranges. Those colors are lifted afterwards with stable base glyph luma.
-    if (params?.brightOutput !== false && !paletteById(params?.paletteId)) {
+    if (params?.brightOutput === true && !paletteById(params?.paletteId)) {
         [rr, gg, bb] = brightenRgb([rr, gg, bb]);
     }
     rr = clamp((rr - 0.5) * contrastBoost + 0.5, 0, 1);

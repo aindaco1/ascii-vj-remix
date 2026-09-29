@@ -403,9 +403,9 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 87 total / 59 accelerated / 28 explicit
+separately requires the centralized 90 total / 62 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 59 accelerated
+physical Windows acceptance must additionally confirm the 62 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 The same smoke renders known color swatches through actual WebGL2 and compares
@@ -615,13 +615,13 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
   pairwise differences between preset compositions on one dark input. Shared uniform vectors run in JS
   and Rust; `npm run test:rust` also validates the complete native WGSL.
 - `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
-  Canvas reference, default-on brightness and live opt-out (RGB and glyph
+  Canvas reference, default-off brightness and live opt-in/out (RGB and glyph
   luminance), toggle persistence across presets/WTF/native payloads,
-  21 live spatial controls across all six scenes, manual/MIDI edits during
+  24 live spatial controls across all nine preset scenes, manual/MIDI edits during
   preset tweens and crossfades, persisted edits and crossfade-layer cleanup,
   frozen-frame equality, floating-point trail decay, Canvas
   limits and a playing 30-second video through the new presets and back to
-  Classic Camera ASCII. All six spatial defaults must respond to two moving
+  Classic Camera ASCII. All nine spatial defaults and the legacy relief mode must respond to two moving
   source frames with identical color/brightness histograms but different shapes,
   in both RGB output and glyph choices. It requires a GPU-capable installed Chromium for
   WebGPU; `CHROMIUM_EXECUTABLE` selects one. The default opens an isolated visible browser.
@@ -634,17 +634,21 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
 - `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
   media/resize paths and JavaScript/GPU errors, including the new presets.
 - `node scripts/capture_spatial_review.mjs /tmp/spatial-review.png` captures
-  one dark source, the brightness toggle off/on, and six spatial presets using
-  actual WebGL2 presentation. Glyph atlas loads must finish before capture.
+  one dark source, the brightness toggle off/on, and all nine spatial presets using
+  actual WebGL2 presentation. Add `--fractals` for the four fractal presets on
+  the unmodified demo source with Bright Output off. Glyph atlas loads must
+  finish before capture.
 - Native scene performance can use the maintained UI harness, for example
   `ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneWet":0.55,"sceneRain":0.2,"sceneMedia":0.85}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 npm run smoke:ui-perf`.
   This is local-only and must use the development identity. Preserve the normal
   frame-time and reactive-update gates; a screenshot is not a performance test.
 
-Manual acceptance: compare Bright output off/on on dark camera, image and
+Manual acceptance: confirm Bright Output starts off on a clean profile and
+retains an explicitly saved choice; compare Bright output off/on on dark camera, image and
 video sources, reselect each spatial preset for its revised defaults, and
 compare preview and native output while changing mode,
-source, density, palette and ramp; exercise freeze/reverse/reset, long feedback
+source, density, palette and ramp; adjust fractal zoom/detail/shape after selecting
+a preset and during its transition; exercise freeze/reverse/reset, long feedback
 fades, source/video continuity, camera orientation, audio start/stop, MIDI
 pickup and output close/reopen. Verify a physical second display and the
 reference-floor hardware separately. See the [1.1.0 record](releases/RELEASE_1.1.0.md).

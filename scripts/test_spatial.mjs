@@ -17,6 +17,7 @@ assert.equal(spatialGlyphRamp('abc',defaults),'abc');
 assert.equal([...spatialGlyphRamp('A'.repeat(96),{...defaults,edgeAmount:1})].length,96);
 for(const preset of SPATIAL_PRESETS){
     assert.equal(preset.params.backend,'auto');
+    assert.equal('brightOutput' in preset.params,false,'presets must preserve the global preference');
     assert.equal('mediaUrl' in preset.params,false);assert.equal('sourceMode' in preset.params,false);
     for(const key of SPATIAL_KEYS) assert.ok(key in preset.params,`${preset.id} lacks ${key}`);
 }
@@ -112,3 +113,31 @@ for(let i=0;i<sceneFrames.length;i++)for(let j=i+1;j<sceneFrames.length;j++){
     assert.ok(difference.changedShapeFraction>.2,`Similar compositions: ${sceneFrames[i].id} / ${sceneFrames[j].id}: ${JSON.stringify(difference)}`);
 }
 console.log('Minimum spatial preset difference on one dark source:',minimumDifference);
+
+// Catalog removals must not invalidate saved looks; IDs and uniforms stay stable.
+assert.ok(!SPATIAL_PRESETS.some(p=>p.id==='brightness-relief'));
+assert.equal(SPATIAL_PRESETS.find(p=>p.id==='orbital-chamber').name,'Orbital Chamber');
+assert.equal(spatialParams({visualMode:'relief'}).visualMode,'relief');
+const fractalModes=['ruins','mandelbrot','mandelbulb','mandelbox'];
+const patterned=(u,v)=>[fract(u*3),fract(v*2),.7];
+function fract(n){return n-Math.floor(n);}
+for(const visualMode of fractalModes){
+    for(const detail of [2,8])for(const fractalZoom of [.5,3]){
+        const p={...defaults,visualMode,fractalDetail:detail,fractalZoom,fractalMorph:detail===2?0:1};
+        for(const t of [-127,0,48,127]){
+            const sample=createSpatialSampler(p,patterned,16/9,t);
+            for(const uv of [[0,0],[.5,.5],[1,1],[.7,.3]])assert.ok(sample(...uv).color.every(Number.isFinite),`${visualMode}: nonfinite at parameter limits`);
+        }
+    }
+    for(const key of ['fractalZoom','fractalDetail','fractalMorph']){
+        const values=key==='fractalZoom'?[.6,2]:key==='fractalDetail'?[2,8]:[0,1];
+        const samplers=values.map(value=>createSpatialSampler({...defaults,visualMode,[key]:value},patterned,16/9,2.137));
+        let changed=0;
+        for(let y=0;y<12;y++)for(let x=0;x<20;x++){
+            const uv=[(x+.5)/20,(y+.5)/12],a=samplers[0](...uv).color,b=samplers[1](...uv).color;
+            if(a.some((v,i)=>Math.abs(v-b[i])>.01))changed++;
+        }
+        assert.ok(changed>0,`${visualMode}: ${key} has no visible effect`);
+    }
+}
+console.log('Fractal parameter limits, live geometry controls and saved relief compatibility passed.');

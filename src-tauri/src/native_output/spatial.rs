@@ -86,6 +86,7 @@ impl Params {
         for i in 0..8 { data[24 + i] = (base as f32 + i as f32 + 0.5) / glyph_count.max(1) as f32; }
         data[32] = n("sceneRelief"); data[33] = 0.0; data[34] = dt as f32; data[35] = if special {1.0} else {0.0};
         data[36] = n("scenePitch").to_radians();
+        data[37] = n("fractalZoom"); data[38] = n("fractalDetail"); data[39] = n("fractalMorph");
         data
     }
 }

@@ -3470,7 +3470,7 @@ impl NativeRenderParams {
             saturation_boost: f64_param(params.saturation_boost, 1.4).clamp(0.0, 8.0),
             contrast_boost: f64_param(params.contrast_boost, 1.0).clamp(0.0, 8.0),
             brightness: f64_param(params.brightness, 1.0).clamp(0.0, 8.0),
-            bright_output: params.bright_output.unwrap_or(true),
+            bright_output: params.bright_output.unwrap_or(false),
             gamma: f64_param(params.gamma, 1.0).clamp(0.01, 8.0),
             bg_blend: f64_param(params.bg_blend, 0.0).clamp(0.0, 1.0),
             quantize_bits: u32_param(params.quantize_bits, 0).min(8),
@@ -5556,16 +5556,16 @@ mod tests {
     }
 
     #[test]
-    fn bright_output_defaults_on_and_accepts_explicit_opt_out() {
+    fn bright_output_defaults_off_and_accepts_explicit_opt_in() {
         let mut payload = base_payload();
         payload.params.bright_output = None;
-        let bright = NativeRenderParams::from_payload(&payload);
-        assert!(bright.bright_output);
-        assert_eq!(process_gpu_cell_color(16, 16, 16, &bright), (139, 139, 139));
-        payload.params.bright_output = Some(false);
         let original = NativeRenderParams::from_payload(&payload);
         assert!(!original.bright_output);
         assert_eq!(process_gpu_cell_color(16, 16, 16, &original), (16, 16, 16));
+        payload.params.bright_output = Some(true);
+        let bright = NativeRenderParams::from_payload(&payload);
+        assert!(bright.bright_output);
+        assert_eq!(process_gpu_cell_color(16, 16, 16, &bright), (139, 139, 139));
     }
 
     #[test]

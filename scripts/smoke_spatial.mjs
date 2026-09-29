@@ -33,7 +33,7 @@ try {
         const {createRenderer}=await import('/renderers/gpu/ascii/renderer/index.js');
         const a=window.ascilineRemix;await a.stop();
         const initial={...a.params},sourceCanvas=document.createElement('canvas');
-        if(initial.brightOutput!==true||!a.controlInputs.get('brightOutput')?.input.checked)throw Error('Bright output must default on');
+        if(initial.brightOutput!==false||a.controlInputs.get('brightOutput')?.input.checked)throw Error('Bright output must default off');
         sourceCanvas.width=64;sourceCanvas.height=48;
         const sourceCtx=sourceCanvas.getContext('2d'),image=sourceCtx.createImageData(64,48);
         for(let y=0;y<48;y++)for(let x=0;x<64;x++)image.data.set([x*4,y*5,(x+y)*2,255],(y*64+x)*4);
@@ -55,7 +55,7 @@ try {
             const raw=new Uint8Array(buffer.getMappedRange()),out=new Uint8Array(r.cols*r.rows*4);
             for(let y=0;y<r.rows;y++)out.set(raw.subarray(y*stride,y*stride+r.cols*4),y*r.cols*4);buffer.unmap();buffer.destroy();return out;
         };
-        for(const backend of ['webgpu','webgl2'])for(const visualMode of ['flat','city','corridor','coast','cathedral','relief','orbitals']){
+        for(const backend of ['webgpu','webgl2'])for(const visualMode of ['flat','city','corridor','coast','cathedral','relief','orbitals','ruins','mandelbrot','mandelbulb','mandelbox']){
             sourceCtx.putImageData(image,0,0);
             a.params={...initial,...SPATIAL_DEFAULTS,backend,visualMode,sceneSpeed:0,sceneFreeze:true,sceneOffset:2.137,sceneMedia:.3,sceneWet:.3,sceneRain:.2,sceneMaterialGlyphs:true,
                 cols:96,rows:54,autoRows:false,cellWidth:8,cellHeight:12,saturationBoost:1,contrastBoost:1,brightness:1,gamma:1,bgBlend:0,quantizeBits:0,
@@ -115,7 +115,7 @@ try {
                 cases.push({backend,effect:'floating-point feedback',maxTailError});
             }
             if(visualMode!=='flat') {
-                const preset=SPATIAL_PRESETS.find(p=>p.params.visualMode===visualMode);
+                const preset=SPATIAL_PRESETS.find(p=>p.params.visualMode===visualMode) || {id:'legacy-relief',params:{...a.params,sceneMedia:1}};
                 Object.assign(r,preset.params,{cols:96,rows:54,autoRows:false,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)});
                 // A canvas-backed moving source exercises normal frame uploads,
                 // not just changing a uniform or replacing a cached texture.
@@ -169,11 +169,11 @@ try {
         const edits={sceneFov:100,scenePitch:13,sceneHeight:1.45,sceneMedia:.42,sceneMediaFit:'crop',
             sceneRoute:'orbit',sceneSpeed:-.8,sceneFreeze:true,sceneMaterialGlyphs:false,
             sceneWet:.35,sceneRain:.1,sceneFog:.04,sceneLight:1.4,sceneGlow:.8,sceneRelief:3,
-            sceneSeed:31,sceneOffset:12.5,feedbackAmount:.8,feedbackHalfLife:.5,feedbackZoom:.03,feedbackRotate:.1};
+            fractalZoom:1.3,fractalDetail:4,fractalMorph:.7,sceneSeed:31,sceneOffset:12.5,feedbackAmount:.8,feedbackHalfLife:.5,feedbackZoom:.03,feedbackRotate:.1};
         let manualControlChecks=0;
         const checkbox=a.controlInputs.get('brightOutput').input;
         checkbox.checked=false;a._handleControlInput('brightOutput');
-        for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','brightness-relief','orbital-chamber','edge-etching','phosphor-echo','classic-camera-ascii']){
+        for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','orbital-chamber','ashen-ruins','fractal-dive','mandelbulb-bloom','mandelbox-passage','edge-etching','phosphor-echo','classic-camera-ascii']){
             await a.applyPreset(id,{transitionSeconds:.15});
             if(a.params.brightOutput!==false||a._nativeOutputPayload().params.brightOutput!==false)throw Error(`Bright output preference changed by ${id}`);
             if((a.staticRuntime.renderer.params?.brightOutput??a.staticRuntime.renderer.brightOutput)!==false)throw Error(`Bright output failed to reach renderer: ${id}`);
@@ -228,6 +228,11 @@ try {
         await new Promise(resolve=>setTimeout(resolve,500));
         assertControl('visualMode','coast');
         if(a.staticRuntime.source!==sourceBefore||video.paused)throw Error('Manual scene selection restarted media');
+        editControl('brightOutput',true);
+        await a.applyPreset('mandelbulb-bloom',{transitionSeconds:.15});
+        assertControl('brightOutput',true);
+        if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==true)throw Error('Explicit bright preference did not persist');
+        editControl('brightOutput',false);
         for(let i=0;i<8;i++)if(a._makeWtfTarget(.1).brightOutput!==false)throw Error('Random visuals changed bright output preference');
         a._persist();
         if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==false)throw Error('Bright output did not persist');

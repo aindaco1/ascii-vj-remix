@@ -157,7 +157,146 @@ fn sceneOrbitals(uv: vec2f) -> SceneSample {
     }
     return SceneSample(mix(sceneSky(rd), sceneMedia(uv) * 0.12, effect(1).z), effect(7).w);
 }
+// Bounded distance estimators: recursive ruins, Mandelbulb and Mandelbox.
+fn fractalBox(p: vec3f, bounds: vec3f) -> f32 {
+    let q: vec3f = abs(p) - bounds;
+    return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+fn fractalDistance(point: vec3f) -> f32 {
+    let zoom: f32 = effect(9).y;
+    let p: vec3f = point / zoom;
+    let shape: f32 = effect(9).w;
+    let detail: f32 = effect(9).z;
+    if (effect(0).x == 7.0) {
+        let cell: vec2f = floor(p.xz / 6.0);
+        let height: f32 = 1.4 + sceneHash(vec2f(cell.x, sceneMod(cell.y, 16.0))) * 2.8;
+        let q: vec3f = vec3f(sceneMod(p.x, 6.0) - 3.0, p.y - height, sceneMod(p.z, 6.0) - 3.0);
+        var distance: f32 = fractalBox(q, vec3f(2.1, height, 2.1));
+        var scale: f32 = 0.5;
+        for (var i: i32 = 0; i < 8; i = i + 1) {
+            if (f32(i) >= detail) { break; }
+            let a: vec3f = fract(q * scale * 0.5 + 0.5) * 2.0 - 1.0;
+            scale = scale * 3.0;
+            let holes: vec3f = abs(1.0 - abs(a) * 3.0);
+            let crossHole: f32 = min(max(holes.x, holes.y), min(max(holes.y, holes.z), max(holes.z, holes.x)));
+            distance = max(distance, (crossHole - (0.7 + shape * 0.5)) / scale);
+        }
+        return min(distance, p.y + 0.3) * zoom;
+    }
+    var z: vec3f = p;
+    var derivative: f32 = 1.0;
+    if (effect(0).x == 9.0) {
+        let power: f32 = 6.0 + shape * 3.0;
+        for (var i: i32 = 0; i < 8; i = i + 1) {
+            let radius: f32 = max(length(z), 0.00001);
+            if (radius > 4.0 || f32(i) >= detail) { break; }
+            let theta: f32 = acos(clamp(z.y / radius, -1.0, 1.0)) * power;
+            var phi: f32 = 0.0;
+            if (dot(z.xz, z.xz) > 0.000000000001) { phi = atan2(z.z, z.x) * power; }
+            let raised: f32 = pow(radius, power - 1.0);
+            derivative = raised * power * derivative + 1.0;
+            z = (raised * radius) * vec3f(sin(theta) * cos(phi), cos(theta), sin(theta) * sin(phi)) + p;
+        }
+        let radius: f32 = max(length(z), 0.00001);
+        return 0.5 * log(radius) * radius / derivative * zoom;
+    }
+    let scale: f32 = -1.7 - shape * 0.6;
+    for (var i: i32 = 0; i < 8; i = i + 1) {
+        if (f32(i) >= detail) { break; }
+        z = clamp(z, vec3f(-1.0), vec3f(1.0)) * 2.0 - z;
+        let fold: f32 = clamp(1.0 / max(dot(z, z), 0.0001), 1.0, 4.0);
+        z = z * fold * scale + p;
+        derivative = derivative * fold * abs(scale) + 1.0;
+    }
+    return (length(z) / derivative - 0.002) * zoom;
+}
+fn fractalTint(phase: f32) -> vec3f {
+    return 0.5 + cos(vec3f(phase) + vec3f(0.0, 2.1, 4.2)) * 0.45;
+}
+fn sceneMandelbrot(uv: vec2f) -> SceneSample {
+    let time: f32 = effect(0).z;
+    let spin: f32 = effect(9).x + choose(0.0, time * 0.07, effect(0).y == 2.0);
+    let q: vec2f = (uv * 2.0 - 1.0) * vec2f(1.0, 1.0 / effect(4).y);
+    let rotated: vec2f = vec2f(q.x * cos(spin) - q.y * sin(spin), q.x * sin(spin) + q.y * cos(spin));
+    // A bounded zoom cycle stays within reliable float32 precision.
+    let scale: f32 = 1.65 * exp(-2.8 * (0.5 - 0.5 * cos(time * 0.13))) / effect(9).y;
+    let media: vec3f = sceneMapped(uv, effect(4).y);
+    let c: vec2f = vec2f(-0.7435, 0.1314 + (effect(1).y - 1.25) * 0.1) + rotated * scale * tan(effect(1).x * 0.5) + (media.rg - 0.5) * (effect(1).z * effect(9).w * 0.035 * scale);
+    var z: vec2f = vec2f(0.0);
+    var count: f32 = 0.0;
+    var escaped: bool = false;
+    for (var i: i32 = 0; i < 128; i = i + 1) {
+        if (f32(i) >= effect(9).z * 16.0) { break; }
+        z = vec2f(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+        count = f32(i);
+        if (dot(z, z) > 64.0) { escaped = true; break; }
+    }
+    if (escaped) { count = count + 1.0 - log(log(length(z))) / log(2.0); }
+    let bands: f32 = 0.7 + 0.3 * cos(count * 0.2);
+    let tint: vec3f = fractalTint(count * 0.12 + time * 0.16 + effect(0).w * 0.1) * bands;
+    // Fade slow-escaping boundary orbits into the interior instead of amplifying
+    // float32-sensitive iteration differences into bright flickering specks.
+    let fade: f32 = exp(-max(count, 0.0) * 0.035);
+    let light: f32 = choose(0.18, 0.18 + (0.37 + bands * 0.65) * fade, escaped);
+    var base: vec3f = vec3f(0.018,0.025,0.05);
+    if (escaped) { base = mix(base, tint, fade); }
+    let color: vec3f = mix(base, media * light, effect(1).z) * effect(2).y;
+    return SceneSample(color, effect(7).y);
+}
+fn sceneFractal(uv: vec2f) -> SceneSample {
+    let time: f32 = effect(0).z;
+    let ruins: bool = effect(0).x == 7.0;
+    let plane: f32 = tan(effect(1).x * 0.5);
+    let q: vec2f = (uv * 2.0 - 1.0) * vec2f(plane, -plane / effect(4).y);
+    let angle: f32 = choose(sin(time * 0.17) * 0.35, time * 0.18, effect(0).y == 2.0);
+    let radius: f32 = choose(3.1, 4.6 + sin(time * 0.12) * 0.6, effect(0).x == 10.0);
+    var ro: vec3f = vec3f(sin(angle) * radius, effect(1).y - 1.25, -cos(angle) * radius);
+    var yaw: f32 = -angle;
+    if (ruins) {
+        ro = vec3f(sin(time * 0.12) * 0.35, effect(1).y, sceneMod(time, 96.0) + 0.5);
+        yaw = choose(0.0, sin(time * 0.13) * 0.3, effect(0).y == 1.0) + choose(0.0, time * 0.18, effect(0).y == 2.0);
+    }
+    let rd: vec3f = normalize(sceneRay(q, yaw, effect(9).x));
+    var sky: vec3f = vec3f(0.018,0.035,0.065);
+    if (ruins) { sky = vec3f(0.78,0.82,0.84); }
+    let backdrop: SceneSample = SceneSample(mix(sky, sceneMapped(uv, effect(4).y) * choose(0.16, 0.85, ruins), effect(1).z * 0.65), effect(7).w);
+    var distance: f32 = 0.0;
+    var farLimit: f32 = 32.0;
+    if (effect(0).x == 9.0) {
+        // The bulb is contained within radius two. Skip empty space exactly;
+        // keep the estimator, cell density and iteration quality unchanged.
+        let b: f32 = dot(ro, rd);
+        let discriminant: f32 = b * b - dot(ro, ro) + 4.0 * effect(9).y * effect(9).y;
+        if (discriminant < 0.0) { return backdrop; }
+        let span: f32 = sqrt(discriminant);
+        distance = max(0.0, -b - span);
+        farLimit = min(farLimit, -b + span);
+        if (farLimit < distance) { return backdrop; }
+    }
+    for (var i: i32 = 0; i < 64; i = i + 1) {
+        let point: vec3f = ro + rd * distance;
+        let d: f32 = fractalDistance(point);
+        if (d < 0.012 + distance * 0.001) {
+            let gradient: vec3f = vec3f(
+                fractalDistance(point + vec3f(0.02,0.0,0.0)) - fractalDistance(point - vec3f(0.02,0.0,0.0)),
+                fractalDistance(point + vec3f(0.0,0.02,0.0)) - fractalDistance(point - vec3f(0.0,0.02,0.0)),
+                fractalDistance(point + vec3f(0.0,0.0,0.02)) - fractalDistance(point - vec3f(0.0,0.0,0.02)));
+            let n: vec3f = gradient / max(length(gradient), 0.00001);
+            let light: f32 = (0.18 + max(dot(n, normalize(vec3f(-0.5,0.8,-0.6))), 0.0) * 1.4) / (1.0 + f32(i) * 0.045) * effect(2).y;
+            var tint: vec3f = fractalTint(length(point) * 2.2 + n.y * 3.0 + time * 0.12 + effect(0).w * 0.1);
+            if (ruins) { tint = vec3f(0.68,0.72,0.73); }
+            let media: vec3f = sceneMapped(vec2f(point.x, -point.y) * 0.2 + vec2f(0.5,0.6), 1.0);
+            let color: vec3f = mix(tint * light, media * (0.12 + light), effect(1).z);
+            return SceneSample(mix(color, sky, 1.0 - exp(-distance * effect(2).x)), effect(7).y);
+        }
+        distance = distance + max(0.004, d * 0.75);
+        if (distance > farLimit) { break; }
+    }
+    return backdrop;
+}
 fn sceneSample(uv: vec2f) -> SceneSample {
+    if (effect(0).x == 8.0) { return sceneMandelbrot(uv); }
+    if (effect(0).x >= 7.0) { return sceneFractal(uv); }
     if (effect(0).x == 6.0) { return sceneOrbitals(uv); }
     let time: f32 = effect(0).z;
     let route: f32 = effect(0).y;

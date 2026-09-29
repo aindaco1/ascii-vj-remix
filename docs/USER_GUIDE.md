@@ -57,11 +57,11 @@ Start with the [install guide](../README.md#install-guide) and
 - The renderer exposes live controls for grid, cell size, color, gamma,
   brightness, contrast, saturation, background blend, quantization, jitter,
   sample position, smoothing, FPS, glyph/cell behavior, and performance status.
-- **Color → Bright output** is on by default. It strongly lifts dark colors
+- **Color → Bright output** is off by default. Enable it to lift dark footage; existing saved choices are retained. It strongly lifts dark colors
   before glyph selection, so low-light camera,
   image and video inputs produce brighter colors and denser glyphs. Your choice
-  persists across launches, preset switches, playlists and WTF mode. Turn it
-  off for the previous color response; the Brightness and Gamma sliders still
+  persists across launches, preset switches, playlists and WTF mode. Leave it
+  off for the original color response; the Brightness and Gamma sliders still
   work. Pure black stays black. With a palette, the mapped colors are lifted
   while its lookup and cycling ranges stay intact; fixed glyph colors keep
   their chosen color.
@@ -497,7 +497,7 @@ control is unavailable; see the [Changelog](../CHANGELOG.md) for that fix.
 
 ## Spatial visuals and trails (1.1.0)
 
-In **Space / Motion**, choose **Visual mode**, or search for one of the eight
+In **Space / Motion**, choose **Visual mode**, or search for one of the eleven
 new presets. The release is currently a local development build for manual
 acceptance; public installers have not been replaced.
 
@@ -507,8 +507,11 @@ acceptance; public installers have not been replaced.
 | Media Corridor | Narrow, symmetric screen tunnel, wide lens and block glyphs |
 | Wet Coast | Slow, low waterfront view, open water, short shoreline buildings and Braille texture |
 | Neon Cathedral | Upward-looking nave with tall columns, a pitched roof and fine glyphs |
-| Brightness Relief · Experimental | Overhead solid-cell terrain; media controls block height and color without city streets |
-| Orbital Chamber · Experimental | Camera orbits a media-colored sphere and rotating tilted ring |
+| Orbital Chamber | Camera orbits a media-colored sphere and rotating tilted ring |
+| Ashen Ruins | Monochrome recursive architecture, open passages and pale distance fog |
+| Fractal Dive | A rotating Mandelbrot zoom with source-driven color and contour distortion |
+| Mandelbulb Bloom | An orbiting organic fractal with Braille surface texture |
+| Mandelbox Passage | Recursive cube forms and changing views through folded architecture |
 | Edge Etching | Directional line glyphs on strong image edges |
 | Phosphor Echo | Decaying trails with gentle zoom and rotation |
 
@@ -519,15 +522,17 @@ the camera clock and offset to their origin and clears stored trails. Forward
 travel wraps through a repeating world; Street weave moves within the clear
 road, and Look around / orbit rotates the travelling view or circles the orbital objects.
 **Camera tilt** looks up or down; Relief uses an elevated camera above its terrain. These are constrained
-2.5D routes, not a free-flying camera or an editable world.
+camera routes, not free flight or an editable world.
 
 **Media amount** blends the selected source into surfaces. Spatial presets now
-start at 85–100% so your input drives their appearance. Zero uses procedural
+start at 80–95% so your input drives their appearance. Zero uses procedural
 materials. Wall images occupy larger 8×4-unit panels; roofs and ceilings also
 use the source, and Orbital Chamber includes it behind the foreground shapes. **Surface framing** controls repeat, fit or crop within surface
 tiles. The existing source picker, camera mirroring and playback controls still
 own media. Previously saved/custom settings keep their values; reselect a
 spatial preset to load its stronger media defaults. Changing a visual preset does not select a new source or restart it.
+
+**Fractal zoom**, **Fractal detail** and **Fractal shape** appear for the four new fractal modes. Zoom changes scale; Detail changes the bounded iteration count; Shape changes carving, bulb power, box folding or media-driven contour distortion. Travel speed, freeze, camera controls and media blending remain live and editable after selecting a preset. Ashen Ruins, Fractal Dive and Mandelbox Passage start with solid cells to expose fine structure; turn Glyph mode on and Solid mode off for ASCII texture. The removed Brightness Relief preset remains available as a visual mode for existing custom looks.
 
 **Material glyphs** distinguishes surfaces, water, windows and sky. It reserves
 eight of the 96 glyph slots. As Media amount rises, its glyph override fades

@@ -323,7 +323,7 @@ const DEFAULT_PARAMS = {
     muted: true,
     volume: 1,
     ...CLASSIC_CAMERA_ASCII_PARAMS,
-    brightOutput: true,
+    brightOutput: false,
     // The clean-profile look is Classic Camera ASCII, but renderer selection
     // remains a global capability decision. Individual presets can still opt
     // into a specific compatibility backend.

@@ -370,7 +370,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 59 accelerated and 28
+route and requires the Windows preset matrix to preserve 62 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -716,7 +716,7 @@ Palettes contain immutable base colors and non-overlapping inclusive ranges.
 The source-to-index LUT always uses base colors; a separate RGBA display table
 animates their RGB entries. Alpha stores base luminance so cycling never changes
 the glyph mask. Off is the compatibility default. The catalog has 21 palettes
-and the preset contract is 87 total, 59 accelerated, 28 explicit Canvas.
+and the preset contract is 90 total, 62 accelerated, 28 explicit Canvas.
 
 `palette-cycling.js` owns range validation, signed modulo, classic/blended lookup,
 amount and the integrated speed transport. `cell-color.wgsl.js` supplies common
@@ -761,12 +761,16 @@ four world-space sheets clipped against opaque depth. Orbitals uses at most 48
 sphere-tracing steps. Relief reads source luminance as block height. Surface framing accounts for
 the physical tile aspect (2:1 on walls, square on horizontal surfaces). Larger
 wall panels, roof/ceiling sampling and the orbital backdrop preserve visible
-source structure; current spatial presets blend in 85–100% source media.
+source structure; current spatial presets blend in 80–95% source media.
 Camera-plane rays include pitch. Corridor uses a narrow, low tunnel; Cathedral
 intersects a two-plane pitched roof; Coast keeps low shoreline blocks and no
 road markings. Relief samples one source-aligned height/color field without
 roads, from an elevated camera. Orbitals rotates its camera and tilts its ring.
-The spatial uniform block is ten vec4s (160 bytes), including camera pitch.
+The spatial uniform block is ten vec4s (160 bytes), including camera pitch and fractal zoom/detail/shape in the final vec4.
+
+Recursive ruins, Mandelbulb and Mandelbox share a 64-step, 32-unit sphere tracer with up to eight estimator iterations. The Mandelbulb first intersects its
+containing sphere to skip empty rays and travel; its shared radial power is
+computed once per estimator iteration. Mandelbrot uses at most 128 iterations, smooth escape color and a bounded zoom cycle that stays within useful float32 precision. Slow-escaping boundary color fades into the interior to reduce numerical shimmer. Ruins use a periodic box field with recursive cross-shaped cuts; the bulb uses spherical power iteration, and the box uses box/sphere folds. Source media controls surface color, glyph luminance and Mandelbrot contour distortion. No external code or runtime assets are fetched.
 
 Scene RGB enters the existing color/palette/dither stage. The cell alpha channel
 still addresses a glyph; it does not carry depth. Optional material/edge glyphs
@@ -776,7 +780,7 @@ luminance for glyph choice. Edge direction uses source
 luminance gradients and the previous glyph near a threshold. Flat
 processing retains its 8-bit cell texture. Bright output is a global persisted
 preference, excluded from presets and preserved by preset/WTF changes. It
-starts on, with an explicit off path retaining the previous color response.
+starts off; opting in enables the lift. Existing saved preferences are retained.
 With source colors, after saturation and before contrast/gamma, luminance L is raised to L^0.22;
 RGB is scaled to that luminance, then chroma is compressed toward it only when
 needed to fit the RGB gamut. This keeps hue and black/white endpoints while

@@ -7,6 +7,7 @@ export function spatialGLSL() {
         .replace(/struct (\w+)\s*\{([^}]+)\};/g, (_, name, fields) => `struct ${name} {${fields.replace(/(\w+):\s*(\w+),/g, '$2 $1;')}};`)
         .replace(/fn (\w+)\(([^)]*)\) -> (\w+)\s*\{/g, (_, name, args, type) => `${type} ${name}(${args.replace(/(\w+):\s*(\w+)/g, '$2 $1')}) {`)
         .replace(/\b(?:let|var) (\w+):\s*(\w+)/g, '$2 $1')
+        .replace(/\batan2\(/g, 'atan(')
         .replace(/\bf32\b/g, 'float').replace(/\bi32\b/g, 'int')
         .replace(/\bvec([234])f\b/g, 'vec$1');
 }

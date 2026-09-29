@@ -61,7 +61,7 @@ export function fillSpatialUniforms(out, p, cols, rows, baseLength, state, now =
         p.feedbackRotate * dt, valid ? 1 : 0, base, total,
         ...Array.from({length:8}, (_, i) => (base + i + 0.5) / Math.max(1, total)),
         p.sceneRelief, 0, dt, special ? 1 : 0,
-        p.scenePitch * Math.PI / 180, 0, 0, 0
+        p.scenePitch * Math.PI / 180, p.fractalZoom, p.fractalDetail, p.fractalMorph
     ]);
     return out;
 }

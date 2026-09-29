@@ -7,10 +7,13 @@ authorized by this record. Version 1.1.0 is synchronized across npm and Tauri.
 
 ## Scope
 
-The candidate adds eight source-preserving looks: Neon Night Drive, Media
-Corridor, Wet Coast, Neon Cathedral, Brightness Relief, Orbital Chamber, Edge
-Etching and Phosphor Echo. Relief and orbitals are explicitly experimental.
-The preset contract is 87 total: 59 accelerated and 28 explicit Canvas.
+The candidate adds eleven source-preserving looks: Neon Night Drive, Media
+Corridor, Wet Coast, Neon Cathedral, Orbital Chamber, Ashen Ruins, Fractal Dive,
+Mandelbulb Bloom, Mandelbox Passage, Edge Etching and Phosphor Echo. Brightness
+Relief has been removed from the built-in preset catalog; its mode remains
+compatible with existing saved looks. Orbital Chamber no longer carries an
+Experimental label. The preset contract is 90 total: 62 accelerated and 28
+explicit Canvas.
 
 | Recommendation | Implemented behavior |
 | --- | --- |
@@ -33,7 +36,30 @@ bounds. WebGPU and native wgpu share the scene WGSL; WebGL2 uses a bounded
 syntax conversion tested through real shader execution. Canvas supplies the
 software reference under its existing density limits. Runtime remains offline.
 
-## Source visibility correction
+## Fractal follow-up and current defaults
+
+Bright Output now starts **off**. An existing saved choice is retained, and
+presets never overwrite this global preference. All four new scenes work with
+it off and keep the selected input, live controls, transport and native output.
+
+- **Ashen Ruins** takes its pale atmosphere and carved architecture from
+  [Remnants by Alcatraz](https://www.pouet.net/prod.php?which=96536).
+- **Fractal Dive**, **Mandelbulb Bloom** and **Mandelbox Passage** are inspired by
+  the animated Mandelbrot, bulb and box views on [Wasting My Time](https://wastingmytime.net/),
+  also described in the [linked article](https://boingboing.net/2026/09/28/full-screen-animated-mandelbrot-fractals-on-the-web.html).
+
+These are original scene implementations of standard fractal mathematics;
+reference source code, artwork, audio and runtime assets were not imported.
+Zoom, detail and shape use the existing canonical parameter contract and the
+last three slots in the unchanged 160-byte spatial uniform block. The three
+3D modes reuse one bounded marcher and source/shading path. Mandelbrot zoom
+is bounded for float32 stability; it is not an arbitrary-precision explorer.
+Ashen Ruins, Fractal Dive and Mandelbox Passage use solid cells to reveal their
+structure. Glyph controls remain available. Mandelbulb Bloom uses Braille.
+
+![New fractal presets with the bundled demo source and Bright Output off](evidence/1.1.0-fractal-presets.png)
+
+## Earlier source visibility correction
 
 Manual feedback identified that the first candidate's city/coast/cathedral
 looks defaulted to procedural materials, while material glyphs could conceal
@@ -54,9 +80,10 @@ recognizable camera/video content by eye.
 
 ![Earlier source-visibility comparison, before the brightness and composition revision](evidence/1.1.0-source-response.png)
 
-## Bright output and preset differentiation
+## Earlier brightness and composition review
 
-The global **Color → Bright output** toggle is on by default, persists across
+This earlier review used Bright Output on by default; the current default is
+off as described above. The global **Color → Bright output** toggle persists across
 launches and remains unchanged by presets, playlists and WTF. It lifts
 luminance before glyph selection, with hue-preserving gamut compression.
 Source colors are lifted before contrast; palettes retain their lookup and
@@ -92,7 +119,8 @@ acceptance.
   research proposal remains a measured optimization opportunity. This candidate
   uses the simpler common shader to preserve roofs and variable-height
   visibility across backends; it does not claim that optimization is complete.
-- Worlds are bounded, periodic 2.5D compositions. There are no bridges,
+- Architectural worlds are bounded, periodic 2.5D compositions; fractal scenes
+  use bounded mathematical surfaces. There are no bridges,
   overlapping rooms, free flight, world editor or per-surface media files.
 - The light/contact/glow terms are artistic approximations. Rain uses sheets,
   not a particle simulation. The map is generated analytically from its seed.
@@ -104,7 +132,49 @@ acceptance.
 - Older WebGL2 devices without float render attachments use byte history with
   an extra decay correction. This prevents stuck trails but changes their fade.
 
-## Local validation
+## Fractal follow-up validation
+
+The desktop/offline/static `npm test` suite passed, including the 90-preset
+browser matrix and the synthetic Jev check. Following the final Mandelbulb
+optimization, the focused spatial checks, Rust suite (**81/81**), shared shader
+validation and optimized native WebView sweep were repeated successfully:
+**90/90**, with **62 WebGPU / 28 Canvas**, no ownership fallbacks or failures.
+
+The real WebGPU/WebGL2 readback test now covers flat media plus ten scene modes
+(including saved relief compatibility), with 26 geometry/brightness/feedback
+cases. Maximum mean RGB error was 1.29/255; the existing 2/255 mean and 2% channel-error
+thresholds were retained. All four new presets change roughly 45–51% of cells
+when equal-histogram source shapes change. The test also covers 216 live control
+edits, edits during preset/MIDI transitions, both saved brightness preferences,
+native payload propagation and uninterrupted video playback. Parameter-limit
+fixtures cover finite fractal output and effective zoom/detail/shape controls.
+On one common dark source, every pair of current spatial presets differs in
+at least 42% of cells before glyph style and density differences.
+
+An initial 240-column Mandelbulb run missed the native source-feed budget
+(18 FPS for a 24 FPS clip). The final implementation intersects a containing
+sphere before marching and reuses radial-power evaluation. The repeat passed
+without changing density, iteration limits or performance gates. Centered
+surface normals and smooth boundary color also resolved CPU/GPU shading
+mismatches and reduced numerical sparkle.
+
+Both native runs used the bundled 30-second video, synthetic audio and one
+physical display on Apple M1 Max / 64 GB:
+
+| Workload | Preview average / P95 | Native presentation | Native source feed |
+| --- | --- | --- | --- |
+| Existing city, 640 columns, Bright Output on, wet reflections/rain | 38.3 FPS / 31.53 ms | 60.0 FPS | 23.8 FPS |
+| Mandelbulb, 240 columns, Bright Output off, detail 5 | 39.1 FPS / 28.75 ms | 57.8 FPS | 23.6 FPS |
+
+Both passed with zero GPU or native-transition failures. These are measured
+local workloads, not a guarantee for maximum fractal detail/density, reference-floor
+hardware or other platforms. The installed Dev app was reopened; Ashen Ruins,
+its three fractal controls, Bright Output off, the 90-preset catalog and the
+unqualified Orbital Chamber label were observed in the native UI. Owner review
+of camera/video, external-display alignment and physical audio/MIDI remains
+pending. No publication or deployment was performed.
+
+## Earlier local validation (before fractal follow-up)
 
 A follow-up interaction check reproduced a manual-control race: changing Field
 of view during a numeric preset transition was overwritten by the next tween
@@ -195,13 +265,13 @@ Before publication, the owner should review:
 
 - Bright output off/on on dark camera, image and video inputs; verify its saved
   preference and compare native Pop Out with the main preview.
-- The eight new presets on a selected video and camera, including close walls,
+- The eleven new presets on a selected video and camera, including close walls,
   height changes, reverse travel, pause/reset, and transitions back to old looks.
 - Pop Out alignment, external-display fullscreen, reopen/resize and the chosen
   density; compare preview/output motion and source framing by eye.
 - Physical audio and UC-33e/mioXC response, saved presets and playlist use.
-- Low-light trail decay, material/edge glyph legibility, and the experimental
-  relief/orbital compositions on representative footage.
+- Low-light trail decay, material/edge glyph legibility, and fractal zoom/detail/shape
+  edits after a preset transition on representative footage.
 
 Public signing/notarization, Windows/Linux packages, updater installation and
 physical reference-floor acceptance remain separate release gates. This record

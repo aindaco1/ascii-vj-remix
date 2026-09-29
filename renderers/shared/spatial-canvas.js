@@ -88,8 +88,89 @@ export function createSpatialSampler(p, sample, aspect, time) {
         const angle=.65+t*.7,ty=point[1]*Math.cos(angle)-point[2]*Math.sin(angle),tz=point[1]*Math.sin(angle)+point[2]*Math.cos(angle);
         return Math.min(Math.hypot(...point.map((n,i)=>n-center[i]))-.95,Math.hypot(Math.hypot(point[0],tz)-1.65,ty)-.22);
     };
+    // CPU reference mirrors the shared GPU estimators and their iteration bounds.
+    const fractalDistance=point=>{
+        const q=mul(point,1/p.fractalZoom),shape=p.fractalMorph,detail=p.fractalDetail;
+        if(mode==='ruins'){
+            const height=1.4+hash(Math.floor(q[0]/6),mod(Math.floor(q[2]/6),16))*2.8;
+            const cell=[mod(q[0],6)-3,q[1]-height,mod(q[2],6)-3];
+            const box=cell.map((v,i)=>Math.abs(v)-[2.1,height,2.1][i]);
+            let distance=Math.hypot(...box.map(v=>Math.max(v,0)))+Math.min(Math.max(...box),0),scale=.5;
+            for(let i=0;i<8&&i<detail;i++){
+                const holes=cell.map(v=>Math.abs(1-Math.abs(fract(v*scale*.5+.5)*2-1)*3));scale*=3;
+                const cross=Math.min(Math.max(holes[0],holes[1]),Math.max(holes[1],holes[2]),Math.max(holes[2],holes[0]));
+                distance=Math.max(distance,(cross-(.7+shape*.5))/scale);
+            }
+            return Math.min(distance,q[1]+.3)*p.fractalZoom;
+        }
+        let z=q,derivative=1;
+        if(mode==='mandelbulb'){
+            const power=6+shape*3;
+            for(let i=0;i<8&&i<detail;i++){
+                const radius=Math.max(Math.hypot(...z),.00001);if(radius>4)break;
+                const theta=Math.acos(clamp(z[1]/radius,-1,1))*power,phi=z[0]*z[0]+z[2]*z[2]>1e-12?Math.atan2(z[2],z[0])*power:0;
+                const raised=radius**(power-1);derivative=raised*power*derivative+1;
+                z=add(mul([Math.sin(theta)*Math.cos(phi),Math.cos(theta),Math.sin(theta)*Math.sin(phi)],raised*radius),q);
+            }
+            const radius=Math.max(Math.hypot(...z),.00001);
+            return .5*Math.log(radius)*radius/derivative*p.fractalZoom;
+        }
+        const scale=-1.7-shape*.6;
+        for(let i=0;i<8&&i<detail;i++){
+            z=z.map(v=>clamp(v,-1,1)*2-v);
+            const fold=clamp(1/Math.max(dot(z,z),.0001),1,4);
+            z=add(mul(z,fold*scale),q);derivative=derivative*fold*Math.abs(scale)+1;
+        }
+        return (Math.hypot(...z)/derivative-.002)*p.fractalZoom;
+    };
+    const fractalTint=phase=>[0,2.1,4.2].map(offset=>.5+Math.cos(phase+offset)*.45);
+    const mandelbrot=(u,v)=>{
+        const spin=p.scenePitch*Math.PI/180+(p.sceneRoute==='orbit'?time*.07:0),q=[u*2-1,(v*2-1)/aspect];
+        const rotated=[q[0]*Math.cos(spin)-q[1]*Math.sin(spin),q[0]*Math.sin(spin)+q[1]*Math.cos(spin)];
+        const scale=1.65*Math.exp(-2.8*(.5-.5*Math.cos(time*.13)))/p.fractalZoom,media=mapped(u,v,aspect);
+        const c=add(add([-.7435,.1314+(p.sceneHeight-1.25)*.1],mul(rotated,scale*Math.tan(p.sceneFov*Math.PI/360))),mul(media.slice(0,2).map(v=>v-.5),p.sceneMedia*p.fractalMorph*.035*scale));
+        let z=[0,0],count=0,escaped=false;
+        for(let i=0;i<128&&i<p.fractalDetail*16;i++){
+            z=add([z[0]*z[0]-z[1]*z[1],2*z[0]*z[1]],c);count=i;
+            if(dot(z,z)>64){escaped=true;break;}
+        }
+        if(escaped)count=count+1-Math.log(Math.log(Math.hypot(...z)))/Math.log(2);
+        const bands=.7+.3*Math.cos(count*.2),tint=mul(fractalTint(count*.12+time*.16+p.sceneSeed*.1),bands);
+        const fade=Math.exp(-Math.max(count,0)*.035),base=[.018,.025,.05];
+        return {color:mul(mix(escaped?mix(base,tint,fade):base,mul(media,escaped?.18+(.37+bands*.65)*fade:.18),p.sceneMedia),p.sceneLight),glyph:5};
+    };
+    const fractal=(u,v)=>{
+        const ruins=mode==='ruins',plane=Math.tan(p.sceneFov*Math.PI/360);
+        const angle=p.sceneRoute==='orbit'?time*.18:Math.sin(time*.17)*.35,radius=mode==='mandelbox'?4.6+Math.sin(time*.12)*.6:3.1;
+        let ro=[Math.sin(angle)*radius,p.sceneHeight-1.25,-Math.cos(angle)*radius],yaw=-angle;
+        if(ruins){ro=[Math.sin(time*.12)*.35,p.sceneHeight,mod(time,96)+.5];yaw=(p.sceneRoute==='weave'?Math.sin(time*.13)*.3:0)+(p.sceneRoute==='orbit'?time*.18:0);}
+        const rd=normal(sceneRay((u*2-1)*plane,(1-v*2)*plane/aspect,yaw,p.scenePitch*Math.PI/180));
+        const sky=ruins?[.78,.82,.84]:[.018,.035,.065];
+        const backdrop={color:mix(sky,mul(mapped(u,v,aspect),ruins?.85:.16),p.sceneMedia*.65),glyph:7};
+        let distance=0,farLimit=32;
+        if(mode==='mandelbulb'){
+            const b=dot(ro,rd),discriminant=b*b-dot(ro,ro)+4*p.fractalZoom*p.fractalZoom;
+            if(discriminant<0)return backdrop;
+            const span=Math.sqrt(discriminant);distance=Math.max(0,-b-span);farLimit=Math.min(farLimit,-b+span);
+            if(farLimit<distance)return backdrop;
+        }
+        for(let i=0;i<64;i++){
+            const point=add(ro,mul(rd,distance)),d=fractalDistance(point);
+            if(d<.012+distance*.001){
+                const n=normal([0,1,2].map(axis=>fractalDistance(point.map((v,j)=>v+(axis===j?.02:0)))-fractalDistance(point.map((v,j)=>v-(axis===j?.02:0)))));
+                const light=(.18+Math.max(dot(n,normal([-.5,.8,-.6])),0)*1.4)/(1+i*.045)*p.sceneLight;
+                const tint=ruins?[.68,.72,.73]:fractalTint(Math.hypot(...point)*2.2+n[1]*3+time*.12+p.sceneSeed*.1);
+                const media=mapped(point[0]*.2+.5,-point[1]*.2+.6);
+                return {color:mix(mix(mul(tint,light),mul(media,.12+light),p.sceneMedia),sky,1-Math.exp(-distance*p.sceneFog)),glyph:5};
+            }
+            distance+=Math.max(.004,d*.75);if(distance>farLimit)break;
+        }
+        return backdrop;
+    };
     const pitch=(p.scenePitch||0)*Math.PI/180;
     return (u,v)=>{
+        if(mode==='mandelbrot')return mandelbrot(u,v);
+        if(['ruins','mandelbulb','mandelbox'].includes(mode))return fractal(u,v);
         if(mode==='orbitals'){
             const plane=Math.tan(p.sceneFov*Math.PI/360);
             const orbit=p.sceneRoute==='orbit'?time*.25:p.sceneRoute==='weave'?Math.sin(time*.22)*.35:0;
