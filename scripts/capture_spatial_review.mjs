@@ -1,4 +1,5 @@
-// Reproducible visual review of actual WebGL output; --fractals selects the new scenes.
+// Reproducible WebGL review. --fractals selects the new looks;
+// --flat-presets captures their built-in defaults instead of manually enabled scenes.
 // Run with an output PNG path; no user media or native profile is read.
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
@@ -17,7 +18,7 @@ try {
     await page.addInitScript(() => localStorage.setItem('asciline-remix-state-v1', JSON.stringify({ backend: 'webgl2' })));
     await page.goto('http://127.0.0.1:4177');
     await page.waitForFunction(() => window.ascilineRemix?.running);
-    const results = await page.evaluate(async (fractals) => {
+    const results = await page.evaluate(async ({fractals,flat}) => {
         const { SPATIAL_PRESETS } = await import('/renderers/shared/spatial-presets.js');
         const { createRenderer } = await import('/renderers/gpu/ascii/renderer/index.js');
         const { createCycleTransport } = await import('/renderers/shared/palette-cycling.js');
@@ -30,7 +31,7 @@ try {
           figcaption{padding:10px 12px;font-size:15px}figure img{width:100%;aspect-ratio:16/9;object-fit:contain;display:block}
           .stage{position:fixed;left:-3000px;top:0;width:1280px;height:720px}
         </style>`);
-        document.body.innerHTML = `<h1>${fractals?'Fractal scenes · Bright Output off':'Bright Output + spatial scenes'}</h1><p>The same source in every view. Actual renderer output with each preset’s own composition, frozen for comparison. No audio modulation.</p><main id="review"></main>`;
+        document.body.innerHTML = `<h1>${flat?'Built-in looks · Flat Media':fractals?'Manual fractal views · Bright Output off':'Bright Output + manual spatial views'}</h1><p>The same source in every view. Actual renderer output${flat?' with built-in defaults':' with spatial modes manually enabled'}, frozen for comparison. No audio modulation.</p><main id="review"></main>`;
         const gallery = document.querySelector('#review');
         const add = (name, url) => {
             const figure = document.createElement('figure');
@@ -46,11 +47,11 @@ try {
         ctx.putImageData(pixels,0,0);
         add(fractals?'Input · Demo image':'Input · 7.5% source brightness',canvas.toDataURL());
         const source = {element:canvas,canvas,isImage:true,isVideo:false,width:640,height:360,ready:true,type:'image',destroy(){},updateParams(){}};
-        const scenes = SPATIAL_PRESETS.filter(p=>fractals?['ruins','mandelbrot','mandelbulb','mandelbox'].includes(p.params.visualMode):p.params.visualMode!=='flat');
+        const scenes = SPATIAL_PRESETS.filter(p=>fractals?['ruins','mandelbrot','mandelbulb','mandelbox'].includes(p.sceneMode):p.sceneMode!=='flat');
         const views = [
             {name:'Classic Camera ASCII · Bright output OFF', params:{...app._allPresets().find(p=>p.id==='classic-camera-ascii').params,brightOutput:false}},
             ...(!fractals?[{name:'Classic Camera ASCII · Bright output ON', params:{...app._allPresets().find(p=>p.id==='classic-camera-ascii').params,brightOutput:true}}]:[]),
-            ...scenes.map(p=>({...p,params:{...p.params,brightOutput:!fractals}}))
+            ...scenes.map(p=>({...p,params:{...p.params,visualMode:flat?'flat':p.sceneMode,brightOutput:!fractals}}))
         ];
         const results=[];
         for(const view of views){
@@ -74,7 +75,7 @@ try {
         }
         await Promise.all([...gallery.querySelectorAll('img')].map(img=>img.decode()));
         return results;
-    }, process.argv.includes('--fractals'));
+    }, {fractals:process.argv.includes('--fractals'),flat:process.argv.includes('--flat-presets')});
     assert.deepEqual(errors, []);
     await page.screenshot({ path: process.argv[2] || '/tmp/ascii-bright-spatial-review.png', fullPage: true });
     console.log(JSON.stringify(results,null,2));

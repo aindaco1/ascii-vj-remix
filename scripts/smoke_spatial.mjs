@@ -24,8 +24,11 @@ try {
     await page.bringToFront();
     await page.goto(url);await page.waitForFunction(()=>window.ascilineRemix?.running);
     const result=await page.evaluate(async()=>{
-        const {SPATIAL_DEFAULTS}=await import('/renderers/shared/spatial.js');
+        const {SPATIAL_DEFAULTS,SPATIAL_CONTRACT}=await import('/renderers/shared/spatial.js');
         const {SPATIAL_PRESETS}=await import('/renderers/shared/spatial-presets.js');
+        const scenePresets=SPATIAL_PRESETS.filter(p=>p.sceneMode!=='flat')
+            .map(p=>({...p,params:{...p.params,visualMode:p.sceneMode}}));
+        if(scenePresets.length!==9)throw Error('Manual spatial scene coverage is incomplete');
         const {spatialMediaFixture,spatialMediaDifference}=await import('/tests/fixtures/spatial-media.js');
         const {createCycleTransport,cycleNowMs}=await import('/renderers/shared/palette-cycling.js');
         const {renderSpatialCells}=await import('/renderers/shared/spatial-canvas.js');
@@ -115,7 +118,7 @@ try {
                 cases.push({backend,effect:'floating-point feedback',maxTailError});
             }
             if(visualMode!=='flat') {
-                const preset=SPATIAL_PRESETS.find(p=>p.params.visualMode===visualMode) || {id:'legacy-relief',params:{...a.params,sceneMedia:1}};
+                const preset=scenePresets.find(p=>p.params.visualMode===visualMode) || {id:'legacy-relief',params:{...a.params,sceneMedia:1}};
                 Object.assign(r,preset.params,{cols:96,rows:54,autoRows:false,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)});
                 // A canvas-backed moving source exercises normal frame uploads,
                 // not just changing a uniform or replacing a cached texture.
@@ -166,6 +169,15 @@ try {
                 if(params[key]!==value)throw Error(`${owner} lost manual ${key}: ${params[key]} != ${value}`);
             }
         };
+        const waitForScene=async visualMode=>{
+            const deadline=performance.now()+5000;
+            while(performance.now()<deadline){
+                const renderer=a.staticRuntime.renderer;
+                if(a.running&&!a.starting&&(renderer?.params||renderer)?.visualMode===visualMode)break;
+                await new Promise(resolve=>setTimeout(resolve,20));
+            }
+            assertControl('visualMode',visualMode);
+        };
         const edits={sceneFov:100,scenePitch:13,sceneHeight:1.45,sceneMedia:.42,sceneMediaFit:'crop',
             sceneRoute:'orbit',sceneSpeed:-.8,sceneFreeze:true,sceneMaterialGlyphs:false,
             sceneWet:.35,sceneRain:.1,sceneFog:.04,sceneLight:1.4,sceneGlow:.8,sceneRelief:3,
@@ -175,11 +187,15 @@ try {
         checkbox.checked=false;a._handleControlInput('brightOutput');
         for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','orbital-chamber','ashen-ruins','fractal-dive','mandelbulb-bloom','mandelbox-passage','edge-etching','phosphor-echo','classic-camera-ascii']){
             await a.applyPreset(id,{transitionSeconds:.15});
+            assertControl('visualMode','flat');
             if(a.params.brightOutput!==false||a._nativeOutputPayload().params.brightOutput!==false)throw Error(`Bright output preference changed by ${id}`);
             if((a.staticRuntime.renderer.params?.brightOutput??a.staticRuntime.renderer.brightOutput)!==false)throw Error(`Bright output failed to reach renderer: ${id}`);
             if(a.staticRuntime.source!==sourceBefore)throw Error(`Source replaced by ${id}`);
             if(video.paused||video.currentTime<timeBefore-.1)throw Error(`Playback interrupted by ${id}: ${JSON.stringify({paused:video.paused,before:timeBefore,after:video.currentTime,readyState:video.readyState,ended:video.ended,source:a.params.mediaUrl})}`);
-            if(a.params.visualMode!=='flat'){
+            const scene=scenePresets.find(p=>p.id===id);
+            if(scene){
+                editControl('visualMode',scene.sceneMode);
+                await waitForScene(scene.sceneMode);
                 const renderer=a.staticRuntime.renderer;
                 for(const [key,value] of Object.entries(edits)){
                     editControl(key,value);assertControl(key,value);manualControlChecks++;
@@ -191,10 +207,16 @@ try {
         }
         // A manual edit must survive the rest of a preset tween/crossfade,
         // including native output parameters and persisted settings.
-        await a.applyPreset('neon-night-drive',{transitionSeconds:.15});
+        // Saved custom looks can still opt into a scene. Exercise the same
+        // preset path for their numeric tweens and structural crossfades.
+        for(const id of ['neon-night-drive','neon-cathedral']){
+            const preset=scenePresets.find(p=>p.id===id);
+            a.userPresets.push({...preset,id:`smoke-${id}`,readonly:false});
+        }
+        await a.applyPreset('smoke-neon-night-drive',{transitionSeconds:.15});
         for(const kind of ['tween','crossfade','midi']){
             editControl('sceneFov',97);
-            const pending=a.applyPreset(kind==='crossfade'?'neon-cathedral':(kind==='midi'?'neon-cathedral':'neon-night-drive'),{transitionSeconds:1.2});
+            const pending=a.applyPreset(kind==='tween'?'smoke-neon-night-drive':'smoke-neon-cathedral',{transitionSeconds:1.2});
             await new Promise(resolve=>setTimeout(resolve,250));
             if(!a.transitioning)throw Error(`${kind} regression did not interrupt a live transition`);
             if(kind==='midi')a._applyMidiVisualValue('sceneFov',105);
@@ -225,8 +247,7 @@ try {
             if(a.sceneTransport.toRate!==-1.25)throw Error('Delayed transition arm replaced manual travel speed');
         } finally {a._armNativeOutputTransition=originalArm;}
         editControl('visualMode','coast');
-        await new Promise(resolve=>setTimeout(resolve,500));
-        assertControl('visualMode','coast');
+        await waitForScene('coast');
         if(a.staticRuntime.source!==sourceBefore||video.paused)throw Error('Manual scene selection restarted media');
         editControl('brightOutput',true);
         await a.applyPreset('mandelbulb-bloom',{transitionSeconds:.15});
@@ -234,6 +255,31 @@ try {
         if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==true)throw Error('Explicit bright preference did not persist');
         editControl('brightOutput',false);
         for(let i=0;i<8;i++)if(a._makeWtfTarget(.1).brightOutput!==false)throw Error('Random visuals changed bright output preference');
+        // Force retry/fallback paths with real anchor generation. Space/Motion
+        // is drawn once per target, even when every visual candidate is rejected.
+        const originalRandom=Math.random,originalSafe=a._isSafeWtfTarget,wtfParams={...a.params};
+        const modes=SPATIAL_CONTRACT.visualMode.options.map(([id])=>id).filter(id=>id!=='flat');
+        let wtfSpatialChecks=0;
+        try {
+            for(const startingMode of ['flat','ruins'])for(const outcome of ['retry','fallback'])for(const [i,expected] of ['flat',...modes].entries()){
+                a.params={...wtfParams,visualMode:startingMode,sceneFreeze:true,scenePitch:-75,solidMode:true};
+                const draws=expected==='flat'?[0.499999]:[0.5,(i-.5)/modes.length];
+                // Zero after the spatial draw forces the existing Canvas ASCII
+                // anchor; it must not replace the independent spatial decision.
+                Math.random=()=>draws.length?draws.shift():0;
+                let attempts=0;
+                a._isSafeWtfTarget=target=>{
+                    attempts++;
+                    if(target.visualMode!==expected)throw Error('WTF safety retry redrew the visual mode');
+                    return outcome==='retry'&&attempts===3;
+                };
+                const target=a._makeWtfTarget(.1);
+                if(attempts!==(outcome==='retry'?3:16)||target.visualMode!==expected)throw Error('WTF final mode changed after retries');
+                if(target.mediaUrl!==wtfParams.mediaUrl||target.sourceMode!==wtfParams.sourceMode||target.brightOutput!==false||target.statsOverlay!==wtfParams.statsOverlay)throw Error('WTF changed source or user preferences');
+                if(expected!=='flat'&&(target.backend!=='auto'||target.sceneFreeze||target.scenePitch===-75))throw Error('WTF failed to load a usable scene view');
+                wtfSpatialChecks++;
+            }
+        } finally {Math.random=originalRandom;a._isSafeWtfTarget=originalSafe;a.params=wtfParams;}
         a._persist();
         if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==false)throw Error('Bright output did not persist');
         await a.stop();
@@ -242,7 +288,7 @@ try {
         for(const key of ['sceneSpeed','sceneFov','sceneMedia','edgeAmount','feedbackAmount'])if(!targets.includes(`visual.${key}`))throw Error(`Missing MIDI ${key}`);
         if(!targets.includes('action.visual.sceneFreeze.toggle')||!targets.includes('action.visual.sceneReset'))throw Error('Missing scene transport MIDI actions');
         if(targets.some(t=>/camera|mediaUrl|popout|sourceMode/i.test(t)))throw Error('Forbidden MIDI target');
-        return {cases,mediaResponse,canvas:cs,manualControlChecks,manualTransitionEdits:['tween','crossfade','midi','delayed-arm'],manualSceneSelection:true,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
+        return {cases,mediaResponse,canvas:cs,manualControlChecks,wtfSpatialChecks,manualTransitionEdits:['tween','crossfade','midi','delayed-arm'],manualSceneSelection:true,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
     });
     assert.deepEqual(errors,[]);
     if(process.env.SPATIAL_SMOKE_REPORT){writeFileSync(process.env.SPATIAL_SMOKE_REPORT,JSON.stringify(result,null,2));}

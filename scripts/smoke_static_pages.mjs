@@ -1481,6 +1481,7 @@ async function runSmoke() {
           results.push({
             id: preset.id,
             active: app.activePresetId === preset.id,
+            visualMode: app.params.visualMode,
             requestedBackend: app.params.backend,
             resolvedBackend: app.staticRuntime?.getStats?.()?.backend || '',
             hasSignal: nonBackground >= 5,
@@ -1498,6 +1499,7 @@ async function runSmoke() {
     });
     const presetFailures = presetMatrix.filter((preset) =>
       !preset.active ||
+      preset.visualMode !== 'flat' ||
       !preset.hasSignal ||
       preset.aspectError > 0.03 ||
       preset.glError !== 0 ||

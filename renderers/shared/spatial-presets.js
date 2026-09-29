@@ -1,4 +1,4 @@
-import { SPATIAL_DEFAULTS } from './spatial.js';
+import { SPATIAL_CONTRACT, SPATIAL_DEFAULTS, spatialParams } from './spatial.js';
 
 const base = { ...SPATIAL_DEFAULTS, backend: 'auto', cols: 200, rows: 0, autoRows: true,
     cellWidth: 8, cellHeight: 12, aspectCorrection: 1, glyphMode: true, solidMode: false,
@@ -38,4 +38,20 @@ export const SPATIAL_PRESETS = Object.freeze([
         charset: 'ascii-today-broadway-kb', cols: 240, glyphMode: false, solidMode: true }],
     ['edge-etching', 'Edge Etching', { edgeAmount: 0.7, charset: 'classic-camera', saturationBoost: 0 }],
     ['phosphor-echo', 'Phosphor Echo', { feedbackAmount: 0.98, feedbackHalfLife: 0.7, feedbackZoom: 0.08, feedbackRotate: 0.06 }]
-].map(([id, name, params]) => Object.freeze({id, name, readonly: true, transitionSeconds: 1.5, params: Object.freeze({...base, ...params})})));
+].map(([id, name, params]) => Object.freeze({
+    id, name, readonly: true, transitionSeconds: 1.5,
+    // Keep the scene recipe available for manual opt-in and WTF. Selecting the
+    // built-in look always starts on the unprojected source.
+    sceneMode: params.visualMode || 'flat',
+    params: Object.freeze({...base, ...params, visualMode: 'flat'})
+})));
+
+const wtfSceneModes = SPATIAL_CONTRACT.visualMode.options.map(([id]) => id).filter(id => id !== 'flat');
+export function randomWtfSpatialParams(random = Math.random) {
+    if (random() < 0.5) return { visualMode: 'flat' };
+    const visualMode = wtfSceneModes[Math.floor(random() * wtfSceneModes.length)];
+    const preset = SPATIAL_PRESETS.find(p => p.sceneMode === visualMode);
+    // Scene-specific camera defaults avoid inheriting an unsuitable view from
+    // an earlier look. Prefer acceleration, retaining normal renderer fallback.
+    return { ...spatialParams(preset?.params), visualMode, backend: 'auto', pixel: false };
+}

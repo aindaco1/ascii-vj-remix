@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { SPATIAL_DEFAULTS as defaults, SPATIAL_KEYS, spatialParams, fillSpatialUniforms, spatialGlyphRamp, specialGlyphsEnabled } from '../renderers/shared/spatial.js';
+import { SPATIAL_CONTRACT, SPATIAL_DEFAULTS as defaults, SPATIAL_KEYS, spatialParams, fillSpatialUniforms, spatialGlyphRamp, specialGlyphsEnabled } from '../renderers/shared/spatial.js';
 import { createCycleTransport, setCycleTransportRate, cycleTimeAt } from '../renderers/shared/palette-cycling.js';
 import { traceSpatialRay, createSpatialSampler, renderSpatialCells } from '../renderers/shared/spatial-canvas.js';
 import { applyAudioReactiveModulation } from '../renderers/shared/audio-reactive.js';
-import { SPATIAL_PRESETS } from '../renderers/shared/spatial-presets.js';
+import { SPATIAL_PRESETS, randomWtfSpatialParams } from '../renderers/shared/spatial-presets.js';
 import { processGpuCellColor } from '../renderers/shared/render-math.js';
 import { spatialMediaFixture, spatialMediaDifference } from '../tests/fixtures/spatial-media.js';
 
@@ -16,10 +16,36 @@ assert.equal(specialGlyphsEnabled(defaults), false);
 assert.equal(spatialGlyphRamp('abc',defaults),'abc');
 assert.equal([...spatialGlyphRamp('A'.repeat(96),{...defaults,edgeAmount:1})].length,96);
 for(const preset of SPATIAL_PRESETS){
+    assert.equal(preset.params.visualMode,'flat',`${preset.id} must start on Flat Media`);
     assert.equal(preset.params.backend,'auto');
     assert.equal('brightOutput' in preset.params,false,'presets must preserve the global preference');
     assert.equal('mediaUrl' in preset.params,false);assert.equal('sourceMode' in preset.params,false);
     for(const key of SPATIAL_KEYS) assert.ok(key in preset.params,`${preset.id} lacks ${key}`);
+}
+const scenePresets = SPATIAL_PRESETS.filter(p => p.sceneMode !== 'flat')
+    .map(p => ({...p, params:{...p.params, visualMode:p.sceneMode}}));
+assert.equal(scenePresets.length,9,'scene checks must still exercise every manual opt-in recipe');
+// Check probability boundaries and every equally sized non-flat bucket without
+// a flaky statistical sample. The flat branch consumes just the coin toss.
+for(const coin of [0,0.499999]) {
+    let calls=0;
+    assert.deepEqual(randomWtfSpatialParams(()=>{calls++;return coin;}),{visualMode:'flat'});
+    assert.equal(calls,1);
+}
+const sceneModes=SPATIAL_CONTRACT.visualMode.options.map(([id])=>id).filter(id=>id!=='flat');
+for(const coin of [0.5,0.999999])for(const [i,visualMode] of sceneModes.entries()) {
+    for(const position of [0,0.5,0.999999]) {
+        const draws=[coin,(i+position)/sceneModes.length];
+        const params=randomWtfSpatialParams(()=>draws.shift());
+        assert.equal(params.visualMode,visualMode);
+        assert.equal(draws.length,0);
+        assert.equal(params.backend,'auto');
+        assert.equal(params.pixel,false);
+        assert.equal(params.sceneFreeze,false);
+        assert.deepEqual(spatialParams(params),{...spatialParams(scenePresets.find(p=>p.sceneMode===visualMode)?.params),visualMode});
+        assert.equal('brightOutput' in params,false);
+        assert.equal('mediaUrl' in params,false);
+    }
 }
 let h=traceSpatialRay([.5,2,.5],[0,0,1],(_x,z)=>z===1?[1,1]:z===3?[4,2]:[0,0]);
 near(h.distance,2.5);assert.equal(h.material,2);assert.deepEqual(h.normal,[0,0,-1]);
@@ -84,7 +110,7 @@ for (const visualMode of ['city','corridor','coast','cathedral','relief']) {
     }
 }
 const mediaResponse = [];
-for (const preset of SPATIAL_PRESETS.filter(p => p.params.visualMode !== 'flat')) {
+for (const preset of scenePresets) {
     const params = {...preset.params, sceneFreeze:true, sceneOffset:2.137, sceneTransport:createCycleTransport(0,0)};
     const render = horizontal => renderSpatialCells(params, spatialMediaFixture(64,48,horizontal),64,48,96,54,
         (rgb,x,y)=>processGpuCellColor(...rgb,params,x,y),{},1000);
@@ -97,9 +123,9 @@ for (const preset of SPATIAL_PRESETS.filter(p => p.params.visualMode !== 'flat')
 console.log('Spatial geometry, projection, wrap seams, transport, bounded audio, presets and floating-point history passed.');
 console.log('Source-content response:', JSON.stringify(mediaResponse));
 
-// Same source, time, and grid: presets must differ in their actual projected
+// Same source, time, and grid: manually enabled scenes must differ in their projected
 // content, even before distinct glyph ramps or density make them look different.
-const sceneFrames = SPATIAL_PRESETS.filter(p=>p.params.visualMode!=='flat').map(preset=>{
+const sceneFrames = scenePresets.map(preset=>{
     const params={...preset.params,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)};
     const pixels=new Uint8ClampedArray(64*48*4);
     for(let y=0;y<48;y++)for(let x=0;x<64;x++)pixels.set([4+x*.3,3+y*.3,2+(x+y)%17,255],(y*64+x)*4);

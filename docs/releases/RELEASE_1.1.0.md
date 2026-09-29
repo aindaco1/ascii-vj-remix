@@ -1,6 +1,6 @@
 # 1.1.0 — Spatial ASCII
 
-Date: 2026-09-28. Status: **local candidate, held for owner manual testing**.
+Date: 2026-09-29. Status: **local candidate, held for owner manual testing**.
 Branch: `release/1.1.0`, based on `caefa8ec9708ff782af9a6a1a4b7946a8953046c`.
 No release tag, push, GitHub release, deployment or updater publication is
 authorized by this record. Version 1.1.0 is synchronized across npm and Tauri.
@@ -36,7 +36,36 @@ bounds. WebGPU and native wgpu share the scene WGSL; WebGL2 uses a bounded
 syntax conversion tested through real shader execution. Canvas supplies the
 software reference under its existing density limits. Runtime remains offline.
 
-## Fractal follow-up and current defaults
+## Flat Media defaults and WTF follow-up (2026-09-29)
+
+All 90 built-in presets now select **Flat Media**, including Ashen Ruins.
+The scene-named presets remain in the catalog with their color/glyph treatments
+and stored camera settings. Select the related Visual mode in Space / Motion
+to enable geometry; reselecting a built-in returns to Flat Media. Saved custom
+looks and existing persisted choices retain their selected mode. Bright Output
+remains off by default and stays user-owned.
+
+WTF draws its visual mode once per transition: 50% Flat Media, with the other
+50% shared evenly among the ten non-flat modes (5% each). The selected mode
+survives preset anchors, all visual-safety retries and the final fallback.
+Spatial choices load their scene's camera settings, unfreeze travel and use
+Auto with existing renderer fallback. This avoids carrying an unsuitable
+camera view from a previous look. Color and glyph choices remain randomized.
+
+Validation covers exact random-choice boundaries, every spatial bucket,
+44 integrated retry/fallback cases, 216 live scene-control checks, saved
+spatial look transitions interrupted by manual/MIDI edits, and source/video
+continuity. Geometry and shaders are unchanged; their CPU/GPU parity and
+moving-source response checks still run with manually enabled scene recipes.
+The complete browser preset matrix and offline bundle check passed. The
+optimized, locally installed macOS development app passed **90/90 presets**,
+including **90/90 Flat Media defaults** in app, renderer and native-output
+params, with the unchanged **62 WebGPU / 28 Canvas** ownership split and no
+failures. The gallery below is a fresh WebGL2 capture of the new defaults.
+
+![Current built-in Flat Media looks on the same demo source, with Bright Output off](evidence/1.1.0-flat-media-presets.png)
+
+## Fractal follow-up (before Flat Media defaults)
 
 Bright Output now starts **off**. An existing saved choice is retained, and
 presets never overwrite this global preference. All four new scenes work with
@@ -57,7 +86,7 @@ is bounded for float32 stability; it is not an arbitrary-precision explorer.
 Ashen Ruins, Fractal Dive and Mandelbox Passage use solid cells to reveal their
 structure. Glyph controls remain available. Mandelbulb Bloom uses Braille.
 
-![New fractal presets with the bundled demo source and Bright Output off](evidence/1.1.0-fractal-presets.png)
+![Earlier fractal preset compositions, now available by manually enabling their spatial modes; Bright Output off](evidence/1.1.0-fractal-presets.png)
 
 ## Earlier source visibility correction
 

@@ -643,6 +643,8 @@ These are all control layers over the same parameter model.
 Presets:
 
 - apply known parameter sets.
+- start in Flat Media for every built-in look; saved custom looks retain their
+  selected visual mode. Scene recipes remain available for manual opt-in.
 - may specify transition duration.
 - can be saved/imported/exported by users.
 
@@ -651,6 +653,11 @@ WTF mode:
 - creates randomized target params.
 - anchors some random states around extreme preset families and traditional
   ASCII presets.
+- independently selects Flat Media with 50% probability, otherwise selecting
+  evenly from the canonical non-flat visual modes. The choice is made once
+  before visual-safety retries and retained by the fallback. Spatial targets use
+  the matching recipe's camera settings and Auto backend; normal renderer
+  fallback still applies. Anchor color/glyph styles remain randomized.
 - transitions indefinitely until stopped.
 - avoids unsafe all-white/all-black states.
 
@@ -761,7 +768,7 @@ four world-space sheets clipped against opaque depth. Orbitals uses at most 48
 sphere-tracing steps. Relief reads source luminance as block height. Surface framing accounts for
 the physical tile aspect (2:1 on walls, square on horizontal surfaces). Larger
 wall panels, roof/ceiling sampling and the orbital backdrop preserve visible
-source structure; current spatial presets blend in 80–95% source media.
+source structure; optional scene recipes blend in 80–95% source media.
 Camera-plane rays include pitch. Corridor uses a narrow, low tunnel; Cathedral
 intersects a two-plane pitched roof; Coast keeps low shoreline blocks and no
 road markings. Relief samples one source-aligned height/color field without

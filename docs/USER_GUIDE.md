@@ -116,7 +116,10 @@ Start with the [install guide](../README.md#install-guide) and
   it.
 - WTF mode continuously transitions through randomized live-safe settings and
   leans into both extreme and traditional ASCII preset families while avoiding
-  pure white or pure black output.
+  pure white or pure black output. Each transition independently chooses Flat
+  Media with 50% probability; the other 50% is shared equally among the ten
+  spatial modes (5% each). This is a probability per transition, so runs can
+  include consecutive flat or spatial looks.
 
 ### Pixel Art and Color Cycling
 
@@ -497,23 +500,29 @@ control is unavailable; see the [Changelog](../CHANGELOG.md) for that fix.
 
 ## Spatial visuals and trails (1.1.0)
 
-In **Space / Motion**, choose **Visual mode**, or search for one of the eleven
-new presets. The release is currently a local development build for manual
-acceptance; public installers have not been replaced.
+All built-in presets start with **Space / Motion → Visual mode → Flat media**,
+including Ashen Ruins. They apply their color, glyph or solid-cell treatment
+directly to your input. Ashen Ruins starts as a pale monochrome, solid-cell look.
+The eleven new presets remain available; their camera and scene settings are
+loaded but only take effect when you choose a spatial Visual mode manually.
+Reselecting a built-in preset restores Flat Media. Saved custom presets retain
+their chosen mode, and existing saved settings are not migrated.
+The release is currently a local development build for manual acceptance;
+public installers have not been replaced.
 
-| Preset | Look |
-| --- | --- |
-| Neon Night Drive | Fast, low street weave, tall buildings, wet streets and rain |
-| Media Corridor | Narrow, symmetric screen tunnel, wide lens and block glyphs |
-| Wet Coast | Slow, low waterfront view, open water, short shoreline buildings and Braille texture |
-| Neon Cathedral | Upward-looking nave with tall columns, a pitched roof and fine glyphs |
-| Orbital Chamber | Camera orbits a media-colored sphere and rotating tilted ring |
-| Ashen Ruins | Monochrome recursive architecture, open passages and pale distance fog |
-| Fractal Dive | A rotating Mandelbrot zoom with source-driven color and contour distortion |
-| Mandelbulb Bloom | An orbiting organic fractal with Braille surface texture |
-| Mandelbox Passage | Recursive cube forms and changing views through folded architecture |
-| Edge Etching | Directional line glyphs on strong image edges |
-| Phosphor Echo | Decaying trails with gentle zoom and rotation |
+| Preset | Optional Visual mode | Scene after opting in |
+| --- | --- | --- |
+| Neon Night Drive | City streets | Fast, low street weave, tall buildings, wet streets and rain |
+| Media Corridor | Media corridor | Narrow, symmetric screen tunnel, wide lens and block glyphs |
+| Wet Coast | Wet coast | Slow waterfront view, open water, short shoreline buildings and Braille texture |
+| Neon Cathedral | Vaulted hall | Upward-looking nave with tall columns, a pitched roof and fine glyphs |
+| Orbital Chamber | Orbitals | Media-colored sphere and rotating tilted ring |
+| Ashen Ruins | Recursive ruins | Monochrome architecture, open passages and pale distance fog |
+| Fractal Dive | Mandelbrot dive | Rotating Mandelbrot zoom with source-driven color and contour distortion |
+| Mandelbulb Bloom | Mandelbulb | Orbiting organic fractal with Braille surface texture |
+| Mandelbox Passage | Mandelbox | Recursive cube forms and folded architecture |
+| Edge Etching | Flat media | Directional line glyphs on strong image edges |
+| Phosphor Echo | Flat media | Decaying trails with gentle zoom and rotation |
 
 **Travel speed** is signed: negative values reverse motion. **Freeze scene**
 stops the scene clock and echo decay/motion; the selected video and audio keep
@@ -524,15 +533,16 @@ road, and Look around / orbit rotates the travelling view or circles the orbital
 **Camera tilt** looks up or down; Relief uses an elevated camera above its terrain. These are constrained
 camera routes, not free flight or an editable world.
 
-**Media amount** blends the selected source into surfaces. Spatial presets now
-start at 80–95% so your input drives their appearance. Zero uses procedural
+**Media amount** blends the selected source into surfaces. The optional scene
+recipes use 80–95% so your input drives their appearance. Zero uses procedural
 materials. Wall images occupy larger 8×4-unit panels; roofs and ceilings also
 use the source, and Orbital Chamber includes it behind the foreground shapes. **Surface framing** controls repeat, fit or crop within surface
 tiles. The existing source picker, camera mirroring and playback controls still
 own media. Previously saved/custom settings keep their values; reselect a
-spatial preset to load its stronger media defaults. Changing a visual preset does not select a new source or restart it.
+related preset and then enable its spatial Visual mode to load its scene recipe.
+Changing a visual preset does not select a new source or restart it.
 
-**Fractal zoom**, **Fractal detail** and **Fractal shape** appear for the four new fractal modes. Zoom changes scale; Detail changes the bounded iteration count; Shape changes carving, bulb power, box folding or media-driven contour distortion. Travel speed, freeze, camera controls and media blending remain live and editable after selecting a preset. Ashen Ruins, Fractal Dive and Mandelbox Passage start with solid cells to expose fine structure; turn Glyph mode on and Solid mode off for ASCII texture. The removed Brightness Relief preset remains available as a visual mode for existing custom looks.
+**Fractal zoom**, **Fractal detail** and **Fractal shape** appear when you enable one of the four fractal modes. Zoom changes scale; Detail changes the bounded iteration count; Shape changes carving, bulb power, box folding or media-driven contour distortion. Travel speed, freeze, camera controls and media blending remain live and editable. Ashen Ruins, Fractal Dive and Mandelbox Passage use solid cells; turn Glyph mode on and Solid mode off for ASCII texture. The removed Brightness Relief preset remains available as a visual mode for existing custom looks.
 
 **Material glyphs** distinguishes surfaces, water, windows and sky. It reserves
 eight of the 96 glyph slots. As Media amount rises, its glyph override fades

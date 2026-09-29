@@ -1,5 +1,5 @@
 import { renderSpatialCells } from './renderers/shared/spatial-canvas.js';
-import { SPATIAL_PRESETS } from './renderers/shared/spatial-presets.js';
+import { SPATIAL_PRESETS, randomWtfSpatialParams } from './renderers/shared/spatial-presets.js';
 import { SPATIAL_DEFAULTS, SPATIAL_CONTRACT, SPATIAL_KEYS, SPATIAL_TWEEN_KEYS, SPATIAL_CONTROLS, spatialParams, effectsEnabled, spatialGlyphRamp } from './renderers/shared/spatial.js';
 import { COLOR_CYCLE_PRESETS } from './renderers/shared/color-cycle-presets.js';
 import { PALETTE_CYCLE_DEFAULTS, PALETTE_CONTRACT, paletteCycleParams, fillPaletteDisplay, createCycleTransport, setCycleTransportRate, cycleNowMs } from './renderers/shared/palette-cycling.js';
@@ -7402,6 +7402,7 @@ class RendererLabApp {
             kind: 'primary-preset-sweep',
             presetCount: BUILTIN_PRESETS.length,
             passed: 0,
+            flatMediaPassed: 0,
             failures: [],
             backends: {},
             glyphBackends: {},
@@ -7466,6 +7467,13 @@ class RendererLabApp {
                     if (!renderer?.running) reasons.push('stopped');
                     if (ratioError > 0.035) reasons.push(`aspect:${ratioError.toFixed(3)}`);
                     if (glError) reasons.push(`gl:${glError}`);
+                    if (this.params.visualMode === 'flat' &&
+                        (renderer?.params || renderer)?.visualMode === 'flat' &&
+                        this._nativeOutputPayload().params.visualMode === 'flat') {
+                        report.flatMediaPassed += 1;
+                    } else {
+                        reasons.push('space-motion:not-flat');
+                    }
 
                     report.backends[backend] = (report.backends[backend] || 0) + 1;
                     if (expectsCanvas) report.canvasEligible += 1;
@@ -10639,12 +10647,16 @@ button:hover{background:#202a35}
     }
 
     _makeWtfTarget(seconds) {
+        // Choose once per transition: visual-safety retries and preset anchors
+        // must not bias the 50% flat / 50% spatial split.
+        const spatial = randomWtfSpatialParams();
         for (let attempt = 0; attempt < 16; attempt++) {
-            const target = this._randomWtfTarget(seconds);
+            const target = this._randomWtfTarget(seconds, spatial);
             if (this._isSafeWtfTarget(target)) return target;
         }
         return normalizeParams({
             ...this.params,
+            ...spatial,
             transitionSeconds: seconds,
             saturationBoost: randomBetween(0.8, 1.8),
             contrastBoost: randomBetween(0.8, 1.8),
@@ -10659,7 +10671,7 @@ button:hover{background:#202a35}
         }, { preserveBlob: true });
     }
 
-    _randomWtfTarget(seconds) {
+    _randomWtfTarget(seconds, spatial = randomWtfSpatialParams()) {
         const target = { ...this.params, transitionSeconds: seconds };
         const currentSolidVisual = this.params.sourceMode === 'static' &&
             (Boolean(this.params.solidMode) || usesPixelCanvas(this.params));
@@ -10750,7 +10762,7 @@ button:hover{background:#202a35}
             this._applyAsciiWtfAnchor(target, anchorParams);
         }
 
-        return normalizeParams(target, { preserveBlob: true });
+        return normalizeParams({ ...target, ...spatial }, { preserveBlob: true });
     }
 
     _applyAsciiWtfAnchor(target, anchorParams, options = {}) {

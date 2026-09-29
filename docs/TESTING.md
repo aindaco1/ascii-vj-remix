@@ -612,16 +612,19 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
 - `npm run test:spatial`: variable-height occlusion, roof hits, no-hit/axis/corner
   rays, rectilinear projection, wrapping, signed transport, finite/clamped
   controls, audio bounds, long-tail decay, distinct source-shape response and
-  pairwise differences between preset compositions on one dark input. Shared uniform vectors run in JS
+  pairwise differences between manually enabled scene compositions on one dark input,
+  Flat Media preset defaults and exact WTF probability boundaries for every mode. Shared uniform vectors run in JS
   and Rust; `npm run test:rust` also validates the complete native WGSL.
 - `npm run smoke:spatial`: real WebGPU/WebGL2 cell readbacks compared with the
   Canvas reference, default-off brightness and live opt-in/out (RGB and glyph
   luminance), toggle persistence across presets/WTF/native payloads,
-  24 live spatial controls across all nine preset scenes, manual/MIDI edits during
+  Flat Media after each built-in preset switch, 24 live spatial controls across
+  all nine manually enabled scenes, manual/MIDI edits during saved spatial
   preset tweens and crossfades, persisted edits and crossfade-layer cleanup,
+  WTF's independent scene choice through anchor generation, safety retries and fallback,
   frozen-frame equality, floating-point trail decay, Canvas
   limits and a playing 30-second video through the new presets and back to
-  Classic Camera ASCII. All nine spatial defaults and the legacy relief mode must respond to two moving
+  Classic Camera ASCII. All nine scene recipes and the legacy relief mode must respond to two moving
   source frames with identical color/brightness histograms but different shapes,
   in both RGB output and glyph choices. It requires a GPU-capable installed Chromium for
   WebGPU; `CHROMIUM_EXECUTABLE` selects one. The default opens an isolated visible browser.
@@ -632,11 +635,14 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
   candidate WebGPU renderers. GPU diagnostics remain fatal; presentation is
   covered separately by native/visible checks.
 - `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
-  media/resize paths and JavaScript/GPU errors, including the new presets.
+  media/resize paths and JavaScript/GPU errors, including Flat Media defaults
+  across the full built-in catalog. The native preset sweep checks the same
+  defaults in app, renderer and native-output params (`flatMediaPassed`).
 - `node scripts/capture_spatial_review.mjs /tmp/spatial-review.png` captures
-  one dark source, the brightness toggle off/on, and all nine spatial presets using
-  actual WebGL2 presentation. Add `--fractals` for the four fractal presets on
-  the unmodified demo source with Bright Output off. Glyph atlas loads must
+  one dark source, the brightness toggle off/on, and all nine manually enabled
+  spatial scenes using actual WebGL2 presentation. Add `--fractals` for the four
+  fractal looks on the unmodified demo source with Bright Output off; add
+  `--flat-presets` to capture their built-in Flat Media defaults. Glyph atlas loads must
   finish before capture.
 - Native scene performance can use the maintained UI harness, for example
   `ASCILINE_UI_PERF_SMOKE_SPATIAL='{"visualMode":"city","sceneWet":0.55,"sceneRain":0.2,"sceneMedia":0.85}' ASCILINE_UI_PERF_SMOKE_COLUMNS=640 ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1 npm run smoke:ui-perf`.
@@ -645,7 +651,8 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
 
 Manual acceptance: confirm Bright Output starts off on a clean profile and
 retains an explicitly saved choice; compare Bright output off/on on dark camera, image and
-video sources, reselect each spatial preset for its revised defaults, and
+video sources, reselect each built-in preset to confirm Flat Media, manually
+enable its related spatial mode, and
 compare preview and native output while changing mode,
 source, density, palette and ramp; adjust fractal zoom/detail/shape after selecting
 a preset and during its transition; exercise freeze/reverse/reset, long feedback
