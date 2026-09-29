@@ -342,6 +342,21 @@ Rules:
 
 Audio analysis is tuned for stable live response.
 
+Feature reads target 120 Hz without queuing overlapping native requests. Input
+capture requests 128-frame buffers within the advertised device limits (2.67 ms
+at 48 kHz), falling back to the device default if unsupported. This is a buffer
+request, not a guarantee of hardware latency. Attacks are immediate on delivery;
+Smoothing controls a time-based release, with zero bypassing it. The default
+0.36 setting has a 25.92 ms release time constant. Beat history and decay also
+use elapsed time so smaller buffers do not shorten beat pulses.
+
+`npm run test:audio-reactive` includes a deterministic sampling/envelope step
+comparison: reaching 90% of an attack takes 8.33 ms with the new 120 Hz model,
+versus 33.33 ms previously; falling to 10% takes 66.67 ms versus 150 ms at the
+default smoothing. These are software model results, excluding device, driver,
+IPC, render scheduling and display latency. For actual capture timing under
+render load, use the native-input probe in [Testing](TESTING.md#audio-response).
+
 Rules:
 
 - Keep analyzer windows and smoothing low enough for live response.

@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-29",
+  "version": "1.1.0",
+  "platform": "macOS, optimized Dev app",
+  "workload": "640 columns, bundled 1080p video, native microphone, preview, Pop Out and 8 transitions",
+  "interpretation": "Capture windows and feature delivery only; not physical sound-to-display latency. Timing percentiles use 30 sampled feature reads.",
+  "report": {
+    "ok": true,
+    "mediaUrl": "media/point-click-test-30s.mp4",
+    "columns": 640,
+    "syntheticAudio": false,
+    "nativeAudio": true,
+    "backend": "auto",
+    "paletteId": "none",
+    "ditherMode": "none",
+    "charset": "point-click",
+    "soak": false,
+    "structuralTransitions": false,
+    "actualBackends": [
+      "webgpu"
+    ],
+    "nativeFailed": 0,
+    "nativeTransitionArmed": 8,
+    "nativeTransitionFailed": 0,
+    "outputDisplayCount": 1,
+    "rendererChanges": 1,
+    "frameResetCount": 0,
+    "finalFrameCount": 608,
+    "hasVisibleSignal": true,
+    "videoTimeAdvanced": true,
+    "error": null,
+    "sampleCount": 30,
+    "phases": {
+      "main": {
+        "hiddenSamples": 0,
+        "unfocusedSamples": 10,
+        "mainAvgFps": 38.384830339321354,
+        "mainMinFps": 32,
+        "mainP95FrameMs": 29.053289473684206,
+        "mainP99FrameMs": 30.810657894736842,
+        "nativeOkHz": 0
+      },
+      "popout": {
+        "hiddenSamples": 0,
+        "unfocusedSamples": 10,
+        "mainAvgFps": 39.30000774976658,
+        "mainMinFps": 35.92814371257485,
+        "mainP95FrameMs": 27.174122807017543,
+        "mainP99FrameMs": 27.701491228070175,
+        "nativeOkHz": 89.38967407047775
+      },
+      "transition": {
+        "hiddenSamples": 0,
+        "unfocusedSamples": 10,
+        "mainAvgFps": 35.28967370399268,
+        "mainMinFps": 31.746031746031747,
+        "mainP95FrameMs": 30.666176470588233,
+        "mainP99FrameMs": 31.333235294117646,
+        "nativeOkHz": 3.173455407922803
+      }
+    },
+    "audioCaptureTiming": {
+      "analysisWindowMs": {
+        "samples": 30,
+        "p50": 2.6666667,
+        "p95": 2.6666667,
+        "max": 2.6666667
+      },
+      "ipcMs": {
+        "samples": 30,
+        "p50": 1,
+        "p95": 6,
+        "max": 8
+      },
+      "featureAgeUpperBoundMs": {
+        "samples": 30,
+        "p50": 2.8099160000001575,
+        "p95": 6.943375000000742,
+        "max": 8.10662500000035
+      }
+    },
+    "mainAvgFps": 37.658170597693534,
+    "mainMinFps": 31.746031746031747,
+    "mainP95FrameMs": 30.666176470588233,
+    "mainP99FrameMs": 31.333235294117646
+  }
+}

@@ -45,8 +45,8 @@ to enable geometry; reselecting a built-in returns to Flat Media. Saved custom
 looks and existing persisted choices retain their selected mode. Bright Output
 remains off by default and stays user-owned.
 
-WTF draws its visual mode once per transition: 50% Flat Media, with the other
-50% shared evenly among the ten non-flat modes (5% each). The selected mode
+WTF draws its visual mode once per transition: 80% Flat Media, with the other
+20% shared evenly among the ten non-flat modes (2% each). The selected mode
 survives preset anchors, all visual-safety retries and the final fallback.
 Spatial choices load their scene's camera settings, unfreeze travel and use
 Auto with existing renderer fallback. This avoids carrying an unsuitable
@@ -64,6 +64,42 @@ params, with the unchanged **62 WebGPU / 28 Canvas** ownership split and no
 failures. The gallery below is a fresh WebGL2 capture of the new defaults.
 
 ![Current built-in Flat Media looks on the same demo source, with Bright Output off](evidence/1.1.0-flat-media-presets.png)
+
+## Audio response and WTF weighting follow-up (2026-09-29)
+
+WTF now chooses Flat Media with 80% probability and each of the ten remaining
+modes with 2% probability. The existing safety retry/fallback tests retain the
+chosen mode; all built-in presets continue to start in Flat Media.
+
+Audio feature reads and reactive synchronization now target 120 Hz. Native input
+requests 128-frame buffers within the supported device range, with the existing
+default buffer as fallback. Browser and native feature delivery share immediate
+attacks and elapsed-time release; Smoothing zero bypasses this envelope. Beat
+decay and history remain consistent when the buffer size or polling rate changes.
+Steady Pop Out updates no longer apply audio modulation twice; autonomous native
+transitions retain direct audio response on their unmodulated endpoints.
+
+The optimized macOS probe used 640 columns, bundled 1080p video, native microphone
+input and visible Pop Out. Its [bounded timing report](evidence/1.1.0-audio-latency.json)
+recorded 2.67 ms capture windows, 1 ms median / 6 ms p95 feature-read IPC and
+2.81 ms median / 6.94 ms p95 feature-age bounds at delivery across 30 samples.
+These exclude physical hardware and display delay. Preview averaged 38.4 FPS
+alone, 39.3 FPS with Pop Out and 35.3 FPS during transitions; worst phase p95 was
+30.67 ms. Native Pop Out averaged 59.9 FPS, with zero GPU failures or presentation
+backlog. All eight native transitions passed.
+
+Audio regression checks cover smoothing, native reply races and parameter
+ownership; Rust passed 84/84 tests. The spatial GPU/source/control/WTF suite and
+static UI suite passed. Offline bundle, media-source policy and renderer resource
+checks passed. The first timing report exposed diagnostic truncation; per-phase
+and audio summaries now fit the existing diagnostic bounds. A separate obscured
+window run failed presentation validation and captured WebKit external-video
+`GPUDevice.createBindGroup` errors; the final visible foreground run passed the
+unchanged gates without new reports. Those local diagnostics are preserved;
+background/occlusion recovery still needs manual review. Reproduction is in
+[Testing](../TESTING.md#audio-response).
+Physical listening, system-audio timing and other-platform hardware acceptance
+remain manual. Publication is still held.
 
 ## Fractal follow-up (before Flat Media defaults)
 

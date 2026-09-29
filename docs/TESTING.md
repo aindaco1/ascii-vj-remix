@@ -224,6 +224,36 @@ full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
 renderer checks, or the 87/59/28 preset ownership contract.
 
+### Audio response
+
+Run `npm run test:audio-reactive` for bounded modulation, immediate attacks,
+frame-rate-independent release, zero smoothing, single-flight native reads,
+duplicate capture frames and stop/restart races. `npm run test:rust` also checks
+native buffer selection, onset detection and beat decay across buffer sizes.
+The static smoke covers capture source/device switching, live settings and
+effective-parameter ownership in steady versus transitioning Pop Out output.
+
+After building the optimized Dev app, a local native-input timing probe runs
+alongside the existing video, Pop Out and transition performance gates:
+
+```bash
+ASCILINE_UI_PERF_SMOKE_NATIVE_AUDIO=1 \
+ASCILINE_UI_PERF_SMOKE_FOREGROUND=1 \
+ASCILINE_UI_PERF_SMOKE_COLUMNS=640 \
+ASCILINE_UI_PERF_SMOKE_DURATION_MS=15000 \
+ASCILINE_UI_PERF_REPORT_PATH=/tmp/ascii-native-audio.json \
+npm run smoke:ui-perf
+```
+
+Keep both app and Pop Out visible during the probe. It uses the selected native
+microphone/input and its normal OS permission.
+It reports analysis-window duration, feature-read IPC round trip and a bound on
+feature age at delivery (age at the native snapshot plus the full round trip).
+It does not record raw audio or measure physical sound-to-display delay.
+Compare rendering against the existing performance gates; do not lower them to
+obtain a latency result. Physical listening, audio-interface/loopback timing,
+system-audio capture and Windows/Linux hardware remain separate manual checks.
+
 ### Renderer Backend Changes
 
 ```bash

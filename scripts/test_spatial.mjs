@@ -27,13 +27,13 @@ const scenePresets = SPATIAL_PRESETS.filter(p => p.sceneMode !== 'flat')
 assert.equal(scenePresets.length,9,'scene checks must still exercise every manual opt-in recipe');
 // Check probability boundaries and every equally sized non-flat bucket without
 // a flaky statistical sample. The flat branch consumes just the coin toss.
-for(const coin of [0,0.499999]) {
+for(const coin of [0,0.799999]) {
     let calls=0;
     assert.deepEqual(randomWtfSpatialParams(()=>{calls++;return coin;}),{visualMode:'flat'});
     assert.equal(calls,1);
 }
 const sceneModes=SPATIAL_CONTRACT.visualMode.options.map(([id])=>id).filter(id=>id!=='flat');
-for(const coin of [0.5,0.999999])for(const [i,visualMode] of sceneModes.entries()) {
+for(const coin of [0.8,0.999999])for(const [i,visualMode] of sceneModes.entries()) {
     for(const position of [0,0.5,0.999999]) {
         const draws=[coin,(i+position)/sceneModes.length];
         const params=randomWtfSpatialParams(()=>draws.shift());

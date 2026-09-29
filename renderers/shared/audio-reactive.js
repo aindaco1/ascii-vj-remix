@@ -170,6 +170,28 @@ export function emptyAudioReactiveFeatures() {
     };
 }
 
+// Attacks follow the newest measurement immediately. Smoothing controls only
+// the release, in elapsed time, so a slower preview cannot stretch the envelope.
+export function smoothAudioReactiveFeatures(state, raw, smoothing, now) {
+    const amount = clamp(Number(smoothing) || 0, 0, 0.98);
+    const dt = Math.max(0, now - (state.lastMs ?? now));
+    const release = amount === 0 ? 1 : -Math.expm1(-dt / (200 * amount * amount));
+    const previous = state.features;
+    const next = {};
+    for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
+        const fallback = key === 'lowMid' || key === 'highMid' ? raw.mid :
+            key === 'presence' || key === 'brightness' ? raw.treble : 0;
+        const value = Number(raw[key] ?? fallback ?? 0);
+        const target = Number.isFinite(value) ? clamp(value, 0, 1) : 0;
+        next[key] = !previous || target >= previous[key]
+            ? target : previous[key] + (target - previous[key]) * release;
+    }
+    next.phase = Number.isFinite(raw.phase) ? raw.phase : now * 0.012;
+    state.features = next;
+    state.lastMs = now;
+    return next;
+}
+
 export function audioReactivePrecision(config) {
     return Number.isInteger(config?.precision) ? config.precision : 2;
 }

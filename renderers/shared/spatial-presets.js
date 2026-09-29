@@ -48,7 +48,7 @@ export const SPATIAL_PRESETS = Object.freeze([
 
 const wtfSceneModes = SPATIAL_CONTRACT.visualMode.options.map(([id]) => id).filter(id => id !== 'flat');
 export function randomWtfSpatialParams(random = Math.random) {
-    if (random() < 0.5) return { visualMode: 'flat' };
+    if (random() < 0.8) return { visualMode: 'flat' };
     const visualMode = wtfSceneModes[Math.floor(random() * wtfSceneModes.length)];
     const preset = SPATIAL_PRESETS.find(p => p.sceneMode === visualMode);
     // Scene-specific camera defaults avoid inheriting an unsuitable view from

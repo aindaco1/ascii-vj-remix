@@ -51,7 +51,7 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - An optional Bright output toggle (off by default) lifts dark camera, image and video output; its setting persists across presets and launches.
 - Built-in and user presets, saved playlists, smooth crossfades, and continuous
   randomized WTF mode. Built-in presets start in Flat Media; spatial modes are
-  optional. Each WTF target has a 50% chance of Flat Media and a 50% chance
+  optional. Each WTF target has an 80% chance of Flat Media and a 20% chance
   shared equally among the other visual modes.
 - Local audio reactivity from microphone/input, files, and supported
   system/display audio paths.
@@ -133,7 +133,7 @@ portal packages are installed for your distribution.
    audio.
 7. Use Pop Out to create a separate output window for another screen.
 8. Use WTF when you want the app to keep generating extreme or traditional
-   ASCII-flavored transitions, with a 50/50 chance of flat or spatial visuals.
+   ASCII-flavored transitions, with a 80/20 chance of flat or spatial visuals.
 
 If the renderer does not start, press Start once. If it still does not start,
 try a lower backend such as WebGL2 or Canvas2D.

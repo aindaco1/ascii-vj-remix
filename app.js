@@ -47,12 +47,12 @@ import {
 import {
     AUDIO_REACTIVE_CONTROLS,
     AUDIO_REACTIVE_DEFAULTS,
-    AUDIO_REACTIVE_FEATURE_KEYS,
     AUDIO_REACTIVE_PRESETS,
     applyAudioReactiveModulation,
     audioReactivePrecision,
     audioReactiveSourceOptions,
     emptyAudioReactiveFeatures,
+    smoothAudioReactiveFeatures,
     sanitizeAudioReactiveSettings
 } from './renderers/shared/audio-reactive.js?v=20260626-audio-reactive';
 import {
@@ -362,8 +362,8 @@ const DEFAULT_PARAMS = {
 };
 
 const RESPONSIVE_FRAME_MS = 1000 / 60;
-const AUDIO_REACTIVE_FRAME_MS = 1000 / 60;
-const NATIVE_OUTPUT_REACTIVE_SYNC_MS = 1000 / 60;
+const AUDIO_REACTIVE_FRAME_MS = 1000 / 120;
+const NATIVE_OUTPUT_REACTIVE_SYNC_MS = AUDIO_REACTIVE_FRAME_MS;
 const NATIVE_OUTPUT_TRANSITION_LEAD_MS = 64;
 const CANVAS_STATIC_SAMPLE_MAX_DIMENSION = 960;
 const AUTOMATED_TRANSITION_MIN_SECONDS = 1;
@@ -411,7 +411,7 @@ const AUDIO_REACTIVE_SOURCE_OPTIONS = audioReactiveSourceOptions({ tauri: isTaur
 
 const AUDIO_REACTIVE_TRANSIENT_FFT_SIZE = 256;
 const AUDIO_REACTIVE_SPECTRAL_FFT_SIZE = 1024;
-const AUDIO_REACTIVE_BEAT_HISTORY = 18;
+const AUDIO_REACTIVE_BEAT_HISTORY_MS = 300;
 const AUDIO_REACTIVE_SILENCE_THRESHOLD = 0.008;
 const AUDIO_REACTIVE_SILENCE_NOTICE_MS = 2200;
 
@@ -3012,14 +3012,17 @@ class AudioReactiveRuntime {
         this.nativeInputAudio = false;
         this.nativeDisplayAudio = false;
         this.nativeFeaturePending = false;
+        this.captureGeneration = 0;
+        this.lastNativeFrame = null;
+        this.captureTiming = null;
         this.raf = null;
         this.frequencyData = null;
         this.timeData = null;
         this.transientFrequencyData = null;
         this.previousTransientFrequencyData = null;
         this.energyHistory = [];
-        this.smoothed = this._emptyFeatures();
-        this.analysisPrimed = false;
+        this.featureSmoothing = {};
+        this.lastBeatFrameAt = null;
         this.beatPulse = 0;
         this.beatCooldownUntil = 0;
         this.silenceStartedAt = 0;
@@ -3027,10 +3030,6 @@ class AudioReactiveRuntime {
         this.status = 'Idle';
         this.sourceLabel = '';
         this._loop = this._loop.bind(this);
-    }
-
-    _emptyFeatures() {
-        return emptyAudioReactiveFeatures();
     }
 
     async start() {
@@ -3103,14 +3102,6 @@ class AudioReactiveRuntime {
         if (this.audioContext.state === 'suspended') await this.audioContext.resume();
     }
 
-    _analyserSmoothing() {
-        return clamp(Number(this.app.audioReactive.smoothing || 0) * 0.28, 0, 0.3);
-    }
-
-    _transientAnalyserSmoothing() {
-        return clamp(Number(this.app.audioReactive.smoothing || 0) * 0.08, 0, 0.1);
-    }
-
     _connectAnalyserNodes() {
         this.analyser = this.audioContext.createAnalyser();
         this.transientAnalyser = this.audioContext.createAnalyser();
@@ -3122,18 +3113,18 @@ class AudioReactiveRuntime {
         this.analyser.fftSize = AUDIO_REACTIVE_SPECTRAL_FFT_SIZE;
         this.analyser.minDecibels = -90;
         this.analyser.maxDecibels = -15;
-        this.analyser.smoothingTimeConstant = this._analyserSmoothing();
+        this.analyser.smoothingTimeConstant = 0;
         this.transientAnalyser.fftSize = AUDIO_REACTIVE_TRANSIENT_FFT_SIZE;
         this.transientAnalyser.minDecibels = -90;
         this.transientAnalyser.maxDecibels = -15;
-        this.transientAnalyser.smoothingTimeConstant = this._transientAnalyserSmoothing();
+        this.transientAnalyser.smoothingTimeConstant = 0;
         this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
         this.timeData = new Float32Array(this.transientAnalyser.fftSize);
         this.transientFrequencyData = new Uint8Array(this.transientAnalyser.frequencyBinCount);
         this.previousTransientFrequencyData = new Uint8Array(this.transientAnalyser.frequencyBinCount);
         this.energyHistory = [];
-        this.smoothed = this._emptyFeatures();
-        this.analysisPrimed = false;
+        this.featureSmoothing = {};
+        this.lastBeatFrameAt = null;
         this.beatPulse = 0;
         this.silenceStartedAt = 0;
         this.silenceNoticeShown = false;
@@ -3273,12 +3264,6 @@ class AudioReactiveRuntime {
     }
 
     updateSettings() {
-        if (this.analyser) {
-            this.analyser.smoothingTimeConstant = this._analyserSmoothing();
-        }
-        if (this.transientAnalyser) {
-            this.transientAnalyser.smoothingTimeConstant = this._transientAnalyserSmoothing();
-        }
         if (this.active) this._emitCurrentFrame();
         if (this.active) this.app._syncNativeOutputWindow(this.app.renderParams());
     }
@@ -3305,59 +3290,44 @@ class AudioReactiveRuntime {
         const source = this.nativeDisplayAudio ? 'display' : this.nativeInputAudio ? 'input' : '';
         if (this.nativeFeaturePending || !this.active || !source) return;
         this.nativeFeaturePending = true;
+        const generation = this.captureGeneration;
+        const requestedAt = performance.now();
         try {
             const raw = source === 'display'
                 ? await readTauriSystemAudioFeatures()
                 : await readTauriInputAudioFeatures();
-            if (!this.active || (source === 'display' && !this.nativeDisplayAudio) || (source === 'input' && !this.nativeInputAudio)) return;
+            if (generation !== this.captureGeneration || !this.active || (source === 'display' && !this.nativeDisplayAudio) || (source === 'input' && !this.nativeInputAudio)) return;
             if (!raw?.available || !raw.active) {
                 this.status = raw?.lastError || 'Native system audio stopped';
                 this.app._syncAudioReactiveUi();
                 return;
             }
+            // Polling can outpace capture. Do not re-apply a stale frame or
+            // smooth it twice, and timestamp delivery rather than the request.
+            if (Number.isFinite(raw.frames) && raw.frames === this.lastNativeFrame) return;
+            this.lastNativeFrame = raw.frames;
+            now = performance.now();
+            this.captureTiming = {
+                analysisWindowMs: Number(raw.analysisWindowMs || 0),
+                ipcMs: now - requestedAt,
+                featureAgeUpperBoundMs: Number(raw.ageMs || 0) + now - requestedAt
+            };
             const features = this._smoothExternalFeatures(raw, now);
             this._monitorSignal(features, now);
             const effectiveParams = applyAudioReactiveModulation(this.app.params, features, this.app.audioReactive, { clampParamValue });
             this.app.applyAudioReactiveFrame(effectiveParams, features);
         } catch (error) {
-            if (this.active && (this.nativeDisplayAudio || this.nativeInputAudio)) {
+            if (generation === this.captureGeneration && this.active && (this.nativeDisplayAudio || this.nativeInputAudio)) {
                 this.status = error?.message || 'Native system audio failed';
                 this.app._syncAudioReactiveUi();
             }
         } finally {
-            this.nativeFeaturePending = false;
+            if (generation === this.captureGeneration) this.nativeFeaturePending = false;
         }
     }
 
     _smoothExternalFeatures(raw, now = performance.now()) {
-        const source = {
-            rms: clamp(Number(raw.rms || 0), 0, 1),
-            bass: clamp(Number(raw.bass || 0), 0, 1),
-            lowMid: clamp(Number(raw.lowMid || raw.mid || 0), 0, 1),
-            mid: clamp(Number(raw.mid || 0), 0, 1),
-            highMid: clamp(Number(raw.highMid || raw.mid || 0), 0, 1),
-            treble: clamp(Number(raw.treble || 0), 0, 1),
-            presence: clamp(Number(raw.presence || raw.treble || 0), 0, 1),
-            brightness: clamp(Number(raw.brightness || raw.treble || 0), 0, 1),
-            flux: clamp(Number(raw.flux || 0), 0, 1),
-            density: clamp(Number(raw.density || 0), 0, 1),
-            beatPulse: clamp(Number(raw.beatPulse || 0), 0, 1),
-            phase: Number.isFinite(Number(raw.phase)) ? Number(raw.phase) : now * 0.012
-        };
-        const smoothAmount = clamp(Number(this.app.audioReactive.smoothing || 0), 0, 0.95);
-        const attackAlpha = clamp(0.92 - smoothAmount * 0.28, 0.58, 0.94);
-        const releaseAlpha = clamp(0.34 - smoothAmount * 0.28, 0.04, 0.34);
-        for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
-            if (!this.analysisPrimed) {
-                this.smoothed[key] = source[key];
-            } else {
-                const alpha = source[key] >= this.smoothed[key] ? attackAlpha : releaseAlpha;
-                this.smoothed[key] += (source[key] - this.smoothed[key]) * alpha;
-            }
-        }
-        this.analysisPrimed = true;
-        this.smoothed.phase = source.phase;
-        return { ...this.smoothed };
+        return smoothAudioReactiveFeatures(this.featureSmoothing, raw, this.app.audioReactive.smoothing, now);
     }
 
     _analyze(now) {
@@ -3395,21 +3365,8 @@ class AudioReactiveRuntime {
             phase: now * 0.012
         };
 
-        const smoothAmount = clamp(Number(this.app.audioReactive.smoothing || 0), 0, 0.95);
-        const attackAlpha = clamp(0.92 - smoothAmount * 0.28, 0.58, 0.94);
-        const releaseAlpha = clamp(0.34 - smoothAmount * 0.28, 0.04, 0.34);
-        for (const key of AUDIO_REACTIVE_FEATURE_KEYS) {
-            if (!this.analysisPrimed) {
-                this.smoothed[key] = raw[key];
-            } else {
-                const alpha = raw[key] >= this.smoothed[key] ? attackAlpha : releaseAlpha;
-                this.smoothed[key] += (raw[key] - this.smoothed[key]) * alpha;
-            }
-        }
-        this.analysisPrimed = true;
-        this.smoothed.phase = raw.phase;
         this.previousTransientFrequencyData.set(this.transientFrequencyData);
-        return { ...this.smoothed };
+        return this._smoothExternalFeatures(raw, now);
     }
 
     _monitorSignal(features, now) {
@@ -3480,9 +3437,11 @@ class AudioReactiveRuntime {
     }
 
     _detectBeat(rms, flux, now, density = 0) {
-        this.energyHistory.push(rms);
-        if (this.energyHistory.length > AUDIO_REACTIVE_BEAT_HISTORY) this.energyHistory.shift();
-        const avg = this.energyHistory.reduce((sum, value) => sum + value, 0) / Math.max(1, this.energyHistory.length);
+        const dt = Math.max(0, now - (this.lastBeatFrameAt ?? now));
+        this.lastBeatFrameAt = now;
+        this.energyHistory.push({ rms, now });
+        while (this.energyHistory.length > 1 && this.energyHistory[0].now < now - AUDIO_REACTIVE_BEAT_HISTORY_MS) this.energyHistory.shift();
+        const avg = this.energyHistory.reduce((sum, value) => sum + value.rms, 0) / Math.max(1, this.energyHistory.length);
         const dense = clamp(Number(density || 0), 0, 1);
         const threshold = Math.max(0.035, avg * (1.22 + dense * 0.3));
         const fluxGate = 0.08 + dense * 0.08;
@@ -3491,7 +3450,7 @@ class AudioReactiveRuntime {
             this.beatPulse = 1;
             this.beatCooldownUntil = now + 135 + dense * 65;
         } else {
-            this.beatPulse *= 0.82 - dense * 0.05;
+            this.beatPulse *= Math.pow(0.82 - dense * 0.05, dt / (1000 / 60));
         }
         return clamp(this.beatPulse, 0, 1);
     }
@@ -3499,6 +3458,9 @@ class AudioReactiveRuntime {
     stop(options = {}) {
         const { keepStatus = false } = options;
         this.active = false;
+        this.captureGeneration++;
+        this.lastNativeFrame = null;
+        this.captureTiming = null;
         const hadNativeInputAudio = this.nativeInputAudio;
         const hadNativeDisplayAudio = this.nativeDisplayAudio;
         this.nativeInputAudio = false;
@@ -3541,8 +3503,8 @@ class AudioReactiveRuntime {
         this.transientFrequencyData = null;
         this.previousTransientFrequencyData = null;
         this.energyHistory = [];
-        this.smoothed = this._emptyFeatures();
-        this.analysisPrimed = false;
+        this.featureSmoothing = {};
+        this.lastBeatFrameAt = null;
         this.beatPulse = 0;
         this.silenceStartedAt = 0;
         this.silenceNoticeShown = false;
@@ -7520,6 +7482,7 @@ class RendererLabApp {
         const sampleMs = Math.max(120, Number(payload.sampleMs) || 500);
         const columns = clamp(Math.round(Number(payload.columns) || DEFAULT_PARAMS.cols), 80, 900);
         const syntheticAudio = payload.syntheticAudio === true;
+        const nativeAudio = payload.nativeAudio === true && !syntheticAudio;
         const spatial = spatialParams(payload.spatial || {});
         const mediaUrl = String(payload.mediaUrl || DEFAULT_PARAMS.mediaUrl);
         const backend = STATIC_GPU_BACKENDS.has(payload.backend) || STATIC_CANVAS_BACKENDS.has(payload.backend)
@@ -7570,6 +7533,7 @@ class RendererLabApp {
                 nativeOk: this.nativeOutputSyncOkCount - syncStart.ok,
                 nativeFailed: this.nativeOutputSyncFailedCount - syncStart.failed,
                 nativeLastSyncMs: this.nativeOutputLastSyncElapsedMs,
+                audioCaptureTiming: nativeAudio ? this.audioReactiveRuntime.captureTiming : null,
                 nativeTransitionAttempts: this.nativeOutputTransitionArmAttemptCount - syncStart.transitionAttempts,
                 nativeTransitionOk: this.nativeOutputTransitionArmOkCount - syncStart.transitionOk,
                 nativeTransitionFailed: this.nativeOutputTransitionArmFailedCount - syncStart.transitionFailed
@@ -7583,6 +7547,7 @@ class RendererLabApp {
             sampleMs,
             columns,
             syntheticAudio,
+            nativeAudio,
             spatial,
             backend,
             paletteId,
@@ -7754,6 +7719,10 @@ class RendererLabApp {
                 });
                 applySyntheticAudio();
                 syntheticAudioTimer = window.setInterval(applySyntheticAudio, AUDIO_REACTIVE_FRAME_MS);
+            } else if (nativeAudio) {
+                this.audioReactive.source = 'input';
+                await this.audioReactiveRuntime.start();
+                if (!this.audioReactiveRuntime.nativeInputAudio) throw new Error('Native audio latency check requires native input capture');
             }
 
             const transitionTargets = [
@@ -7834,6 +7803,13 @@ class RendererLabApp {
             report.rendererChanges = rendererChanges;
             report.frameResetCount = usable.filter((item) => item.frameReset).length;
             report.finalFrameCount = Number(usable.at(-1)?.frameCount || 0);
+            if (nativeAudio) {
+                report.audioCaptureTiming = Object.fromEntries(['analysisWindowMs', 'ipcMs', 'featureAgeUpperBoundMs'].map(key => {
+                    const values = usable.map(s => s.audioCaptureTiming?.[key]).filter(Number.isFinite).sort((a,b)=>a-b);
+                    return [key, { samples:values.length, p50:values[Math.floor(values.length*.5)], p95:values[Math.min(values.length-1,Math.floor(values.length*.95))], max:values.at(-1) }];
+                }));
+                if (!report.audioCaptureTiming.analysisWindowMs.samples) throw new Error('No native capture timing samples');
+            }
             const videoTimes = usable.map((item) => item.videoCurrentTime).filter(Number.isFinite);
             report.videoTimeAdvanced = videoTimes.length > 1 &&
                 Math.max(...videoTimes) - Math.min(...videoTimes) > 0.05;
@@ -7871,6 +7847,7 @@ class RendererLabApp {
         } finally {
             if (syntheticAudioTimer) window.clearInterval(syntheticAudioTimer);
             if (syntheticAudio) this.clearAudioReactiveFrame();
+            if (nativeAudio) this.audioReactiveRuntime.stop({keepStatus:true});
             this._stopWtf();
             this.uiPerfSmokeActive = false;
             const compactPhases = Object.fromEntries(Object.entries(report.phases).map(([phase, stats]) => [
@@ -7890,13 +7867,13 @@ class RendererLabApp {
                 mediaUrl: report.mediaUrl,
                 columns: report.columns,
                 syntheticAudio: report.syntheticAudio,
+                nativeAudio: report.nativeAudio,
                 backend: report.backend,
                 paletteId: report.paletteId,
                 ditherMode: report.ditherMode,
                 charset: report.charset,
                 soak: report.soak,
                 structuralTransitions: report.structuralTransitions,
-                phases: compactPhases,
                 actualBackends: report.actualBackends,
                 nativeFailed: report.nativeFailed,
                 nativeTransitionArmed: report.nativeTransitionArmed,
@@ -7914,6 +7891,14 @@ class RendererLabApp {
                     ? Math.round(value * 1000) / 1000
                     : value
             )));
+            // Keep each diagnostic below the adapter's 1000-character bound.
+            // The smoke runner joins these bounded summaries after the final report.
+            for (const [phase, stats] of Object.entries(compactPhases)) {
+                await recordTauriMediaDiagnostic(`[ASCILINE_UI_PERF_PHASE_REPORT] ${JSON.stringify({phase, ...stats})}`).catch(() => {});
+            }
+            if (report.audioCaptureTiming) {
+                await recordTauriMediaDiagnostic(`[ASCILINE_UI_PERF_AUDIO_REPORT] ${JSON.stringify(report.audioCaptureTiming)}`).catch(() => {});
+            }
             await recordTauriMediaDiagnostic(
                 `[ASCILINE_UI_PERF_REPORT] ${JSON.stringify(compactSummary)}`
             ).catch(() => {});
@@ -8902,7 +8887,8 @@ button:hover{background:#202a35}
             mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
             // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
             nativeWtfActive: false,
-            audioReactiveActive: Boolean(this.audioReactiveRuntime?.active),
+            // Audio is also resolved above, including the shared release envelope.
+            audioReactiveActive: false,
             audioReactiveSource: this.audioReactive.source,
             audioReactivePreset: this.audioReactive.preset,
             audioReactiveSensitivity: this.audioReactive.sensitivity,
@@ -8919,6 +8905,9 @@ button:hover{background:#202a35}
 
     _nativeOutputPayload(params = this.renderParams(), transition = null) {
         const cameraMeta = this._nativeCameraOutputMeta(this.params);
+        // Armed transitions carry base endpoints and run without parameter IPC.
+        // Keep their native audio response; ordinary updates are already modulated.
+        const audioReactiveActive = Boolean(transition && this.audioReactiveRuntime?.active);
         const outputMode = cameraMeta
             ? 'native-camera'
             : this._canUseNativeRenderOutputWindow(this.params)
@@ -8932,13 +8921,13 @@ button:hover{background:#202a35}
             ),
             label: this.params.sourceName || sourceNameFromUrl(this.params.mediaUrl),
             nativeSourceId: this._nativeOutputSourceId(),
-            params: this._nativeOutputParams(params, cameraMeta),
+            params: { ...this._nativeOutputParams(params, cameraMeta), audioReactiveActive },
             mediaState: outputMode === 'static' ? this._captureStaticMediaState() : null,
             transition: transition ? {
                 kind: transition.kind,
                 startAtUnixMs: transition.startAtUnixMs,
                 durationMs: transition.durationMs,
-                fromParams: this._nativeOutputParams(transition.fromParams, cameraMeta)
+                fromParams: { ...this._nativeOutputParams(transition.fromParams, cameraMeta), audioReactiveActive }
             } : null
         };
     }
@@ -10648,7 +10637,7 @@ button:hover{background:#202a35}
 
     _makeWtfTarget(seconds) {
         // Choose once per transition: visual-safety retries and preset anchors
-        // must not bias the 50% flat / 50% spatial split.
+        // must not bias the 80% flat / 20% spatial split.
         const spatial = randomWtfSpatialParams();
         for (let attempt = 0; attempt < 16; attempt++) {
             const target = this._randomWtfTarget(seconds, spatial);

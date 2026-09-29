@@ -259,6 +259,17 @@ base params
 Effective params must not persist back into user presets unless the user
 explicitly saves the current state as a preset.
 
+Audio feature polling and reactive output synchronization target 120 Hz, with
+at most one native feature read in flight. Duplicate capture frames and replies
+from stopped sessions are ignored. Browser FFT analyzers do not add smoothing;
+both capture paths use the shared immediate-attack, elapsed-time release
+envelope. Smoothing zero bypasses the envelope. Native input requests 128-frame
+buffers within the device's supported range and retains the default-buffer
+fallback. Beat history and decay follow time rather than callback count.
+Steady Pop Out updates consume these effective parameters without applying audio
+a second time. Armed native transitions receive unmodulated endpoints and keep
+their direct native audio response while parameter synchronization is suspended.
+
 ## Backend Selection
 
 Backend `auto` attempts the highest-quality viable path first.
@@ -653,7 +664,7 @@ WTF mode:
 - creates randomized target params.
 - anchors some random states around extreme preset families and traditional
   ASCII presets.
-- independently selects Flat Media with 50% probability, otherwise selecting
+- independently selects Flat Media with 80% probability, otherwise selecting
   evenly from the canonical non-flat visual modes. The choice is made once
   before visual-safety retries and retained by the fallback. Spatial targets use
   the matching recipe's camera settings and Auto backend; normal renderer

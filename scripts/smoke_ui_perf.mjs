@@ -54,7 +54,9 @@ if (launch.status !== 0) console.error(`ui-perf-smoke: app exited with status ${
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let reportLine = null;
-const deadline = Date.now() + Math.max(30000, durationMs + 25000);
+// Match the native harness's startup/completion allowance. Measured frame-rate
+// and presentation gates remain independent of startup or window creation.
+const deadline = Date.now() + durationMs + 120000;
 while (Date.now() < deadline) {
   if (existsSync(mediaLogPath)) {
     reportLine = readFileSync(mediaLogPath, 'utf8')
@@ -73,6 +75,15 @@ if (!reportLine) {
 
 const jsonStart = reportLine.indexOf('{');
 const report = JSON.parse(reportLine.slice(jsonStart));
+const diagnosticLines = readFileSync(mediaLogPath, 'utf8').split(/\r?\n/);
+const parseDiagnostic = line => JSON.parse(line.slice(line.indexOf('{')));
+const phaseReports = diagnosticLines.filter(line => line.includes('[ASCILINE_UI_PERF_PHASE_REPORT]')).map(parseDiagnostic);
+if (phaseReports.length) report.phases = Object.fromEntries(phaseReports.map(({phase, ...stats}) => [phase, stats]));
+const audioReport = diagnosticLines.filter(line => line.includes('[ASCILINE_UI_PERF_AUDIO_REPORT]')).at(-1);
+if (audioReport) report.audioCaptureTiming = parseDiagnostic(audioReport);
+if (report.nativeAudio && !report.audioCaptureTiming?.analysisWindowMs?.samples) {
+  throw new Error('Native audio capture timing report is missing');
+}
 const phaseValues = Object.values(report.phases || {});
 const phaseAverage = (key) => phaseValues.length
   ? phaseValues.reduce((sum, phase) => sum + Number(phase?.[key] || 0), 0) / phaseValues.length

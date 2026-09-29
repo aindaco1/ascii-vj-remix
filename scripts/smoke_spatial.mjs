@@ -263,7 +263,7 @@ try {
         try {
             for(const startingMode of ['flat','ruins'])for(const outcome of ['retry','fallback'])for(const [i,expected] of ['flat',...modes].entries()){
                 a.params={...wtfParams,visualMode:startingMode,sceneFreeze:true,scenePitch:-75,solidMode:true};
-                const draws=expected==='flat'?[0.499999]:[0.5,(i-.5)/modes.length];
+                const draws=expected==='flat'?[0.799999]:[0.8,(i-.5)/modes.length];
                 // Zero after the spatial draw forces the existing Canvas ASCII
                 // anchor; it must not replace the independent spatial decision.
                 Math.random=()=>draws.length?draws.shift():0;

@@ -117,8 +117,8 @@ Start with the [install guide](../README.md#install-guide) and
 - WTF mode continuously transitions through randomized live-safe settings and
   leans into both extreme and traditional ASCII preset families while avoiding
   pure white or pure black output. Each transition independently chooses Flat
-  Media with 50% probability; the other 50% is shared equally among the ten
-  spatial modes (5% each). This is a probability per transition, so runs can
+  Media with 80% probability; the other 20% is shared equally among the ten
+  spatial modes (2% each). This is a probability per transition, so runs can
   include consecutive flat or spatial looks.
 
 ### Pixel Art and Color Cycling
@@ -150,6 +150,9 @@ They do not include those artists' images or authored scene animations.
   audio features.
 - Audio analysis tracks RMS, bass, low-mid, mid, high-mid, treble, presence,
   brightness, density, transient energy, beat pulse, and spectral movement.
+- Attacks follow each fresh audio reading immediately. Smoothing controls how
+  quickly the response falls away; set it to zero for the sharpest response.
+  Capture hardware and the display still contribute some delay.
 - Dense-mix dampening and noise-floor controls help busy songs stay reactive
   without pinning jitter and beat response at maximum.
 - Audio modulation is non-persistent: it affects live effective render params

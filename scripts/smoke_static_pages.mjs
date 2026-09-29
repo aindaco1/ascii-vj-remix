@@ -1041,9 +1041,13 @@ async function runSmoke() {
       const pointClick = { ...app.params, backend: 'auto', ...presetParams('point-click-default'), ...cameraBase };
       const neon = { ...app.params, ...presetParams('neon-sledgehammer'), ...cameraBase };
       const previousWtfActive = app.wtfActive;
+      const previousAudioActive = app.audioReactiveRuntime.active;
       app.wtfActive = true;
+      app.audioReactiveRuntime.active = true;
       const wtfPayload = app._nativeOutputPayload?.(classic);
+      const transitionPayload = app._nativeOutputPayload(classic, {fromParams:classic, kind:'tween', durationMs:1000, startAtUnixMs:Date.now()});
       app.wtfActive = previousWtfActive;
+      app.audioReactiveRuntime.active = previousAudioActive;
       return {
         classicMirrors: app?._shouldMirrorNativeCameraOutput?.(classic) ?? null,
         classicNativeGlyphs: app?._nativeOutputGlyphMode?.(classic) ?? null,
@@ -1051,6 +1055,10 @@ async function runSmoke() {
         neonMirrors: app?._shouldMirrorNativeCameraOutput?.(neon) ?? null,
         neonNativeGlyphs: app?._nativeOutputGlyphMode?.(neon) ?? null,
         nativeWtfActive: wtfPayload?.params?.nativeWtfActive,
+        nativeAudioActive: wtfPayload?.params?.audioReactiveActive,
+        nativeBrightness: wtfPayload?.params?.brightness,
+        effectiveBrightness: classic.brightness,
+        transitionAudioActive: transitionPayload.params.audioReactiveActive && transitionPayload.transition.fromParams.audioReactiveActive,
         classic: {
           glyphMode: classic.glyphMode,
           solidMode: classic.solidMode,
@@ -1079,6 +1087,9 @@ async function runSmoke() {
     }
     if (cameraNativeParity.nativeWtfActive !== false) {
       throw new Error(`Native output should consume app-resolved WTF params instead of double-modulating: ${JSON.stringify(cameraNativeParity)}`);
+    }
+    if (cameraNativeParity.nativeAudioActive !== false || cameraNativeParity.nativeBrightness !== cameraNativeParity.effectiveBrightness || !cameraNativeParity.transitionAudioActive) {
+      throw new Error(`Native output should consume app-resolved audio params without a second envelope or modulation: ${JSON.stringify(cameraNativeParity)}`);
     }
     await page.click('#source-list [data-source-id="demo-image"]');
     await page.waitForFunction(
