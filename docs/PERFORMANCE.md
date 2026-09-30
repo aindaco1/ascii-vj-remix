@@ -89,7 +89,7 @@ The optimized city/video/synthetic-audio workload at 640 columns measured
 presentation on M1 Max/64 GB, with 85% source media. The maintained phased
 smoke passed its existing gates; occasional spikes remain. Exact scope, the frame-time
 tails and manual/reference-floor limitations are recorded in the
-[1.1.0 candidate record](releases/RELEASE_1.1.0.md#local-validation).
+[1.1.0 release record](releases/RELEASE_1.1.0.md#earlier-local-validation-before-fractal-follow-up).
 
 ## 0.9.6 Measured Optimization Pass
 
@@ -211,7 +211,7 @@ use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
 the normal software density ceiling. The earlier 71-preset installed sweep resolved
 43 built-ins to WebGPU and 28 to Canvas2D, kept all 71 visible, and confirmed
 every GPU-eligible preset was accelerated. These are historical measurements;
-the current 87/59/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
+the current 90/62/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
 Native Pop Out remains independently
 GPU-rendered. An earlier 30-second structural run held the primary view at 30.0 FPS,
 native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS

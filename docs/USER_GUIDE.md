@@ -515,8 +515,10 @@ The eleven new presets remain available; their camera and scene settings are
 loaded but only take effect when you choose a spatial Visual mode manually.
 Reselecting a built-in preset restores Flat Media. Saved custom presets retain
 their chosen mode, and existing saved settings are not migrated.
-The release is currently a local development build for manual acceptance;
-public installers have not been replaced.
+Version 1.1.0 is available in [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.1.0)
+and through the production in-app updater. See the
+[release record](releases/RELEASE_1.1.0.md#published-artifacts-and-acceptance)
+for installer/updater validation and remaining physical-platform checks.
 
 | Preset | Optional Visual mode | Scene after opting in |
 | --- | --- | --- |

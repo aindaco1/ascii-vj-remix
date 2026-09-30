@@ -387,8 +387,8 @@ construction and frame counters succeeded, but glyph-atlas output stayed
 blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
-the problematic glyph upload path, so the 1.0 release retires that blanket
-route and requires the Windows preset matrix to preserve 62 accelerated and 28
+the problematic glyph upload path, so the 1.0 release retired that blanket
+route. The current Windows preset matrix must preserve 62 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -769,7 +769,7 @@ Lookup tables, pipelines, glyph data and source textures remain independent of
 the cycling display table. Native/browser output receives the same controls;
 mirrored output receives already-rendered pixels and applies no second cycle.
 
-## Spatial stage (1.1.0, unpublished)
+## Spatial stage (1.1.0)
 
 `renderers/shared/spatial-contract.json` owns defaults, enumerations, limits and
 control labels. JS normalization, UI and Rust validation consume that contract;

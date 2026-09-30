@@ -183,7 +183,7 @@ for that integration's separate rollback. No application/data migration is invol
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 87 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 90 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -222,7 +222,7 @@ choose another parent directory. These fresh browser contexts contain synthetic
 smoke fixtures; diagnostics do not dump storage, environment variables, or the
 full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
-renderer checks, or the 87/59/28 preset ownership contract.
+renderer checks, or the 90/62/28 preset ownership contract.
 
 ### Audio response
 

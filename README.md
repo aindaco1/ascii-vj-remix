@@ -111,14 +111,14 @@ metadata. The Windows installers are unsigned previews.
 For an AppImage:
 
 ```bash
-chmod +x ASCII-VJ-Remix*.AppImage
-./ASCII-VJ-Remix*.AppImage
+chmod +x ASCII.VJ.Remix_*.AppImage
+./ASCII.VJ.Remix_*.AppImage
 ```
 
 For a `.deb` package:
 
 ```bash
-sudo apt install ./ascii-vj-remix*.deb
+sudo apt install ./ASCII.VJ.Remix_*.deb
 ```
 
 If the app does not launch, check that WebKitGTK, GPU drivers, and desktop
