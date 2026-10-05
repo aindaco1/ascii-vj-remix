@@ -1,5 +1,5 @@
 import { spatialWGSL } from '../../../../shared/spatial-shader.js';
-import { spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
+import { SPATIAL_UNIFORM_FLOATS, spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
 import { activeGlyphRamp } from '../../../../shared/character-sets.js';
 import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
 import { cachedGpuPipeline } from '../../../../shared/gpu-pipeline-cache.js';
@@ -76,12 +76,16 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 
-struct SpatialParams { data: array<vec4f, 10>, };
+struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
+    let at = vec2<u32>(clamp(uv, vec2f(0.0), vec2f(0.999999)) * vec2f(f32(params.cols), f32(params.rows)));
+    return processColor(color, at.x, at.y);
+}
 fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
 fn sceneMedia(uv: vec2f) -> vec3f {
     var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
@@ -170,12 +174,16 @@ struct FeatureData {
 
 // Simple hash for per-cell pseudo-random jitter
 
-struct SpatialParams { data: array<vec4f, 10>, };
+struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
+    let at = vec2<u32>(clamp(uv, vec2f(0.0), vec2f(0.999999)) * vec2f(f32(params.cols), f32(params.rows)));
+    return processColor(color, at.x, at.y);
+}
 fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
 fn sceneMedia(uv: vec2f) -> vec3f {
     var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
@@ -344,7 +352,7 @@ export class WebGPURenderer {
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
         Object.assign(this, paletteCycleParams(options), spatialParams(options));
-        this.spatialData = new Float32Array(40);
+        this.spatialData = new Float32Array(SPATIAL_UNIFORM_FLOATS);
         this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);
@@ -471,7 +479,7 @@ export class WebGPURenderer {
 
         this._createCellTexture();
 
-        this.spatialBuffer = this.device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        this.spatialBuffer = this.device.createBuffer({ size: this.spatialData.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         this.paramsBuffer = this.device.createBuffer({
             size: 112,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST

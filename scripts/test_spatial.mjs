@@ -20,20 +20,20 @@ for(const preset of SPATIAL_PRESETS){
     assert.equal(preset.params.backend,'auto');
     assert.equal('brightOutput' in preset.params,false,'presets must preserve the global preference');
     assert.equal('mediaUrl' in preset.params,false);assert.equal('sourceMode' in preset.params,false);
-    for(const key of SPATIAL_KEYS) assert.ok(key in preset.params,`${preset.id} lacks ${key}`);
+    for(const key of SPATIAL_KEYS.filter(k=>!SPATIAL_CONTRACT[k].global)) assert.ok(key in preset.params,`${preset.id} lacks ${key}`);
 }
 const scenePresets = SPATIAL_PRESETS.filter(p => p.sceneMode !== 'flat')
     .map(p => ({...p, params:{...p.params, visualMode:p.sceneMode}}));
 assert.equal(scenePresets.length,9,'scene checks must still exercise every manual opt-in recipe');
 // Check probability boundaries and every equally sized non-flat bucket without
 // a flaky statistical sample. The flat branch consumes just the coin toss.
-for(const coin of [0,0.799999]) {
+for(const coin of [0,0.949999]) {
     let calls=0;
     assert.deepEqual(randomWtfSpatialParams(()=>{calls++;return coin;}),{visualMode:'flat'});
     assert.equal(calls,1);
 }
 const sceneModes=SPATIAL_CONTRACT.visualMode.options.map(([id])=>id).filter(id=>id!=='flat');
-for(const coin of [0.8,0.999999])for(const [i,visualMode] of sceneModes.entries()) {
+for(const coin of [0.95,0.999999])for(const [i,visualMode] of sceneModes.entries()) {
     for(const position of [0,0.5,0.999999]) {
         const draws=[coin,(i+position)/sceneModes.length];
         const params=randomWtfSpatialParams(()=>draws.shift());
@@ -65,13 +65,13 @@ const source=()=>[.2,.4,.8];source.aspect=16/9;
 const a=createSpatialSampler(p,source,16/9,0),b=createSpatialSampler(p,source,16/9,32);
 for(const uv of [[.1,.2],[.4,.8],[.8,.5]])a(...uv).color.forEach((c,i)=>near(c,b(...uv).color[i]));
 function decay(hz){
-    const state={},out=new Float32Array(40),params={...p,feedbackAmount:.98,feedbackHalfLife:.7};let remaining=1;
+    const state={},out=new Float32Array(52),params={...p,feedbackAmount:.98,feedbackHalfLife:.7};let remaining=1;
     fillSpatialUniforms(out,params,120,45,10,state,1000);
     for(let i=1;i<=hz;i++){fillSpatialUniforms(out,params,120,45,10,state,1000+i*1000/hz);remaining*=out[18];}
     return remaining;
 }
 near(decay(30),decay(60));
-const data=new Float32Array(40),state={};fillSpatialUniforms(data,p,120,45,10,state,1000);assert.equal(data[21],0);
+const data=new Float32Array(52),state={};fillSpatialUniforms(data,p,120,45,10,state,1000);assert.equal(data[21],0);
 fillSpatialUniforms(data,p,120,45,10,state,1017);assert.equal(data[21],1);
 fillSpatialUniforms(data,{...p,sceneSeed:8},120,45,10,state,1034);assert.equal(data[21],0);
 fillSpatialUniforms(data,p,120,45,10,state,3000);assert.equal(data[21],0);
@@ -85,7 +85,7 @@ assert.ok(audio.sceneFov>=p.sceneFov&&audio.sceneFov<=110);assert.ok(audio.scene
 assert.equal(applyAudioReactiveModulation({...p,visualMode:'flat'},{bass:1},{sensitivity:12}).sceneHeight,p.sceneHeight);
 
 for (const fixture of JSON.parse(readFileSync(new URL('../tests/fixtures/spatial-uniforms.json',import.meta.url),'utf8'))) {
-    const p=spatialParams(fixture.input),state={},out=new Float32Array(40);
+    const p=spatialParams(fixture.input),state={},out=new Float32Array(52);
     for(const sample of fixture.samples){fillSpatialUniforms(out,p,fixture.cols,fixture.rows,fixture.baseGlyphCount,state,sample.now);out.forEach((n,i)=>near(n,sample.expected[i]));}
 }
 

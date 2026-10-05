@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "mediaUrl": "media/point-click-test-30s.mp4",
+  "columns": 240,
+  "syntheticAudio": true,
+  "nativeAudio": false,
+  "backend": "auto",
+  "paletteId": "none",
+  "ditherMode": "none",
+  "charset": "point-click",
+  "soak": false,
+  "structuralTransitions": false,
+  "actualBackends": [
+    "webgpu"
+  ],
+  "nativeFailed": 0,
+  "nativeTransitionArmed": 7,
+  "nativeTransitionFailed": 0,
+  "outputDisplayCount": 1,
+  "rendererChanges": 1,
+  "frameResetCount": 0,
+  "finalFrameCount": 503,
+  "hasVisibleSignal": true,
+  "videoTimeAdvanced": true,
+  "frontendErrors": 0,
+  "videoFrameSupported": true,
+  "error": null,
+  "sampleCount": 24,
+  "phases": {
+    "main": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 8,
+      "mainAvgFps": 39.471057884231534,
+      "mainMinFps": 37.924151696606785,
+      "mainP95FrameMs": 26.36842105263158,
+      "mainP99FrameMs": 26.36842105263158,
+      "nativeOkHz": 0
+    },
+    "popout": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 8,
+      "mainAvgFps": 38.471057884231534,
+      "mainMinFps": 36,
+      "mainP95FrameMs": 27.284502923976607,
+      "mainP99FrameMs": 27.679122807017546,
+      "nativeOkHz": 83.18812375249502
+    },
+    "transition": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 8,
+      "mainAvgFps": 37.22926942525767,
+      "mainMinFps": 35.714285714285715,
+      "mainP95FrameMs": 28,
+      "mainP99FrameMs": 28,
+      "nativeOkHz": 3.4752080945075177
+    }
+  },
+  "mainAvgFps": 38.390461731240244,
+  "mainMinFps": 35.714285714285715,
+  "mainP95FrameMs": 28,
+  "mainP99FrameMs": 28,
+  "testedSpatial": {
+    "visualMode": "mandelbox",
+    "sceneMedia": 0.85,
+    "accentStyle": "glass",
+    "accentAmount": 0.5,
+    "accentCoverage": 1,
+    "accentPlacement": "quiet",
+    "accentAudio": 1,
+    "accentSubtleLimit": true
+  },
+  "scope": "macOS development host; synthetic audio; built-in video; not physical Windows/Linux acceptance",
+  "date": "2026-10-04",
+  "host": "Apple M1 Max",
+  "os": "macOS 27.0.1",
+  "nativePresentation": {
+    "presentedAverageFps": 60,
+    "sourceAverageFps": 23.8,
+    "gpuFailures": 0
+  }
+}

@@ -1,0 +1,1253 @@
+{
+  "targets": 46,
+  "cases": [
+    {
+      "index": 0,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 33.97625343363249,
+      "visibleRatio": 1
+    },
+    {
+      "index": 0,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 33.62262530863283,
+      "visibleRatio": 1
+    },
+    {
+      "index": 0,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 45.161359413555516,
+      "visibleRatio": 1
+    },
+    {
+      "index": 1,
+      "backend": "webgl2",
+      "mode": "ruins",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 106.45538009258506,
+      "visibleRatio": 1
+    },
+    {
+      "index": 1,
+      "backend": "webgpu",
+      "mode": "ruins",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 106.47359228394255,
+      "visibleRatio": 1
+    },
+    {
+      "index": 1,
+      "backend": "canvas2d",
+      "mode": "ruins",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 106.49777935955292,
+      "visibleRatio": 1
+    },
+    {
+      "index": 2,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 30.389181867284393,
+      "visibleRatio": 0.6919367283950617
+    },
+    {
+      "index": 2,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 30.190040316359287,
+      "visibleRatio": 0.6819058641975309
+    },
+    {
+      "index": 2,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 39.028312152774866,
+      "visibleRatio": 0.7170138888888888
+    },
+    {
+      "index": 3,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 47.08387538580753,
+      "visibleRatio": 0.7775848765432098
+    },
+    {
+      "index": 3,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 46.8682952546372,
+      "visibleRatio": 0.7609953703703703
+    },
+    {
+      "index": 3,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 47.10342966821737,
+      "visibleRatio": 0.7635030864197531
+    },
+    {
+      "index": 4,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 26.151645640438495,
+      "visibleRatio": 1
+    },
+    {
+      "index": 4,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 25.96397268519198,
+      "visibleRatio": 1
+    },
+    {
+      "index": 4,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 26.77464112655026,
+      "visibleRatio": 1
+    },
+    {
+      "index": 5,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 69.49499290124014,
+      "visibleRatio": 0.8663194444444444
+    },
+    {
+      "index": 5,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 68.48194259259913,
+      "visibleRatio": 0.8524305555555556
+    },
+    {
+      "index": 5,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 69.11232716049875,
+      "visibleRatio": 0.8564814814814815
+    },
+    {
+      "index": 6,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 28.917049112653817,
+      "visibleRatio": 0.6089891975308642
+    },
+    {
+      "index": 6,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 28.52991176697555,
+      "visibleRatio": 0.597608024691358
+    },
+    {
+      "index": 6,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 37.18238267746018,
+      "visibleRatio": 0.6653163580246914
+    },
+    {
+      "index": 7,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 43.27238792441718,
+      "visibleRatio": 1
+    },
+    {
+      "index": 7,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 43.11189158954229,
+      "visibleRatio": 1
+    },
+    {
+      "index": 7,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 57.72271095681869,
+      "visibleRatio": 1
+    },
+    {
+      "index": 8,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": true,
+      "average": 20.978661802361483,
+      "visibleRatio": 0.3558706275720165
+    },
+    {
+      "index": 8,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": true,
+      "average": 20.84311343880683,
+      "visibleRatio": 0.356835133744856
+    },
+    {
+      "index": 8,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": true,
+      "average": 27.51508817838568,
+      "visibleRatio": 0.5003536522633745
+    },
+    {
+      "index": 9,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 38.189723186717835,
+      "visibleRatio": 0.6579861111111112
+    },
+    {
+      "index": 9,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 37.97198148147113,
+      "visibleRatio": 0.6599151234567902
+    },
+    {
+      "index": 9,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 38.432288811718855,
+      "visibleRatio": 0.6612654320987654
+    },
+    {
+      "index": 10,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 35.99739016207153,
+      "visibleRatio": 0.9992283950617284
+    },
+    {
+      "index": 10,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 35.74182577163984,
+      "visibleRatio": 0.9982638888888888
+    },
+    {
+      "index": 10,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 37.00200347225707,
+      "visibleRatio": 0.9988425925925926
+    },
+    {
+      "index": 11,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 79.31047789350482,
+      "visibleRatio": 1
+    },
+    {
+      "index": 11,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 79.24586014658797,
+      "visibleRatio": 1
+    },
+    {
+      "index": 11,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 79.68495354936594,
+      "visibleRatio": 1
+    },
+    {
+      "index": 12,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 30.49624081790073,
+      "visibleRatio": 0.6776620370370371
+    },
+    {
+      "index": 12,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 30.178660532406404,
+      "visibleRatio": 0.6726466049382716
+    },
+    {
+      "index": 12,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 38.71871832561187,
+      "visibleRatio": 0.7135416666666666
+    },
+    {
+      "index": 13,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 29.450461728405394,
+      "visibleRatio": 1
+    },
+    {
+      "index": 13,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 29.427543325627713,
+      "visibleRatio": 1
+    },
+    {
+      "index": 13,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 38.92551828704898,
+      "visibleRatio": 1
+    },
+    {
+      "index": 14,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 42.102966898189656,
+      "visibleRatio": 0.9998070987654321
+    },
+    {
+      "index": 14,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 41.97564475312905,
+      "visibleRatio": 0.9998070987654321
+    },
+    {
+      "index": 14,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 48.45377897381027,
+      "visibleRatio": 1
+    },
+    {
+      "index": 15,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 36.96300937499588,
+      "visibleRatio": 0.7015817901234568
+    },
+    {
+      "index": 15,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 36.60787222221969,
+      "visibleRatio": 0.6952160493827161
+    },
+    {
+      "index": 15,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 36.9502182098739,
+      "visibleRatio": 0.7035108024691358
+    },
+    {
+      "index": 16,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 34.48203202160505,
+      "visibleRatio": 0.7555941358024691
+    },
+    {
+      "index": 16,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 34.23501041666589,
+      "visibleRatio": 0.7505787037037037
+    },
+    {
+      "index": 16,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 42.108301234565076,
+      "visibleRatio": 0.7770061728395061
+    },
+    {
+      "index": 17,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 88.61012148911759,
+      "visibleRatio": 0.9949845679012346
+    },
+    {
+      "index": 17,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 87.46858283171258,
+      "visibleRatio": 0.9909336419753086
+    },
+    {
+      "index": 17,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 88.22106331010482,
+      "visibleRatio": 0.9905478395061729
+    },
+    {
+      "index": 18,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 42.69832835648613,
+      "visibleRatio": 0.8244598765432098
+    },
+    {
+      "index": 18,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 42.33984664352261,
+      "visibleRatio": 0.8171296296296297
+    },
+    {
+      "index": 18,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 53.077819290123465,
+      "visibleRatio": 0.8412422839506173
+    },
+    {
+      "index": 19,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 28.34466500773276,
+      "visibleRatio": 1
+    },
+    {
+      "index": 19,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 28.34308314044886,
+      "visibleRatio": 1
+    },
+    {
+      "index": 19,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 42.88984004630496,
+      "visibleRatio": 1
+    },
+    {
+      "index": 20,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 41.70657581022261,
+      "visibleRatio": 1
+    },
+    {
+      "index": 20,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 41.477022376579924,
+      "visibleRatio": 1
+    },
+    {
+      "index": 20,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "silk",
+      "glyphs": false,
+      "average": 54.636253935232276,
+      "visibleRatio": 1
+    },
+    {
+      "index": 21,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 45.07788522371862,
+      "visibleRatio": 1
+    },
+    {
+      "index": 21,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 45.01936111106385,
+      "visibleRatio": 1
+    },
+    {
+      "index": 21,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 45.83842256939646,
+      "visibleRatio": 1
+    },
+    {
+      "index": 22,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 40.10538665123171,
+      "visibleRatio": 0.7619598765432098
+    },
+    {
+      "index": 22,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 39.831956597220746,
+      "visibleRatio": 0.7582947530864198
+    },
+    {
+      "index": 22,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 42.96377129629142,
+      "visibleRatio": 0.7679398148148148
+    },
+    {
+      "index": 23,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 69.83670239196381,
+      "visibleRatio": 1
+    },
+    {
+      "index": 23,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 69.08778966048631,
+      "visibleRatio": 1
+    },
+    {
+      "index": 23,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 70.3908054012236,
+      "visibleRatio": 1
+    },
+    {
+      "index": 24,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 30.349952662044185,
+      "visibleRatio": 0.8335262345679012
+    },
+    {
+      "index": 24,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 30.233232484576877,
+      "visibleRatio": 0.8236882716049383
+    },
+    {
+      "index": 24,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 36.01502033179805,
+      "visibleRatio": 0.8634259259259259
+    },
+    {
+      "index": 25,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 29.743645794751295,
+      "visibleRatio": 0.6986882716049383
+    },
+    {
+      "index": 25,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 29.743810300926274,
+      "visibleRatio": 0.683641975308642
+    },
+    {
+      "index": 25,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 37.86449062499117,
+      "visibleRatio": 0.7121913580246914
+    },
+    {
+      "index": 26,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 63.31199035494011,
+      "visibleRatio": 0.9195601851851852
+    },
+    {
+      "index": 26,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 62.67384911265578,
+      "visibleRatio": 0.9108796296296297
+    },
+    {
+      "index": 26,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "glass",
+      "glyphs": false,
+      "average": 69.9316324074096,
+      "visibleRatio": 0.9114583333333334
+    },
+    {
+      "index": 27,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 54.57671697531213,
+      "visibleRatio": 1
+    },
+    {
+      "index": 27,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 54.976043672842295,
+      "visibleRatio": 1
+    },
+    {
+      "index": 27,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 55.55116929012586,
+      "visibleRatio": 1
+    },
+    {
+      "index": 28,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 14.109942203571187,
+      "visibleRatio": 0.3721707818930041
+    },
+    {
+      "index": 28,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 14.059738358406864,
+      "visibleRatio": 0.3707240226337449
+    },
+    {
+      "index": 28,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 17.196500112521004,
+      "visibleRatio": 0.3438786008230453
+    },
+    {
+      "index": 29,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 43.17809988748361,
+      "visibleRatio": 0.9849054783950617
+    },
+    {
+      "index": 29,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 43.17164636060657,
+      "visibleRatio": 0.984937628600823
+    },
+    {
+      "index": 29,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": true,
+      "average": 40.19129295909875,
+      "visibleRatio": 0.9699074074074074
+    },
+    {
+      "index": 30,
+      "backend": "webgl2",
+      "mode": "city",
+      "accent": "off",
+      "glyphs": false,
+      "average": 49.769134413618275,
+      "visibleRatio": 1
+    },
+    {
+      "index": 30,
+      "backend": "webgpu",
+      "mode": "city",
+      "accent": "off",
+      "glyphs": false,
+      "average": 49.51903765435852,
+      "visibleRatio": 1
+    },
+    {
+      "index": 30,
+      "backend": "canvas2d",
+      "mode": "city",
+      "accent": "off",
+      "glyphs": false,
+      "average": 49.575895679049935,
+      "visibleRatio": 1
+    },
+    {
+      "index": 31,
+      "backend": "webgl2",
+      "mode": "mandelbulb",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 13.054117515431534,
+      "visibleRatio": 0.11824845679012345
+    },
+    {
+      "index": 31,
+      "backend": "webgpu",
+      "mode": "mandelbulb",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 13.053825038579689,
+      "visibleRatio": 0.11824845679012345
+    },
+    {
+      "index": 31,
+      "backend": "canvas2d",
+      "mode": "mandelbulb",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 13.091575270061671,
+      "visibleRatio": 0.11805555555555555
+    },
+    {
+      "index": 32,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 42.226510262326215,
+      "visibleRatio": 1
+    },
+    {
+      "index": 32,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 42.152958410473005,
+      "visibleRatio": 1
+    },
+    {
+      "index": 32,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 50.06845709874665,
+      "visibleRatio": 1
+    },
+    {
+      "index": 33,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 40.168002160481976,
+      "visibleRatio": 0.7546296296296297
+    },
+    {
+      "index": 33,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 40.258569212952736,
+      "visibleRatio": 0.7459490740740741
+    },
+    {
+      "index": 33,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 40.749358641964896,
+      "visibleRatio": 0.7548225308641975
+    },
+    {
+      "index": 34,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 29.383735146603595,
+      "visibleRatio": 0.6043595679012346
+    },
+    {
+      "index": 34,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 29.113627584874546,
+      "visibleRatio": 0.5979938271604939
+    },
+    {
+      "index": 34,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 34.77209016202922,
+      "visibleRatio": 0.6340663580246914
+    },
+    {
+      "index": 35,
+      "backend": "webgl2",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 69.73622013892,
+      "visibleRatio": 1
+    },
+    {
+      "index": 35,
+      "backend": "webgpu",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 70.03049699076789,
+      "visibleRatio": 1
+    },
+    {
+      "index": 35,
+      "backend": "canvas2d",
+      "mode": "flat",
+      "accent": "off",
+      "glyphs": false,
+      "average": 70.4584243055819,
+      "visibleRatio": 1
+    },
+    {
+      "index": 36,
+      "backend": "webgl2",
+      "mode": "city",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 37.57871323302848,
+      "visibleRatio": 1
+    },
+    {
+      "index": 36,
+      "backend": "webgpu",
+      "mode": "city",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 37.57929139660877,
+      "visibleRatio": 1
+    },
+    {
+      "index": 36,
+      "backend": "canvas2d",
+      "mode": "city",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 37.65935679012763,
+      "visibleRatio": 1
+    },
+    {
+      "index": 37,
+      "backend": "webgl2",
+      "mode": "corridor",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 44.45058028551142,
+      "visibleRatio": 1
+    },
+    {
+      "index": 37,
+      "backend": "webgpu",
+      "mode": "corridor",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 44.42299004631361,
+      "visibleRatio": 1
+    },
+    {
+      "index": 37,
+      "backend": "canvas2d",
+      "mode": "corridor",
+      "accent": "threads",
+      "glyphs": false,
+      "average": 44.55855898921556,
+      "visibleRatio": 1
+    },
+    {
+      "index": 38,
+      "backend": "webgl2",
+      "mode": "coast",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 68.65832121913499,
+      "visibleRatio": 0.8059413580246914
+    },
+    {
+      "index": 38,
+      "backend": "webgpu",
+      "mode": "coast",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 68.6675704475303,
+      "visibleRatio": 0.8061342592592593
+    },
+    {
+      "index": 38,
+      "backend": "canvas2d",
+      "mode": "coast",
+      "accent": "chroma",
+      "glyphs": false,
+      "average": 68.58779830246819,
+      "visibleRatio": 0.8043981481481481
+    },
+    {
+      "index": 39,
+      "backend": "webgl2",
+      "mode": "cathedral",
+      "accent": "off",
+      "glyphs": false,
+      "average": 63.472883256160166,
+      "visibleRatio": 1
+    },
+    {
+      "index": 39,
+      "backend": "webgpu",
+      "mode": "cathedral",
+      "accent": "off",
+      "glyphs": false,
+      "average": 63.44759074072669,
+      "visibleRatio": 1
+    },
+    {
+      "index": 39,
+      "backend": "canvas2d",
+      "mode": "cathedral",
+      "accent": "off",
+      "glyphs": false,
+      "average": 63.430902623442755,
+      "visibleRatio": 1
+    },
+    {
+      "index": 40,
+      "backend": "webgl2",
+      "mode": "relief",
+      "accent": "off",
+      "glyphs": false,
+      "average": 32.0382562114235,
+      "visibleRatio": 0.5628858024691358
+    },
+    {
+      "index": 40,
+      "backend": "webgpu",
+      "mode": "relief",
+      "accent": "off",
+      "glyphs": false,
+      "average": 32.07518773148512,
+      "visibleRatio": 0.5630787037037037
+    },
+    {
+      "index": 40,
+      "backend": "canvas2d",
+      "mode": "relief",
+      "accent": "off",
+      "glyphs": false,
+      "average": 32.01449537037454,
+      "visibleRatio": 0.5626929012345679
+    },
+    {
+      "index": 41,
+      "backend": "webgl2",
+      "mode": "orbitals",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 17.94394182098762,
+      "visibleRatio": 0.18383487654320987
+    },
+    {
+      "index": 41,
+      "backend": "webgpu",
+      "mode": "orbitals",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 17.944786844135724,
+      "visibleRatio": 0.18364197530864199
+    },
+    {
+      "index": 41,
+      "backend": "canvas2d",
+      "mode": "orbitals",
+      "accent": "etch",
+      "glyphs": false,
+      "average": 17.91882839506156,
+      "visibleRatio": 0.18344907407407407
+    },
+    {
+      "index": 42,
+      "backend": "webgl2",
+      "mode": "ruins",
+      "accent": "off",
+      "glyphs": false,
+      "average": 101.85682905092582,
+      "visibleRatio": 1
+    },
+    {
+      "index": 42,
+      "backend": "webgpu",
+      "mode": "ruins",
+      "accent": "off",
+      "glyphs": false,
+      "average": 101.8511141975308,
+      "visibleRatio": 1
+    },
+    {
+      "index": 42,
+      "backend": "canvas2d",
+      "mode": "ruins",
+      "accent": "off",
+      "glyphs": false,
+      "average": 101.8066712577159,
+      "visibleRatio": 1
+    },
+    {
+      "index": 43,
+      "backend": "webgl2",
+      "mode": "mandelbrot",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.037165354918315,
+      "visibleRatio": 1
+    },
+    {
+      "index": 43,
+      "backend": "webgpu",
+      "mode": "mandelbrot",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.080432484548172,
+      "visibleRatio": 1
+    },
+    {
+      "index": 43,
+      "backend": "canvas2d",
+      "mode": "mandelbrot",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.084093981461805,
+      "visibleRatio": 1
+    },
+    {
+      "index": 44,
+      "backend": "webgl2",
+      "mode": "mandelbulb",
+      "accent": "off",
+      "glyphs": false,
+      "average": 30.894020601876388,
+      "visibleRatio": 1
+    },
+    {
+      "index": 44,
+      "backend": "webgpu",
+      "mode": "mandelbulb",
+      "accent": "off",
+      "glyphs": false,
+      "average": 30.894020601876388,
+      "visibleRatio": 1
+    },
+    {
+      "index": 44,
+      "backend": "canvas2d",
+      "mode": "mandelbulb",
+      "accent": "off",
+      "glyphs": false,
+      "average": 30.853333487678764,
+      "visibleRatio": 1
+    },
+    {
+      "index": 45,
+      "backend": "webgl2",
+      "mode": "mandelbox",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.280742515425754,
+      "visibleRatio": 0.2974537037037037
+    },
+    {
+      "index": 45,
+      "backend": "webgpu",
+      "mode": "mandelbox",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.265498109559992,
+      "visibleRatio": 0.2959104938271605
+    },
+    {
+      "index": 45,
+      "backend": "canvas2d",
+      "mode": "mandelbox",
+      "accent": "off",
+      "glyphs": false,
+      "average": 22.26499085647369,
+      "visibleRatio": 0.2959104938271605
+    }
+  ],
+  "generationMs": {
+    "max": 132,
+    "average": 28.694444444444443
+  },
+  "failClosed": true,
+  "blackSourceAllowed": true
+}

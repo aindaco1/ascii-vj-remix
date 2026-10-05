@@ -1,5 +1,5 @@
 {
-  "visualMode": {"default":"flat","label":"Visual mode","options":[["flat","Flat media"],["city","City streets"],["corridor","Media corridor"],["coast","Wet coast"],["cathedral","Vaulted hall"],["relief","Brightness relief · experimental"],["orbitals","Orbitals"],["ruins","Recursive ruins"],["mandelbrot","Mandelbrot dive"],["mandelbulb","Mandelbulb"],["mandelbox","Mandelbox"]]},
+  "visualMode": {"default":"flat","label":"Visual mode","options":[["flat","Flat media"],["city","City streets"],["corridor","Media corridor"],["coast","Wet coast"],["cathedral","Vaulted hall"],["relief","Brightness relief \u00b7 experimental"],["orbitals","Orbitals"],["ruins","Recursive ruins"],["mandelbrot","Mandelbrot dive"],["mandelbulb","Mandelbulb"],["mandelbox","Mandelbox"]]},
   "sceneRoute": {"modes":["city","corridor","coast","cathedral","relief","orbitals","ruins","mandelbrot","mandelbulb","mandelbox"],"default":"drive","label":"Camera route","options":[["drive","Forward / wrapped"],["weave","Street weave"],["orbit","Look around / orbit"]]},
   "sceneSpeed": {"default":0.65,"label":"Travel speed","min":-4,"max":4,"step":0.05},
   "sceneFreeze": {"default":false,"label":"Freeze scene"},
@@ -7,7 +7,7 @@
   "sceneSeed": {"modes":["city","corridor","coast","cathedral","relief","ruins","mandelbrot","mandelbulb","mandelbox"],"default":7,"label":"World seed","min":1,"max":999,"step":1},
   "sceneFov": {"default":70,"label":"Field of view","min":40,"max":110,"step":1},
   "sceneHeight": {"default":1.25,"label":"Camera height","min":0.3,"max":3,"step":0.01},
-  "scenePitch": {"default":0,"min":-75,"max":60,"step":1,"label":"Camera tilt","unit":"°"},
+  "scenePitch": {"default":0,"min":-75,"max":60,"step":1,"label":"Camera tilt","unit":"\u00b0"},
   "sceneMedia": {"default":0.85,"label":"Media amount","min":0,"max":1,"step":0.01},
   "sceneMediaFit": {"default":"repeat","label":"Surface framing","options":[["repeat","Repeat"],["fit","Fit"],["crop","Crop"]]},
   "sceneFog": {"modes":["city","corridor","coast","cathedral","relief","ruins","mandelbulb","mandelbox"],"default":0.055,"label":"Distance fog","min":0,"max":0.2,"step":0.005},
@@ -24,5 +24,14 @@
   "feedbackRotate": {"default":0,"label":"Echo rotation","min":-1,"max":1,"step":0.01},
   "fractalZoom": {"modes":["ruins","mandelbrot","mandelbulb","mandelbox"],"default":1,"label":"Fractal zoom","min":0.5,"max":3,"step":0.01},
   "fractalDetail": {"modes":["ruins","mandelbrot","mandelbulb","mandelbox"],"default":5,"label":"Fractal detail","min":2,"max":8,"step":1},
-  "fractalMorph": {"modes":["ruins","mandelbrot","mandelbulb","mandelbox"],"default":0.5,"label":"Fractal shape","min":0,"max":1,"step":0.01}
+  "fractalMorph": {"modes":["ruins","mandelbrot","mandelbulb","mandelbox"],"default":0.5,"label":"Fractal shape","min":0,"max":1,"step":0.01},
+  "accentStyle": {"default":"threads","label":"Fractal texture","options":[["threads","Threads"],["etch","Engraving"],["silk","Flowing bands"],["glass","Julia glass"],["chroma","Color currents"],["off","Off"]],"group":"Fractal Accents"},
+  "accentAmount": {"default":0,"label":"Fractal amount","min":0,"max":1,"step":0.01,"group":"Fractal Accents"},
+  "accentCoverage": {"default":0.65,"label":"Coverage","min":0,"max":1,"step":0.01,"group":"Fractal Accents"},
+  "accentPlacement": {"default":"midtones","label":"Placement","trailAmount":0.985,"trailHalfLife":0.4,"options":[["edges","Edges"],["midtones","Midtones"],["quiet","Quiet areas"],["trails","Trails"]],"group":"Fractal Accents"},
+  "accentVariation": {"default":0,"label":"Variation","min":0,"max":5,"step":1,"discrete":true,"group":"Fractal Accents"},
+  "accentScale": {"default":1,"label":"Texture scale","min":0.5,"max":3,"step":0.01,"group":"Fractal Accents"},
+  "accentMotion": {"default":0.15,"label":"Drift","min":0,"max":1,"step":0.01,"group":"Fractal Accents"},
+  "accentAudio": {"default":0.25,"label":"Audio accent","min":0,"max":1,"step":0.01,"group":"Fractal Accents","audioGain":0.03},
+  "accentSubtleLimit": {"default":true,"label":"Subtle limit","global":true,"group":"Fractal Accents"}
 }

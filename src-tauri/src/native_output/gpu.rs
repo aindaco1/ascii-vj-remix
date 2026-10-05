@@ -75,12 +75,16 @@ struct FeatureData {
 @group(0) @binding(4) var<storage, read> features: FeatureData;
 
 
-struct SpatialParams { data: array<vec4f, 10>, };
+struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
+fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
+    let at = vec2<u32>(clamp(uv, vec2f(0.0), vec2f(0.999999)) * vec2f(f32(params.cols), f32(params.rows)));
+    return processColor(color, at.x, at.y);
+}
 fn sceneSourceAspect() -> f32 { return f32(params.srcW) / f32(params.srcH); }
 fn sceneMedia(uv: vec2f) -> vec3f {
     var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
@@ -578,7 +582,7 @@ impl NativeGpuPresenter {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let spatial_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Spatial visual parameters"), size: 160, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let spatial_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Spatial visual parameters"), size: 208, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let feature_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("ASCILINE native GPU palette and dither features"),
             size: feature_buffer_size() as u64,
@@ -1537,6 +1541,7 @@ mod tests {
             font_family: "Courier New".to_string(),
             min_glyph_intensity: 180,
             native_wtf_active: false,
+            wtf_visibility_guard: false,
             audio_reactive_active: false,
             audio_reactive_source: String::new(),
             audio_reactive_preset: "pulse-reactor".to_string(),

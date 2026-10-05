@@ -202,6 +202,7 @@ pub struct NativeOutputParams {
     pub camera_fps: Option<f64>,
     pub camera_mirror: Option<bool>,
     pub native_wtf_active: Option<bool>,
+    pub wtf_visibility_guard: Option<bool>,
     pub audio_reactive_active: Option<bool>,
     pub audio_reactive_source: Option<String>,
     pub audio_reactive_preset: Option<String>,
@@ -513,6 +514,7 @@ struct NativeRenderParams {
     #[allow(dead_code)]
     min_glyph_intensity: u8,
     native_wtf_active: bool,
+    wtf_visibility_guard: bool,
     audio_reactive_active: bool,
     audio_reactive_source: String,
     audio_reactive_preset: String,
@@ -2474,6 +2476,10 @@ fn native_modulated_params(
     if changed {
         clamp_native_visual_safety(&mut out, &base);
     }
+    if out.wtf_visibility_guard {
+        protect_wtf_visibility(&mut out);
+        changed = true;
+    }
     (out, changed)
 }
 
@@ -2621,6 +2627,8 @@ fn apply_native_audio_modulation(
             params.spatial.add(&base.spatial, key, amount * scale);
         }
     }
+    let accent_pulse = native_audio_feature_value(params, features, "presence") * sensitivity * native_audio_feature_amount(params, "presence");
+    params.spatial.modulate_accent(&base.spatial, accent_pulse);
     let sway_amount = sensitivity * routes.sway;
     if sway_amount > 0.0 {
         let motion = native_audio_feature_value(params, features, "flux")
@@ -3460,7 +3468,7 @@ impl NativeRenderParams {
         let mut palette_luminance_order: Vec<_> = (0..palette_colors.len()).collect();
         palette_luminance_order.sort_by(|a, b| native_palette_luma(palette_colors[*a])
             .total_cmp(&native_palette_luma(palette_colors[*b])).then_with(|| a.cmp(b)));
-        Self {
+        let mut out = Self {
             spatial: spatial::Params::from_input(&params.spatial),
             loop_media: params.loop_.unwrap_or(true),
             cols: u32_param(params.cols, 480).clamp(1, 4096),
@@ -3556,6 +3564,7 @@ impl NativeRenderParams {
                 .clamp(0.0, 255.0)
                 .round() as u8,
             native_wtf_active: params.native_wtf_active.unwrap_or(false),
+            wtf_visibility_guard: params.wtf_visibility_guard.unwrap_or(false),
             audio_reactive_active: params.audio_reactive_active.unwrap_or(false),
             audio_reactive_source: params.audio_reactive_source.clone().unwrap_or_default(),
             audio_reactive_preset: params
@@ -3583,8 +3592,23 @@ impl NativeRenderParams {
             .clamp(0.0, 1.0),
             audio_reactive_noise_floor: f64_param(params.audio_reactive_noise_floor, 0.005)
                 .clamp(0.0, 0.18),
-        }
+        };
+        if out.wtf_visibility_guard { protect_wtf_visibility(&mut out); }
+        out
     }
+}
+
+fn protect_wtf_visibility(params: &mut NativeRenderParams) {
+    static LIMITS: OnceLock<std::collections::HashMap<String, [f64; 2]>> = OnceLock::new();
+    let limits = LIMITS.get_or_init(|| serde_json::from_str(include_str!(
+        "../../renderers/shared/wtf-visual-limits.json"
+    )).expect("valid shared WTF visibility limits"));
+    let bound = |key: &str, value: f64| { let [min, max] = limits[key]; value.clamp(min, max) };
+    params.contrast_boost = bound("contrastBoost", params.contrast_boost);
+    params.brightness = bound("brightness", params.brightness);
+    params.gamma = bound("gamma", params.gamma);
+    params.bg_blend = bound("bgBlend", params.bg_blend);
+    params.quantize_bits = bound("quantizeBits", params.quantize_bits as f64) as u32;
 }
 
 fn f64_param(value: Option<f64>, fallback: f64) -> f64 {
@@ -4660,6 +4684,7 @@ fn params_snapshot(params: &Arc<Mutex<NativeRenderParams>>) -> NativeRenderParam
                     camera_fps: None,
                     camera_mirror: None,
                     native_wtf_active: Some(false),
+                wtf_visibility_guard: None,
                     audio_reactive_active: Some(false),
                     audio_reactive_source: None,
                     audio_reactive_preset: None,
@@ -5262,6 +5287,7 @@ mod tests {
                 camera_fps: None,
                 camera_mirror: None,
                 native_wtf_active: Some(false),
+                wtf_visibility_guard: None,
                 audio_reactive_active: Some(false),
                 audio_reactive_source: None,
                 audio_reactive_preset: None,
@@ -5283,6 +5309,35 @@ mod tests {
 
     fn params() -> NativeRenderParams {
         NativeRenderParams::from_payload(&base_payload())
+    }
+
+    #[test]
+    fn wtf_visibility_is_opt_in_and_uses_shared_limits() {
+        let mut payload = base_payload();
+        payload.params.contrast_boost = Some(3.0);
+        payload.params.gamma = Some(0.3);
+        payload.params.brightness = Some(0.3);
+        payload.params.bg_blend = Some(0.8);
+        payload.params.quantize_bits = Some(6.0);
+        let manual = NativeRenderParams::from_payload(&payload);
+        assert_eq!(manual.contrast_boost, 3.0);
+        payload.params.wtf_visibility_guard = Some(true);
+        let guarded = NativeRenderParams::from_payload(&payload);
+        assert_eq!(guarded.contrast_boost, 1.1);
+        assert_eq!(guarded.gamma, 1.35);
+        assert_eq!(guarded.brightness, 1.0);
+        assert_eq!(guarded.bg_blend, 0.25);
+        assert_eq!(guarded.quantize_bits, 3);
+        assert_eq!(guarded.bright_output, manual.bright_output);
+        #[cfg(target_os = "macos")]
+        {
+            let mut audio = guarded;
+            audio.contrast_boost = 2.85;
+            audio.gamma = 0.55;
+            let (live, _) = native_modulated_params(audio, 0.0, None);
+            assert_eq!(live.contrast_boost, 1.1);
+            assert_eq!(live.gamma, 1.35);
+        }
     }
 
     #[test]

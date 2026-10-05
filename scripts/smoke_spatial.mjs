@@ -15,17 +15,28 @@ try {
     browser=await chromium.launch({executablePath:findChromiumExecutable({preferInstalled:true}),headless:process.env.SPATIAL_SMOKE_HEADLESS === '1',args:['--enable-unsafe-webgpu','--disable-gpu-sandbox']});
     const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[];
     page.on('pageerror',e=>errors.push(e.message));
+    page.on('console',m=>{if(m.text().startsWith('[spatial]'))console.log(m.text());});
     page.on('console',m=>{if(m.type()==='error'||/validation|invalid|destroyed/i.test(m.text())){errors.push(m.text());console.error(m.text());}});
     // The installed Chromium driver intermittently returns an invalid startup
     // swapchain with both the baseline and candidate WebGPU renderer. Bootstrap
     // this numerical fixture on WebGL2, then exercise WebGPU explicitly below.
     // GPU diagnostics remain fatal; native presentation has its own sweep.
     await page.addInitScript(()=>localStorage.setItem('asciline-remix-state-v1', JSON.stringify({backend:'webgl2'})));
+    await page.addInitScript(() => {
+        if (!globalThis.GPUDevice) return;
+        const create = GPUDevice.prototype.createShaderModule;
+        GPUDevice.prototype.createShaderModule = function(...args) {
+            const module = create.apply(this, args);
+            module.getCompilationInfo().then(info => { for (const m of info.messages) if (m.type === 'error') console.error(`WGSL ${m.lineNum}:${m.linePos} ${m.message}`); });
+            return module;
+        };
+    });
     await page.bringToFront();
     await page.goto(url);await page.waitForFunction(()=>window.ascilineRemix?.running);
     const result=await page.evaluate(async()=>{
-        const {SPATIAL_DEFAULTS,SPATIAL_CONTRACT}=await import('/renderers/shared/spatial.js');
+        const {SPATIAL_DEFAULTS,SPATIAL_CONTRACT,ACCENT_KEYS,accentsEnabled}=await import('/renderers/shared/spatial.js');
         const {SPATIAL_PRESETS}=await import('/renderers/shared/spatial-presets.js');
+        const {FRACTAL_ACCENT_PRESETS}=await import('/renderers/shared/fractal-accent-presets.js');
         const scenePresets=SPATIAL_PRESETS.filter(p=>p.sceneMode!=='flat')
             .map(p=>({...p,params:{...p.params,visualMode:p.sceneMode}}));
         if(scenePresets.length!==9)throw Error('Manual spatial scene coverage is incomplete');
@@ -44,7 +55,7 @@ try {
         const source={element:sourceCanvas,canvas:sourceCanvas,isImage:true,isVideo:false,width:64,height:48,type:'image',ready:true,destroy(){},updateParams(){}};
         const originalLoad=a.loadStaticSource;
         a.loadStaticSource=async()=>source;
-        const cases=[],mediaResponse=[];
+        const cases=[],mediaResponse=[],gpuCells=new Map();
         const read=async r=>{
             if(r.gl){
                 const out=new Uint8Array(r.cols*r.rows*4),raw=new Uint8Array(out.length),gl=r.gl;
@@ -58,11 +69,22 @@ try {
             const raw=new Uint8Array(buffer.getMappedRange()),out=new Uint8Array(r.cols*r.rows*4);
             for(let y=0;y<r.rows;y++)out.set(raw.subarray(y*stride,y*stride+r.cols*4),y*r.cols*4);buffer.unmap();buffer.destroy();return out;
         };
-        for(const backend of ['webgpu','webgl2'])for(const visualMode of ['flat','city','corridor','coast','cathedral','relief','orbitals','ruins','mandelbrot','mandelbulb','mandelbox']){
+        const scenarios = [
+            ...['flat','city','corridor','coast','cathedral','relief','orbitals','ruins','mandelbrot','mandelbulb','mandelbox'].map(visualMode=>({visualMode})),
+            ...FRACTAL_ACCENT_PRESETS.map(p=>({visualMode:'flat',accent:p.id,params:p.params})),
+            ...FRACTAL_ACCENT_PRESETS.slice(0,5).map(p=>({visualMode:'flat',accent:p.id+'-maximum',params:{...p.params,accentAmount:1,accentCoverage:1}})),
+            ...SPATIAL_CONTRACT.visualMode.options.filter(([mode])=>mode!=='flat').flatMap(([visualMode])=>
+                FRACTAL_ACCENT_PRESETS.slice(0,5).map(p=>({visualMode,accent:p.id+'-scene',params:{...p.params,visualMode,sceneMedia:.85}}))),
+            {visualMode:'flat',accent:'monochrome-chroma',params:{...FRACTAL_ACCENT_PRESETS[4].params,saturationBoost:0}},
+            {visualMode:'flat',accent:'trails-without-echo',params:{...FRACTAL_ACCENT_PRESETS[5].params,feedbackAmount:0}},
+        ];
+        for(const backend of ['webgpu','webgl2'])for(const scenario of scenarios){
+            const {visualMode}=scenario;
             sourceCtx.putImageData(image,0,0);
             a.params={...initial,...SPATIAL_DEFAULTS,backend,visualMode,sceneSpeed:0,sceneFreeze:true,sceneOffset:2.137,sceneMedia:.3,sceneWet:.3,sceneRain:.2,sceneMaterialGlyphs:true,
                 cols:96,rows:54,autoRows:false,cellWidth:8,cellHeight:12,saturationBoost:1,contrastBoost:1,brightness:1,gamma:1,bgBlend:0,quantizeBits:0,
                 glyphMode:true,solidMode:false,paletteId:'none',ditherMode:'none',jitterAmount:0,sampleX:.5,sampleY:.5,charset:'asciline',glyphDepth:96,glyphOffset:0,glyphReverse:false};
+            if (scenario.accent) Object.assign(a.params, scenario.params, {cols:96,rows:54,autoRows:false,sceneFreeze:true,sceneOffset:2.137,sceneTransport:createCycleTransport(0,0)});
             const target=document.createElement('div');document.body.appendChild(target);
             const r=await createRenderer({...a.params,source,targetElement:target,preferredBackend:backend,sceneTransport:createCycleTransport(0,0)});
             // Readback tests use a real offscreen GPU attachment; headless-shell has
@@ -77,19 +99,57 @@ try {
             if(r.device)r.device.pushErrorScope('validation');
             r.renderFrame();
             if(r.device){const error=await r.device.popErrorScope();if(error)throw Error(`WebGPU validation: ${error.message}`);}
+            const hasHistory=a.params.feedbackAmount>0||(accentsEnabled(a.params)&&a.params.accentPlacement==='trails');
+            if(hasHistory)r.renderFrame(); // Warm floating-point history before the frozen comparison.
             const pixels=await read(r),p={...a.params,sceneTransport:a.sceneTransport},state={};
             const expected=renderSpatialCells(p,image.data,64,48,96,54,(rgb,x,y)=>processGpuCellColor(...rgb,p,x,y),state,0);
             let diff=0,bad=0,max=0,signal=0;
             for(let i=0;i<pixels.length;i++){const d=Math.abs(pixels[i]-expected[i]);if(i%4<3){diff+=d;max=Math.max(max,d);if(d>8)bad++;signal+=pixels[i];}}
             const avg=diff/(96*54*3),fraction=bad/(96*54*3);
-            cases.push({backend,visualMode,avgError:avg,badFraction:fraction,maxError:max,signal:signal/(96*54*3)});
-            if(avg>2||fraction>.02){
+            cases.push({backend,visualMode,accent:scenario.accent,avgError:avg,badFraction:fraction,maxError:max,signal:signal/(96*54*3)});
+            // Warped rays expose different float-sensitive fractal boundaries.
+            // Keep the original bounds for existing cases, plus a tighter direct
+            // GPU/GPU check (including glyph addresses) for every new accent case.
+            const warped=a.params.accentStyle==='glass'&&visualMode!=='flat';
+            if(scenario.accent){
+                const key=visualMode+':'+scenario.accent;
+                if(backend==='webgpu')gpuCells.set(key,pixels);
+                else{
+                    const other=gpuCells.get(key);let sum=0,large=0;
+                    for(let i=0;i<pixels.length;i++){const d=Math.abs(pixels[i]-other[i]);sum+=d;if(d>8)large++;}
+                    const parity={mean:sum/pixels.length,badFraction:large/pixels.length};
+                    cases.at(-1).gpuParity=parity;
+                    if(parity.mean>.5||parity.badFraction>.01)throw Error(`WebGPU/WebGL2 accent disagreement ${key}: ${JSON.stringify(parity)}`);
+                }
+                if(visualMode==='flat'){
+                    let glyphError=0;for(let i=3;i<pixels.length;i+=4)glyphError+=Math.abs(pixels[i]-expected[i]);
+                    if(glyphError/(96*54)>1)throw Error(`Accent glyph parity ${backend}/${scenario.accent}`);
+                }
+            }
+            if(avg>2||fraction>(warped?.025:.02)){
                 const points=[];for(let i=0;i<pixels.length&&points.length<12;i+=4)if([0,1,2].some(c=>Math.abs(pixels[i+c]-expected[i+c])>8))points.push({x:(i/4)%96,y:Math.floor(i/384),actual:[...pixels.slice(i,i+4)],expected:[...expected.slice(i,i+4)]});
                 throw Error(`CPU/GPU parity ${JSON.stringify({...cases.at(-1),points})}`);
             }
-            // Frozen input/time must be bit-identical across renders.
-            r.renderFrame();const again=await read(r);if(pixels.some((n,i)=>n!==again[i]))throw Error(`Freeze drift ${backend}/${visualMode}`);
-            if(visualMode==='flat') {
+            // Floating-point history can straddle an 8-bit rounding boundary.
+            // Freeze must not accumulate drift across repeated presentations.
+            for(let frame=0;frame<(hasHistory?12:1);frame++) {
+                r.renderFrame();const again=await read(r);
+                if(pixels.some((n,i)=>Math.abs(n-again[i])>(hasHistory?1:0)))throw Error(`Freeze drift ${backend}/${visualMode}/${scenario.accent}`);
+            }
+            if(scenario.accent==='phosphor-lace') {
+                source.isImage=false;source.isVideo=true;r.sceneFreeze=false;
+                const tails=[];
+                for(const amount of [0,scenario.params.accentAmount]) {
+                    r.accentAmount=amount;r.spatialState={};sourceCtx.putImageData(image,0,0);r.renderFrame();
+                    sourceCtx.clearRect(0,0,64,48);r.spatialState.lastMs=cycleNowMs()-1000/60;r.renderFrame();
+                    tails.push(await read(r));
+                }
+                if(!tails[1].some((n,i)=>i%4<3&&n<tails[0][i]-2))throw Error(`Invisible lace history ${backend}`);
+                for(let frame=0;frame<120;frame++){r.spatialState.lastMs=cycleNowMs()-1000/60;r.renderFrame();}
+                if((await read(r)).some((n,i)=>i%4<3&&n>2))throw Error(`Lace failed to decay ${backend}`);
+                source.isImage=true;source.isVideo=false;
+            }
+            if(visualMode==='flat' && !scenario.accent) {
                 // Toggle the live uniform on a dark moving source. Verify both
                 // RGB and glyph luminance, plus opt-out parity with the old path.
                 const dark=new ImageData(64,48);
@@ -142,13 +202,23 @@ try {
                 source.isVideo=false;source.isImage=true;
             }
             r.destroy();target.remove();attachment?.destroy();
+            if(scenario===scenarios.at(-1))console.info(`[spatial] ${backend} readbacks passed`);
         }
         // Real Canvas fallback stays inside the existing software density cap.
         a.params={...a.params,backend:'canvas2d',cols:640,autoRows:true,visualMode:'city'};await a.start();
         const c=a.staticRuntime.renderer;c.running=false;c.renderFrame();const cs=c.getStats();
         if(cs.cols>120||cs.cols*cs.rows>6000)throw Error('Software density limit regressed');
         if(!c.spatialState?.history?.some(n=>n>0))throw Error('Canvas scene is blank');
-        await a.stop();a.loadStaticSource=originalLoad;
+        await a.stop();
+        const canvasAccents=[];
+        for(const preset of [...FRACTAL_ACCENT_PRESETS,...FRACTAL_ACCENT_PRESETS.slice(0,5).map(p=>({...p,id:p.id+'-scene',params:{...p.params,visualMode:'mandelbox'}}))]){
+            a.params={...initial,...preset.params,backend:'canvas2d',cols:640,autoRows:true};
+            await a.start();const renderer=a.staticRuntime.renderer;renderer.running=false;renderer.renderFrame();
+            const stats=renderer.getStats();
+            if(stats.cols>120||stats.cols*stats.rows>6000||!renderer.spatialState?.history?.some(n=>n>0))throw Error(`Canvas accent failed ${preset.id}`);
+            canvasAccents.push(preset.id);await a.stop();
+        }
+        a.loadStaticSource=originalLoad;
         // Presets reuse one playing video. No source selection or decoder restart.
         a.params={...initial,...SPATIAL_DEFAULTS,mediaUrl:'media/point-click-test-30s.mp4',mediaType:'video',sourceMode:'static',backend:'webgl2',muted:true};
         await a.start();const sourceBefore=a.staticRuntime.source,video=sourceBefore.element;
@@ -185,7 +255,7 @@ try {
         let manualControlChecks=0;
         const checkbox=a.controlInputs.get('brightOutput').input;
         checkbox.checked=false;a._handleControlInput('brightOutput');
-        for(const id of ['neon-night-drive','media-corridor','wet-coast','neon-cathedral','orbital-chamber','ashen-ruins','fractal-dive','mandelbulb-bloom','mandelbox-passage','edge-etching','phosphor-echo','classic-camera-ascii']){
+        for(const id of [...FRACTAL_ACCENT_PRESETS.map(p=>p.id),'neon-night-drive','media-corridor','wet-coast','neon-cathedral','orbital-chamber','ashen-ruins','fractal-dive','mandelbulb-bloom','mandelbox-passage','edge-etching','phosphor-echo','classic-camera-ascii']){
             await a.applyPreset(id,{transitionSeconds:.15});
             assertControl('visualMode','flat');
             if(a.params.brightOutput!==false||a._nativeOutputPayload().params.brightOutput!==false)throw Error(`Bright output preference changed by ${id}`);
@@ -205,6 +275,48 @@ try {
                 if(a.staticRuntime.renderer!==renderer)throw Error(`Live spatial controls rebuilt ${id}`);
             }
         }
+        for (const enabled of [false, true]) {
+            editControl('accentSubtleLimit', enabled);
+            for (const preset of FRACTAL_ACCENT_PRESETS) {
+                await a.applyPreset(preset.id, {transitionSeconds:.05});
+                assertControl('accentSubtleLimit', enabled);
+                const before = {...a.params};
+                document.querySelector('#accent-next-variation').click();
+                assertControl('accentVariation', (before.accentVariation + 1) % 6);
+                for (const key of ['accentAmount','accentCoverage','accentPlacement','paletteId']) assertControl(key, before[key]);
+                if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).accentSubtleLimit!==enabled)throw Error('Subtle limit did not persist');
+                if((await a._makeWtfTarget(1))?.accentSubtleLimit!==enabled)throw Error('WTF changed the global subtle limit');
+                a._applyMidiVisualValue('accentAmount', .9);assertControl('accentAmount', .9);
+                if(a.staticRuntime.source!==sourceBefore||video.paused)throw Error('Fractal controls restarted media');
+            }
+        }
+        // Ordinary presets retain the full accent state, including explicit Off.
+        await a.applyPreset('silver-etching',{transitionSeconds:.05});
+        const retained=Object.fromEntries(ACCENT_KEYS.map(key=>[key,a.params[key]]));
+        for(const id of ['classic-camera-ascii','neon-night-drive','mandelbox-passage']){
+            await a.applyPreset(id,{transitionSeconds:.05});
+            for(const [key,value] of Object.entries(retained))assertControl(key,value);
+            editControl('visualMode','mandelbox');
+            for(const key of ACCENT_KEYS)if(a.controlInputs.get(key).input.disabled)throw Error(`Inactive scene accent control ${key}`);
+        }
+        editControl('accentStyle','off');
+        await a.applyPreset('classic-camera-ascii',{transitionSeconds:.05});assertControl('accentStyle','off');
+        // Test the real WTF path and its safety-retry fallback without statistical assertions.
+        const nativeRandom=Math.random,accentOriginalSafe=a._isSafeWtfTarget;
+        try{
+            for(const safe of [true,false])for(const draw of [.1,.9]){
+                let attempts=0;Math.random=()=>draw;a._isSafeWtfTarget=()=>safe||++attempts===17;
+                const target=await a._makeWtfTarget(1);
+                if((target.accentStyle==='off')!==(draw<.35))throw Error('WTF did not choose accents before safety retries');
+                if(target.accentSubtleLimit!==a.params.accentSubtleLimit)throw Error('WTF lost global limit');
+            }
+        }finally{Math.random=nativeRandom;a._isSafeWtfTarget=accentOriginalSafe;}
+        const originalPrompt=window.prompt;window.prompt=()=> 'Accent smoke save';
+        try{a._saveCurrentPreset();}finally{window.prompt=originalPrompt;}
+        if(a._sanitizedUserPresets().some(p=>'accentSubtleLimit' in p.params))throw Error('Saved/exported presets own Subtle Limit');
+        const savedAccentPreset=a.activePresetId;
+        await a.applyPreset('silver-etching',{transitionSeconds:.05});
+        await a.applyPreset(savedAccentPreset,{transitionSeconds:.05});assertControl('accentStyle','off');
         // A manual edit must survive the rest of a preset tween/crossfade,
         // including native output parameters and persisted settings.
         // Saved custom looks can still opt into a scene. Exercise the same
@@ -254,7 +366,7 @@ try {
         assertControl('brightOutput',true);
         if(JSON.parse(localStorage.getItem('asciline-remix-state-v1')).brightOutput!==true)throw Error('Explicit bright preference did not persist');
         editControl('brightOutput',false);
-        for(let i=0;i<8;i++)if(a._makeWtfTarget(.1).brightOutput!==false)throw Error('Random visuals changed bright output preference');
+        for(let i=0;i<8;i++)if((await a._makeWtfTarget(.1))?.brightOutput!==false)throw Error('Random visuals changed bright output preference');
         // Force retry/fallback paths with real anchor generation. Space/Motion
         // is drawn once per target, even when every visual candidate is rejected.
         const originalRandom=Math.random,originalSafe=a._isSafeWtfTarget,wtfParams={...a.params};
@@ -263,7 +375,7 @@ try {
         try {
             for(const startingMode of ['flat','ruins'])for(const outcome of ['retry','fallback'])for(const [i,expected] of ['flat',...modes].entries()){
                 a.params={...wtfParams,visualMode:startingMode,sceneFreeze:true,scenePitch:-75,solidMode:true};
-                const draws=expected==='flat'?[0.799999]:[0.8,(i-.5)/modes.length];
+                const draws=expected==='flat'?[0.949999]:[0.95,(i-.5)/modes.length];
                 // Zero after the spatial draw forces the existing Canvas ASCII
                 // anchor; it must not replace the independent spatial decision.
                 Math.random=()=>draws.length?draws.shift():0;
@@ -271,10 +383,10 @@ try {
                 a._isSafeWtfTarget=target=>{
                     attempts++;
                     if(target.visualMode!==expected)throw Error('WTF safety retry redrew the visual mode');
-                    return outcome==='retry'&&attempts===3;
+                    return attempts===(outcome==='retry'?3:17);
                 };
-                const target=a._makeWtfTarget(.1);
-                if(attempts!==(outcome==='retry'?3:16)||target.visualMode!==expected)throw Error('WTF final mode changed after retries');
+                const target=await a._makeWtfTarget(.1);
+                if(attempts!==(outcome==='retry'?3:17)||target.visualMode!==expected)throw Error('WTF final mode changed after retries');
                 if(target.mediaUrl!==wtfParams.mediaUrl||target.sourceMode!==wtfParams.sourceMode||target.brightOutput!==false||target.statsOverlay!==wtfParams.statsOverlay)throw Error('WTF changed source or user preferences');
                 if(expected!=='flat'&&(target.backend!=='auto'||target.sceneFreeze||target.scenePitch===-75))throw Error('WTF failed to load a usable scene view');
                 wtfSpatialChecks++;
@@ -285,10 +397,11 @@ try {
         await a.stop();
         // New visual MIDI targets remain controls, never source/capture/output actions.
         const targets=a.midiTargetDescriptors().map(t=>t.id);
-        for(const key of ['sceneSpeed','sceneFov','sceneMedia','edgeAmount','feedbackAmount'])if(!targets.includes(`visual.${key}`))throw Error(`Missing MIDI ${key}`);
+        for(const key of ['sceneSpeed','sceneFov','sceneMedia','edgeAmount','feedbackAmount','accentAmount','accentCoverage'])if(!targets.includes(`visual.${key}`))throw Error(`Missing MIDI ${key}`);
         if(!targets.includes('action.visual.sceneFreeze.toggle')||!targets.includes('action.visual.sceneReset'))throw Error('Missing scene transport MIDI actions');
+        if(!targets.includes('action.visual.accentVariation.next')||!targets.includes('action.visual.accentSubtleLimit.toggle'))throw Error('Missing variation MIDI action');
         if(targets.some(t=>/camera|mediaUrl|popout|sourceMode/i.test(t)))throw Error('Forbidden MIDI target');
-        return {cases,mediaResponse,canvas:cs,manualControlChecks,wtfSpatialChecks,manualTransitionEdits:['tween','crossfade','midi','delayed-arm'],manualSceneSelection:true,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
+        return {cases,mediaResponse,canvas:cs,canvasAccents,manualControlChecks,wtfSpatialChecks,manualTransitionEdits:['tween','crossfade','midi','delayed-arm'],manualSceneSelection:true,video:{sourcePreserved:true,timeBefore,timeAfter:video.currentTime},midi:true};
     });
     assert.deepEqual(errors,[]);
     if(process.env.SPATIAL_SMOKE_REPORT){writeFileSync(process.env.SPATIAL_SMOKE_REPORT,JSON.stringify(result,null,2));}

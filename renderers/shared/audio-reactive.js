@@ -1,5 +1,5 @@
 import spatialAudioRoutes from './spatial-audio.json' with { type: 'json' };
-import { SPATIAL_CONTRACT } from './spatial.js';
+import { SPATIAL_CONTRACT, accentsEnabled } from './spatial.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export const AUDIO_REACTIVE_DEFAULTS = {
@@ -306,6 +306,10 @@ export function applyAudioReactiveModulation(baseParams, features, audioSettings
             const amount = Number(normalizedFeatures[feature] || 0) * sensitivity * audioFeatureAmount(feature, settings);
             out[key] = clamp(Number(baseParams[key] ?? rule.default) + amount * scale, rule.min, rule.max);
         }
+    }
+    if (accentsEnabled(baseParams)) {
+        const pulse = clamp(Number(normalizedFeatures.presence || 0) * sensitivity * audioFeatureAmount('presence', settings), 0, 1);
+        out.accentAmount = clamp(baseParams.accentAmount + pulse * (baseParams.accentAudio ?? .25) * SPATIAL_CONTRACT.accentAudio.audioGain, 0, 1);
     }
     const swayAmount = sensitivity * (preset.sway || 0);
     if (swayAmount > 0) {

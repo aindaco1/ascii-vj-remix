@@ -1595,7 +1595,8 @@ async function runSmoke() {
         cols: 96, rows: 48, autoRows: false, cellWidth: 1, cellHeight: 1, aspectCorrection: 1,
         saturationBoost: 1, contrastBoost: 1, brightness: 1, brightOutput: false, gamma: 1, bgBlend: 0,
         quantizeBits: 0, jitterAmount: 0, sampleX: 0.5, sampleY: 0.5, smoothing: false,
-        visualMode: 'flat', edgeAmount: 0, feedbackAmount: 0,
+        // Palette swatches isolate color mapping from persistent visual accents.
+        visualMode: 'flat', edgeAmount: 0, feedbackAmount: 0, accentStyle: 'off', accentAmount: 0,
         solidMode: true, glyphMode: false, pixel: false, paletteId: cases[0].id,
         paletteMapping: cases[0].mapping, paletteCycleMode: 'off', ditherMode: 'none' };
       try {

@@ -46,8 +46,8 @@ const collapsedWindowsContract = validateBuiltInPresetBackendContract({
 });
 assert.equal(collapsedWindowsContract.ok, false);
 assert.deepEqual(collapsedWindowsContract.mismatches, [
-  'acceleratedEligible:7!=62',
-  'canvasEligible:83!=28'
+  'acceleratedEligible:7!=68',
+  'canvasEligible:89!=28'
 ]);
 
 console.log('preset-backend-contract: ok');

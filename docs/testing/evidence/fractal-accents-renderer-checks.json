@@ -1,0 +1,2469 @@
+{
+  "cases": [
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "avgError": 0,
+      "badFraction": 0,
+      "maxError": 0,
+      "signal": 118.29629629629629
+    },
+    {
+      "backend": "webgpu",
+      "effect": "bright output",
+      "offLuma": 13,
+      "onLuma": 133
+    },
+    {
+      "backend": "webgpu",
+      "effect": "floating-point feedback",
+      "maxTailError": 0.5625
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "avgError": 0.057291666666666664,
+      "badFraction": 0.0018647119341563786,
+      "maxError": 63,
+      "signal": 43.2534079218107
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "avgError": 0.059027777777777776,
+      "badFraction": 0.0018647119341563786,
+      "maxError": 61,
+      "signal": 53.73894032921811
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "avgError": 0.07253086419753087,
+      "badFraction": 0.0021862139917695473,
+      "maxError": 81,
+      "signal": 38.36368312757202
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "avgError": 0.02456275720164609,
+      "badFraction": 0.0009002057613168725,
+      "maxError": 55,
+      "signal": 53.54565329218107
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "avgError": 0.022183641975308643,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 115,
+      "signal": 36.45145318930041
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "avgError": 0.033371913580246916,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 81,
+      "signal": 38.65329218106996
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "avgError": 0.012474279835390947,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 32,
+      "signal": 118.91499485596708
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "avgError": 0.20588991769547324,
+      "badFraction": 0.0055941358024691355,
+      "maxError": 76,
+      "signal": 61.0619212962963
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "avgError": 0.041023662551440326,
+      "badFraction": 0.00051440329218107,
+      "maxError": 18,
+      "signal": 23.993505658436213
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "avgError": 1.2872942386831276,
+      "badFraction": 0.018454218106995886,
+      "maxError": 179,
+      "signal": 57.83982767489712
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "threadlight",
+      "avgError": 0.17560442386831276,
+      "badFraction": 0,
+      "maxError": 2,
+      "signal": 146.60435956790124
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "silver-etching",
+      "avgError": 0.23051697530864199,
+      "badFraction": 0,
+      "maxError": 1,
+      "signal": 147.2264660493827
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "contour-silk",
+      "avgError": 0.2339891975308642,
+      "badFraction": 0,
+      "maxError": 3,
+      "signal": 146.9218106995885
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "julia-glass",
+      "avgError": 0.2103909465020576,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 146.56134259259258
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "chromatic-undertow",
+      "avgError": 0.19945987654320987,
+      "badFraction": 0,
+      "maxError": 4,
+      "signal": 152.39654063786008
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "phosphor-lace",
+      "avgError": 0.011638374485596709,
+      "badFraction": 0,
+      "maxError": 1,
+      "signal": 146.85236625514403
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "threadlight-maximum",
+      "avgError": 0.2507716049382716,
+      "badFraction": 0,
+      "maxError": 3,
+      "signal": 146.39300411522635
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "silver-etching-maximum",
+      "avgError": 0.21296296296296297,
+      "badFraction": 0,
+      "maxError": 1,
+      "signal": 145.8358410493827
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "contour-silk-maximum",
+      "avgError": 0.2357253086419753,
+      "badFraction": 0,
+      "maxError": 4,
+      "signal": 147.31802983539094
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "julia-glass-maximum",
+      "avgError": 0.2201003086419753,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 146.5159465020576
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "chromatic-undertow-maximum",
+      "avgError": 0.19309413580246915,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 153.73707561728395
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "accent": "threadlight-scene",
+      "avgError": 0.3838091563786008,
+      "badFraction": 0.0021219135802469135,
+      "maxError": 197,
+      "signal": 93.45074588477367
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "accent": "silver-etching-scene",
+      "avgError": 0.4074074074074074,
+      "badFraction": 0.0028935185185185184,
+      "maxError": 80,
+      "signal": 93.76350308641975
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "accent": "contour-silk-scene",
+      "avgError": 0.44836676954732513,
+      "badFraction": 0.0021219135802469135,
+      "maxError": 235,
+      "signal": 94.21926440329219
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "accent": "julia-glass-scene",
+      "avgError": 0.06114969135802469,
+      "badFraction": 0.001286008230452675,
+      "maxError": 136,
+      "signal": 94.36773405349794
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "city",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.4351851851851852,
+      "badFraction": 0.00257201646090535,
+      "maxError": 200,
+      "signal": 95.15830761316873
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "accent": "threadlight-scene",
+      "avgError": 0.39795524691358025,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 195,
+      "signal": 118.90078446502058
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "accent": "silver-etching-scene",
+      "avgError": 0.42804783950617287,
+      "badFraction": 0.0028935185185185184,
+      "maxError": 131,
+      "signal": 118.6195987654321
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "accent": "contour-silk-scene",
+      "avgError": 0.4452803497942387,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 191,
+      "signal": 120.01260288065843
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "accent": "julia-glass-scene",
+      "avgError": 0.01459619341563786,
+      "badFraction": 0.0003215020576131687,
+      "maxError": 68,
+      "signal": 119.2289737654321
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "corridor",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.4338348765432099,
+      "badFraction": 0.002764917695473251,
+      "maxError": 170,
+      "signal": 123.1133616255144
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "accent": "threadlight-scene",
+      "avgError": 0.36484053497942387,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 197,
+      "signal": 85.85699588477367
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "accent": "silver-etching-scene",
+      "avgError": 0.4068287037037037,
+      "badFraction": 0.0030864197530864196,
+      "maxError": 80,
+      "signal": 86.12538580246914
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "accent": "contour-silk-scene",
+      "avgError": 0.4331275720164609,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 235,
+      "signal": 86.74421296296296
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "accent": "julia-glass-scene",
+      "avgError": 0.051826131687242795,
+      "badFraction": 0.0015432098765432098,
+      "maxError": 68,
+      "signal": 86.52295524691358
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "coast",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.4219393004115226,
+      "badFraction": 0.002764917695473251,
+      "maxError": 200,
+      "signal": 87.68936471193416
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "accent": "threadlight-scene",
+      "avgError": 0.28941615226337447,
+      "badFraction": 0.0010931069958847737,
+      "maxError": 164,
+      "signal": 106.63065843621399
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "accent": "silver-etching-scene",
+      "avgError": 0.3287037037037037,
+      "badFraction": 0.0015432098765432098,
+      "maxError": 89,
+      "signal": 106.55652006172839
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "accent": "contour-silk-scene",
+      "avgError": 0.3296682098765432,
+      "badFraction": 0.0010931069958847737,
+      "maxError": 178,
+      "signal": 107.42644032921811
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "accent": "julia-glass-scene",
+      "avgError": 0.02745627572016461,
+      "badFraction": 0.0005787037037037037,
+      "maxError": 44,
+      "signal": 106.58449074074075
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "cathedral",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.30079732510288065,
+      "badFraction": 0.0013503086419753086,
+      "maxError": 174,
+      "signal": 109.80156893004116
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "accent": "threadlight-scene",
+      "avgError": 0.16396604938271606,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 134,
+      "signal": 73.07915380658436
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "accent": "silver-etching-scene",
+      "avgError": 0.24402006172839505,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 99,
+      "signal": 72.93441358024691
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "accent": "contour-silk-scene",
+      "avgError": 0.2736625514403292,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 127,
+      "signal": 73.731545781893
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "accent": "julia-glass-scene",
+      "avgError": 0.06391460905349794,
+      "badFraction": 0.0009645061728395061,
+      "maxError": 136,
+      "signal": 73.30722736625515
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "relief",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.22890946502057613,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 119,
+      "signal": 72.22055041152264
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "accent": "threadlight-scene",
+      "avgError": 0.10114454732510288,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 29,
+      "signal": 51.39274691358025
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "accent": "silver-etching-scene",
+      "avgError": 0.2525077160493827,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 23,
+      "signal": 51.31577932098765
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "accent": "contour-silk-scene",
+      "avgError": 0.25,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 27,
+      "signal": 51.85667438271605
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "accent": "julia-glass-scene",
+      "avgError": 0.03009259259259259,
+      "badFraction": 0.0005787037037037037,
+      "maxError": 148,
+      "signal": 51.4857896090535
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "orbitals",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.22003600823045266,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 31,
+      "signal": 52.937178497942384
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "accent": "threadlight-scene",
+      "avgError": 0.2132201646090535,
+      "badFraction": 0.0001286008230452675,
+      "maxError": 26,
+      "signal": 141.63766718106996
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "accent": "silver-etching-scene",
+      "avgError": 0.24537037037037038,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 13,
+      "signal": 139.83005401234567
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "accent": "contour-silk-scene",
+      "avgError": 0.2490354938271605,
+      "badFraction": 0.0001286008230452675,
+      "maxError": 27,
+      "signal": 142.90354938271605
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "accent": "julia-glass-scene",
+      "avgError": 0.060635288065843625,
+      "badFraction": 0.0014789094650205761,
+      "maxError": 44,
+      "signal": 141.80697016460906
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "ruins",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.21772119341563786,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 21,
+      "signal": 146.82349537037038
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "accent": "threadlight-scene",
+      "avgError": 0.37725051440329216,
+      "badFraction": 0.007973251028806584,
+      "maxError": 63,
+      "signal": 93.16158693415638
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "accent": "silver-etching-scene",
+      "avgError": 0.453125,
+      "badFraction": 0.007908950617283951,
+      "maxError": 58,
+      "signal": 92.65528549382717
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "accent": "contour-silk-scene",
+      "avgError": 0.48373199588477367,
+      "badFraction": 0.007844650205761318,
+      "maxError": 78,
+      "signal": 93.72633744855968
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "accent": "julia-glass-scene",
+      "avgError": 0.24916409465020575,
+      "badFraction": 0.007973251028806584,
+      "maxError": 76,
+      "signal": 92.94701646090535
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbrot",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.45023148148148145,
+      "badFraction": 0.008166152263374485,
+      "maxError": 60,
+      "signal": 96.44785236625515
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "accent": "threadlight-scene",
+      "avgError": 0.11297582304526749,
+      "badFraction": 0.0004501028806584362,
+      "maxError": 11,
+      "signal": 47.19984567901235
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "accent": "silver-etching-scene",
+      "avgError": 0.25655864197530864,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 12,
+      "signal": 47.39506172839506
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "accent": "contour-silk-scene",
+      "avgError": 0.25771604938271603,
+      "badFraction": 0.0003215020576131687,
+      "maxError": 10,
+      "signal": 47.83359053497942
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "accent": "julia-glass-scene",
+      "avgError": 0.0844264403292181,
+      "badFraction": 0.0019290123456790122,
+      "maxError": 103,
+      "signal": 47.19984567901235
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbulb",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.23276748971193414,
+      "badFraction": 0.00051440329218107,
+      "maxError": 13,
+      "signal": 49.57825360082305
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "accent": "threadlight-scene",
+      "avgError": 1.2759130658436213,
+      "badFraction": 0.017039609053497943,
+      "maxError": 151,
+      "signal": 93.53234310699588
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "accent": "silver-etching-scene",
+      "avgError": 1.2943672839506173,
+      "badFraction": 0.016010802469135804,
+      "maxError": 169,
+      "signal": 93.09432870370371
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "accent": "contour-silk-scene",
+      "avgError": 1.3275462962962963,
+      "badFraction": 0.017811213991769548,
+      "maxError": 156,
+      "signal": 94.46797839506173
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "accent": "julia-glass-scene",
+      "avgError": 1.3175154320987654,
+      "badFraction": 0.020061728395061727,
+      "maxError": 137,
+      "signal": 94.1289866255144
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "mandelbox",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 1.318994341563786,
+      "badFraction": 0.016911008230452676,
+      "maxError": 161,
+      "signal": 97.89191100823045
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "monochrome-chroma",
+      "avgError": 0.251929012345679,
+      "badFraction": 0,
+      "maxError": 3,
+      "signal": 154.20833333333334
+    },
+    {
+      "backend": "webgpu",
+      "visualMode": "flat",
+      "accent": "trails-without-echo",
+      "avgError": 0.011638374485596709,
+      "badFraction": 0,
+      "maxError": 1,
+      "signal": 146.85236625514403
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "avgError": 0.08641975308641975,
+      "badFraction": 0,
+      "maxError": 5,
+      "signal": 118.20987654320987
+    },
+    {
+      "backend": "webgl2",
+      "effect": "bright output",
+      "offLuma": 13,
+      "onLuma": 133
+    },
+    {
+      "backend": "webgl2",
+      "effect": "floating-point feedback",
+      "maxTailError": 0.5625
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "avgError": 0.06147119341563786,
+      "badFraction": 0.001993312757201646,
+      "maxError": 63,
+      "signal": 43.25527263374486
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "avgError": 0.06629372427983539,
+      "badFraction": 0.00205761316872428,
+      "maxError": 61,
+      "signal": 53.744277263374485
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "avgError": 0.09747942386831275,
+      "badFraction": 0.0023791152263374486,
+      "maxError": 81,
+      "signal": 38.3695987654321
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "avgError": 0.024498456790123458,
+      "badFraction": 0.0009002057613168725,
+      "maxError": 58,
+      "signal": 53.547903806584365
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "avgError": 0.04443158436213992,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 115,
+      "signal": 36.473572530864196
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "avgError": 0.033950617283950615,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 81,
+      "signal": 38.652713477366255
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "avgError": 0.01408179012345679,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 32,
+      "signal": 118.91338734567901
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "avgError": 0.21167695473251028,
+      "badFraction": 0.005401234567901234,
+      "maxError": 76,
+      "signal": 61.046875
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "avgError": 0.0415380658436214,
+      "badFraction": 0.00051440329218107,
+      "maxError": 18,
+      "signal": 23.992991255144034
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "avgError": 1.2874871399176955,
+      "badFraction": 0.018454218106995886,
+      "maxError": 179,
+      "signal": 57.83963477366255
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "threadlight",
+      "avgError": 0.26093106995884774,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 146.51491769547326,
+      "gpuParity": {
+        "mean": 0.11704282407407407,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "silver-etching",
+      "avgError": 0.31385030864197533,
+      "badFraction": 0,
+      "maxError": 4,
+      "signal": 147.1466049382716,
+      "gpuParity": {
+        "mean": 0.09524498456790123,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "contour-silk",
+      "avgError": 0.320923353909465,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 146.8343621399177,
+      "gpuParity": {
+        "mean": 0.1089891975308642,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "julia-glass",
+      "avgError": 0.24537037037037038,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 146.51993312757202,
+      "gpuParity": {
+        "mean": 0.08097029320987655,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "chromatic-undertow",
+      "avgError": 0.30510545267489714,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 152.2941100823045,
+      "gpuParity": {
+        "mean": 0.12273341049382716,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "phosphor-lace",
+      "avgError": 0.10474537037037036,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 146.75913065843622,
+      "gpuParity": {
+        "mean": 0.10633680555555555,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "threadlight-maximum",
+      "avgError": 0.3331404320987654,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 146.31269290123456,
+      "gpuParity": {
+        "mean": 0.13199266975308643,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "silver-etching-maximum",
+      "avgError": 0.30459104938271603,
+      "badFraction": 0,
+      "maxError": 5,
+      "signal": 145.76118827160494,
+      "gpuParity": {
+        "mean": 0.10045331790123457,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "contour-silk-maximum",
+      "avgError": 0.32227366255144035,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 147.23263888888889,
+      "gpuParity": {
+        "mean": 0.11294367283950617,
+        "badFraction": 0.000048225308641975306
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "julia-glass-maximum",
+      "avgError": 0.2478780864197531,
+      "badFraction": 0,
+      "maxError": 8,
+      "signal": 146.48109567901236,
+      "gpuParity": {
+        "mean": 0.0736400462962963,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "chromatic-undertow-maximum",
+      "avgError": 0.30330504115226337,
+      "badFraction": 0,
+      "maxError": 7,
+      "signal": 153.63162294238683,
+      "gpuParity": {
+        "mean": 0.1271701388888889,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "accent": "threadlight-scene",
+      "avgError": 0.389917695473251,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 197,
+      "signal": 93.46482767489712,
+      "gpuParity": {
+        "mean": 0.0544945987654321,
+        "badFraction": 0.0005304783950617284
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "accent": "silver-etching-scene",
+      "avgError": 0.43016975308641975,
+      "badFraction": 0.0030864197530864196,
+      "maxError": 80,
+      "signal": 93.78086419753086,
+      "gpuParity": {
+        "mean": 0.05415702160493827,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "accent": "contour-silk-scene",
+      "avgError": 0.46772119341563784,
+      "badFraction": 0.0022505144032921812,
+      "maxError": 235,
+      "signal": 94.231545781893,
+      "gpuParity": {
+        "mean": 0.05758101851851852,
+        "badFraction": 0.0005304783950617284
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "accent": "julia-glass-scene",
+      "avgError": 0.06938014403292181,
+      "badFraction": 0.0014789094650205761,
+      "maxError": 133,
+      "signal": 94.41968878600824,
+      "gpuParity": {
+        "mean": 0.06341628086419752,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "city",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.4530606995884774,
+      "badFraction": 0.002700617283950617,
+      "maxError": 200,
+      "signal": 95.16898148148148,
+      "gpuParity": {
+        "mean": 0.05960648148148148,
+        "badFraction": 0.0005304783950617284
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "accent": "threadlight-scene",
+      "avgError": 0.4089506172839506,
+      "badFraction": 0.00257201646090535,
+      "maxError": 195,
+      "signal": 118.91988168724279,
+      "gpuParity": {
+        "mean": 0.038097993827160496,
+        "badFraction": 0.00033757716049382714
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "accent": "silver-etching-scene",
+      "avgError": 0.46045524691358025,
+      "badFraction": 0.0030864197530864196,
+      "maxError": 131,
+      "signal": 118.64043209876543,
+      "gpuParity": {
+        "mean": 0.03911072530864197,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "accent": "contour-silk-scene",
+      "avgError": 0.4710648148148148,
+      "badFraction": 0.00257201646090535,
+      "maxError": 191,
+      "signal": 120.02617026748972,
+      "gpuParity": {
+        "mean": 0.03414351851851852,
+        "badFraction": 0.00033757716049382714
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "accent": "julia-glass-scene",
+      "avgError": 0.0360082304526749,
+      "badFraction": 0.0007073045267489712,
+      "maxError": 115,
+      "signal": 119.21643518518519,
+      "gpuParity": {
+        "mean": 0.023967978395061727,
+        "badFraction": 0.00038580246913580245
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "corridor",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.47055041152263377,
+      "badFraction": 0.003022119341563786,
+      "maxError": 170,
+      "signal": 123.11998456790124,
+      "gpuParity": {
+        "mean": 0.041087962962962965,
+        "badFraction": 0.00028935185185185184
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "accent": "threadlight-scene",
+      "avgError": 0.40219907407407407,
+      "badFraction": 0.0024434156378600825,
+      "maxError": 197,
+      "signal": 85.825295781893,
+      "gpuParity": {
+        "mean": 0.08834876543209877,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "accent": "silver-etching-scene",
+      "avgError": 0.4340277777777778,
+      "badFraction": 0.003279320987654321,
+      "maxError": 80,
+      "signal": 86.1028163580247,
+      "gpuParity": {
+        "mean": 0.059558256172839504,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "accent": "contour-silk-scene",
+      "avgError": 0.4731867283950617,
+      "badFraction": 0.0024434156378600825,
+      "maxError": 235,
+      "signal": 86.71045524691358,
+      "gpuParity": {
+        "mean": 0.08130787037037036,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "accent": "julia-glass-scene",
+      "avgError": 0.05099022633744856,
+      "badFraction": 0.0015432098765432098,
+      "maxError": 68,
+      "signal": 86.53086419753086,
+      "gpuParity": {
+        "mean": 0.00863233024691358,
+        "badFraction": 0.00038580246913580245
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "coast",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.468042695473251,
+      "badFraction": 0.0029578189300411522,
+      "maxError": 200,
+      "signal": 87.65123456790124,
+      "gpuParity": {
+        "mean": 0.0900366512345679,
+        "badFraction": 0.0005787037037037037
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "accent": "threadlight-scene",
+      "avgError": 0.2844650205761317,
+      "badFraction": 0.0012217078189300412,
+      "maxError": 180,
+      "signal": 106.64023919753086,
+      "gpuParity": {
+        "mean": 0.021846064814814815,
+        "badFraction": 0.00028935185185185184
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "accent": "silver-etching-scene",
+      "avgError": 0.3439429012345679,
+      "badFraction": 0.0015432098765432098,
+      "maxError": 92,
+      "signal": 106.56751543209876,
+      "gpuParity": {
+        "mean": 0.02507716049382716,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "accent": "contour-silk-scene",
+      "avgError": 0.33989197530864196,
+      "badFraction": 0.0012217078189300412,
+      "maxError": 195,
+      "signal": 107.43344907407408,
+      "gpuParity": {
+        "mean": 0.020109953703703703,
+        "badFraction": 0.00028935185185185184
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "accent": "julia-glass-scene",
+      "avgError": 0.042309670781893,
+      "badFraction": 0.0008359053497942387,
+      "maxError": 130,
+      "signal": 106.57208076131687,
+      "gpuParity": {
+        "mean": 0.021122685185185185,
+        "badFraction": 0.00024112654320987653
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "cathedral",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.3153292181069959,
+      "badFraction": 0.0013503086419753086,
+      "maxError": 191,
+      "signal": 109.8045267489712,
+      "gpuParity": {
+        "mean": 0.027633101851851853,
+        "badFraction": 0.00033757716049382714
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "accent": "threadlight-scene",
+      "avgError": 0.18878600823045266,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 136,
+      "signal": 73.10410236625515,
+      "gpuParity": {
+        "mean": 0.025511188271604937,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "accent": "silver-etching-scene",
+      "avgError": 0.27141203703703703,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 122,
+      "signal": 72.96026234567901,
+      "gpuParity": {
+        "mean": 0.029272762345679014,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "accent": "contour-silk-scene",
+      "avgError": 0.2984825102880658,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 127,
+      "signal": 73.7562371399177,
+      "gpuParity": {
+        "mean": 0.026909722222222224,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "accent": "julia-glass-scene",
+      "avgError": 0.06487911522633745,
+      "badFraction": 0.0009645061728395061,
+      "maxError": 133,
+      "signal": 73.35641718106996,
+      "gpuParity": {
+        "mean": 0.05092592592592592,
+        "badFraction": 0.00038580246913580245
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "relief",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.2593878600823045,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 141,
+      "signal": 72.24832818930041,
+      "gpuParity": {
+        "mean": 0.031201774691358024,
+        "badFraction": 0.00019290123456790122
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "accent": "threadlight-scene",
+      "avgError": 0.10693158436213991,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 29,
+      "signal": 51.38554526748971,
+      "gpuParity": {
+        "mean": 0.012345679012345678,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "accent": "silver-etching-scene",
+      "avgError": 0.25559413580246915,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 23,
+      "signal": 51.30999228395062,
+      "gpuParity": {
+        "mean": 0.0061246141975308645,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "accent": "contour-silk-scene",
+      "avgError": 0.25462962962962965,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 27,
+      "signal": 51.84831532921811,
+      "gpuParity": {
+        "mean": 0.011622299382716049,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "accent": "julia-glass-scene",
+      "avgError": 0.029642489711934155,
+      "badFraction": 0.0005787037037037037,
+      "maxError": 148,
+      "signal": 51.495756172839506,
+      "gpuParity": {
+        "mean": 0.010223765432098766,
+        "badFraction": 0.00038580246913580245
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "orbitals",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.22518004115226337,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 31,
+      "signal": 52.92637602880659,
+      "gpuParity": {
+        "mean": 0.012008101851851851,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "accent": "threadlight-scene",
+      "avgError": 0.20498971193415638,
+      "badFraction": 0.0001286008230452675,
+      "maxError": 26,
+      "signal": 141.6448688271605,
+      "gpuParity": {
+        "mean": 0.020929783950617283,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "accent": "silver-etching-scene",
+      "avgError": 0.2700617283950617,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 13,
+      "signal": 139.83854166666666,
+      "gpuParity": {
+        "mean": 0.02435378086419753,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "accent": "contour-silk-scene",
+      "avgError": 0.25848765432098764,
+      "badFraction": 0.0001286008230452675,
+      "maxError": 27,
+      "signal": 142.9068287037037,
+      "gpuParity": {
+        "mean": 0.017119984567901234,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "accent": "julia-glass-scene",
+      "avgError": 0.07921810699588477,
+      "badFraction": 0.0018647119341563786,
+      "maxError": 78,
+      "signal": 141.83314043209876,
+      "gpuParity": {
+        "mean": 0.04205246913580247,
+        "badFraction": 0.0008198302469135802
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "ruins",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.23527520576131689,
+      "badFraction": 0.00019290123456790122,
+      "maxError": 21,
+      "signal": 146.81442901234567,
+      "gpuParity": {
+        "mean": 0.019772376543209878,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "accent": "threadlight-scene",
+      "avgError": 0.4218106995884774,
+      "badFraction": 0.008359053497942387,
+      "maxError": 67,
+      "signal": 93.12178497942386,
+      "gpuParity": {
+        "mean": 0.0798611111111111,
+        "badFraction": 0.0009645061728395061
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "accent": "silver-etching-scene",
+      "avgError": 0.48746141975308643,
+      "badFraction": 0.008487654320987654,
+      "maxError": 58,
+      "signal": 92.62712191358025,
+      "gpuParity": {
+        "mean": 0.05724344135802469,
+        "badFraction": 0.0009645061728395061
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "accent": "contour-silk-scene",
+      "avgError": 0.5338220164609053,
+      "badFraction": 0.00823045267489712,
+      "maxError": 78,
+      "signal": 93.68422067901234,
+      "gpuParity": {
+        "mean": 0.0777391975308642,
+        "badFraction": 0.0010609567901234567
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "accent": "julia-glass-scene",
+      "avgError": 0.24729938271604937,
+      "badFraction": 0.008037551440329218,
+      "maxError": 76,
+      "signal": 92.95402520576131,
+      "gpuParity": {
+        "mean": 0.010802469135802469,
+        "badFraction": 0.00033757716049382714
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbrot",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.5027649176954733,
+      "badFraction": 0.009066358024691358,
+      "maxError": 59,
+      "signal": 96.4008487654321,
+      "gpuParity": {
+        "mean": 0.07918595679012345,
+        "badFraction": 0.0014949845679012345
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "accent": "threadlight-scene",
+      "avgError": 0.11876286008230452,
+      "badFraction": 0.0004501028806584362,
+      "maxError": 11,
+      "signal": 47.19277263374486,
+      "gpuParity": {
+        "mean": 0.012008101851851851,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "accent": "silver-etching-scene",
+      "avgError": 0.25771604938271603,
+      "badFraction": 0.00038580246913580245,
+      "maxError": 12,
+      "signal": 47.3900462962963,
+      "gpuParity": {
+        "mean": 0.005883487654320988,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "accent": "contour-silk-scene",
+      "avgError": 0.2640174897119342,
+      "badFraction": 0.0003215020576131687,
+      "maxError": 10,
+      "signal": 47.82741769547325,
+      "gpuParity": {
+        "mean": 0.009259259259259259,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "accent": "julia-glass-scene",
+      "avgError": 0.09233539094650206,
+      "badFraction": 0.0019290123456790122,
+      "maxError": 103,
+      "signal": 47.20582561728395,
+      "gpuParity": {
+        "mean": 0.01089891975308642,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbulb",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 0.2404835390946502,
+      "badFraction": 0.00051440329218107,
+      "maxError": 13,
+      "signal": 49.56938014403292,
+      "gpuParity": {
+        "mean": 0.010561342592592593,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "accent": "threadlight-scene",
+      "avgError": 1.2755272633744856,
+      "badFraction": 0.017039609053497943,
+      "maxError": 151,
+      "signal": 93.53311471193416,
+      "gpuParity": {
+        "mean": 0.009259259259259259,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "accent": "silver-etching-scene",
+      "avgError": 1.2986111111111112,
+      "badFraction": 0.016010802469135804,
+      "maxError": 169,
+      "signal": 93.09702932098766,
+      "gpuParity": {
+        "mean": 0.006751543209876543,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "accent": "contour-silk-scene",
+      "avgError": 1.3312114197530864,
+      "badFraction": 0.017811213991769548,
+      "maxError": 156,
+      "signal": 94.47022890946502,
+      "gpuParity": {
+        "mean": 0.0078125,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "accent": "julia-glass-scene",
+      "avgError": 1.3566100823045268,
+      "badFraction": 0.021347736625514403,
+      "maxError": 137,
+      "signal": 94.1806841563786,
+      "gpuParity": {
+        "mean": 0.14501350308641975,
+        "badFraction": 0.0035204475308641976
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "mandelbox",
+      "accent": "chromatic-undertow-scene",
+      "avgError": 1.3238168724279835,
+      "badFraction": 0.016911008230452676,
+      "maxError": 161,
+      "signal": 97.89017489711934,
+      "gpuParity": {
+        "mean": 0.006558641975308642,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "monochrome-chroma",
+      "avgError": 0.33719135802469136,
+      "badFraction": 0,
+      "maxError": 4,
+      "signal": 154.11689814814815,
+      "gpuParity": {
+        "mean": 0.09654706790123457,
+        "badFraction": 0
+      }
+    },
+    {
+      "backend": "webgl2",
+      "visualMode": "flat",
+      "accent": "trails-without-echo",
+      "avgError": 0.10474537037037036,
+      "badFraction": 0,
+      "maxError": 6,
+      "signal": 146.75913065843622,
+      "gpuParity": {
+        "mean": 0.10633680555555555,
+        "badFraction": 0
+      }
+    }
+  ],
+  "mediaResponse": [
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 56.62139917695473,
+      "changedShapeFraction": 0.31963734567901236,
+      "changedGlyphFraction": 0.31983024691358025
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.84085648148148,
+      "changedShapeFraction": 0.32175925925925924,
+      "changedGlyphFraction": 0.32137345679012347
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.413773148148145,
+      "changedShapeFraction": 0.31983024691358025,
+      "changedGlyphFraction": 0.32060185185185186
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 53.7988683127572,
+      "changedShapeFraction": 0.32060185185185186,
+      "changedGlyphFraction": 0.32156635802469136
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.55471965020576,
+      "changedShapeFraction": 0.3256172839506173,
+      "changedGlyphFraction": 0.3258101851851852
+    },
+    {
+      "backend": "webgpu",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.58423353909465,
+      "changedShapeFraction": 0.31983024691358025,
+      "changedGlyphFraction": 0.32060185185185186
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgpu",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.75270061728395,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 56.615097736625515,
+      "changedShapeFraction": 0.3194444444444444,
+      "changedGlyphFraction": 0.31963734567901236
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-night-drive",
+      "meanRgbDifference": 44.60410236625514,
+      "changedShapeFraction": 0.41705246913580246,
+      "changedGlyphFraction": 0.36921296296296297
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "media-corridor",
+      "meanRgbDifference": 99.26286008230453,
+      "changedShapeFraction": 0.4984567901234568,
+      "changedGlyphFraction": 0.4984567901234568
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "wet-coast",
+      "meanRgbDifference": 34.03819444444444,
+      "changedShapeFraction": 0.24729938271604937,
+      "changedGlyphFraction": 0.22550154320987653
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "neon-cathedral",
+      "meanRgbDifference": 65.6770190329218,
+      "changedShapeFraction": 0.4390432098765432,
+      "changedGlyphFraction": 0.3908179012345679
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.831147119341566,
+      "changedShapeFraction": 0.32156635802469136,
+      "changedGlyphFraction": 0.3211805555555556
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.40412808641975,
+      "changedShapeFraction": 0.31963734567901236,
+      "changedGlyphFraction": 0.32040895061728397
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 53.79012345679013,
+      "changedShapeFraction": 0.32040895061728397,
+      "changedGlyphFraction": 0.32156635802469136
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.55471965020576,
+      "changedShapeFraction": 0.3256172839506173,
+      "changedGlyphFraction": 0.3258101851851852
+    },
+    {
+      "backend": "webgl2",
+      "preset": "legacy-relief",
+      "meanRgbDifference": 54.574395576131685,
+      "changedShapeFraction": 0.31963734567901236,
+      "changedGlyphFraction": 0.32040895061728397
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "orbital-chamber",
+      "meanRgbDifference": 68.29681069958848,
+      "changedShapeFraction": 0.5362654320987654,
+      "changedGlyphFraction": 0.5362654320987654
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "ashen-ruins",
+      "meanRgbDifference": 49.89081790123457,
+      "changedShapeFraction": 0.5086805555555556,
+      "changedGlyphFraction": 0.5163966049382716
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "fractal-dive",
+      "meanRgbDifference": 56.077674897119344,
+      "changedShapeFraction": 0.5,
+      "changedGlyphFraction": 0.5
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbulb-bloom",
+      "meanRgbDifference": 44.10249485596708,
+      "changedShapeFraction": 0.4479166666666667,
+      "changedGlyphFraction": 0.4479166666666667
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    },
+    {
+      "backend": "webgl2",
+      "preset": "mandelbox-passage",
+      "meanRgbDifference": 54.74909979423868,
+      "changedShapeFraction": 0.49209104938271603,
+      "changedGlyphFraction": 0.49209104938271603
+    }
+  ],
+  "canvas": {
+    "backend": "canvas2d",
+    "sourceType": "image",
+    "cols": 109,
+    "rows": 55,
+    "requestedCols": 640,
+    "densityClamped": true,
+    "fps": 60,
+    "currentFps": 0,
+    "canvasSize": "872x660"
+  },
+  "canvasAccents": [
+    "threadlight",
+    "silver-etching",
+    "contour-silk",
+    "julia-glass",
+    "chromatic-undertow",
+    "phosphor-lace",
+    "threadlight-scene",
+    "silver-etching-scene",
+    "contour-silk-scene",
+    "julia-glass-scene",
+    "chromatic-undertow-scene"
+  ],
+  "manualControlChecks": 216,
+  "wtfSpatialChecks": 44,
+  "manualTransitionEdits": [
+    "tween",
+    "crossfade",
+    "midi",
+    "delayed-arm"
+  ],
+  "manualSceneSelection": true,
+  "video": {
+    "sourcePreserved": true,
+    "timeBefore": 2.121155,
+    "timeAfter": 19.321677
+  },
+  "midi": true
+}

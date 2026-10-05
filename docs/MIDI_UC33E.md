@@ -340,3 +340,11 @@ Hardware checklist:
 
 Prospective direct-USB, cross-platform hardware, controller-profile, and SysEx
 work is tracked in the [Roadmap](ROADMAP.md).
+
+
+Fractal Accents sliders and selectors use the existing visual-control Learn
+path. **Another variation** is the learnable action
+`action.visual.accentVariation.next`; it cycles the six curated fields without
+changing the source or the global Subtle Limit. **Toggle Subtle Limit** is
+`action.visual.accentSubtleLimit.toggle`. Subtle Limit stays user-owned
+when presets or WTF change.

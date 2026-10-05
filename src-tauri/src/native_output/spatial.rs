@@ -7,6 +7,8 @@ use std::sync::LazyLock;
 
 static CONTRACT: LazyLock<BTreeMap<String, Value>> = LazyLock::new(||
     serde_json::from_str(include_str!("../../../renderers/shared/spatial-contract.json")).expect("spatial contract"));
+static VARIATIONS: LazyLock<Vec<Value>> = LazyLock::new(||
+    serde_json::from_str(include_str!("../../../renderers/shared/fractal-variations.json")).expect("fractal variations"));
 pub(super) const GLYPHS: &str = "-|/\\~+#.";
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -52,10 +54,16 @@ impl Params {
         CONTRACT[key]["options"].as_array().unwrap().iter().position(|v| v[0] == self.values[key]).unwrap_or(0) as f32
     }
     pub fn special_glyphs(&self) -> bool { (self.option("visualMode") > 0.0 && self.flag("sceneMaterialGlyphs")) || self.number("edgeAmount") > 0.0 }
-    pub fn enabled(&self) -> bool { self.option("visualMode") > 0.0 || self.number("edgeAmount") > 0.0 || self.number("feedbackAmount") > 0.0 }
+    pub fn enabled(&self) -> bool { self.option("visualMode") > 0.0 || self.number("edgeAmount") > 0.0 || self.number("feedbackAmount") > 0.0 || self.accents_enabled() }
+    pub fn accents_enabled(&self) -> bool { self.option("accentStyle") != 5.0 && self.number("accentAmount") > 0.0 && self.number("accentCoverage") > 0.0 }
+    pub fn modulate_accent(&mut self, base: &Self, pulse: f64) {
+        if base.accents_enabled() {
+            self.add(base, "accentAmount", pulse.clamp(0.0, 1.0) * base.number("accentAudio") * CONTRACT["accentAudio"]["audioGain"].as_f64().unwrap());
+        }
+    }
     pub fn tween(&mut self, from: &Self, to: &Self, eased: f64) {
         for (key, rule) in CONTRACT.iter() {
-            if rule["default"].is_number() && key != "sceneSeed" {
+            if rule["default"].is_number() && key != "sceneSeed" && rule["discrete"] != true {
                 self.values.insert(key.clone(), Value::from(from.number(key) + (to.number(key) - from.number(key)) * eased));
             }
         }
@@ -64,8 +72,9 @@ impl Params {
         let rule = &CONTRACT[key];
         self.values.insert(key.to_string(), Value::from((base.number(key) + amount).clamp(rule["min"].as_f64().unwrap(), rule["max"].as_f64().unwrap())));
     }
-    pub fn uniforms(&self, cols: u32, rows: u32, cell_w: u32, cell_h: u32, glyph_count: u32, history: &mut History, resource_key: u64, now: f64) -> [f32; 40] {
+    pub fn uniforms(&self, cols: u32, rows: u32, cell_w: u32, cell_h: u32, glyph_count: u32, history: &mut History, resource_key: u64, now: f64) -> [f32; 52] {
         let key = format!("{}:{cols}:{rows}:{resource_key}:{}:{}:{}:{}:{}:{}:{}", self.reset_id, self.option("visualMode"), self.number("sceneSeed"), self.option("sceneRoute"), self.number("sceneOffset"), self.special_glyphs(), self.number("edgeAmount") > 0.0, self.number("feedbackAmount") > 0.0);
+        let key = format!("{key}:{}:{}:{}:{}:{}", self.option("accentStyle"), self.option("accentPlacement"), self.number("accentVariation"), self.accents_enabled(), self.flag("accentSubtleLimit"));
         let valid = history.key == key && history.last_ms > 0.0 && now - history.last_ms < 1000.0;
         let dt = if self.flag("sceneFreeze") || history.last_ms <= 0.0 { 0.0 } else { ((now - history.last_ms) / 1000.0).clamp(0.0, 0.25) };
         history.key = key;
@@ -73,20 +82,29 @@ impl Params {
         let special = self.special_glyphs();
         let base = glyph_count.saturating_sub(if special { 8 } else { 0 });
         let n = |key| self.number(key) as f32;
-        let mut data = [0.0_f32; 40];
+        let lace = self.accents_enabled() && self.option("accentPlacement") == 3.0 && self.number("feedbackAmount") <= 0.0;
+        let feedback = if lace { CONTRACT["accentPlacement"]["trailAmount"].as_f64().unwrap() } else { self.number("feedbackAmount") };
+        let half_life = if lace { CONTRACT["accentPlacement"]["trailHalfLife"].as_f64().unwrap() } else { self.number("feedbackHalfLife") };
+        let mut data = [0.0_f32; 52];
         data[..24].copy_from_slice(&[
             self.option("visualMode"), self.option("sceneRoute"), (self.transport.time_at(now) + self.number("sceneOffset")) as f32, n("sceneSeed"),
             n("sceneFov").to_radians(), n("sceneHeight"), n("sceneMedia"), self.option("sceneMediaFit"),
             n("sceneFog"), n("sceneLight"), n("sceneGlow"), n("sceneWet"),
             n("sceneRain"), if self.flag("sceneMaterialGlyphs") {1.0} else {0.0}, n("edgeAmount"), cols as f32,
             rows as f32, (cols * cell_w) as f32 / (rows * cell_h).max(1) as f32,
-            if valid && self.number("feedbackAmount") > 0.0 { (0.5_f64.powf(dt / self.number("feedbackHalfLife")) * self.number("feedbackAmount").powf(dt * 60.0)) as f32 } else {0.0}, n("feedbackZoom") * dt as f32,
+            if valid && feedback > 0.0 { (0.5_f64.powf(dt / half_life) * feedback.powf(dt * 60.0)) as f32 } else {0.0}, n("feedbackZoom") * dt as f32,
             n("feedbackRotate") * dt as f32, if valid {1.0} else {0.0}, base as f32, glyph_count as f32
         ]);
         for i in 0..8 { data[24 + i] = (base as f32 + i as f32 + 0.5) / glyph_count.max(1) as f32; }
         data[32] = n("sceneRelief"); data[33] = 0.0; data[34] = dt as f32; data[35] = if special {1.0} else {0.0};
         data[36] = n("scenePitch").to_radians();
         data[37] = n("fractalZoom"); data[38] = n("fractalDetail"); data[39] = n("fractalMorph");
+        let variation = &VARIATIONS[self.number("accentVariation") as usize];
+        data[40..].copy_from_slice(&[
+            self.option("accentStyle"), n("accentAmount"), n("accentCoverage"), self.option("accentPlacement"),
+            n("accentScale"), n("accentMotion"), if self.flag("accentSubtleLimit") {1.0} else {0.0}, n("accentVariation"),
+            variation["real"].as_f64().unwrap() as f32, variation["imag"].as_f64().unwrap() as f32, variation["scale"].as_f64().unwrap() as f32, 0.0,
+        ]);
         data
     }
 }
@@ -105,14 +123,32 @@ mod tests {
             // Golden times are in the sender's deterministic test clock domain.
             params.transport = palette::Transport::validated(input.scene_transport.as_ref());
             let mut history = History::default();
-            let count = 10 + if params.special_glyphs() { 8 } else { 0 };
+            let value = |key: &str| fixture[key].as_u64().unwrap() as u32;
+            let count = value("baseGlyphCount") + if params.special_glyphs() { 8 } else { 0 };
             for sample in fixture["samples"].as_array().unwrap() {
-                let actual = params.uniforms(120,45,8,12,count,&mut history,0,sample["now"].as_f64().unwrap());
+                let actual = params.uniforms(value("cols"),value("rows"),value("cellWidth"),value("cellHeight"),count,&mut history,0,sample["now"].as_f64().unwrap());
                 for (index, expected) in sample["expected"].as_array().unwrap().iter().enumerate() {
                     assert!((f64::from(actual[index])-expected.as_f64().unwrap()).abs()<0.00001, "slot {index}: {} != {expected}",actual[index]);
                 }
             }
         }
+    }
+    #[test]
+    fn accent_audio_is_bounded_and_variation_is_discrete() {
+        let make = |value: Value| Params::from_input(&serde_json::from_value(value).unwrap());
+        let from = make(serde_json::json!({"accentAmount":0.1,"accentAudio":1,"accentVariation":0}));
+        let to = make(serde_json::json!({"accentAmount":0.2,"accentVariation":5,"accentSubtleLimit":false}));
+        let mut p = from.clone();
+        p.modulate_accent(&from, 100.0);
+        assert!((p.number("accentAmount") - 0.13).abs() < 0.000001);
+        let off = Params::default();
+        p = off.clone(); p.modulate_accent(&off, 1.0);
+        assert_eq!(p.number("accentAmount"), 0.0);
+        assert!(p.flag("accentSubtleLimit"));
+        p = to.clone(); p.tween(&from, &to, 0.5);
+        assert_eq!(p.number("accentVariation"), 5.0);
+        assert!(!p.flag("accentSubtleLimit"));
+        assert!((p.number("accentAmount") - 0.15).abs() < 0.000001);
     }
     #[test]
     fn invalid_fields_and_unknown_payload_keys_do_not_enter_render_state() {
