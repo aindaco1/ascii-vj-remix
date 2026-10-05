@@ -107,6 +107,10 @@ Validation:
 
 ## Remaining acceptance boundaries
 
+This is the pre-release local implementation record. Subsequent cross-platform
+CI, published installer/updater acceptance and cleanup are recorded in the
+[1.2.0 release record](../releases/RELEASE_1.2.0.md).
+
 Windows/Linux builds and physical-device checks were not run for these local
 changes. Shared shader validation, platform-independent JS/Rust tests and
 Canvas fallback checks do not replace those checks. Existing Desktop CI runs

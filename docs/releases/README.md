@@ -11,7 +11,7 @@ shipped changes. The [documentation index](../README.md) covers current guides.
 
 | Version | Record | Evidence boundary |
 | --- | --- | --- |
-| 1.2.0 | [Fractal Accents](RELEASE_1.2.0.md) | Release approved 2026-10-04; local renderer and Mac checks passed. CI, publication and installer/updater acceptance pending. |
+| 1.2.0 | [Fractal Accents](RELEASE_1.2.0.md) | Published 2026-10-05 UTC; exact-main CI, three-platform installer/updater checks and independent local Mac acceptance passed. Physical follow-ups remain explicit. |
 | 1.1.0 | [Spatial ASCII](RELEASE_1.1.0.md) | Published 2026-09-29; exact-main CI, all three platform installer/updater hops and independent local Mac acceptance passed. Physical follow-ups remain explicit. |
 | 1.0.5 | [macOS compatibility and issue follow-ups](RELEASE_1.0.5.md) | Records deployment-target and compiler corrections, public artifacts and remaining physical acceptance. |
 | 1.0.4 | [Cycling and performance release](RELEASE_1.0.4.md) | Tracks source, CI, artifacts and installed/hardware acceptance separately. |
