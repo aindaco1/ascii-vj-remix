@@ -294,7 +294,7 @@ fn sceneFractal(uv: vec2f) -> SceneSample {
     }
     return backdrop;
 }
-fn sceneSample(uv: vec2f) -> SceneSample {
+fn sceneSampleBase(uv: vec2f) -> SceneSample {
     if (effect(0).x == 8.0) { return sceneMandelbrot(uv); }
     if (effect(0).x >= 7.0) { return sceneFractal(uv); }
     if (effect(0).x == 6.0) { return sceneOrbitals(uv); }
@@ -373,9 +373,100 @@ fn sceneSample(uv: vec2f) -> SceneSample {
     }
     return result;
 }
+fn accentEnabled() -> bool {
+    return effect(10).x != 5.0 && effect(10).y > 0.0 && effect(10).z > 0.0;
+}
+fn accentField(uv: vec2f) -> vec4f {
+    let drift: f32 = effect(0).z * effect(11).y * 0.04;
+    var z: vec2f = (uv * 2.0 - 1.0) * effect(12).z / (effect(11).x * vec2f(1.0, effect(4).y)) + vec2f(sin(drift), cos(drift * 0.73)) * 0.06;
+    var trap: f32 = 1.0;
+    var stripes: f32 = 0.0;
+    var etch: f32 = 0.0;
+    var count: f32 = 0.0;
+    for (var i: i32 = 0; i < 24; i = i + 1) {
+        z = vec2f(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + effect(12).xy;
+        let r2: f32 = dot(z, z);
+        trap = min(trap, min(abs(z.x), abs(z.y)));
+        let s2: f32 = 2.0 * z.x * z.y / max(0.0001, r2);
+        stripes = stripes + 3.0 * s2 - 4.0 * s2 * s2 * s2;
+        etch = etch + abs(r2 - 1.0) / (r2 + 1.0);
+        count = count + 1.0;
+        if (r2 > 16.0) { break; }
+    }
+    return vec4f(exp(-trap * 18.0), stripes / count, sin(etch / count * 24.0 + drift), sin((z.x - z.y) / (1.0 + abs(z.x) + abs(z.y)) * 4.0));
+}
+fn accentMask(uv: vec2f, trails: bool) -> vec2f {
+    let luma: vec3f = vec3f(0.2126, 0.7152, 0.0722);
+    let px: vec2f = 1.0 / vec2f(effect(3).w, effect(4).x);
+    let source: vec3f = sceneMedia(uv);
+    let luminance: f32 = dot(source, luma);
+    let gx: f32 = dot(sceneMedia(uv + vec2f(px.x, 0.0)) - sceneMedia(uv - vec2f(px.x, 0.0)), luma);
+    let gy: f32 = dot(sceneMedia(uv + vec2f(0.0, px.y)) - sceneMedia(uv - vec2f(0.0, px.y)), luma);
+    let edge: f32 = smoothstep(0.015, 0.22, length(vec2f(gx, gy)));
+    let coverageField: f32 = 0.5 + 0.5 * sin(uv.x * 11.0 + effect(11).w) * cos(uv.y * 9.0 - effect(11).w);
+    let coverage: f32 = choose(smoothstep(1.0 - effect(10).z - 0.08, 1.0 - effect(10).z + 0.08, coverageField), 1.0, effect(10).z >= 1.0);
+    var mask: f32 = smoothstep(0.02, 0.18, luminance) * (1.0 - smoothstep(0.8, 0.98, luminance));
+    if (effect(10).w == 0.0) { mask = edge; }
+    if (effect(10).w == 2.0) { mask = (1.0 - edge) * smoothstep(0.015, 0.12, luminance); }
+    if (trails) { mask = 1.0; }
+    return vec2f(coverage * mask, edge);
+}
+fn accentDisplacement(mask: vec2f) -> f32 {
+    return min(effect(10).y * 2.5, choose(1.0, 0.85, effect(11).z > 0.5)) * mask.x * (1.0 - mask.y);
+}
+fn sceneSample(uv: vec2f) -> SceneSample {
+    var at: vec2f = uv;
+    if (accentEnabled() && effect(10).x == 3.0 && effect(10).w != 3.0) {
+        at = uv + accentField(uv).yw * accentDisplacement(accentMask(uv, false)) / vec2f(effect(3).w, effect(4).x);
+    }
+    return sceneSampleBase(at);
+}
+fn accentApply(cell: vec4f, uv: vec2f, trails: bool) -> vec4f {
+    if (!trails && effect(10).x == 3.0 && effect(0).x != 0.0) { return cell; }
+    let field: vec4f = accentField(uv);
+    let subtle: bool = effect(11).z > 0.5;
+    let luma: vec3f = vec3f(0.2126, 0.7152, 0.0722);
+    let px: vec2f = 1.0 / vec2f(effect(3).w, effect(4).x);
+    let mask: vec2f = accentMask(uv, trails);
+    let amount: f32 = min(effect(10).y, choose(1.0, 0.5, subtle)) * mask.x;
+    var result: vec4f = cell;
+    if (trails) {
+        result = cell * pow(max(0.00001, 1.0 - amount * (1.0 - field.x)), effect(8).z * 60.0);
+    } else if (effect(10).x == 3.0) {
+        let displacement: f32 = accentDisplacement(mask);
+        let delta: vec2f = field.yw * displacement;
+        let direction: vec2f = vec2f(choose(1.0, -1.0, delta.x < 0.0), choose(1.0, -1.0, delta.y < 0.0));
+        let a: vec4f = sceneProcess(sceneMedia(uv + vec2f(direction.x * px.x, 0.0)), uv);
+        let b: vec4f = sceneProcess(sceneMedia(uv + vec2f(0.0, direction.y * px.y)), uv);
+        let c: vec4f = sceneProcess(sceneMedia(uv + direction * px), uv);
+        result = mix(mix(cell, a, abs(delta.x)), mix(b, c, abs(delta.x)), abs(delta.y));
+    } else if (effect(10).x == 4.0) {
+        var shifted: vec3f = cell.gbr;
+        if (field.w < 0.0) { shifted = cell.brg; }
+        let delta: vec3f = shifted - cell.rgb;
+        let tone: f32 = field.w * amount * 0.5;
+        result = vec4f(cell.rgb + (delta - vec3f(dot(delta, luma))) * abs(field.w) * amount + cell.rgb * tone, cell.a + cell.a * tone);
+    } else {
+        var signal: f32 = (field.x - 0.55) * 2.0;
+        if (effect(10).x == 1.0) { signal = field.z; }
+        if (effect(10).x == 2.0) { signal = field.y; }
+        result = vec4f(cell.rgb + cell.rgb * signal * amount, cell.a + cell.a * signal * amount * 0.65);
+    }
+    if (subtle) {
+        var delta: vec3f = clamp(result.rgb - cell.rgb, max(vec3f(-0.22), -cell.rgb), min(vec3f(0.22), vec3f(1.0) - cell.rgb));
+        delta = delta * min(1.0, 0.16 / max(0.00001, abs(dot(delta, luma))));
+        result = vec4f(cell.rgb + delta, clamp(result.a, cell.a - 0.1, cell.a + 0.1));
+    }
+    return clamp(result, vec4f(0.0), vec4f(1.0));
+}
 fn sceneFinish(cell: vec4f, uv: vec2f, materialGlyph: f32) -> vec4f {
     var color: vec3f = cell.rgb;
     var alpha: f32 = cell.a;
+    if (accentEnabled() && effect(10).w != 3.0) {
+        let accented: vec4f = accentApply(cell, uv, false);
+        color = accented.rgb;
+        alpha = accented.a;
+    }
     if (effect(8).w > 0.5) { alpha = min(0.999, alpha) * effect(5).z / effect(5).w; }
     // Fade the material override with the procedural/media blend, so source
     // luminance and shapes choose glyphs on media-dominant surfaces.
@@ -403,7 +494,13 @@ fn sceneFinish(cell: vec4f, uv: vec2f, materialGlyph: f32) -> vec4f {
         let previous: vec4f = sceneHistory(oldUV);
         var oldColor: vec3f = previous.rgb * effect(4).z;
         if (effect(8).y > 0.5) { oldColor = max(vec3f(0.0), oldColor - vec3f(effect(8).z * (60.0 / 255.0))); }
-        if (dot(oldColor, vec3f(0.2126,0.7152,0.0722)) > dot(color, vec3f(0.2126,0.7152,0.0722))) { alpha = previous.a; }
+        var oldAlpha: f32 = previous.a;
+        if (accentEnabled() && effect(10).w == 3.0) {
+            let tail: vec4f = accentApply(vec4f(oldColor, previous.a * effect(4).z), uv, true);
+            oldColor = tail.rgb;
+            oldAlpha = tail.a;
+        }
+        if (dot(oldColor, vec3f(0.2126,0.7152,0.0722)) > dot(color, vec3f(0.2126,0.7152,0.0722))) { alpha = oldAlpha; }
         color = max(color, oldColor);
     }
     return vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), alpha);

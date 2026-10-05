@@ -1,5 +1,5 @@
 import { spatialGLSL } from '../../../../shared/spatial-shader.js';
-import { spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
+import { SPATIAL_UNIFORM_FLOATS, spatialParams, fillSpatialUniforms } from '../../../../shared/spatial.js';
 import { activeGlyphRamp } from '../../../../shared/character-sets.js';
 import { uploadStaticImage } from '../../../../shared/canvas-readback.js';
 import { fillPaletteDisplay, paletteCycleParams } from '../../../../shared/palette-cycling.js';
@@ -69,7 +69,7 @@ layout(location=0) out vec4 fragColor;
 layout(location=1) out vec4 historyColor;
 
 
-uniform vec4 u_spatial[10];
+uniform vec4 u_spatial[13];
 uniform sampler2D u_history;
 vec4 effect(int index) { return u_spatial[index]; }
 float choose(float a, float b, bool condition) { return condition ? b : a; }
@@ -84,6 +84,7 @@ vec4 sceneHistory(vec2 uv) {
     if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return vec4(0.0);
     return texture(u_history, vec2(uv.x, 1.0 - uv.y));
 }
+vec4 sceneProcess(vec3 color, vec2 uv);
 ${spatialGLSL()}
 
 // Hash for per-cell jitter
@@ -112,26 +113,8 @@ vec3 brightenRgb(vec3 color) {
     return vec3(lifted) + (scaled - vec3(lifted)) * chroma;
 }
 
-void main() {
-    vec2 cellCoord = floor(v_texCoord * u_gridSize);
-    vec2 cellCenter = (cellCoord + vec2(u_sampleX, u_sampleY)) / u_gridSize;
-
-    // Jitter sample point within the cell (animated by time)
-    vec2 cellSize = 1.0 / u_gridSize;
-    vec2 seed = cellCoord + u_time * u_jitterSpeed * vec2(7.13, 11.71);
-    float jx = (hash(seed) - 0.5) * cellSize.x * u_jitterAmount;
-    float jy = (hash(seed + vec2(37.0, 91.0)) - 0.5) * cellSize.y * u_jitterAmount;
-    vec2 sampleUV = clamp(cellCenter + vec2(jx, jy), vec2(0.0), vec2(1.0));
-    if (u_mirrorX == 1) {
-        sampleUV.x = 1.0 - sampleUV.x;
-    }
-
-    vec4 c = texture(u_source, sampleUV);
-    vec2 sceneUV = vec2((cellCoord.x + 0.5) / u_gridSize.x, 1.0 - (cellCoord.y + 0.5) / u_gridSize.y);
-    SceneSample scene = SceneSample(c.rgb, 0.0);
-    if (effect(0).x > 0.0) scene = sceneSample(sceneUV);
-    c = vec4(scene.color, c.a);
-
+vec4 processColor(vec3 color, vec2 cellCoord) {
+    vec4 c = vec4(color, 1.0);
     c.rgb = clamp(c.rgb, 0.0, 1.0);
     float avg = (c.r + c.g + c.b) * 0.333333333;
     vec3 boosted = clamp(vec3(
@@ -162,13 +145,38 @@ void main() {
         int paletteIndex = int(round(texelFetch(u_paletteLut, ivec2(q.b, row), 0).r * 255.0));
         vec4 mapped = texelFetch(u_paletteColors, ivec2(clamp(paletteIndex, 0, u_paletteCount - 1), 0), 0);
         if (u_brightOutput == 1) mapped = vec4(brightenRgb(mapped.rgb), pow(mapped.a, 0.22));
-        fragColor = sceneFinish(mapped, sceneUV, scene.glyph);
-        historyColor = fragColor;
-        return;
+        return mapped;
     }
 
     float luma = dot(boosted, vec3(0.2126, 0.7152, 0.0722));
-    fragColor = sceneFinish(vec4(boosted, luma), sceneUV, scene.glyph);
+    return vec4(boosted, luma);
+}
+vec4 sceneProcess(vec3 color, vec2 uv) {
+    vec2 at = floor(clamp(uv, vec2(0.0), vec2(0.999999)) * u_gridSize);
+    return processColor(color, vec2(at.x, u_gridSize.y - 1.0 - at.y));
+}
+
+void main() {
+    vec2 cellCoord = floor(v_texCoord * u_gridSize);
+    vec2 cellCenter = (cellCoord + vec2(u_sampleX, u_sampleY)) / u_gridSize;
+
+    // Jitter sample point within the cell (animated by time)
+    vec2 cellSize = 1.0 / u_gridSize;
+    vec2 seed = cellCoord + u_time * u_jitterSpeed * vec2(7.13, 11.71);
+    float jx = (hash(seed) - 0.5) * cellSize.x * u_jitterAmount;
+    float jy = (hash(seed + vec2(37.0, 91.0)) - 0.5) * cellSize.y * u_jitterAmount;
+    vec2 sampleUV = clamp(cellCenter + vec2(jx, jy), vec2(0.0), vec2(1.0));
+    if (u_mirrorX == 1) {
+        sampleUV.x = 1.0 - sampleUV.x;
+    }
+
+    vec4 c = texture(u_source, sampleUV);
+    vec2 sceneUV = vec2((cellCoord.x + 0.5) / u_gridSize.x, 1.0 - (cellCoord.y + 0.5) / u_gridSize.y);
+    SceneSample scene = SceneSample(c.rgb, 0.0);
+    if (effect(0).x > 0.0) scene = sceneSample(sceneUV);
+    c = vec4(scene.color, c.a);
+
+    fragColor = sceneFinish(processColor(c.rgb, cellCoord), sceneUV, scene.glyph);
     historyColor = fragColor;
 }`;
 
@@ -285,7 +293,7 @@ export class WebGL2Renderer {
         this.bgBlend = options.bgBlend || 0;
         this.quantizeBits = options.quantizeBits || 0;
         Object.assign(this, paletteCycleParams(options), spatialParams(options));
-        this.spatialData = new Float32Array(40);
+        this.spatialData = new Float32Array(SPATIAL_UNIFORM_FLOATS);
         this.spatialState = {};
         this.paletteDisplay = new Float32Array(MAX_PALETTE_COLORS * 4);
         this.paletteDisplayLast = new Float32Array(MAX_PALETTE_COLORS * 4).fill(-1);

@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "mediaUrl": "media/point-click-test-30s.mp4",
+  "columns": 480,
+  "syntheticAudio": true,
+  "nativeAudio": false,
+  "backend": "auto",
+  "paletteId": "none",
+  "ditherMode": "none",
+  "charset": "point-click",
+  "soak": false,
+  "structuralTransitions": false,
+  "actualBackends": [
+    "webgpu"
+  ],
+  "nativeFailed": 0,
+  "nativeTransitionArmed": 22,
+  "nativeTransitionFailed": 0,
+  "outputDisplayCount": 1,
+  "rendererChanges": 23,
+  "frameResetCount": 21,
+  "finalFrameCount": 13,
+  "hasVisibleSignal": true,
+  "videoTimeAdvanced": true,
+  "frontendErrors": 0,
+  "videoFrameSupported": true,
+  "error": null,
+  "sampleCount": 90,
+  "phases": {
+    "main": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 19,
+      "mainAvgFps": 39.974580605647766,
+      "mainMinFps": 36,
+      "mainP95FrameMs": 26.55526315789474,
+      "mainP99FrameMs": 27.43011695906433,
+      "nativeOkHz": 0
+    },
+    "popout": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 0,
+      "mainAvgFps": 40.04081035529807,
+      "mainMinFps": 29.761904761904763,
+      "mainP95FrameMs": 29.28552631578946,
+      "mainP99FrameMs": 32.991,
+      "nativeOkHz": 82.73228705665943
+    },
+    "transition": {
+      "hiddenSamples": 0,
+      "unfocusedSamples": 0,
+      "mainAvgFps": 26.255633634270183,
+      "mainMinFps": 0,
+      "mainP95FrameMs": 45.35999999999999,
+      "mainP99FrameMs": 49.391999999999996,
+      "nativeOkHz": 5.280049186152346
+    }
+  },
+  "mainAvgFps": 35.42367486507201,
+  "mainMinFps": 0,
+  "mainP95FrameMs": 45.35999999999999,
+  "mainP99FrameMs": 49.391999999999996
+}

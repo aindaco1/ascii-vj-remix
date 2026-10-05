@@ -117,9 +117,12 @@ Start with the [install guide](../README.md#install-guide) and
 - WTF mode continuously transitions through randomized live-safe settings and
   leans into both extreme and traditional ASCII preset families while avoiding
   pure white or pure black output. Each transition independently chooses Flat
-  Media with 80% probability; the other 20% is shared equally among the ten
-  spatial modes (2% each). This is a probability per transition, so runs can
-  include consecutive flat or spatial looks.
+  Media with 95% probability; the other 5% is shared equally among the ten
+  spatial modes (0.5% each). This is a probability per transition, so runs can
+  include consecutive flat or spatial looks. WTF checks dim footage, glyph coverage,
+  fixed glyph colors, and active audio response before accepting a target. If no
+  candidate or fallback is safe, it holds the current look and retries. Naturally
+  black source frames remain valid. Bright Output stays under your control.
 
 ### Pixel Art and Color Cycling
 
@@ -584,3 +587,52 @@ Normal and Advanced density limits have not changed. Relief, orbitals, wet
 reflections and dense scenes can require more GPU time; reduce Columns before
 raising other limits. Physical M1/16 GB and Windows/Linux acceptance is still
 pending for this release.
+
+
+## Fractal Accents
+
+The six new looks keep your selected media in Flat Media and add small fractal
+textures. Selecting them preserves source playback and your global Subtle Limit.
+
+| Preset | Accent |
+| --- | --- |
+| Threadlight | Fine orbit-trap threads along edges, with Braille texture |
+| Silver Etching | Quiet monochrome contour engraving in midtones |
+| Contour Silk | Soft angular bands across quieter solid-cell areas |
+| Julia Glass | Small, edge-protected distortions in solid cells |
+| Chromatic Undertow | Color currents with a tonal response in monochrome and glyph looks |
+| Phosphor Lace | Fractal attenuation of short moving-source trails |
+
+Open **Fractal Accents** to adjust **Fractal amount**, **Coverage**, **Placement**,
+**Texture scale**, **Drift** and **Audio accent**. Amount controls intensity;
+Coverage changes how much of the image receives it. Placement selects Edges,
+Midtones, Quiet areas or Trails. Trails uses your Phosphor / echo settings,
+or supplies a short echo when that control is zero; it is clearest with a moving
+source. Select **Off**, or set Amount or Coverage to zero, to bypass the accent.
+Accents work over every preset and optional spatial/fractal Visual mode. Their
+color and glyph-density changes also show in fixed-color and monochrome looks.
+
+Switching ordinary built-in presets keeps your current accent settings, including
+Off. Selecting one of the six accent presets loads its recipe. Saved custom
+presets restore their own accent settings.
+
+WTF independently adds an accent to 65% of its targets, choosing among all six
+recipes and varying amount, coverage, scale, drift, audio response and variation.
+The remaining 35% switch accents off. This works with both flat and scene targets;
+WTF preserves your global Subtle Limit.
+
+**Subtle Limit** starts enabled globally. It caps the accent's brightness,
+color and displacement changes even when a slider, audio or MIDI asks for
+more. Turning it off allows stronger treatments. Your choice persists across
+presets and launches; saved presets do not change it. Other color and audio
+controls retain their normal range.
+
+**Variation** selects one of six curated Julia fields. **Another variation**
+cycles them while keeping the rest of your look. Drift uses the existing
+scene clock; **Freeze scene**, **Travel speed** and **Reset scene / trails**
+remain available under Space / Motion. Audio accent adds a restrained
+presence-driven accent when Audio Reactivity is running. The controls and
+Another variation are available through MIDI Learn.
+
+The accents share WebGPU, WebGL2, native Pop Out and the existing bounded
+Canvas fallback. No additional files, downloads or online service are needed.

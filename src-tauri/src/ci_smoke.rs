@@ -655,6 +655,7 @@ fn spawn_ui_perf_smoke(app: &App) {
             "sampleMs": sample_ms,
             "columns": columns,
             "syntheticAudio": synthetic_audio,
+            "wtf": env::var("ASCILINE_UI_PERF_SMOKE_WTF").is_ok_and(|value| value == "1"),
             "nativeAudio": env::var("ASCILINE_UI_PERF_SMOKE_NATIVE_AUDIO").is_ok_and(|value| value == "1"),
             "paletteId": palette_id,
             "ditherMode": dither_mode,

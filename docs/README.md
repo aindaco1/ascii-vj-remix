@@ -41,6 +41,8 @@ release records and benchmark evidence.
   and evidence. Historical pending rows are not current release status.
 - [Performance evidence](performance/) contains dated benchmark reports;
   [Performance](PERFORMANCE.md) explains their workloads and limits.
+- [Fractal Accents local validation](testing/FRACTAL_ACCENTS.md) records visual,
+  backend and performance checks for the unreleased accent pack.
 - [Jev integration verification](testing/JEV_EVALUATION.md) records development
   test results and their evidence boundaries, without a desktop release.
 - [Crash relay](../crash-relay/README.md) owns Worker setup and aggregation details.
@@ -65,4 +67,4 @@ and proposals in the Roadmap. Preserve evidence boundaries when reorganizing.
 For moves, update relative links, heading anchors, and workflow/script path
 references together. Validate local links and run `git diff --check`.
 
-The [1.1.0 Spatial ASCII release record](releases/RELEASE_1.1.0.md) covers implementation, release approval, validation evidence and remaining platform checks.
+The [1.2.0 Fractal Accents release record](releases/RELEASE_1.2.0.md) covers implementation, release approval, validation evidence and remaining platform checks.

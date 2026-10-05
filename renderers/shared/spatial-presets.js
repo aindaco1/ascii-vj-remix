@@ -1,6 +1,6 @@
-import { SPATIAL_CONTRACT, SPATIAL_DEFAULTS, spatialParams } from './spatial.js';
+import { SPATIAL_CONTRACT, SPATIAL_DEFAULTS, spatialPresetParams } from './spatial.js';
 
-const base = { ...SPATIAL_DEFAULTS, backend: 'auto', cols: 200, rows: 0, autoRows: true,
+const base = { ...spatialPresetParams(SPATIAL_DEFAULTS), backend: 'auto', cols: 200, rows: 0, autoRows: true,
     cellWidth: 8, cellHeight: 12, aspectCorrection: 1, glyphMode: true, solidMode: false,
     pixel: false, charset: 'asciline', glyphDepth: 96, glyphOffset: 0, glyphReverse: false,
     saturationBoost: 1.1, contrastBoost: 1.05, brightness: 1.2, gamma: 1.55,
@@ -48,10 +48,10 @@ export const SPATIAL_PRESETS = Object.freeze([
 
 const wtfSceneModes = SPATIAL_CONTRACT.visualMode.options.map(([id]) => id).filter(id => id !== 'flat');
 export function randomWtfSpatialParams(random = Math.random) {
-    if (random() < 0.8) return { visualMode: 'flat' };
+    if (random() < 0.95) return { visualMode: 'flat' };
     const visualMode = wtfSceneModes[Math.floor(random() * wtfSceneModes.length)];
     const preset = SPATIAL_PRESETS.find(p => p.sceneMode === visualMode);
     // Scene-specific camera defaults avoid inheriting an unsuitable view from
     // an earlier look. Prefer acceleration, retaining normal renderer fallback.
-    return { ...spatialParams(preset?.params), visualMode, backend: 'auto', pixel: false };
+    return { ...spatialPresetParams(preset?.params), visualMode, backend: 'auto', pixel: false };
 }

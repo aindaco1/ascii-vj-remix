@@ -1,6 +1,9 @@
+import { protectWtfVisibility } from './renderers/shared/wtf-visual-safety.js';
+import { inspectWtfTarget, sampleWtfSource } from './renderers/shared/wtf-visual-probe.js';
 import { renderSpatialCells } from './renderers/shared/spatial-canvas.js';
+import { FRACTAL_ACCENT_PRESETS, retainedPresetAccents, randomWtfAccentParams } from './renderers/shared/fractal-accent-presets.js';
 import { SPATIAL_PRESETS, randomWtfSpatialParams } from './renderers/shared/spatial-presets.js';
-import { SPATIAL_DEFAULTS, SPATIAL_CONTRACT, SPATIAL_KEYS, SPATIAL_TWEEN_KEYS, SPATIAL_CONTROLS, spatialParams, effectsEnabled, spatialGlyphRamp } from './renderers/shared/spatial.js';
+import { SPATIAL_DEFAULTS, SPATIAL_CONTRACT, SPATIAL_GLOBAL_KEYS, FRACTAL_VARIATIONS, SPATIAL_KEYS, SPATIAL_TWEEN_KEYS, SPATIAL_CONTROLS, spatialParams, accentsEnabled, effectsEnabled, spatialGlyphRamp } from './renderers/shared/spatial.js';
 import { COLOR_CYCLE_PRESETS } from './renderers/shared/color-cycle-presets.js';
 import { PALETTE_CYCLE_DEFAULTS, PALETTE_CONTRACT, paletteCycleParams, fillPaletteDisplay, createCycleTransport, setCycleTransportRate, cycleNowMs } from './renderers/shared/palette-cycling.js';
 import {
@@ -711,6 +714,7 @@ const BUILTIN_PRESETS = [
     ...PALETTE_PRESETS,
     ...COLOR_CYCLE_PRESETS,
     ...SPATIAL_PRESETS,
+    ...FRACTAL_ACCENT_PRESETS,
     {
         id: 'arcade-rain',
         name: 'Arcade Rain',
@@ -1495,8 +1499,10 @@ const ASCII_WTF_PRESET_IDS = [
 ];
 const WTF_ANCHOR_PRESET_IDS = [
     ...EXTREME_WTF_PRESET_IDS,
-    ...ASCII_WTF_PRESET_IDS
+    ...ASCII_WTF_PRESET_IDS,
+    ...FRACTAL_ACCENT_PRESETS.map(p => p.id)
 ];
+const randomWtfVisualParams = () => ({...randomWtfSpatialParams(), ...randomWtfAccentParams()});
 const ASCII_WTF_PRESET_ID_SET = new Set(ASCII_WTF_PRESET_IDS);
 
 const BUILTIN_PRESET_BY_ID = new Map(BUILTIN_PRESETS.map((preset) => [preset.id, preset]));
@@ -1539,7 +1545,8 @@ const CANVAS_ASCII_JITTER_MIGRATIONS = ASCII_WTF_PRESETS.map((preset) => ({
 }));
 
 const CONTROL_GROUPS = [
-    { title: 'Space / Motion', controls: SPATIAL_CONTROLS },
+    { title: 'Space / Motion', controls: SPATIAL_CONTROLS.filter(c => !c.group) },
+    { title: 'Fractal Accents', controls: SPATIAL_CONTROLS.filter(c => c.group === 'Fractal Accents') },
     {
         title: 'Playback',
         controls: [
@@ -1729,7 +1736,7 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, 'statsOverlay', 'advancedDensity', 'brightOutput', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, ...SPATIAL_GLOBAL_KEYS, 'statsOverlay', 'advancedDensity', 'brightOutput', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -1742,8 +1749,10 @@ const STATIC_CANVAS_BACKENDS = new Set(['canvas2d', 'pixel-canvas']);
 
 const CONTROL_APPLIES = {
     ...Object.fromEntries(SPATIAL_KEYS.map(key => [key, ({ params }) => params.sourceMode === 'static' && (
+        SPATIAL_CONTRACT[key].group === 'Fractal Accents' ? true :
         SPATIAL_CONTRACT[key].modes ? SPATIAL_CONTRACT[key].modes.includes(params.visualMode) :
-        key === 'visualMode' || key.startsWith('feedback') || key === 'sceneFreeze' || params.visualMode !== 'flat'
+        key === 'visualMode' || key.startsWith('feedback') || key === 'sceneFreeze' ||
+        (key === 'sceneSpeed' && accentsEnabled(params)) || params.visualMode !== 'flat'
     )])),
     transitionSeconds: () => true,
     volume: ({ params }) => params.sourceMode === 'stream' || isLikelyVideo(params),
@@ -2872,7 +2881,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
 
     if (effectsEnabled(params)) {
         const cells = renderSpatialCells(params, sourcePixels, sampleWidth, sampleHeight, cols, rows,
-            (rgb, x, y) => processGpuCellColor(...rgb, params, x, y, paletteLut, paletteDisplay), {});
+            (rgb, x, y) => processGpuCellColor(...rgb, params, x, y, paletteLut, paletteDisplay), {}, undefined, time);
         gridPixels.set(cells);
         for (let i = 3; i < gridPixels.length; i += 4) gridPixels[i] = 255;
     } else for (let row = 0; row < rows; row++) {
@@ -2965,37 +2974,6 @@ function canvasVisualSignal(canvas) {
 
 function canvasHasVisibleSignal(canvas) {
     return canvasVisualSignal(canvas).visible;
-}
-
-function canvasHasSafeVisualSignal(canvas) {
-    if (!canvas?.width || !canvas?.height) return false;
-    const sample = document.createElement('canvas');
-    sample.width = Math.min(120, canvas.width);
-    sample.height = Math.min(90, canvas.height);
-    const ctx = sample.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return false;
-
-    try {
-        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
-        const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
-        let minLuma = 255;
-        let maxLuma = 0;
-        let sumLuma = 0;
-        let sumLumaSquared = 0;
-        for (let i = 0; i < data.length; i += 4) {
-            const luma = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-            minLuma = Math.min(minLuma, luma);
-            maxLuma = Math.max(maxLuma, luma);
-            sumLuma += luma;
-            sumLumaSquared += luma * luma;
-        }
-        const total = Math.max(1, data.length / 4);
-        const avg = sumLuma / total;
-        const variance = Math.max(0, sumLumaSquared / total - avg * avg);
-        return maxLuma > 28 && avg > 3 && avg < 248 && (maxLuma - minLuma > 14 || variance > 24);
-    } catch {
-        return false;
-    }
 }
 
 class AudioReactiveRuntime {
@@ -4419,8 +4397,8 @@ class CanvasStaticRenderer {
         ctx.font = `bold ${Math.max(1, this.params.cellHeight)}px ${this.params.fontFamily}, monospace`;
         if (effectsEnabled(this.params)) {
             const cells = renderSpatialCells(this.params, data, sampleWidth, sampleHeight, cols, this.rows,
-                (rgb, x, y) => processGpuCellColor(...rgb, this.params, x, y, this.paletteLut, this.paletteDisplay),
-                this.spatialState ||= {});
+                (rgb, x, y) => (accentsEnabled(this.params) && this.params.visualMode === 'flat' ? processColor : processGpuCellColor)(...rgb, this.params, x, y, this.paletteLut, this.paletteDisplay),
+                this.spatialState ||= {}, undefined, time);
             const ramp = [...this.glyphRamp];
             for (let y = 0; y < this.rows; y++) for (let x = 0; x < cols; x++) {
                 const i = (y * cols + x) * 4;
@@ -7077,11 +7055,25 @@ class RendererLabApp {
                 reset.addEventListener('click', () => this._resetScene());
                 section.appendChild(reset);
             }
+            if (group.title === 'Fractal Accents') {
+                const next = document.createElement('button');
+                next.type = 'button'; next.textContent = 'Another variation';
+                next.id = 'accent-next-variation';
+                next.addEventListener('click', () => this._nextAccentVariation());
+                section.appendChild(next);
+            }
             const target = group.title === 'Camera' && els.cameraControlsSlot
                 ? els.cameraControlsSlot
                 : els.controls;
             target.appendChild(section);
         }
+    }
+
+    _nextAccentVariation() {
+        this.params.accentVariation = (this.params.accentVariation + 1) % FRACTAL_VARIATIONS.length;
+        this._syncInputValues(['accentVariation']);
+        this._paramChanged('accentVariation');
+        return true;
     }
 
     _resetScene() {
@@ -7510,6 +7502,7 @@ class RendererLabApp {
         const sampleMs = Math.max(120, Number(payload.sampleMs) || 500);
         const columns = clamp(Math.round(Number(payload.columns) || DEFAULT_PARAMS.cols), 80, 900);
         const syntheticAudio = payload.syntheticAudio === true;
+        const wtf = payload.wtf === true;
         const nativeAudio = payload.nativeAudio === true && !syntheticAudio;
         const spatial = spatialParams(payload.spatial || {});
         const mediaUrl = String(payload.mediaUrl || DEFAULT_PARAMS.mediaUrl);
@@ -7575,6 +7568,7 @@ class RendererLabApp {
             sampleMs,
             columns,
             syntheticAudio,
+            wtf,
             nativeAudio,
             spatial,
             backend,
@@ -7758,6 +7752,9 @@ class RendererLabApp {
                 if (!this.audioReactiveRuntime.nativeInputAudio) throw new Error('Native audio latency check requires native input capture');
             }
 
+            // The smoke harness drives the real target/transition path itself.
+            // Avoid starting a competing WTF loop during measured phases.
+            if (wtf) { this.wtfActive = true; this._syncWtfButton(); }
             const transitionTargets = [
                 {
                     brightness: 0.76,
@@ -7802,11 +7799,12 @@ class RendererLabApp {
                 const transitionChurn = (async () => {
                     let targetIndex = 0;
                     while (performance.now() < transitionDeadline) {
-                        const target = normalizeParams({
+                        const target = wtf ? await this._makeWtfTarget(0.55) : normalizeParams({
                             ...this.params,
                             ...transitionTargets[targetIndex % transitionTargets.length]
                         }, { preserveBlob: true });
-                        await this._transitionTo(target, 0.55);
+                        if (target) await this._transitionTo(target, 0.55);
+                        else await wait(100);
                         targetIndex += 1;
                     }
                 })();
@@ -7903,6 +7901,7 @@ class RendererLabApp {
                 mediaUrl: report.mediaUrl,
                 columns: report.columns,
                 syntheticAudio: report.syntheticAudio,
+                wtf: report.wtf,
                 nativeAudio: report.nativeAudio,
                 backend: report.backend,
                 paletteId: report.paletteId,
@@ -7952,10 +7951,14 @@ class RendererLabApp {
     renderParams() {
         if (this.audioReactiveRuntime?.active && this.audioReactiveFeatures) {
             this.effectiveParams = applyAudioReactiveModulation(this.params, this.audioReactiveFeatures, this.audioReactive, { clampParamValue });
-            return { ...this.effectiveParams, paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
+            return { ...this._wtfRenderParams(this.effectiveParams), paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
         }
         this.effectiveParams = null;
-        return { ...this.params, paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
+        return { ...this._wtfRenderParams(this.params), paletteCycleTransport: this.paletteCycleTransport, sceneTransport: this.sceneTransport };
+    }
+
+    _wtfRenderParams(params) {
+        return this.wtfActive ? protectWtfVisibility(params) : params;
     }
 
     _mainPreviewRenderParams(params = this.renderParams()) {
@@ -7974,6 +7977,7 @@ class RendererLabApp {
 
     _applyEffectiveRendererParams(params = this.renderParams(), key = 'live') {
         if (!this.running) return;
+        params = this._wtfRenderParams(params);
         if (!this.transitioning) {
             setCycleTransportRate(this.paletteCycleTransport, params.paletteCycleSpeed);
             setCycleTransportRate(this.sceneTransport, (params.sceneFreeze ? 0 : params.sceneSpeed));
@@ -8943,6 +8947,7 @@ button:hover{background:#202a35}
             mirrorX: cameraMeta ? Boolean(this.params.cameraMirror) : Boolean(params.mirrorX),
             // The app already resolves WTF into concrete transition params; native-side WTF would double-modulate Pop Out.
             nativeWtfActive: false,
+            wtfVisibilityGuard: Boolean(this.wtfActive),
             // Audio is also resolved above, including the shared release envelope.
             audioReactiveActive: false,
             audioReactiveSource: this.audioReactive.source,
@@ -10141,6 +10146,9 @@ button:hover{background:#202a35}
         } else if (key === 'customGlyphRamp') {
             const removed = Number(entry.input.dataset.removedScalars || 0);
             value.textContent = `${[...String(current || '')].length}/96${removed ? ` · ${removed} removed` : ''}`;
+        } else if (key === 'accentVariation') {
+            value.textContent = FRACTAL_VARIATIONS[current]?.name || String(current);
+            entry.input.setAttribute('aria-valuetext', value.textContent);
         } else if (typeof current === 'number') {
             value.textContent = `${Number.isInteger(current) ? current : current.toFixed(2)}${config.unit || ''}`;
         } else {
@@ -10622,7 +10630,8 @@ button:hover{background:#202a35}
             ...DEFAULT_PARAMS,
             ...this._currentSourceParams(),
             statsOverlay: this.params.statsOverlay,
-            brightOutput: this.params.brightOutput
+            brightOutput: this.params.brightOutput,
+            ...Object.fromEntries(SPATIAL_GLOBAL_KEYS.map(key => [key, this.params[key]]))
         };
     }
 
@@ -10675,7 +10684,12 @@ button:hover{background:#202a35}
                 AUTOMATED_TRANSITION_MIN_SECONDS,
                 AUTOMATED_TRANSITION_MAX_SECONDS
             );
-            const target = this._makeWtfTarget(seconds);
+            const target = await this._makeWtfTarget(seconds);
+            if (!this.wtfActive || token !== this.wtfToken) break;
+            if (!target) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                continue;
+            }
             try {
                 const completed = await this._transitionTo(target, seconds);
                 if (!completed || !this.wtfActive || token !== this.wtfToken) break;
@@ -10695,32 +10709,32 @@ button:hover{background:#202a35}
         }
     }
 
-    _makeWtfTarget(seconds) {
-        // Choose once per transition: visual-safety retries and preset anchors
-        // must not bias the 80% flat / 20% spatial split.
-        const spatial = randomWtfSpatialParams();
+    async _makeWtfTarget(seconds) {
+        // Draw once: retries and the checked fallback preserve the 95/5 split.
+        const spatial = randomWtfVisualParams();
+        const source = sampleWtfSource(this._staticMediaSource());
+        // Readback failure is not evidence of a safe look. Retry on a later frame.
+        if (!source && this.params.sourceMode === 'static') return null;
         for (let attempt = 0; attempt < 16; attempt++) {
-            const target = this._randomWtfTarget(seconds, spatial);
-            if (this._isSafeWtfTarget(target)) return target;
+            const target = protectWtfVisibility(this._randomWtfTarget(seconds, spatial));
+            if (await this._isSafeWtfTarget(target, source)) return target;
         }
-        return normalizeParams({
-            ...this.params,
-            ...spatial,
-            transitionSeconds: seconds,
-            saturationBoost: randomBetween(0.8, 1.8),
-            contrastBoost: randomBetween(0.8, 1.8),
-            brightness: randomBetween(0.75, 1.25),
-            gamma: randomBetween(0.75, 1.45),
-            bgBlend: randomBetween(0.1, 0.45),
-            quantizeBits: randomInt(0, 3),
-            fps: randomInt(WTF_MIN_SMOOTH_FPS, WTF_MAX_SMOOTH_FPS),
-            fpsCap: randomInt(WTF_MIN_SMOOTH_FPS, WTF_MAX_SMOOTH_FPS),
-            cols: randomInt(180, 560),
-            autoRows: true
+        // Do not inherit a black fixed foreground, blank custom ramp, palette
+        // collapse or dark feedback from the look that exhausted the retries.
+        const target = normalizeParams({
+            ...this.params, ...spatial, transitionSeconds: seconds,
+            saturationBoost: 1, contrastBoost: 1, brightness: 1.35, gamma: 2.2,
+            bgBlend: 0, quantizeBits: 0, paletteId: 'none', paletteCycleMode: 'off',
+            ditherMode: 'none', glyphColorMode: 'source', glyphReverse: false,
+            glyphOffset: 0, charset: 'classic-camera', glyphDepth: 96,
+            glyphMode: false, solidMode: true, pixel: false, backgroundColor: '#030405',
+            edgeAmount: 0, feedbackAmount: 0, jitterAmount: 0,
+            fps: WTF_MAX_SMOOTH_FPS, fpsCap: WTF_MAX_SMOOTH_FPS, cols: 240, autoRows: true
         }, { preserveBlob: true });
+        return await this._isSafeWtfTarget(target, source) ? target : null;
     }
 
-    _randomWtfTarget(seconds, spatial = randomWtfSpatialParams()) {
+    _randomWtfTarget(seconds, spatial = randomWtfVisualParams()) {
         const target = { ...this.params, transitionSeconds: seconds };
         const currentSolidVisual = this.params.sourceMode === 'static' &&
             (Boolean(this.params.solidMode) || usesPixelCanvas(this.params));
@@ -10851,22 +10865,15 @@ button:hover{background:#202a35}
         target.codecQuality = anchorParams.codecQuality || target.codecQuality;
     }
 
-    _isSafeWtfTarget(target) {
-        if (target.brightness < 0.42) return false;
-        if (target.brightness > 1.75 && target.contrastBoost > 2.25 && target.gamma < 0.65) return false;
-        if (target.bgBlend > 0.78 && target.brightness < 0.8) return false;
-        if (target.solidMode && target.brightness < 0.62 && target.bgBlend > 0.58) return false;
-
-        if (target.sourceMode !== 'static') return true;
-        const rect = els.container.getBoundingClientRect();
-        const dpr = Math.max(1, window.devicePixelRatio || 1);
-        const width = Math.max(1, Math.floor(rect.width * dpr));
-        const height = Math.max(1, Math.floor(rect.height * dpr));
-        const snapshot = this._makeSoftwareTransitionSnapshot(target, width, height, {
-            maxCells: 18000,
-            sampleLimit: 420
-        });
-        return snapshot ? canvasHasSafeVisualSignal(snapshot) : true;
+    async _isSafeWtfTarget(target, source = sampleWtfSource(this._staticMediaSource())) {
+        try {
+            return await inspectWtfTarget(target, source, {
+                time: (this.staticRuntime?.renderer?.frameCount || 0) / Math.max(1, target.fps),
+                audio: this.audioReactiveRuntime?.active ? this.audioReactive : null
+            });
+        } catch {
+            return false;
+        }
     }
 
     _waitForTransitionIdle(timeoutMs = 6000) {
@@ -10920,7 +10927,7 @@ button:hover{background:#202a35}
         const previousParams = { ...this.params };
         const presetParams = stripPresetExcludedParams(preset.params);
         const target = normalizeParams(
-            { ...this._baseForPreset(preset), ...presetParams },
+            { ...this._baseForPreset(preset), ...presetParams, ...retainedPresetAccents(preset, this.params) },
             { preserveBlob: true }
         );
         target.statsOverlay = this.params.statsOverlay;
@@ -11607,6 +11614,8 @@ button:hover{background:#202a35}
             ['action.audio.toggle', 'Action / Toggle Audio Reactivity'],
             ['action.visual.sceneFreeze.toggle', 'Action / Freeze Scene'],
             ['action.visual.sceneReset', 'Action / Reset Scene and Trails'],
+            ['action.visual.accentVariation.next', 'Action / Another Fractal Variation'],
+            ['action.visual.accentSubtleLimit.toggle', 'Action / Toggle Subtle Limit'],
             ['action.visual.glyphMode.toggle', 'Action / Toggle Glyph Mode'],
             ['action.visual.solidMode.toggle', 'Action / Toggle Solid Mode'],
             ['action.visual.smoothing.toggle', 'Action / Toggle Smoothing'],
@@ -11773,6 +11782,8 @@ button:hover{background:#202a35}
                 return true;
             case 'action.visual.sceneFreeze.toggle': return this._applyMidiVisualValue('sceneFreeze', !this.params.sceneFreeze);
             case 'action.visual.sceneReset': return this._resetScene();
+            case 'action.visual.accentVariation.next': return this._nextAccentVariation();
+            case 'action.visual.accentSubtleLimit.toggle': return this._applyMidiVisualValue('accentSubtleLimit', !this.params.accentSubtleLimit);
             case 'action.visual.glyphMode.toggle': return this._applyMidiVisualValue('glyphMode', !this.params.glyphMode);
             case 'action.visual.solidMode.toggle': return this._applyMidiVisualValue('solidMode', !this.params.solidMode);
             case 'action.visual.smoothing.toggle': return this._applyMidiVisualValue('smoothing', !this.params.smoothing);

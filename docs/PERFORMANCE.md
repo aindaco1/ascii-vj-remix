@@ -211,7 +211,7 @@ use the compact WebGPU ramp texture. Presets that explicitly own Canvas2D keep
 the normal software density ceiling. The earlier 71-preset installed sweep resolved
 43 built-ins to WebGPU and 28 to Canvas2D, kept all 71 visible, and confirmed
 every GPU-eligible preset was accelerated. These are historical measurements;
-the current 90/62/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
+the current 96/68/28 contract is defined in [Testing](TESTING.md#renderer-backend-changes).
 Native Pop Out remains independently
 GPU-rendered. An earlier 30-second structural run held the primary view at 30.0 FPS,
 native presentation at 60.0 FPS, source uploads at 23.5 FPS for the 24 FPS
@@ -563,3 +563,12 @@ releases its quad buffer/VAO.
 The UI performance smoke now reports actual UI completion/failure with a bounded
 timeout. Timer expiry alone is never a passing measurement. Exact local results
 and platform limitations belong in the [1.0.4 release record](releases/RELEASE_1.0.4.md).
+
+
+Fractal accents add one bounded, early-exiting Julia loop (at most 24 iterations)
+to the existing cell pass while enabled in any Visual mode. Off, zero Amount or
+Coverage skips it. Spatial glass warps the primary scene ray without extra traces. Canvas reuses its field allocation and caches it when the
+clock is unchanged. Existing grid ceilings and resolution are unchanged.
+Use the installed primary preset sweep plus an optimized UI/native smoke with
+`ASCILINE_UI_PERF_SMOKE_SPATIAL='{"accentAmount":0.5,"accentCoverage":1}'`
+to measure the feature on the target device; low-end hardware needs its own run.

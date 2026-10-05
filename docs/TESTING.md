@@ -183,7 +183,7 @@ for that integration's separate rollback. No application/data migration is invol
 | Rust/Tauri modules | `npm run test:rust` |
 | Native output performance | `npm run smoke:native-output`, `npm run test:native-output-log` |
 | UI performance | `npm run smoke:ui-perf`, `npm run bench:density` with fixed defaults/transitions, feature configuration, phase percentiles, renderer replacements, and frame resets |
-| Installed primary presets | `npm run smoke:primary-presets`, all 90 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
+| Installed primary presets | `npm run smoke:primary-presets`, all 96 built-ins on Demo Image with per-preset primary visibility, backend-family, running-state, GPU-error, and aspect checks |
 | Release install/update | `npm run smoke:release-install` |
 
 ## Recommended Check Sets
@@ -222,7 +222,7 @@ choose another parent directory. These fresh browser contexts contain synthetic
 smoke fixtures; diagnostics do not dump storage, environment variables, or the
 full DOM. The Windows Desktop job uploads failure diagnostics as a separate
 artifact retained for seven days. This does not relax startup timeouts, visible
-renderer checks, or the 90/62/28 preset ownership contract.
+renderer checks, or the 96/68/28 preset ownership contract.
 
 ### Audio response
 
@@ -440,9 +440,9 @@ installer before merging.
 The static preset matrix also verifies backend ownership: clean state and
 built-ins without an explicit compatibility backend retain Auto and resolve to
 WebGPU/WebGL2 in the capable Chromium smoke runtime. The packaged preset sweep
-separately requires the centralized 90 total / 62 accelerated / 28 explicit
+separately requires the centralized 96 total / 68 accelerated / 28 explicit
 Canvas ownership contract. The Windows CI lane runs the full visible matrix;
-physical Windows acceptance must additionally confirm the 62 accelerated
+physical Windows acceptance must additionally confirm the 68 accelerated
 presets resolve to WebGPU on the target RTX machine and remain visible.
 
 The same smoke renders known color swatches through actual WebGL2 and compares
@@ -671,6 +671,16 @@ coverage is tracked in the [Roadmap](ROADMAP.md).
   intermittently reports an invalid startup swapchain with the baseline and
   candidate WebGPU renderers. GPU diagnostics remain fatal; presentation is
   covered separately by native/visible checks.
+- `npm run smoke:wtf`: deterministic target generation, explicit blackout/blank
+  ramp/fixed-black-glyph rejection, checked fallback and readback failure, black
+  source preservation, every optional scene, and final glyph-image readbacks in
+  WebGPU/WebGL2/Canvas after a dim cut with strong synthetic audio. WebGPU uses
+  an offscreen presentation attachment to avoid the headless swapchain issue.
+  `WTF_SMOKE_REPORT=/path/report.json` saves measured output and generation time.
+  The shared tone-limit and audio checks also run inside `test:spatial`.
+  For installed macOS preview/native transition performance, run `smoke:ui-perf`
+  with `ASCILINE_UI_PERF_SMOKE_WTF=1` and
+  `ASCILINE_UI_PERF_SMOKE_SYNTHETIC_AUDIO=1` against an optimized Dev build.
 - `npm run smoke:static`: every built-in preset, existing palettes, glyphs,
   media/resize paths and JavaScript/GPU errors, including Flat Media defaults
   across the full built-in catalog. The native preset sweep checks the same
@@ -696,3 +706,30 @@ a preset and during its transition; exercise freeze/reverse/reset, long feedback
 fades, source/video continuity, camera orientation, audio start/stop, MIDI
 pickup and output close/reopen. Verify a physical second display and the
 reference-floor hardware separately. See the [1.1.0 record](releases/RELEASE_1.1.0.md).
+
+
+### Fractal accent regression checks
+
+`test:spatial` also runs `test_fractal_accents.mjs`: exact zero bypass,
+visible color/glyph differences in every scene, curated variation, Subtle Limit
+bounds at maximum strength, bounded audio, field reuse, freeze, trail decay,
+trail fallback, preset retention and deterministic WTF recipe/Off selection.
+`smoke:spatial` compares every accent and maximum strength against the Canvas
+reference on WebGPU and WebGL2, including every optional scene with each
+non-trail style. It checks visible lace attenuation/decay,
+global-toggle preservation across preset/WTF changes, variation controls,
+MIDI-to-native payloads and continuous video playback. Frozen floating-point
+history permits one byte of quantization error without accumulating drift.
+All accent cases also compare WebGPU directly with WebGL2, including glyph
+addresses (mean error ≤0.5/255 and ≤1% of channels differing by more than 8).
+CPU comparisons retain mean error ≤2/255; spatial glass allows 2.5% of RGB
+channels above 8, versus 2% for the other cases, because shifted rays encounter
+different float-sensitive fractal boundaries. This does not change existing
+scene gates. Review actual output alongside these numerical checks.
+
+`node scripts/capture_spatial_review.mjs /tmp/fractal-accents.png --accents`
+captures paired accent-off/on views using actual WebGL2 output; the final pair
+uses moving-source history. Add `--accent-combinations` to review fixed-color
+glyphs, monochrome and optional scene combinations. Use the normal static matrix, installed primary
+preset sweep and optimized native/UI performance gates for these changes.
+Physical Windows/Linux and reference-floor hardware remain separate acceptance.

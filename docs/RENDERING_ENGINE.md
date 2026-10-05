@@ -388,7 +388,7 @@ blank, while solid/pixel output remained visible. The earlier response routed
 all Windows glyph previews through Canvas2D, collapsing the accelerated set to
 roughly seven presets. The compact active-ramp glyph texture has since replaced
 the problematic glyph upload path, so the 1.0 release retired that blanket
-route. The current Windows preset matrix must preserve 62 accelerated and 28
+route. The current Windows preset matrix must preserve 68 accelerated and 28
 explicit Canvas presets. A real renderer-construction failure still falls back
 to Canvas2D.
 
@@ -680,13 +680,21 @@ WTF mode:
 - creates randomized target params.
 - anchors some random states around extreme preset families and traditional
   ASCII presets.
-- independently selects Flat Media with 80% probability, otherwise selecting
+- independently selects Flat Media with 95% probability, otherwise selecting
   evenly from the canonical non-flat visual modes. The choice is made once
   before visual-safety retries and retained by the fallback. Spatial targets use
   the matching recipe's camera settings and Auto backend; normal renderer
   fallback still applies. Anchor color/glyph styles remain randomized.
 - transitions indefinitely until stopped.
-- avoids unsafe all-white/all-black states.
+- checks a bounded source sample (48 pixels on its longest side) plus a dim reference through the shared
+  cell renderer at the source/cell aspect ratio, accounting for glyph atlas
+  coverage and fixed foreground colors. Dim and bright audio limits are probed
+  even before audio starts; active audio routing is checked separately.
+  Atlas/readback failures reject candidates; the neutral fallback is checked too.
+  Black source frames skip only the source check, never the reference check.
+- shares WTF-only tone limits from `wtf-visual-limits.json` between JS effective
+  parameters and Rust native output, including autonomous native audio. This
+  avoids clipping shadows before gamma and preserves the Bright Output setting.
 
 Experimental MIDI:
 
@@ -750,7 +758,7 @@ Palettes contain immutable base colors and non-overlapping inclusive ranges.
 The source-to-index LUT always uses base colors; a separate RGBA display table
 animates their RGB entries. Alpha stores base luminance so cycling never changes
 the glyph mask. Off is the compatibility default. The catalog has 21 palettes
-and the preset contract is 90 total, 62 accelerated, 28 explicit Canvas.
+and the preset contract is 96 total, 68 accelerated, 28 explicit Canvas.
 
 `palette-cycling.js` owns range validation, signed modulo, classic/blended lookup,
 amount and the integrated speed transport. `cell-color.wgsl.js` supplies common
@@ -800,7 +808,7 @@ Camera-plane rays include pitch. Corridor uses a narrow, low tunnel; Cathedral
 intersects a two-plane pitched roof; Coast keeps low shoreline blocks and no
 road markings. Relief samples one source-aligned height/color field without
 roads, from an elevated camera. Orbitals rotates its camera and tilts its ring.
-The spatial uniform block is ten vec4s (160 bytes), including camera pitch and fractal zoom/detail/shape in the final vec4.
+The spatial uniform block is thirteen vec4s (208 bytes). The first ten retain the 1.1.0 layout; three appended vec4s carry accent style/masking, controls and the Julia constant.
 
 Recursive ruins, Mandelbulb and Mandelbox share a 64-step, 32-unit sphere tracer with up to eight estimator iterations. The Mandelbulb first intersects its
 containing sphere to skip empty rays and travel; its shared radial power is
@@ -845,3 +853,44 @@ The legacy server-stream renderer is unchanged and hides spatial controls.
 Per-column geometry caching is a possible future optimization, not a claim of
 this implementation. The measured cell shader is the initial baseline; keep
 geometry parity fixtures and source continuity when changing traversal.
+
+
+## Fractal accents
+
+`fractal-accent-presets.js` adds six Flat Media looks. `fractal-variations.json`
+owns six curated Julia constants; the shared shader measures orbit traps,
+angular stripes and contours with at most 24 iterations per cell. No explorer
+code, extra rendering pass, runtime dependency or remote asset is included.
+WebGPU, lowered WebGL2 and native wgpu use the same math. The bounded Canvas
+reference in `fractal-accents.js` caches a reusable field buffer by grid,
+aspect, variation, scale and animation time; source-dependent masks stay live.
+
+Amount controls strength, Coverage controls a coherent spatial mask, and
+Placement selects source edges, midtones, quiet areas or history in every Visual
+mode. Off, zero Amount and zero Coverage bypass exactly. Threads, etching and
+silk modulate RGB and glyph luminance. Chroma rotates processed channels with a
+tonal component, so monochrome and fixed-color glyph looks remain responsive.
+Flat glass interpolates nearby processed cells; spatial glass warps the primary
+scene ray once, without additional scene traces. Masks always use the selected
+media, including over scenes. Trails attenuate RGB and
+glyph history with elapsed-time scaling and no additional energy. When enabled
+with zero Phosphor / echo, Trails uses the shared contract's short-echo defaults. Freeze stops drift and attenuation through the existing
+scene transport; Reset scene / trails clears history.
+
+Subtle Limit defaults on and remains global across preset loads, saves,
+imports, WTF and launches. It caps Amount at 0.5 in rendering, channel delta
+at 0.22, luminance delta at 0.16 and glyph luminance delta at 0.1. Glass moves by
+at most 0.85 cell per axis. Spatial glass bounds displacement instead of color
+because it changes the sampled scene ray; all other styles and flat glass apply
+the color/glyph bounds. These limits apply to the accent contribution.
+Existing color, audio and feedback controls keep their own behavior. Presence
+adds at most 0.03 times Audio response to an already-enabled Amount using the
+existing normalized features. JS and Rust share that gain in the contract.
+Variation is discrete and excluded from numeric tweening. Another variation
+cycles the curated set without changing color, source or audio settings.
+
+Ordinary built-in preset loads retain the current canonical accent fields;
+accent recipes and saved custom presets restore their own fields. WTF draws its
+accent choice once before visual-safety retries (65% on / 35% off), independently
+of its existing 95% flat / 5% scene choice. All six recipes are also available as
+WTF anchors. Both paths exclude the global limit from preset-owned parameters.

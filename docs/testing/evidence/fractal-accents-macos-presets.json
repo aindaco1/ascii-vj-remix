@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "kind": "primary-preset-sweep",
+  "presetCount": 96,
+  "passed": 96,
+  "flatMediaPassed": 96,
+  "failures": [],
+  "backends": {
+    "webgpu": 68,
+    "canvas2d": 28
+  },
+  "glyphBackends": {
+    "webgpu": 51,
+    "canvas2d": 28
+  },
+  "acceleratedEligible": 68,
+  "acceleratedPassed": 68,
+  "canvasEligible": 28,
+  "source": "media/demo.svg",
+  "backendContract": {
+    "ok": true,
+    "expected": {
+      "presetCount": 96,
+      "acceleratedEligible": 68,
+      "canvasEligible": 28
+    },
+    "actual": {
+      "presetCount": 96,
+      "acceleratedEligible": 68,
+      "canvasEligible": 28
+    },
+    "mismatches": []
+  },
+  "mainAvgFps": 0,
+  "mainMinFps": 0,
+  "mainP95FrameMs": 0,
+  "mainP99FrameMs": 0
+}

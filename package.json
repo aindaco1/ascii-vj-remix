@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -100,8 +100,9 @@
     "tauri:build:dev": "node scripts/tauri_env.mjs build --config src-tauri/tauri.dev.conf.json",
     "test:palette-cycling": "node scripts/test_palette_cycling.mjs",
     "test:renderer-resources": "node scripts/test_renderer_resources.mjs && node scripts/test_webgpu_video_lifecycle.mjs",
-    "test:spatial": "node scripts/test_spatial.mjs",
-    "smoke:spatial": "node scripts/smoke_spatial.mjs"
+    "test:spatial": "node scripts/test_spatial.mjs && node scripts/test_fractal_accents.mjs && node scripts/test_wtf_visibility.mjs",
+    "smoke:spatial": "node scripts/smoke_spatial.mjs",
+    "smoke:wtf": "node scripts/smoke_wtf_visibility.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
