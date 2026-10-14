@@ -68,5 +68,5 @@ For moves, update relative links, heading anchors, and workflow/script path
 references together. Validate local links and run `git diff --check`.
 
 The [1.3.0 Native Video I/O release record](releases/RELEASE_1.3.0.md) owns the
-current candidate, deployment steps and outstanding acceptance. The
-[1.2.0 record](releases/RELEASE_1.2.0.md) retains the latest published evidence.
+published installer/updater evidence, cleanup and remaining manual acceptance.
+The [1.2.0 record](releases/RELEASE_1.2.0.md) retains the previous release's evidence.

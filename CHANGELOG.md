@@ -1,8 +1,8 @@
 # Changelog
 
-## [1.3.0] - Unreleased
+## [1.3.0] - 2026-10-13
 
-Release candidate; publication and acceptance status are tracked in the
+Publication and acceptance evidence are tracked in the
 [1.3.0 release record](docs/releases/RELEASE_1.3.0.md).
 
 - Add native [NDI®](https://ndi.video/) video input/output on the desktop platform paths and native

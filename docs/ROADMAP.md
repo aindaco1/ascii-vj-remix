@@ -35,11 +35,13 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Native Video Release Acceptance
 
-The implemented Dev candidate and accepted scope are recorded in
+The published scope and automated acceptance are recorded in the
 [1.3.0 release record](releases/RELEASE_1.3.0.md).
-Before public release, complete the Windows/Linux installed matrix, physical
-LAN and HX2/HX3/device interoperability, sustained performance, network-permission
-recovery, sleep/wake, clean installation and updater-hop gates in that record.
+Complete the deferred Windows/Linux installed transport matrix, physical LAN and
+HX2/HX3/device interoperability, sustained performance, network-permission
+recovery, sleep/wake, macOS 13 runtime and transparent-media coverage in that
+record. Automated public installer and 1.2.0 → 1.3.0 updater checks have passed;
+physical privacy-grant and transport behavior after updating remain follow-ups.
 
 ## MIDI Controllers and Profiles
 

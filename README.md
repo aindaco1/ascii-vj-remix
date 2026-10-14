@@ -8,12 +8,11 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is **1.3.0 — Native Video I/O**, an unpublished
-release candidate. It adds native [NDI®](https://ndi.video/) input/output on macOS,
+The current published version is **1.3.0 — Native Video I/O**.
+It adds native [NDI®](https://ndi.video/) input/output on macOS,
 Windows and Linux, plus Syphon on macOS, with preserved transparency and
 concurrent Pop Out. See the [release record](docs/releases/RELEASE_1.3.0.md) for
-verified behavior and open acceptance checks. The latest published version is
-**1.2.0 — Fractal Accents**.
+published installer/updater evidence and remaining manual acceptance checks.
 Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).

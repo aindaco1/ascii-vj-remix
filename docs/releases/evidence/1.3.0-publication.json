@@ -1,0 +1,749 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-14T04:06:40.927408+00:00",
+  "release": {
+    "version": "1.3.0",
+    "tag": "v1.3.0",
+    "source_commit": "52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+    "tooling_commit": "5846e0fa91c38e029fc28dc297c0b3d1abf15526",
+    "pull_request": "https://github.com/aindaco1/ascii-vj-remix/pull/49",
+    "published_at": "2026-10-14T03:56:30Z",
+    "url": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.3.0"
+  },
+  "pull_request_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38501598797",
+    "workflow_commit": "512974b25a9a768c8d4cd253e3988f33578fdf86",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38501598797/job/115649578068"
+      },
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38501598797/job/115649578269"
+      },
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38501598797/job/115649578308"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38501598797/job/115649578414"
+      }
+    ]
+  },
+  "source_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38504292662",
+    "workflow_commit": "52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38504292662/job/115658112367"
+      },
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38504292662/job/115658112562"
+      },
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38504292662/job/115658112564"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38504292662/job/115658112732"
+      }
+    ]
+  },
+  "tooling_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506449076",
+    "workflow_commit": "5846e0fa91c38e029fc28dc297c0b3d1abf15526",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506449076/job/115664961557"
+      },
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506449076/job/115664961659"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506449076/job/115664961743"
+      },
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506449076/job/115664961792"
+      }
+    ]
+  },
+  "release_and_published_acceptance": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310",
+    "workflow_commit": "5846e0fa91c38e029fc28dc297c0b3d1abf15526",
+    "conclusion": "success",
+    "attempt": 2,
+    "jobs": [
+      {
+        "name": "Build macos-aarch64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668935747"
+      },
+      {
+        "name": "Resolve immutable release context",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668936327"
+      },
+      {
+        "name": "Build macos-aarch64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668936578"
+      },
+      {
+        "name": "Build linux-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668937245"
+      },
+      {
+        "name": "Build windows-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668937751"
+      },
+      {
+        "name": "Build linux-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668964521"
+      },
+      {
+        "name": "Require exact Desktop CI success",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668965025"
+      },
+      {
+        "name": "Build windows-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115668978082"
+      },
+      {
+        "name": "Bundle macos-aarch64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115671113299"
+      },
+      {
+        "name": "Bundle windows-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115671113413"
+      },
+      {
+        "name": "Bundle linux-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115671113456"
+      },
+      {
+        "name": "Publish GitHub Release",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115672330950"
+      },
+      {
+        "name": "ubuntu-24.04 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115672478911"
+      },
+      {
+        "name": "windows-latest install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115672478912"
+      },
+      {
+        "name": "macos-26 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/38506448310/job/115672479032"
+      }
+    ]
+  },
+  "ci_updater_hop_proof": [
+    "2026-10-14T03:57:38.4994438Z Linux updater hop smoke passed: 1.2.0 -> 1.3.0",
+    "2026-10-14T03:58:01.9048299Z Windows updater hop smoke passed: 1.2.0 -> 1.3.0",
+    "2026-10-14T03:57:34.8073840Z macOS updater identity hop passed: 1.2.0 -> 1.3.0"
+  ],
+  "local_macos_acceptance": {
+    "result": "passed",
+    "locally_verified_sha256": {
+      "ASCII.VJ.Remix.app.tar.gz": "sha256:cd6d07b67ac70d6bcb177701555265279c7355611e3c63d0edd8ece668972a1e",
+      "ASCII.VJ.Remix.app.tar.gz.sig": "sha256:26ce84b01c523f3650719eb313ae48eab2664d23081409ea3116dcdc2af93272",
+      "ASCII.VJ.Remix_1.3.0_aarch64.dmg": "sha256:86a7645f4bae5ef077d07b916ed6b1c5e311330241f487709e7e90b97a2f6e69",
+      "latest.json": "sha256:30f8f0e7a7d7f93d6c602545af1e960478108369edddb5574cef370626fa80d4"
+    },
+    "live_latest_matches_tagged_manifest": true,
+    "updater_platform_count": 9,
+    "previous_version": "1.2.0",
+    "dmg_layout_and_trust_verified": true,
+    "developer_id_notarization_and_designated_requirement_verified": true,
+    "video_runtime_notices_and_nested_signatures_verified": true,
+    "minimum_system_version": "13.0",
+    "designated_requirement": "identifier \"com.asciline.remix\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = PWT3Q52LZ2",
+    "installed": {
+      "version": "1.3.0",
+      "bundle_id": "com.asciline.remix",
+      "signature_and_gatekeeper": "passed",
+      "minimum_os": "13.0",
+      "video_io_bundle_issues": []
+    },
+    "production_updater": {
+      "ok": true,
+      "kind": "updater",
+      "mode": "install",
+      "package_version": "1.2.0",
+      "expected_version": "1.3.0",
+      "found_update": true,
+      "update_version": "1.3.0",
+      "current_version": "1.2.0",
+      "target": "darwin",
+      "download_url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix.app.tar.gz",
+      "downloaded_bytes": 58754280,
+      "install_started": true,
+      "install_finished": true,
+      "forced_update": false,
+      "forced_from_version": null,
+      "backend": null,
+      "media_url": null,
+      "elapsed_ms": 3405,
+      "error": null
+    },
+    "production_updater_ui": {
+      "ok": true,
+      "kind": "updater-ui",
+      "package_version": "1.3.0",
+      "update_control_present": true,
+      "update_control_visible": true,
+      "update_status_present": true,
+      "reports_control_present": true,
+      "reports_control_visible": true,
+      "reports_control_label": "Reports",
+      "backend_status_absent": true,
+      "elapsed_ms": 1202,
+      "error": null
+    },
+    "profile_reset_used": false,
+    "dev_version": "1.3.0"
+  },
+  "published_assets": [
+    {
+      "name": "ASCII.VJ.Remix-1.3.0-1.x86_64.rpm",
+      "size_in_bytes": 61664979,
+      "digest": "sha256:9d2445bccae951d8b5ccf56076bae2797feba14905c1c8560a98fbb5f591523b",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix-1.3.0-1.x86_64.rpm"
+    },
+    {
+      "name": "ASCII.VJ.Remix-1.3.0-1.x86_64.rpm.sig",
+      "size_in_bytes": 424,
+      "digest": "sha256:171c1aec769b2084b57b7e26e9340977c0cfd3f3ea089c8cd7bf5d1af7fabd9b",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix-1.3.0-1.x86_64.rpm.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz",
+      "size_in_bytes": 58754280,
+      "digest": "sha256:cd6d07b67ac70d6bcb177701555265279c7355611e3c63d0edd8ece668972a1e",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix.app.tar.gz"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+      "size_in_bytes": 416,
+      "digest": "sha256:26ce84b01c523f3650719eb313ae48eab2664d23081409ea3116dcdc2af93272",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix.app.tar.gz.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_aarch64.dmg",
+      "size_in_bytes": 58376703,
+      "digest": "sha256:86a7645f4bae5ef077d07b916ed6b1c5e311330241f487709e7e90b97a2f6e69",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_aarch64.dmg"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_amd64.AppImage",
+      "size_in_bytes": 133282296,
+      "digest": "sha256:e3e5ae67612e36829e223b8a08548e7d6c4e24264884d2d4c6f577e12483345a",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.AppImage"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_amd64.AppImage.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:f43f0e1f0c6851fce8ebf959e978731120ebd5ef9a1d9cc6615a17e3865d35aa",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.AppImage.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_amd64.deb",
+      "size_in_bytes": 61665242,
+      "digest": "sha256:7a785348115fa6f197086f5988bbdea0e7d7ba50396e0b17cca6b141c7ef16fb",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.deb"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_amd64.deb.sig",
+      "size_in_bytes": 420,
+      "digest": "sha256:89c4fe671e51690e73e49918b23f4e9707dfbf7a4a7d04caea69517f9f1a5b26",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.deb.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_x64-setup.exe",
+      "size_in_bytes": 46277052,
+      "digest": "sha256:35508d20c66bea363856e695359b0b02c28fd5a78c67e3453fa6df582406110f",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64-setup.exe"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_x64-setup.exe.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:2956ab5be14cc7a0ea11fbb138325d8e5f68cd0b9dad77adeddddf7d77e6ace2",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64-setup.exe.sig"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_x64_en-US.msi",
+      "size_in_bytes": 60502016,
+      "digest": "sha256:4d90cc52477464cc7ea4fdb78d470aa20af2e6170a5b4751096c73f4d541c4a7",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64_en-US.msi"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.0_x64_en-US.msi.sig",
+      "size_in_bytes": 428,
+      "digest": "sha256:4b2e2c5c1f6801377f79f4ee3c1235890e7c280a63f12617402c64c895e5b013",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64_en-US.msi.sig"
+    },
+    {
+      "name": "latest.json",
+      "size_in_bytes": 5488,
+      "digest": "sha256:30f8f0e7a7d7f93d6c602545af1e960478108369edddb5574cef370626fa80d4",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/latest.json"
+    }
+  ],
+  "updater": {
+    "version": "1.3.0",
+    "live_latest_matches_tagged_manifest": true,
+    "platforms": {
+      "linux-x86_64-appimage": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.AppImage",
+        "has_signature": true
+      },
+      "linux-x86_64-deb": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.deb",
+        "has_signature": true
+      },
+      "linux-x86_64-rpm": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix-1.3.0-1.x86_64.rpm",
+        "has_signature": true
+      },
+      "linux-x86_64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_amd64.AppImage",
+        "has_signature": true
+      },
+      "darwin-aarch64-app": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix.app.tar.gz",
+        "has_signature": true
+      },
+      "darwin-aarch64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix.app.tar.gz",
+        "has_signature": true
+      },
+      "windows-x86_64-msi": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64_en-US.msi",
+        "has_signature": true
+      },
+      "windows-x86_64-nsis": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64-setup.exe",
+        "has_signature": true
+      },
+      "windows-x86_64": {
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.0/ASCII.VJ.Remix_1.3.0_x64_en-US.msi",
+        "has_signature": true
+      }
+    }
+  },
+  "cleanup": {
+    "local": {
+      "removed_targets": 51,
+      "allocated_bytes_removed": 7564840960,
+      "targets": [
+        {
+          "name": "debug",
+          "allocated_bytes": 5268217856
+        },
+        {
+          "name": "ascii-video-io-sdk",
+          "allocated_bytes": 2036178944
+        },
+        {
+          "name": "ascii-1.3.0-linux-packages",
+          "allocated_bytes": 256614400
+        },
+        {
+          "name": "decode-resize-parity",
+          "allocated_bytes": 1261568
+        },
+        {
+          "name": "__pycache__",
+          "allocated_bytes": 12288
+        },
+        {
+          "name": "publication",
+          "allocated_bytes": 225280
+        },
+        {
+          "name": "ascii-1.3.0-alpha.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-artifact-inventory-final.jsonl",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-artifact-inventory.jsonl",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-cache-inventory.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-deploy-pr.md",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-dev-build.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-final-linux-smoke",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-final-offline.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-final-windows-smoke",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-install.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-installed.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-launch.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-linux-ci.log",
+          "allocated_bytes": 319488
+        },
+        {
+          "name": "ascii-1.3.0-local-artifacts.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-local-cleanup.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-main-ci.json",
+          "allocated_bytes": 20480
+        },
+        {
+          "name": "ascii-1.3.0-main-windows.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-native-alpha.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-ndi-license-review.txt",
+          "allocated_bytes": 20480
+        },
+        {
+          "name": "ascii-1.3.0-ndi-roundtrip-final.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-ndi-roundtrip.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-pr-ci.json",
+          "allocated_bytes": 20480
+        },
+        {
+          "name": "ascii-1.3.0-pr.md",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-production-ui.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-production-ui.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-production-update.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-production-update.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-public-release.json",
+          "allocated_bytes": 28672
+        },
+        {
+          "name": "ascii-1.3.0-release-check.log",
+          "allocated_bytes": 28672
+        },
+        {
+          "name": "ascii-1.3.0-release-ci.json",
+          "allocated_bytes": 45056
+        },
+        {
+          "name": "ascii-1.3.0-release-linux-runtime.log",
+          "allocated_bytes": 311296
+        },
+        {
+          "name": "ascii-1.3.0-release-mac-build.log",
+          "allocated_bytes": 45056
+        },
+        {
+          "name": "ascii-1.3.0-release-mac-runtime.log",
+          "allocated_bytes": 278528
+        },
+        {
+          "name": "ascii-1.3.0-release-notes.md",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-remote-cleanup.json",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-retained-peer.log",
+          "allocated_bytes": 4096
+        },
+        {
+          "name": "ascii-1.3.0-stage.log",
+          "allocated_bytes": 430080
+        },
+        {
+          "name": "ascii-1.3.0-static.log",
+          "allocated_bytes": 16384
+        },
+        {
+          "name": "ascii-1.3.0-tooling-ci.json",
+          "allocated_bytes": 20480
+        },
+        {
+          "name": "ascii-1.3.0-updater-job-115672478911.log",
+          "allocated_bytes": 57344
+        },
+        {
+          "name": "ascii-1.3.0-updater-job-115672478912.log",
+          "allocated_bytes": 45056
+        },
+        {
+          "name": "ascii-1.3.0-updater-job-115672479032.log",
+          "allocated_bytes": 45056
+        },
+        {
+          "name": "ascii-1.3.0-windows-alpha-final.log",
+          "allocated_bytes": 163840
+        },
+        {
+          "name": "ascii-1.3.0-windows-alpha.log",
+          "allocated_bytes": 163840
+        },
+        {
+          "name": "ascii-1.3.0-windows-ci.log",
+          "allocated_bytes": 163840
+        }
+      ],
+      "retained_testing_root": "/private/tmp/ascii-vj-remix-release-testing"
+    },
+    "github_actions": {
+      "removed_count": 13,
+      "bytes_removed": 1354177687,
+      "artifacts": [
+        {
+          "created_at": "2026-10-14T03:40:01Z",
+          "expired": false,
+          "id": 11869055158,
+          "name": "release-binary-windows-x86_64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 36401193
+        },
+        {
+          "created_at": "2026-10-14T03:56:03Z",
+          "expired": false,
+          "id": 11868524105,
+          "name": "ascii-vj-remix-Windows-X64",
+          "run_id": 38506448310,
+          "size_in_bytes": 106017100
+        },
+        {
+          "created_at": "2026-10-14T03:55:27Z",
+          "expired": false,
+          "id": 11868524023,
+          "name": "ascii-vj-remix-Linux-X64",
+          "run_id": 38506448310,
+          "size_in_bytes": 255047910
+        },
+        {
+          "created_at": "2026-10-14T03:34:15Z",
+          "expired": false,
+          "id": 11868420838,
+          "name": "release-runtime-linux-x86_64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 57703728
+        },
+        {
+          "created_at": "2026-10-14T03:51:26Z",
+          "expired": false,
+          "id": 11868268838,
+          "name": "release-binary-macos-aarch64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 37441532
+        },
+        {
+          "created_at": "2026-10-14T03:54:59Z",
+          "expired": false,
+          "id": 11868174839,
+          "name": "ascii-vj-remix-macOS-ARM64",
+          "run_id": 38506448310,
+          "size_in_bytes": 116396691
+        },
+        {
+          "created_at": "2026-10-14T03:42:52Z",
+          "expired": false,
+          "id": 11868138544,
+          "name": "release-runtime-windows-x86_64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 59296848
+        },
+        {
+          "created_at": "2026-10-14T03:34:34Z",
+          "expired": false,
+          "id": 11867893647,
+          "name": "release-binary-linux-x86_64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 42751243
+        },
+        {
+          "created_at": "2026-10-14T03:33:29Z",
+          "expired": false,
+          "id": 11867074791,
+          "name": "release-runtime-macos-aarch64-52c7eedb0886a9e1036f7cf9ffed2376a9caef7f",
+          "run_id": 38506448310,
+          "size_in_bytes": 42346150
+        },
+        {
+          "created_at": "2026-10-14T02:20:25Z",
+          "expired": false,
+          "id": 11865720988,
+          "name": "ascii-vj-remix-linux-test-5fc706aa446d5050b712b8dc0ecfdbea03b69f01",
+          "run_id": 38498968401,
+          "size_in_bytes": 255093957
+        },
+        {
+          "created_at": "2026-10-14T02:20:42Z",
+          "expired": false,
+          "id": 11864989506,
+          "name": "ascii-vj-remix-native-smoke-ubuntu-24.04-38498968401-1",
+          "run_id": 38498968401,
+          "size_in_bytes": 353
+        },
+        {
+          "created_at": "2026-10-05T01:01:30Z",
+          "expired": false,
+          "id": 11320731527,
+          "name": "ascii-vj-remix-windows-test-468f13ca7ce220897f52cd2d70887aed353320ef",
+          "run_id": 37247322430,
+          "size_in_bytes": 100740599
+        },
+        {
+          "created_at": "2026-10-05T00:35:51Z",
+          "expired": false,
+          "id": 11319319372,
+          "name": "ascii-vj-remix-linux-test-468f13ca7ce220897f52cd2d70887aed353320ef",
+          "run_id": 37247322430,
+          "size_in_bytes": 244940383
+        }
+      ]
+    },
+    "github_caches": {
+      "removed_count": 4,
+      "bytes_removed": 350589053,
+      "caches": [
+        {
+          "id": 8917197087,
+          "key": "node-cache-Windows-x64-npm-72dfc4e69153c01bf98e770679645db92bb118a59f932716d989340811456fa9",
+          "ref": "refs/pull/49/merge",
+          "sizeInBytes": 85440814
+        },
+        {
+          "id": 8916774406,
+          "key": "msys2-pkgs-upd:true-conf:d1e95228-files:31b6c9cd610f7c7f1e23d6066a3c98cc0d9f14a9f5daa122083a98f9e9edb22f",
+          "ref": "refs/pull/49/merge",
+          "sizeInBytes": 87653407
+        },
+        {
+          "id": 8916171104,
+          "key": "node-cache-Linux-x64-npm-24d86e11e7596ab30d1c574ee051de83e4a08d768daf73d2e1fb2a1c8d618a62",
+          "ref": "refs/pull/49/merge",
+          "sizeInBytes": 91545212
+        },
+        {
+          "id": 8915422351,
+          "key": "node-cache-macOS-arm64-npm-24d86e11e7596ab30d1c574ee051de83e4a08d768daf73d2e1fb2a1c8d618a62",
+          "ref": "refs/pull/49/merge",
+          "sizeInBytes": 85949620
+        }
+      ]
+    },
+    "removed_merged_branch": "feat/native-video-io",
+    "remaining_branches": [
+      "main"
+    ],
+    "open_pull_requests": 0,
+    "retained": [
+      "Production and Dev apps at 1.3.0",
+      "One signed 1.2.0 rollback app",
+      "Optimized release cache, node_modules, dist, staged FFmpeg/NDI/Syphon and pinned SDK cache",
+      "Current Mac public downloads and Windows/Linux Dev installers",
+      "NDI/Syphon test peers and current local reports",
+      "Published release history, signing identities, user media/preferences/reports, and other managed worktrees"
+    ]
+  },
+  "remaining_manual_checks": [
+    "Installed Windows/Linux NDI input/output, alpha, resize, reconnect and concurrent Pop Out",
+    "Mac transport regression on the public package",
+    "Named third-party applications/plugins, physical LAN, HX2/HX3 sources and hardware receivers",
+    "30-minute 1080p60 throughput, latency, memory and drops",
+    "Network permission/firewall recovery, sleep/wake and macOS 13 runtime",
+    "Transparent-media preset coverage and privacy grants/transport behavior after updating"
+  ],
+  "authorization": "Owner explicitly requested deployment and cleanup after the outstanding manual acceptance checks were disclosed; those checks are deferred, not marked passed."
+}

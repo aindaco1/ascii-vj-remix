@@ -111,9 +111,10 @@ attributes do not break app signing. You can override the build directory with
 ## Build cleanup
 
 Keep the current installed Dev app, its optimized `release` build cache,
-`node_modules`, the current `dist` bundle, and staged FFmpeg resources for local
-development and testing. Once build/test processes have stopped, the generated
-`debug` tree and obsolete smoke outputs can be removed. The next debug build
+`node_modules`, the current `dist` bundle, staged FFmpeg/NDI/Syphon resources and
+the pinned SDK staging cache for local development and testing. Once build/test
+processes have stopped, the generated `debug` tree and obsolete smoke outputs
+can be removed. The next debug build
 recreates its cache; `npm run tauri:dev` and `npm run check:desktop` remain the
 normal development commands.
 

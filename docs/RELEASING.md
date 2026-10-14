@@ -228,7 +228,7 @@ still identifies SDK 6.3.2 on 2026-10-13. Recheck the full agreement and archive
 hashes before public redistribution; stop on an upstream checksum change. Preserve
 Syphon's BSD license. Verify signed dynamic library loading, installer contents,
 clean network-permission/firewall behavior and real input/output after updates.
-Current candidate evidence and unverified platform/device claims are recorded
+Published acceptance evidence and unverified platform/device claims are recorded
 in the [1.3.0 release record](releases/RELEASE_1.3.0.md).
 
 ## Build and Package
@@ -246,6 +246,8 @@ successful main-push `Desktop` workflow, then hands both outputs to the bundle
 jobs as immutable one-day workflow artifacts. The restored app binary is
 verified against its commit, platform, version, byte size, and SHA-256 before
 `tauri bundle` packages it without recompiling. Runtime builds remain offline;
+the isolated FFmpeg job runs only FFmpeg checks, and the package job stages and
+validates the complete FFmpeg/NDI/Syphon runtime set before bundling.
 Unix artifact downloads restore executable mode on `ffmpeg` and `ffprobe`
 before the release-input checks, because zipped artifact transfers reset file
 permissions. Runtime hashes and camera-input availability are still verified.
