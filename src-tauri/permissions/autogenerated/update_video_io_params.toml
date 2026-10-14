@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-video-io-params"
+description = "Enables the update_video_io_params command without any pre-configured scope."
+commands.allow = ["update_video_io_params"]
+
+[[permission]]
+identifier = "deny-update-video-io-params"
+description = "Denies the update_video_io_params command without any pre-configured scope."
+commands.deny = ["update_video_io_params"]

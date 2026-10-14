@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-discover-video-sources"
+description = "Enables the discover_video_sources command without any pre-configured scope."
+commands.allow = ["discover_video_sources"]
+
+[[permission]]
+identifier = "deny-discover-video-sources"
+description = "Denies the discover_video_sources command without any pre-configured scope."
+commands.deny = ["discover_video_sources"]

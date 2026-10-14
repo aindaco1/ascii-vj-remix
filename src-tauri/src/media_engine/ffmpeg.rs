@@ -183,10 +183,18 @@ impl Default for CameraReaderOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedRgbFrame {
+    pub alpha: Option<Vec<u8>>,
     pub index: usize,
     pub width: u32,
     pub height: u32,
     pub data: Vec<u8>,
+}
+
+impl DecodedRgbFrame {
+    pub fn from_rgba(index: usize, width: u32, height: u32, rgba: &[u8]) -> Self {
+        let alpha: Vec<_> = rgba.chunks_exact(4).map(|p| p[3]).collect();
+        Self { index, width, height, data: rgba.chunks_exact(4).flat_map(|p| p[..3].iter().copied()).collect(), alpha: alpha.iter().any(|a| *a != 255).then_some(alpha) }
+    }
 }
 
 #[derive(Debug)]
@@ -197,6 +205,7 @@ pub struct FfmpegRgbFrameReader {
     width: u32,
     height: u32,
     frame_bytes: usize,
+    rgba: bool,
     index: usize,
     finished: bool,
 }
@@ -229,12 +238,13 @@ impl FfmpegRgbFrameReader {
             filled += read;
         }
 
-        let frame = DecodedRgbFrame {
+        let frame = if self.rgba { DecodedRgbFrame::from_rgba(self.index, self.width, self.height, &data) } else { DecodedRgbFrame {
+            alpha: None,
             index: self.index,
             width: self.width,
             height: self.height,
             data,
-        };
+        } };
         self.index += 1;
         Ok(Some(frame))
     }
@@ -355,7 +365,8 @@ pub fn spawn_rgb_reader_with_options(
         program: binaries.ffmpeg.clone(),
         width: config.width,
         height: config.height,
-        frame_bytes: checked_rgb_frame_bytes(config.width, config.height)?,
+        frame_bytes: checked_rgb_frame_bytes(config.width, config.height)? / 3 * 4,
+        rgba: true,
         index: 0,
         finished: false,
     })
@@ -416,6 +427,7 @@ fn spawn_camera_rgb_reader_with_args(
         width: config.width,
         height: config.height,
         frame_bytes: checked_rgb_frame_bytes(config.width, config.height)?,
+        rgba: false,
         index: 0,
         finished: false,
     })
@@ -479,7 +491,7 @@ fn ffmpeg_decode_args(
         "-vf".to_string(),
         ffmpeg_video_filter(config, options),
         "-pix_fmt".to_string(),
-        "rgb24".to_string(),
+        "rgba".to_string(),
         "-f".to_string(),
         "rawvideo".to_string(),
         "pipe:1".to_string(),
@@ -810,6 +822,7 @@ fn frames_from_rgb24(
         .chunks_exact(frame_bytes)
         .enumerate()
         .map(|(index, data)| DecodedRgbFrame {
+            alpha: None,
             index,
             width,
             height,

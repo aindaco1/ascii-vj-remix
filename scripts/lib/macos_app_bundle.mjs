@@ -80,6 +80,13 @@ export async function inspectMacosAppBundle(appPath, options = {}) {
     if (!plist.includes(`<key>${key}</key>`)) issues.push(`macOS bundle Info.plist is missing ${key}`);
   }
 
+  if (options.requireVideoIo) {
+    for (const file of ['Frameworks/libndi.dylib', 'Frameworks/Syphon.framework/Syphon', 'Resources/resources/video-io/NOTICE.md', 'Resources/resources/video-io/SYPHON-LICENSE.txt', 'Resources/resources/video-io/macos-aarch64/manifest.json', 'Resources/resources/video-io/macos-aarch64/NDI-THIRD-PARTY-LICENSES.txt']) {
+      if (!(await fileExists(path.join(contents, file)))) issues.push(`macOS bundle is missing ${file}`);
+    }
+    if (!plist.includes('<key>NSLocalNetworkUsageDescription</key>')) issues.push('macOS video sharing is missing its local-network usage description');
+  }
+
   const bundledFfmpegRoot = path.join(resources, 'resources', 'ffmpeg');
   if (!(await fileExists(path.join(bundledFfmpegRoot, 'README.md')))) {
     issues.push('macOS bundle is missing resources/ffmpeg/README.md');

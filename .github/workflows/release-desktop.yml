@@ -207,6 +207,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Stage pinned NDI and Syphon runtimes
+        run: npm run video-io:stage
+
       - name: Compile release app without bundling
         run: npm run tauri:build -- --no-bundle --ci
 
@@ -287,6 +290,9 @@ jobs:
 
       - name: Install npm dependencies
         run: npm ci
+
+      - name: Stage pinned NDI and Syphon runtimes
+        run: npm run video-io:stage
 
       - name: Download verified FFmpeg runtime
         uses: actions/download-artifact@v8

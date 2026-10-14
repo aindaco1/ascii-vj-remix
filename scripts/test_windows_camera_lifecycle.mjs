@@ -8,14 +8,16 @@ import { syncNativePreviewGeometry } from '../renderers/shared/native-preview-ge
 const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const methods = appSource.slice(appSource.indexOf('    async _switchStaticSource('), appSource.indexOf('    async _prepareForSourceSwitch('));
 const events = [];
-const Controller = new Function('normalizeParams', 'isCameraParams', 'sendTauriOutputState', `return class { ${methods} }`)(
+const Controller = new Function('normalizeParams', 'isCameraParams', 'sendTauriOutputState', 'isTransportSource', `return class { ${methods} }`)(
   (params) => params,
   (params) => params.mediaType === 'camera',
-  async (payload) => { events.push(`native:${payload.mediaType}`); return true; }
+  async (payload) => { events.push(`native:${payload.mediaType}`); return true; },
+  (params) => ['ndi', 'syphon'].includes(params.mediaType)
 );
 function fixture(windows = true) {
   const app = new Controller();
   Object.assign(app, {
+    videoIo: { releaseInput: async () => {} },
     params: { sourceMode: 'static', mediaType: 'camera', mediaUrl: 'camera:' },
     nativeOutputCapabilities: { nativeCameraPreviewBridge: windows },
     nativeOutputActive: true,
@@ -129,8 +131,8 @@ console.log('Native preview geometry resize and preset regression passed.');
 // Windows where native Pop Out reuses the same selected camera identity).
 const initStart = appSource.indexOf('    async init() {', appSource.indexOf('class RendererLabApp'));
 const initMethod = appSource.slice(initStart, appSource.indexOf('    _startWebViewKeepalive()', initStart));
-const Startup = new Function('isTauriUpdaterAvailable', 'isTauriRuntime', 'els', 'isCameraParams',
-  `return class { ${initMethod} }`)(async () => false, () => false, {}, (params) => params.mediaType === 'camera');
+const Startup = new Function('isTauriUpdaterAvailable', 'isTauriRuntime', 'els', 'isCameraParams', 'isTransportSource',
+  `return class { ${initMethod} }`)(async () => false, () => false, {}, (params) => params.mediaType === 'camera', () => false);
 for (const mediaType of ['camera', 'image', 'video']) {
   let finishEnumeration;
   const cameraReady = new Promise((resolve) => { finishEnumeration = resolve; });
@@ -139,6 +141,7 @@ for (const mediaType of ['camera', 'image', 'video']) {
   const startup = new Startup();
   Object.assign(startup, {
     params: { mediaType, cameraDeviceId: '' },
+    videoIo: { init: async () => {} },
     desktopUpdater: { setAvailable() {}, checkOnLaunch() {} },
     midiRuntime: { init: () => unrelatedDevice },
     _initCrashReporter: async () => {},

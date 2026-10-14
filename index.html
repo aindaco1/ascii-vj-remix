@@ -110,6 +110,19 @@
                     </div>
                 </section>
 
+                <details id="video-io" class="panel video-io-panel" hidden>
+                    <summary>Video I/O</summary>
+                    <div class="video-io-controls">
+                        <label class="field"><span>Live input</span><select id="video-io-source"><option value="">Select NDI or Syphon in Source</option></select></label>
+                        <button id="video-io-refresh" type="button">Refresh sources</button>
+                        <div class="video-io-toggles"><label><input id="video-io-ndi" type="checkbox"> NDI Out</label><label id="video-io-syphon-label"><input id="video-io-syphon" type="checkbox"> Syphon Out</label></div>
+                        <label class="field"><span>Output name</span><input id="video-io-name" maxlength="128" type="text" spellcheck="false"></label>
+                        <label class="field"><span>Output format</span><select id="video-io-format"><option value="1280:30">720p · 30 fps</option><option value="1280:60">720p · 60 fps</option><option value="1920:30">1080p · 30 fps</option><option value="1920:60">1080p · 60 fps</option></select></label>
+                        <a class="video-io-credit" href="https://ndi.video/" target="_blank" rel="noopener noreferrer">NDI®</a>
+                        <span id="video-io-status" role="status" aria-live="polite">Sharing off</span>
+                    </div>
+                </details>
+
                 <div id="camera-controls-slot" class="camera-controls-slot"></div>
 
                 <section class="panel preset-panel">

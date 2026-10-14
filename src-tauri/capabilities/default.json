@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-renderer-lab",
   "description": "Capability set for the main renderer lab control window.",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:app:allow-name",
     "core:event:allow-emit-to",
@@ -59,6 +61,13 @@
     "allow-finish-midi-sysex-capture",
     "allow-send-midi-sysex",
     "process:allow-restart",
-    "updater:default"
+    "updater:default",
+    "allow-get-video-io-status",
+    "allow-discover-video-sources",
+    "allow-configure-video-io",
+    "allow-update-video-io-params",
+    "allow-write-video-io-frame",
+    "allow-read-video-io-frame",
+    "allow-open-video-io-popout"
   ]
 }

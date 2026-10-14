@@ -96,5 +96,15 @@ export function createAccentSampler(p, sample, process, cols, rows, aspect, time
         const f = fieldAt(x, y), shift = displacement(...maskAt(u, v));
         return [u + f[1] * shift / cols, v + f[3] * shift / rows];
     };
+    apply.coverage = (coverage, sampleCoverage, u, v, x, y) => {
+        if (p.accentStyle !== 'glass' || p.accentPlacement === 'trails') return coverage;
+        const [wu, wv] = apply.warp(u, v, x, y);
+        const dx = (wu - u) * cols, dy = (wv - v) * rows;
+        const sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
+        const a = sampleCoverage(u + sx / cols, v), b = sampleCoverage(u, v + sy / rows);
+        const c = sampleCoverage(u + sx / cols, v + sy / rows);
+        const blend = (a, b, t) => a + (b - a) * t;
+        return blend(blend(coverage, a, Math.abs(dx)), blend(b, c, Math.abs(dx)), Math.abs(dy));
+    };
     return apply;
 }

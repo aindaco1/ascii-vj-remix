@@ -1,17 +1,19 @@
 # ASCII VJ Remix
 
 ASCII VJ Remix is a local-first native desktop renderer lab for turning
-images, videos, cameras, and audio-reactive signals into high-performance ASCII
+images, videos, cameras, live video feeds, and audio-reactive signals into high-performance ASCII
 and cell-based visuals.
 
 The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current source/package version is **1.2.0 — Fractal Accents**. It adds six
-source-aware accent presets, shared controls across all looks and optional scenes,
-and stronger WTF visibility protection. See the
-[release record](docs/releases/RELEASE_1.2.0.md) for validation and platform limits.
+The current source/package version is **1.3.0 — Native Video I/O**, an unpublished
+release candidate. It adds native [NDI®](https://ndi.video/) input/output on macOS,
+Windows and Linux, plus Syphon on macOS, with preserved transparency and
+concurrent Pop Out. See the [release record](docs/releases/RELEASE_1.3.0.md) for
+verified behavior and open acceptance checks. The latest published version is
+**1.2.0 — Fractal Accents**.
 Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).
@@ -61,6 +63,9 @@ The result is a live renderer workbench for stylized ASCII/cell video output.
 - Local audio reactivity from microphone/input, files, and supported
   system/display audio paths.
 - Native Pop Out for another display and PNG capture of the main renderer.
+- [Native video sharing](docs/USER_GUIDE.md#native-video-sharing): one NDI or
+  Syphon input, independently enabled outputs, and 720p/1080p at 30/60 fps.
+  Transports carry video only; 1080p60 is a performance target.
 - Experimental UC-33e MIDI control through the mioXC DIN connection.
 
 See the [User Guide](docs/USER_GUIDE.md#current-capabilities) for the full feature
@@ -68,9 +73,11 @@ set and platform limits. It also covers [system requirements](docs/USER_GUIDE.md
 [hardware](docs/USER_GUIDE.md#hardware-guidance), and
 [battery and heat](docs/USER_GUIDE.md#battery-and-heat-warning).
 
-Media, camera frames, and audio analysis stay local. The app bundles its runtime
-assets; intentional online paths are limited to signed updater checks/downloads
-and production-only reviewed, sanitized crash reports. See
+Media and audio analysis stay local unless you enable a video output. NDI sends
+video over the LAN; Syphon shares it with apps on the same Mac. Sharing starts
+off on launch. The app bundles its runtime assets; intentional internet paths
+are signed updater checks/downloads and production-only reviewed, sanitized
+crash reports. See
 [privacy and offline behavior](docs/USER_GUIDE.md#privacy-and-offline-behavior).
 
 ## Install Guide
@@ -157,6 +164,7 @@ The short version:
 ```bash
 git submodule update --init shared/dust-wave-platform
 npm ci
+npm run video-io:stage
 npm run tauri:dev
 npm test
 ```
@@ -187,3 +195,7 @@ In plain language: the project is broadly permissive, but the license includes
 an explicit restriction against using the software to serve, deliver, or display
 digital advertisements, sponsored content, or commercial marketing to end users.
 Read the license itself before redistributing or building on this project.
+
+Bundled NDI and Syphon components retain their separate
+[component terms and notices](src-tauri/resources/video-io/NOTICE.md).
+NDI® is a registered trademark of Vizrt NDI AB.

@@ -505,4 +505,26 @@ fn sceneFinish(cell: vec4f, uv: vec2f, materialGlyph: f32) -> vec4f {
     }
     return vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), alpha);
 }
+
+// Coverage is separate from cell.a, which continues to select a glyph.
+// Procedural scenes cover their generated backdrop; flat effects retain source
+// coverage and can move it with displacement and feedback.
+fn sceneCoverageFinish(source: f32, uv: vec2f) -> f32 {
+    var coverage: f32 = source;
+    if (effect(0).x > 0.0) { coverage = 1.0; }
+    if (accentEnabled() && effect(10).x == 3.0 && effect(10).w != 3.0 && effect(0).x == 0.0) {
+        let delta: vec2f = accentField(uv).yw * accentDisplacement(accentMask(uv, false));
+        let px: vec2f = 1.0 / vec2f(effect(3).w, effect(4).x);
+        let direction: vec2f = vec2f(choose(1.0, -1.0, delta.x < 0.0), choose(1.0, -1.0, delta.y < 0.0));
+        coverage = mix(mix(coverage, sceneCoverage(uv + vec2f(direction.x * px.x, 0.0)), abs(delta.x)),
+            mix(sceneCoverage(uv + vec2f(0.0, direction.y * px.y)), sceneCoverage(uv + direction * px), abs(delta.x)), abs(delta.y));
+    }
+    if (effect(4).z > 0.0) {
+        let angle: f32 = effect(5).x;
+        let p: vec2f = (uv - 0.5) * exp(-effect(4).w);
+        let oldUV: vec2f = vec2f(p.x * cos(angle) - p.y * sin(angle), p.x * sin(angle) + p.y * cos(angle)) + 0.5;
+        coverage = max(coverage, sceneHistoryCoverage(oldUV) * effect(4).z);
+    }
+    return clamp(coverage, 0.0, 1.0);
+}
 `;

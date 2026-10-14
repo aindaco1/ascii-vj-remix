@@ -133,6 +133,7 @@ pub struct RawVideoFrame {
     pub width: u32,
     pub height: u32,
     pub rgb_base64: String,
+    pub alpha_base64: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -481,6 +482,7 @@ impl RawVideoSessions {
                 width: session.width,
                 height: session.height,
                 rgb_base64: general_purpose::STANDARD.encode(frame.data),
+                alpha_base64: frame.alpha.map(|alpha| general_purpose::STANDARD.encode(alpha)),
             });
         }
 

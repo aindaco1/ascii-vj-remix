@@ -62,6 +62,10 @@ async function scanFile(filePath) {
       const matchedStart = match.index + match[0].indexOf(matchedText);
       if (matchedStart > 0 && text[matchedStart - 1] === '\\') continue;
       if (allowedNamespaceUrls.has(matchedText)) continue;
+      // Required NDI attribution is a user-activated documentation link, never
+      // a runtime fetch, script, stylesheet, frame, image or module dependency.
+      if (path.extname(filePath) === '.html' && matchedText === 'https://ndi.video/'
+        && /<a\s[^>]*\bhref=["']$/.test(text.slice(0, matchedStart))) continue;
       if (allowedLocalUrlPrefixes.some((prefix) => matchedText.startsWith(prefix))) continue;
 
       const line = text.slice(0, match.index).split('\n').length;
@@ -108,4 +112,4 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-console.log('Offline bundle check passed: no remote runtime URLs found in dist/.');
+console.log('Offline bundle check passed: local runtime assets; explicit NDI documentation link only.');

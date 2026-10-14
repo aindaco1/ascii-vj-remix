@@ -9,6 +9,17 @@ APP_ID="com.asciline.remix.dev"
 PRODUCTION_APP="/Applications/ASCII VJ Remix.app"
 LOCAL_IDENTITY="${ASCILINE_LOCAL_CODESIGN_IDENTITY:-ASCII VJ Remix Local Code Signing}"
 CODESIGN_IDENTITY="${ASCILINE_CODESIGN_IDENTITY:-$LOCAL_IDENTITY}"
+# Hardened runtime library validation requires a real Team ID for bundled NDI
+# and Syphon. Self-signed certificates have none, even when signing both files.
+if [[ -z "${ASCILINE_CODESIGN_IDENTITY:-}" ]]; then
+  TEAM_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)"
+  if [[ -n "$TEAM_IDENTITY" ]]; then
+    CODESIGN_IDENTITY="$TEAM_IDENTITY"
+  else
+    echo "ASCII VJ Remix local run: set ASCILINE_CODESIGN_IDENTITY to an Apple team signing identity for the bundled video libraries." >&2
+    exit 1
+  fi
+fi
 
 if [[ "$INSTALL_APP" == "$PRODUCTION_APP" || "$(basename "$INSTALL_APP")" == "ASCII VJ Remix.app" ]]; then
   echo "ASCII VJ Remix local run: refusing to target the production app bundle." >&2

@@ -80,6 +80,12 @@ struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var coverageHistory: texture_2d<f32>;
+@group(0) @binding(9) var coverageOut: texture_storage_2d<rgba16float, write>;
+fn sceneHistoryCoverage(uv: vec2f) -> f32 {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return 0.0; }
+    return textureLoad(coverageHistory, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0).r;
+}
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
 fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
@@ -92,6 +98,12 @@ fn sceneMedia(uv: vec2f) -> vec3f {
     if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
     let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
     return textureLoad(srcTex, at).rgb;
+}
+fn sceneCoverage(uv: vec2f) -> f32 {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at).a;
 }
 fn sceneHistory(uv: vec2f) -> vec4f {
     if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
@@ -127,6 +139,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
     textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), boosted);
+    textureStore(coverageOut, vec2<i32>(i32(cx), i32(cy)), vec4f(sceneCoverageFinish(c.a, uv), 0.0, 0.0, 0.0));
 }
 `;
 
@@ -178,6 +191,12 @@ struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var coverageHistory: texture_2d<f32>;
+@group(0) @binding(9) var coverageOut: texture_storage_2d<rgba16float, write>;
+fn sceneHistoryCoverage(uv: vec2f) -> f32 {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return 0.0; }
+    return textureLoad(coverageHistory, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0).r;
+}
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
 fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
@@ -190,6 +209,12 @@ fn sceneMedia(uv: vec2f) -> vec3f {
     if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
     let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
     return textureLoad(srcTex, at, 0).rgb;
+}
+fn sceneCoverage(uv: vec2f) -> f32 {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at, 0).a;
 }
 fn sceneHistory(uv: vec2f) -> vec4f {
     if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
@@ -228,6 +253,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), boosted);
     textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), boosted);
+    textureStore(coverageOut, vec2<i32>(i32(cx), i32(cy)), vec4f(sceneCoverageFinish(c.a, uv), 0.0, 0.0, 0.0));
 }
 `;
 
@@ -277,6 +303,7 @@ struct RenderParams {
 @group(0) @binding(0) var cellColorTex: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: RenderParams;
 @group(0) @binding(2) var glyphAtlasTex: texture_2d<f32>;
+@group(0) @binding(3) var coverageTex: texture_2d<f32>;
 
 fn unpackColor(value: u32) -> vec3<f32> {
     return vec3<f32>(
@@ -297,8 +324,9 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let cy = min(cellY, params.rows - 1u);
 
     let cell = textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    let coverage = textureLoad(coverageTex, vec2<i32>(i32(cx), i32(cy)), 0).r;
     if (params.glyphMode == 0u || params.glyphCount == 0u) {
-        return vec4<f32>(cell.rgb, 1.0);
+        return vec4<f32>(cell.rgb * coverage, coverage);
     }
     let localX = pixelX - f32(cellX * params.cellW);
     let localY = pixelY - f32(cellY * params.cellH);
@@ -322,10 +350,10 @@ fn fragmentMain(@location(0) texCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let atlasX = rampColumn * 16u + glyphX;
     let alpha = textureLoad(glyphAtlasTex, vec2<i32>(i32(atlasX), i32(atlasY)), 0).r;
     if (alpha <= 0.5) {
-        return vec4<f32>(unpackColor(params.backgroundColor), 1.0);
+        return vec4<f32>(unpackColor(params.backgroundColor) * coverage, coverage);
     }
     let foreground = select(cell.rgb, unpackColor(params.glyphColor), params.glyphColorMode == 1u);
-    return vec4<f32>(foreground, 1.0);
+    return vec4<f32>(foreground * coverage, coverage);
 }
 `;
 
@@ -541,7 +569,7 @@ export class WebGPURenderer {
         if (!this.imageSourceTexture) return;
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
-        if (this.source.isNativeOutputPreview
+        if ((this.source.isNativeOutputPreview || this.source.isDynamicDimensions)
             && (this.imageSourceSize?.[0] !== this.source.width || this.imageSourceSize?.[1] !== this.source.height)) {
             this.imageSourceTexture.destroy();
             // This method performs its upload synchronously; the async signature
@@ -596,6 +624,10 @@ export class WebGPURenderer {
         this.nextHistoryTexture?.destroy();
         this.nextHistoryTexture = this.device.createTexture({size: [this.cols, this.rows], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING});
         this.nextHistoryView = this.nextHistoryTexture.createView();
+        this.coverageTexture?.destroy(); this.nextCoverageTexture?.destroy();
+        const coverage = () => this.device.createTexture({size: [this.cols, this.rows], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING});
+        this.coverageTexture = coverage(); this.nextCoverageTexture = coverage();
+        this.coverageView = this.coverageTexture.createView(); this.nextCoverageView = this.nextCoverageTexture.createView();
         this.spatialState = {};
         this.imageComputeBindGroup = null;
         this.renderBindGroup = null;
@@ -603,16 +635,14 @@ export class WebGPURenderer {
 
     _createStableBindGroups() {
         if (!this.cellColorView || !this.paramsBuffer || !this.renderParamsBuffer) return;
-        this.renderBindGroup = this.device.createBindGroup({
-            layout: this.renderPipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: this.cellColorView },
-                { binding: 1, resource: { buffer: this.renderParamsBuffer } },
-                { binding: 2, resource: this.glyphAtlasView }
-            ]
-        });
+        const renderBind = coverage => this.device.createBindGroup({layout: this.renderPipeline.getBindGroupLayout(0), entries: [
+            {binding: 0, resource: this.cellColorView}, {binding: 1, resource: {buffer: this.renderParamsBuffer}},
+            {binding: 2, resource: this.glyphAtlasView}, {binding: 3, resource: coverage}
+        ]});
+        this.renderBindGroup = renderBind(this.nextCoverageView);
+        this.nextRenderBindGroup = renderBind(this.coverageView);
         if (!this.usesExternalVideoTexture && this.imageComputePipeline && this.imageSourceView) {
-            const bind = (read, write) => this.device.createBindGroup({
+            const bind = (read, write, coverageRead, coverageWrite) => this.device.createBindGroup({
                 layout: this.imageComputePipeline.getBindGroupLayout(0),
                 entries: [
                     { binding: 0, resource: this.imageSourceView },
@@ -622,11 +652,12 @@ export class WebGPURenderer {
                     { binding: 4, resource: { buffer: this.featureBuffer } },
                     { binding: 5, resource: { buffer: this.spatialBuffer } },
                     { binding: 6, resource: read },
-                    { binding: 7, resource: write }
+                    { binding: 7, resource: write },
+                    { binding: 8, resource: coverageRead }, { binding: 9, resource: coverageWrite }
                 ]
             });
-            this.imageComputeBindGroup = bind(this.historyView, this.nextHistoryView);
-            this.nextImageComputeBindGroup = bind(this.nextHistoryView, this.historyView);
+            this.imageComputeBindGroup = bind(this.historyView, this.nextHistoryView, this.coverageView, this.nextCoverageView);
+            this.nextImageComputeBindGroup = bind(this.nextHistoryView, this.historyView, this.nextCoverageView, this.coverageView);
         }
     }
 
@@ -723,7 +754,7 @@ export class WebGPURenderer {
 
     _renderSourceFrame(videoSource) {
 
-        if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
+        if ((this.source.isNativeOutputPreview || this.source.isDynamicDimensions)) this.syncNativePreviewGeometry();
 
         this.syncPaletteDisplay();
         fillSpatialUniforms(this.spatialData, this, this.cols, this.rows, [...activeGlyphRamp(this)].length, this.spatialState);
@@ -808,7 +839,8 @@ export class WebGPURenderer {
                     { binding: 4, resource: { buffer: this.featureBuffer } },
                     { binding: 5, resource: { buffer: this.spatialBuffer } },
                     { binding: 6, resource: this.historyView },
-                    { binding: 7, resource: this.nextHistoryView }
+                    { binding: 7, resource: this.nextHistoryView },
+                    { binding: 8, resource: this.coverageView }, { binding: 9, resource: this.nextCoverageView }
                 ]
             });
         } else {
@@ -831,7 +863,7 @@ export class WebGPURenderer {
                 view: this.context.getCurrentTexture().createView(),
                 loadOp: 'clear',
                 storeOp: 'store',
-                clearValue: { r: 0, g: 0, b: 0, a: 1 }
+                clearValue: { r: 0, g: 0, b: 0, a: 0 }
             }]
         });
         renderPass.setPipeline(this.renderPipeline);
@@ -842,6 +874,9 @@ export class WebGPURenderer {
 
         this.device.queue.submit([encoder.finish()]);
         this.frameCount++;
+        [this.coverageTexture, this.nextCoverageTexture] = [this.nextCoverageTexture, this.coverageTexture];
+        [this.coverageView, this.nextCoverageView] = [this.nextCoverageView, this.coverageView];
+        [this.renderBindGroup, this.nextRenderBindGroup] = [this.nextRenderBindGroup, this.renderBindGroup];
         [this.historyTexture, this.nextHistoryTexture] = [this.nextHistoryTexture, this.historyTexture];
         [this.historyView, this.nextHistoryView] = [this.nextHistoryView, this.historyView];
         [this.imageComputeBindGroup, this.nextImageComputeBindGroup] = [this.nextImageComputeBindGroup, this.imageComputeBindGroup];
@@ -924,6 +959,7 @@ export class WebGPURenderer {
         this.spatialBuffer?.destroy();
         this.historyTexture?.destroy();
         this.nextHistoryTexture?.destroy();
+        this.coverageTexture?.destroy(); this.nextCoverageTexture?.destroy();
         if (this.glyphAtlasTexture) this.glyphAtlasTexture.destroy();
         this.cellColorView = null;
         this.imageSourceView = null;

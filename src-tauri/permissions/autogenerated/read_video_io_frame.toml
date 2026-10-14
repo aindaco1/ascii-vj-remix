@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-video-io-frame"
+description = "Enables the read_video_io_frame command without any pre-configured scope."
+commands.allow = ["read_video_io_frame"]
+
+[[permission]]
+identifier = "deny-read-video-io-frame"
+description = "Denies the read_video_io_frame command without any pre-configured scope."
+commands.deny = ["read_video_io_frame"]

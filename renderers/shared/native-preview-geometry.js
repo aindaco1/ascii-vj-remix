@@ -3,7 +3,7 @@ import { resolveGridDimensions } from './density-policy.js';
 // Only the Windows native preview bridge can change its canvas dimensions
 // independently of the source object. Ordinary media paths are unchanged.
 export function syncNativePreviewGeometry(renderer, params = renderer.nativePreviewParams) {
-    if (!renderer.source?.isNativeOutputPreview || !params) return;
+    if (!(renderer.source?.isNativeOutputPreview || renderer.source?.isDynamicDimensions) || !params) return;
     renderer.nativePreviewParams = params;
     const { source } = renderer;
     const grid = resolveGridDimensions(params, source.width, source.height, {

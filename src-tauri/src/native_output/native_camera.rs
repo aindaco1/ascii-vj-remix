@@ -157,7 +157,7 @@ mod platform {
             }
             self.last_sequence = sequence;
             Ok(Some(DecodedRgbFrame {
-                index: sequence as usize,
+            alpha: None,                index: sequence as usize,
                 width,
                 height,
                 data: self.buffer[..len].to_vec(),
@@ -240,7 +240,7 @@ mod platform {
                 // An empty sample also completes a request; represent it with
                 // a zero-sized frame so the owner can request the next one.
                 *pending = Some(result.map(|frame| frame.unwrap_or(DecodedRgbFrame {
-                    index: 0, width: 0, height: 0, data: Vec::new(),
+            alpha: None,                    index: 0, width: 0, height: 0, data: Vec::new(),
                 })));
             }
             Ok(())
@@ -431,7 +431,7 @@ mod platform {
                 .map_err(|error| format!("Windows camera buffer unlock failed: {error}"))?;
             let data = copied?;
             Ok(DecodedRgbFrame {
-                index: 0,
+            alpha: None,                index: 0,
                 width,
                 height,
                 data,

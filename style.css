@@ -1493,3 +1493,11 @@ button:disabled {
         text-align: left;
     }
 }
+
+.video-io-panel { padding: 10px; }
+.video-io-panel summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.video-io-controls { display: grid; gap: 8px; margin-top: 10px; }
+.video-io-controls .field { min-width: 0; }
+.video-io-controls input[type=text], .video-io-controls select { width: 100%; min-width: 0; }
+.video-io-toggles { display: flex; gap: 12px; font-size: 11px; }
+#video-io-status { color: var(--text-muted, #aaa); font-size: 10px; }

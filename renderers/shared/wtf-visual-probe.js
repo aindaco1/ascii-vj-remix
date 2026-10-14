@@ -92,7 +92,13 @@ export async function inspectWtfTarget(params, source, { time = 0, audio = null 
     }
     const sources = [dimSource];
     // Black source frames are valid content, not evidence of a bad candidate.
-    if (source && wtfCellSignal(source.pixels, { backgroundColor: '#000000' }).average > 8) sources.push(source);
+    if (source) {
+        // Source alpha is coverage, not the glyph address used by cell buffers.
+        // Transparent pixels do not supply evidence for visibility recovery.
+        let weighted=0,weight=0;
+        for(let i=0;i<source.pixels.length;i+=4){const a=source.pixels[i+3]/255;weighted+=luma(...source.pixels.subarray(i,i+3))*a;weight+=a;}
+        if(weight>0 && weighted/weight>8) sources.push(source);
+    }
     for (const variant of variants) {
         const lut = getPaletteLut(variant.paletteId, variant.paletteMapping);
         const display = fillPaletteDisplay(new Float32Array(PALETTE_CONTRACT.maxColors * 4), paletteById(variant.paletteId), variant);

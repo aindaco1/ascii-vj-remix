@@ -11,6 +11,8 @@ shipped changes. The [documentation index](../README.md) covers current guides.
 
 | Version | Record | Evidence boundary |
 | --- | --- | --- |
+| 1.3.0 candidate | [Native Video I/O](RELEASE_1.3.0.md) | Unpublished release preparation; source/CI results and open gates. |
+| 2026-10-10 Dev | [Native NDI and Syphon](NATIVE_VIDEO_IO_DEV.md) | Original plan and installed Mac development evidence. |
 | 1.2.0 | [Fractal Accents](RELEASE_1.2.0.md) | Published 2026-10-05 UTC; exact-main CI, three-platform installer/updater checks and independent local Mac acceptance passed. Physical follow-ups remain explicit. |
 | 1.1.0 | [Spatial ASCII](RELEASE_1.1.0.md) | Published 2026-09-29; exact-main CI, all three platform installer/updater hops and independent local Mac acceptance passed. Physical follow-ups remain explicit. |
 | 1.0.5 | [macOS compatibility and issue follow-ups](RELEASE_1.0.5.md) | Records deployment-target and compiler corrections, public artifacts and remaining physical acceptance. |

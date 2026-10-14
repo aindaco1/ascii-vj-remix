@@ -139,7 +139,7 @@ for (const preset of AUDIO_REACTIVE_PRESETS) {
     sendTauriOutputState: () => reply.promise
   });
   const app = {
-    ...settings, ...finish, ...arm, audioReactiveRevision:0, nativeOutputActive:true,
+    ...settings, ...finish, ...arm, videoIo:{active:false}, audioReactiveRevision:0, nativeOutputActive:true,
     transitionToken:1, running:true, _canUseNativeOutputWindow: () => true,
     _nativeOutputPayload: () => ({}), renderParams: () => ({brightness:1}),
     _syncNativeOutputWindow: (params, interval, options) => sent.push({params, options})

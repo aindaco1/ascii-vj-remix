@@ -332,6 +332,7 @@ mod tests {
 
     fn rgb_frame(index: usize, rgb: &[u8]) -> DecodedRgbFrame {
         DecodedRgbFrame {
+            alpha: None,
             index,
             width: 2,
             height: 1,

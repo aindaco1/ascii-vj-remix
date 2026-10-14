@@ -18,7 +18,7 @@ Related practice docs:
 - WebGPU/WebGL output is the visual-quality target.
 - ASCILINE-derived Canvas and adaptive-stream paths remain available as
   compatibility and development infrastructure.
-- Normal app use is local-first and offline.
+- Normal app use is local-first and offline; explicitly enabled NDI uses the LAN.
 - All live controls route through one canonical parameter model.
 - Presets, WTF mode, audio reactivity, and MIDI control compose without forking
   renderer state.
@@ -37,7 +37,7 @@ Source selection
   -> effective params
   -> renderer runtime
   -> main preview
-  -> optional native/browser Pop Out
+  -> optional shared native output (Pop Out / NDI / Syphon)
 ```
 
 Source selection can come from built-in media, user-selected files, camera
@@ -170,6 +170,34 @@ registered media id
 
 The normal Source UI hides stream mode. Prospective productization work is
 tracked in the [Roadmap](ROADMAP.md).
+
+## Native Video I/O
+
+`renderers/desktop/video-io.js` owns source/output controls and bounded binary
+IPC. `src-tauri/src/video_io/` owns one input session, a latest-frame slot, the
+shared offscreen native renderer and independently enabled destinations.
+NDI discovery and capture/send use the standard SDK through a narrow C ABI;
+Syphon uses the bundled public Metal API through `native/video_syphon.m`.
+
+NDI frames normalize stride/channel order into straight RGBA8. Syphon textures
+are retained and imported onto the existing wgpu Metal device. Live input preview
+uses one latest binary frame; it does not own the receiver. Accelerated transport
+output reuses the existing native cell/glyph pipelines and canonical effective
+parameters. Canvas-owned presets send their finished pixels, including the
+outgoing transition layer. Local image/video/camera sources use the same source
+adapter; no second decoder is created for each transport.
+
+The finished RGBA texture feeds NDI readback, Syphon's retained GPU export slots
+and Pop Out. Maximum in-flight render/readback/export work is three frames;
+latest frames replace older ones rather than extending a queue. Output format
+is independent of window dimensions. Pop Out flattens coverage onto its display
+background; transport outputs retain it. No audio enters the transport bridge.
+
+Coverage travels separately from `cell.a` (glyph address), with coverage history
+for feedback. Glyph/background composition receives coverage once; crossfades
+interpolate premultiplied RGBA before returning to straight transport RGBA.
+Source-generation changes clear history/preview/readback and reject stale IPC.
+SDK networking is opt-in; source lists, identifiers and pixels are not reports.
 
 ## Parameter Model
 

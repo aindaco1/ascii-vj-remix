@@ -24,7 +24,7 @@ const source = {isVideo:true, element:{readyState:1}, width:64, height:48};
 const renderer = new WebGPURenderer({device, source});
 Object.assign(renderer, {
   initialized:true, usesExternalVideoTexture:true, rows:4,
-  syncPaletteDisplay() {}, videoComputePipeline:{getBindGroupLayout: () => ({})}, renderBindGroup:{},
+  syncPaletteDisplay() {}, videoComputePipeline:{getBindGroupLayout: () => ({})}, renderBindGroup:{}, nextRenderBindGroup:{},
   context:{getCurrentTexture: () => ({createView: () => ({})})}, historyView:{id:1}, nextHistoryView:{id:2}
 });
 renderer._renderFrame(); assert.equal(frames.length, 0, 'decoder gaps should not submit stale data');

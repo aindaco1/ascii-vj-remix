@@ -99,7 +99,9 @@ impl SmokeReport {
 }
 
 pub fn maybe_spawn(app: &App) {
-    if env::var_os("ASCILINE_CRASH_REPORT_SMOKE").is_some() {
+    if env::var_os("ASCILINE_VIDEO_IO_SMOKE").is_some() {
+        spawn_video_io_smoke(app);
+    } else if env::var_os("ASCILINE_CRASH_REPORT_SMOKE").is_some() {
         spawn_crash_relay_smoke(app);
     } else if env::var_os("ASCILINE_UPDATER_SMOKE").is_some() {
         spawn_updater_smoke(app);
@@ -725,4 +727,32 @@ fn emit_report<T: Serialize>(report: &T, code: i32) {
 fn finish<T: Serialize>(report: T, code: i32) -> ! {
     emit_report(&report, code);
     process::exit(code);
+}
+
+// A real installed WebView drives the public controller; a separate SDK peer
+// supplies the synthetic source and checks the two output transports.
+fn spawn_video_io_smoke(app: &App) {
+    let handle=app.handle().clone();
+    let protocol=env::var("ASCILINE_VIDEO_IO_SMOKE").unwrap_or_else(|_| "ndi".into());
+    let backend=env::var("ASCILINE_VIDEO_IO_SMOKE_BACKEND").unwrap_or_else(|_| "webgl2".into());
+    let (tx,rx)=mpsc::channel();
+    let listener=handle.listen("asciline-video-io-smoke-result",move |event| {let _=tx.send(event.payload().to_owned());});
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(2));
+        let duration_ms=env::var("ASCILINE_VIDEO_IO_SMOKE_DURATION_MS").ok().and_then(|s|s.parse::<u64>().ok()).unwrap_or(8000);
+        let script=include_str!("video_io/smoke.js").replace("OPTIONS",&json!({"protocol":protocol,"backend":backend,"durationMs":duration_ms,"requireReconnect":env::var_os("ASCILINE_VIDEO_IO_SMOKE_RECONNECT").is_some()}).to_string());
+        if let Some(main)=handle.get_webview_window("main") {let _=main.show();let _=main.set_focus();let _=main.eval(&script);}
+        let mut report=rx.recv_timeout(Duration::from_millis(duration_ms+90000)).ok().and_then(|s|serde_json::from_str::<serde_json::Value>(&s).ok()).unwrap_or(json!({"ok":false,"error":"Installed video I/O smoke timed out"}));
+        handle.unlisten(listener);
+        if report["ok"]==true {
+            if let Some(window)=handle.get_window("native-output") {let _=window.close();}
+            thread::sleep(Duration::from_secs(1));
+            let before=crate::video_io::get_video_io_status(handle.clone(),handle.state()).unwrap();
+            thread::sleep(Duration::from_secs(1));
+            let after=crate::video_io::get_video_io_status(handle.clone(),handle.state()).unwrap();
+            let independent=!after.popout&&after.ndi=="sending"&&after.frames>before.frames;
+            report["closePreservesSharing"]=json!(independent);report["ok"]=json!(independent);
+        }
+        let ok=report["ok"]==true;finish(report,if ok {0} else {1});
+    });
 }

@@ -198,6 +198,10 @@ if (!Array.isArray(resources) || !resources.includes('../media/**/*')) {
   issues.push('bundle.resources must include ../media/**/* for packaged native output demo media');
 }
 
+if (!resources.includes('resources/video-io/**/*')) issues.push('bundle.resources must include pinned video runtimes and notices');
+for (const framework of ['frameworks/Syphon.framework', 'frameworks/libndi.dylib']) {
+  if (!config.bundle?.macOS?.frameworks?.includes(framework)) issues.push(`macOS must sign bundled ${framework}`);
+}
 const requiredIcons = [
   'icons/32x32.png',
   'icons/128x128.png',
@@ -293,6 +297,8 @@ if (!mainCapability) {
   const requiredMainPermissions = [
     'core:app:allow-name',
     'dialog:allow-open',
+    'allow-get-video-io-status', 'allow-discover-video-sources', 'allow-configure-video-io',
+    'allow-update-video-io-params', 'allow-read-video-io-frame', 'allow-write-video-io-frame', 'allow-open-video-io-popout',
     'core:event:allow-unlisten',
     'core:webview:allow-clear-all-browsing-data',
     'core:webview:allow-create-webview-window',
@@ -338,9 +344,9 @@ if (!mainCapability) {
       issues.push(`main capability must include ${permission}`);
     }
   }
-  const tauriAdapter = await readFile(tauriAdapterPath, 'utf8');
+  const tauriAdapter = await readFile(tauriAdapterPath, 'utf8') + await readFile(path.join(root, 'renderers/desktop/video-io.js'), 'utf8');
   const invokedCommands = new Set(
-    [...tauriAdapter.matchAll(/\binvokeTauri\(\s*['"]([a-z][a-z0-9_]*)['"]/g)]
+    [...tauriAdapter.matchAll(/\binvoke(?:Tauri)?\(\s*['"]([a-z][a-z0-9_]*)['"]/g)]
       .map((match) => match[1])
   );
   for (const command of invokedCommands) {
@@ -387,6 +393,8 @@ if (!outputCapability) {
   for (const forbidden of [
     'core:app:allow-name',
     'dialog:allow-open',
+    'allow-get-video-io-status', 'allow-discover-video-sources', 'allow-configure-video-io',
+    'allow-update-video-io-params', 'allow-read-video-io-frame', 'allow-write-video-io-frame', 'allow-open-video-io-popout',
     'core:event:allow-emit-to',
     'core:event:allow-unlisten',
     'core:webview:allow-create-webview-window',
@@ -569,4 +577,4 @@ if (issues.length > 0) {
   process.exit(1);
 }
 
-console.log('Tauri policy check passed: local-only runtime policy with configured GitHub updater, notarized macOS release path, unsigned Windows preview path, and Rust-only crash relay exceptions.');
+console.log('Tauri policy check passed: offline-by-default policy with user-enabled native LAN video, configured GitHub updater, notarized macOS release path, unsigned Windows preview path, and Rust-only crash relay exceptions.');
