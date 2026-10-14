@@ -740,6 +740,10 @@ Physical Windows/Linux and reference-floor hardware remain separate acceptance.
 Stage SDKs with `npm run video-io:stage`. The deterministic Rust frame/ABI/config
 checks run in `npm run test:rust`; run `npm run test:video-io-alpha` for the actual
 WebGPU/WebGL2/Canvas transparent, half-transparent and opaque pixel fixtures.
+`npm run test:video-io-runtime` uses the staged SDK for a synthetic 60-frame
+1080p send/receive round trip with alpha and opaque-black checks. Desktop CI
+runs this on each platform after compilation; it does not establish LAN/device
+or installed-app acceptance.
 On a native GPU, run:
 
 ```bash

@@ -2,6 +2,7 @@
 
 Prepared: 2026-10-13. Status: **unpublished candidate; acceptance incomplete**.
 Branch: `feat/native-video-io`, based on `a524e80` (the published 1.2.0 line).
+Review: [draft PR #49](https://github.com/aindaco1/ascii-vj-remix/pull/49).
 The owner requested documentation updates and preparation for production.
 Publication has not been requested in this preparation step.
 
@@ -42,8 +43,15 @@ the version bump; they are not evidence of a signed public 1.3.0 package.
 | Throughput in that pass | 419–429 renders in short 8-second intervals, approximately 52–54 fps; no staging drops. Delivered receiver frame age and sustained 60 fps were not measured. |
 | 1.3.0 source/version checks, 2026-10-13 | Passed `release:version:check` and the complete `check:release` gate, including 93 Rust tests; the separately invoked native GPU fixture also passed. |
 | Release credentials, 2026-10-13 | Repository secret-presence check passed for updater signing and Mac notarization. This does not validate signed artifacts. Windows remains an unsigned preview. |
+| Mac 1.3.0 Dev package, 2026-10-13 | Built, installed and launch-smoked successfully as `com.asciline.remix.dev`; strict signature, runtime/notice contents and macOS 13 minimum metadata passed. |
 | Candidate Desktop CI and development packages | Follow the [candidate branch runs](https://github.com/aindaco1/ascii-vj-remix/actions/workflows/desktop.yml?query=branch%3Afeat%2Fnative-video-io) and PR checks for exact commit status and downloadable test installers. A queued/running job is not acceptance. |
 | Production packages, public feed and 1.2.0 → 1.3.0 updater | Not run; nothing published. |
+
+The complete static browser smoke passed with no errors, retaining the 96-preset
+backend contract. The fresh staged NDI SDK passed a synthetic 60-frame 1080p
+round trip with partial alpha and opaque black preserved; CI runs that same
+check on every platform. Sanitized [preparation evidence](evidence/1.3.0-preparation.json)
+identifies the local source revision and validation limits.
 
 The preparation pass also verified all nine browser alpha fixtures (transparent,
 half-transparent and opaque on WebGPU, WebGL2 and Canvas), 245 local Markdown

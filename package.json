@@ -105,7 +105,8 @@
     "smoke:wtf": "node scripts/smoke_wtf_visibility.mjs",
     "video-io:stage": "node scripts/stage_video_io.mjs",
     "test:video-io-alpha": "node scripts/test_video_io_alpha.mjs",
-    "check:video-io-resources": "node scripts/check_video_io_resources.mjs"
+    "check:video-io-resources": "node scripts/check_video_io_resources.mjs",
+    "test:video-io-runtime": "node scripts/test_video_io_runtime.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

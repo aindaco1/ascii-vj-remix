@@ -84,6 +84,10 @@ jobs:
       - name: Verify desktop build
         run: npm run check:desktop
 
+      - name: Verify NDI SDK video and alpha round trip
+        timeout-minutes: 5
+        run: npm run test:video-io-runtime
+
       - name: Verify Jev harness offline
         run: npm run test:jev-harness
 
