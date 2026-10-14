@@ -1,5 +1,6 @@
 {
-  "dateUTC": "2026-10-13",
+  "dateLocal": "2026-10-13",
+  "timezone": "America/Denver",
   "version": "1.3.0",
   "status": "unpublished-candidate",
   "applicationSourceCommit": "9088c78b8e0bbd1945998af6aa49346946a6a782",
