@@ -153,7 +153,10 @@ jobs:
         run: npm run ffmpeg:build-sidecar
 
       - name: Verify FFmpeg release runtime
-        run: npm run check:release-runtime
+        # This isolated job produces FFmpeg only; bundle validates all runtimes.
+        run: |
+          npm run test:ffmpeg-source-build
+          npm run check:ffmpeg-release
 
       - name: Upload verified FFmpeg runtime
         uses: actions/upload-artifact@v7
