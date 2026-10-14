@@ -78,6 +78,10 @@ opaque black pixel was `[0, 0, 0, 254]`, while half-transparent samples remained
 128. The SDK fixture now uses the same two-code compression tolerance for all
 alpha bands and also checks a fully transparent band. Renderer alpha checks
 remain unchanged; this correction does not clamp or alter application pixels.
+The next Windows run passed those assertions on 56 frames before the old
+eight-second timeout. The integrity fixture now allows 30 seconds for connection
+startup and debug-build copies; it still requires 60 valid frames and is not a
+performance benchmark.
 
 ## Acceptance Before Production
 

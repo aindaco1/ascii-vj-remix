@@ -113,7 +113,9 @@ fn main() -> Result<(), String> {
         let mut receiver = ndi::Receiver::new(api, &source)?;
         let start = Instant::now();
         let mut received = 0;
-        while start.elapsed() < Duration::from_secs(8) {
+        // Allow SDK connection startup and unoptimized copies on hosted VMs.
+        // This is a frame-integrity gate, not a frame-rate benchmark.
+        while start.elapsed() < Duration::from_secs(30) {
             if let Some(f) = receiver.receive(100)? {
                 if f.width != 1920 || f.height != 1080 {
                     return Err("Incorrect received dimensions".into());

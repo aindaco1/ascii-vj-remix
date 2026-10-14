@@ -743,7 +743,9 @@ WebGPU/WebGL2/Canvas transparent, half-transparent and opaque pixel fixtures.
 `npm run test:video-io-runtime` uses the staged SDK for a synthetic 60-frame
 1080p send/receive round trip with transparent/partial/opaque alpha and black
 checks. The compressed SDK round trip permits two 8-bit code values of rounding;
-renderer/transport-buffer unit fixtures retain their stricter bounds. Desktop CI
+renderer/transport-buffer unit fixtures retain their stricter bounds. The
+30-second deadline allows connection startup and debug-build copies on hosted
+VMs; it does not measure the 1080p60 target. Desktop CI
 runs this on each platform after compilation; it does not establish LAN/device
 or installed-app acceptance.
 On a native GPU, run:
