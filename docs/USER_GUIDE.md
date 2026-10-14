@@ -33,7 +33,9 @@ Select **NDI® Input** or **Syphon Input** in Source, then choose a discovered
 sender under **Video I/O**. Refresh repeats discovery. Only one transport source
 is selected at a time; presets and WTF keep that source. Syphon is available
 only on macOS. NDI finds senders on the local network; source visibility depends
-on sender settings and network/firewall permissions.
+on sender settings and network/firewall permissions. On Linux, install the
+Avahi libraries and keep its service running; see
+[Linux NDI discovery](#linux-ndi-sources-do-not-appear).
 
 Enable **NDI Out** and/or **Syphon Out** to share the finished visuals. Set the
 output name and 720p/1080p at 30/60 fps. Pop Out can run at the same time; closing
@@ -485,6 +487,22 @@ See [Security](SECURITY.md) for the full local media, permission,
 updater, Tauri capability, and FFmpeg sidecar security model.
 
 ## Troubleshooting
+
+### Linux NDI sources do not appear
+
+NDI requires `libavahi-common.so.3`, `libavahi-client.so.3` and a running Avahi
+service on Linux. The deb/rpm packages declare these dependencies; AppImage
+users install them through their distribution. On Ubuntu/Debian:
+
+```bash
+sudo apt install avahi-daemon libavahi-client3 libavahi-common3
+sudo systemctl enable --now avahi-daemon
+```
+
+On Fedora, install `avahi` and `avahi-libs`, then start `avahi-daemon`. Refresh
+the Video I/O source list. If it stays empty, confirm the sender is active on
+the same LAN and that the firewall permits discovery and video traffic. See the
+[NDI platform requirements](https://docs.ndi.video/all/developing-with-ndi/sdk/platform-considerations).
 
 ### Camera says blocked or denied
 

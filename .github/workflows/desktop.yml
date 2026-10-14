@@ -50,6 +50,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            avahi-daemon \
+            libavahi-client3 \
+            libavahi-common3 \
             build-essential \
             ca-certificates \
             curl \
@@ -65,6 +68,8 @@ jobs:
             dbus-x11 \
             mesa-vulkan-drivers \
             xvfb
+          sudo systemctl start avahi-daemon
+          systemctl is-active avahi-daemon
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

@@ -130,7 +130,9 @@ sudo apt install ./ASCII.VJ.Remix_*.deb
 ```
 
 If the app does not launch, check that WebKitGTK, GPU drivers, and desktop
-portal packages are installed for your distribution.
+portal packages are installed for your distribution. Linux NDI discovery also
+needs [Avahi libraries and its running service](docs/USER_GUIDE.md#linux-ndi-sources-do-not-appear);
+the deb/rpm packages declare the dependencies, while AppImage users install them.
 
 ## First Run
 

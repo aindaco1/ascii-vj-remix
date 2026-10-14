@@ -43,7 +43,8 @@ Platform-specific desktop prerequisites:
 - Windows: Visual Studio Build Tools with the C++ workload and WebView2
   runtime.
 - Linux: WebKitGTK 4.1 development packages, appindicator, ALSA development
-  headers, librsvg, OpenSSL, patchelf, and build tools.
+  headers, librsvg, OpenSSL, patchelf, and build tools. Native NDI discovery also
+  requires the Avahi client/common libraries and a running `avahi-daemon` service.
 
 Optional but useful:
 

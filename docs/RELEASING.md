@@ -213,7 +213,9 @@ Run `npm run video-io:stage` before desktop checks/builds; CI does this for each
 binary and packaging job. `check:video-io-resources` verifies the staged NDI
 version/hash and notices, including the complete SDK third-party license file. macOS includes NDI and Syphon under Contents/Frameworks
 so Tauri signs nested code before signing the app. Windows/Linux package NDI
-under resources/video-io for the current architecture. Bundle notices and pinned
+under resources/video-io for the current architecture. Linux deb/rpm metadata
+requires Avahi libraries/service; AppImage users follow the
+[host setup](USER_GUIDE.md#linux-ndi-sources-do-not-appear). Bundle notices and pinned
 provenance with installers and updater archives. Do not distribute SDK headers,
 NDI Tools or SDK example programs as application dependencies.
 

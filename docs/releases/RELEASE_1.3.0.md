@@ -65,6 +65,12 @@ the app bundle; [component notices](../../src-tauri/resources/video-io/NOTICE.md
 and pinned provenance are shipped. The final distribution check must use the
 full SDK agreement and the exact packaged libraries, not the web summary alone.
 
+The first Linux SDK round trip received no frames despite successful compilation.
+NDI requires Avahi libraries and an active daemon on Linux; those prerequisites
+were missing from the CI setup and package metadata. They are now declared in
+the Linux packages, CI and AppImage setup instructions. The next exact-candidate
+CI run must verify the correction.
+
 ## Acceptance Before Production
 
 Complete these checks or record an explicit owner-approved deferral with its

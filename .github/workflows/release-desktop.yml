@@ -612,10 +612,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            avahi-daemon \
+            libavahi-client3 \
+            libavahi-common3 \
             ca-certificates \
             dbus-x11 \
             libfuse2 \
             xvfb
+          sudo systemctl start avahi-daemon
 
       - name: Download published release assets
         env:
