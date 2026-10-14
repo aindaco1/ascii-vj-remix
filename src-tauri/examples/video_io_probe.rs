@@ -116,7 +116,13 @@ fn main() -> Result<(), String> {
                     return Err("Incorrect received dimensions".into());
                 }
                 if f.rgba[3] != 255 || f.rgba[1920 * 4 + 3].abs_diff(128) > 2 {
-                    return Err("Alpha did not survive the NDI connection".into());
+                    return Err(format!(
+                        "Alpha did not survive the NDI connection: top={:?}, next_row={:?}, center={:?}, alpha_range={:?}",
+                        &f.rgba[..4],
+                        &f.rgba[1920 * 4..1920 * 4 + 4],
+                        &f.rgba[(540 * 1920 + 960) * 4..(540 * 1920 + 960) * 4 + 4],
+                        f.rgba.chunks_exact(4).fold((255u8, 0u8), |(lo, hi), p| (lo.min(p[3]), hi.max(p[3])))
+                    ));
                 }
                 received += 1;
                 if received == 60 {
