@@ -7,6 +7,19 @@ Performance work is about frame pacing, GPU
 output, media decode, camera latency, audio-reactive response, native Pop Out,
 and keeping the dense control UI responsive while the renderer is under load.
 
+## Native Video I/O Target
+
+1080p60 is the native video sharing target. It is not a measured guarantee across
+all looks and machines. The Dev candidate uses latest-frame slots and caps GPU
+work/readback/export at three in-flight frames. NDI capture and sending run on
+separate workers; Syphon input/output remains on Metal except preview readback.
+Canvas presets require finished-frame CPU transfer and can have a lower limit.
+
+Short installed Mac tests with input + both transports + Pop Out measured roughly
+52–54 rendered frames/second at 1080p with no staging drops. This does not measure
+receiver frame age or establish a 30-minute soak. Publish sustained limits only
+after the named-hardware/peer checks in [candidate evidence](releases/NATIVE_VIDEO_IO_DEV.md).
+
 ## Performance Principles
 
 - Test performance with optimized builds when making performance claims.

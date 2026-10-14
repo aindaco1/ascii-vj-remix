@@ -66,7 +66,9 @@ ASCII/cell visuals.
 - Intentional online runtime paths are limited to the production app's bounded
   release-metadata check for signed updater artifacts at launch, explicit
   updater download/install actions, and production-only reviewed/sanitized
-  crash report submission.
+  crash report submission. User-enabled NDI® discovery/input/output is an
+  explicit LAN video-sharing path; Syphon is local to the Mac. See
+  [native transport security](SECURITY.md#native-video-transport-boundary).
 - Preserve the app name: ASCII VJ Remix.
 - Preserve the native app direction for macOS, Windows, and Linux.
 - Do not reframe browser mode as the product. Browser/Vite paths are useful for
@@ -74,7 +76,9 @@ ASCII/cell visuals.
 - Keep renderer quality high. WebGPU/WebGL output is the visual quality target.
 - Preserve fallback paths unless a replacement is implemented and tested.
 - Treat Pop Out performance and latency as critical user-facing behavior.
-- Keep user-selected local media local. Do not upload files or camera/audio data.
+- Keep user-selected local media local except for explicitly enabled video
+  sharing. Sharing and live inputs reset off on launch; no transport audio.
+  Never attach media, discovered names, network addresses or raw frames to reports.
 - Keep stats overlay user-owned. Random presets, WTF mode, and audio presets do
   not turn it off unless the user explicitly does.
 - Stream infrastructure exists but is not a normal visible source mode. Keep
@@ -129,6 +133,7 @@ Use this map to find the likely owner of a change:
 | Tauri adapter and output-display helpers | [renderers/desktop/](../renderers/desktop/) |
 | Tauri shell, commands, permissions, updater, native audio, native output | [src-tauri/](../src-tauri/) |
 | Native MIDI input/output and SysEx | [midi.rs](../src-tauri/src/midi.rs) |
+| Native video I/O | [video-io.js](../renderers/desktop/video-io.js), [video_io](../src-tauri/src/video_io/), [runtime provenance](../src-tauri/resources/video-io/provenance.json) |
 | Native Pop Out renderer | [native_output.rs](../src-tauri/src/native_output.rs), [gpu.rs](../src-tauri/src/native_output/gpu.rs) |
 | Platform-native camera paths | [native_camera.rs](../src-tauri/src/native_output/native_camera.rs), [ffmpeg.rs](../src-tauri/src/media_engine/ffmpeg.rs) |
 | Rust media engine, codec, FFmpeg sessions | [src-tauri/src/media_engine/](../src-tauri/src/media_engine/) |
@@ -198,7 +203,7 @@ source selection
   -> effective params
   -> renderer runtime
   -> main preview
-  -> optional native/browser Pop Out
+  -> optional shared native output (Pop Out / NDI / Syphon)
 ```
 
 Important implications:

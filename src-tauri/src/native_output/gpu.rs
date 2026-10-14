@@ -79,6 +79,12 @@ struct SpatialParams { data: array<vec4f, 13>, };
 @group(0) @binding(5) var<uniform> spatial: SpatialParams;
 @group(0) @binding(6) var historyTex: texture_2d<f32>;
 @group(0) @binding(7) var historyOut: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var coverageHistory: texture_2d<f32>;
+@group(0) @binding(9) var coverageOut: texture_storage_2d<rgba16float, write>;
+fn sceneHistoryCoverage(uv: vec2f) -> f32 {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return 0.0; }
+    return textureLoad(coverageHistory, vec2<i32>(uv * vec2f(f32(params.cols), f32(params.rows))), 0).r;
+}
 fn effect(index: i32) -> vec4f { return spatial.data[index]; }
 fn choose(a: f32, b: f32, condition: bool) -> f32 { return select(a, b, condition); }
 fn sceneProcess(color: vec3f, uv: vec2f) -> vec4f {
@@ -91,6 +97,12 @@ fn sceneMedia(uv: vec2f) -> vec3f {
     if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
     let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
     return textureLoad(srcTex, at, 0).rgb;
+}
+fn sceneCoverage(uv: vec2f) -> f32 {
+    var sampleUV = clamp(uv, vec2f(0.0), vec2f(0.999999));
+    if (params.mirrorX != 0u) { sampleUV.x = 1.0 - sampleUV.x; }
+    let at = clamp(vec2<i32>(sampleUV * vec2f(f32(params.srcW), f32(params.srcH))), vec2<i32>(0), vec2<i32>(i32(params.srcW)-1, i32(params.srcH)-1));
+    return textureLoad(srcTex, at, 0).a;
 }
 fn sceneHistory(uv: vec2f) -> vec4f {
     if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) { return vec4f(0.0); }
@@ -125,6 +137,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let processed = sceneFinish(processColor(sample.color, cx, cy), uv, sample.glyph);
     textureStore(colorOut, vec2<i32>(i32(cx), i32(cy)), processed);
     textureStore(historyOut, vec2<i32>(i32(cx), i32(cy)), processed);
+    textureStore(coverageOut, vec2<i32>(i32(cx), i32(cy)), vec4f(sceneCoverageFinish(c.a, uv), 0.0, 0.0, 0.0));
 }
 "#;
 
@@ -169,6 +182,7 @@ struct RenderParams {
 @group(0) @binding(1) var<uniform> params: RenderParams;
 @group(0) @binding(2) var glyphAtlasTex: texture_2d_array<f32>;
 @group(0) @binding(3) var<storage, read> glyphRamp: array<u32>;
+@group(0) @binding(4) var coverageTex: texture_2d<f32>;
 
 fn unpackColor(value: u32) -> vec3<f32> {
     return vec3<f32>(
@@ -199,8 +213,9 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
     let cx = min(cellX, params.cols - 1u);
     let cy = min(cellY, params.rows - 1u);
     let cell = textureLoad(cellColorTex, vec2<i32>(i32(cx), i32(cy)), 0);
+    let coverage = textureLoad(coverageTex, vec2<i32>(i32(cx), i32(cy)), 0).r;
     if (params.glyphMode == 0u || params.glyphCount == 0u) {
-        return vec4<f32>(cell.rgb, params.opacity);
+        return vec4<f32>(cell.rgb, params.opacity * coverage);
     }
 
     var localX = renderX - f32(cellX * params.cellW);
@@ -233,10 +248,10 @@ fn fragmentMain(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32
         i32(glyphMip)
     ).r;
     if (alpha <= 0.5) {
-        return vec4<f32>(unpackColor(params.backgroundColor), params.opacity);
+        return vec4<f32>(unpackColor(params.backgroundColor), params.opacity * coverage);
     }
     let foreground = select(cell.rgb, unpackColor(params.glyphColor), params.glyphColorMode == 1u);
-    return vec4<f32>(foreground, params.opacity);
+    return vec4<f32>(foreground, params.opacity * coverage);
 }
 "#;
 
@@ -306,12 +321,12 @@ impl Drop for NativeMetalView {
     }
 }
 
-pub(super) struct NativeGpuPresenter {
+pub(crate) struct NativeGpuPresenter {
     ready_at: Instant,
     first_frame_presented: bool,
-    surface: wgpu::Surface<'static>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    surface: Option<wgpu::Surface<'static>>,
+    pub(crate) device: wgpu::Device,
+    pub(crate) queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     compute_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
@@ -320,6 +335,10 @@ pub(super) struct NativeGpuPresenter {
     next_history_texture: Option<wgpu::Texture>,
     next_history_view: Option<wgpu::TextureView>,
     next_compute_bind_group: Option<wgpu::BindGroup>,
+    coverage_texture: Option<wgpu::Texture>,
+    coverage_view: Option<wgpu::TextureView>,
+    next_coverage_texture: Option<wgpu::Texture>,
+    next_coverage_view: Option<wgpu::TextureView>,
     history_texture: Option<wgpu::Texture>,
     history_view: Option<wgpu::TextureView>,
     params_buffer: wgpu::Buffer,
@@ -345,7 +364,9 @@ pub(super) struct NativeGpuPresenter {
     loaded_glyph_pages: [bool; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize],
     compute_bind_group: Option<wgpu::BindGroup>,
     render_bind_group: Option<wgpu::BindGroup>,
+    next_render_bind_group: Option<wgpu::BindGroup>,
     rgba_frame: Vec<u8>,
+    transition_targets: Option<(wgpu::Texture, wgpu::Texture, crate::video_io::gpu::Blitter)>,
     #[cfg(target_os = "macos")]
     metal_view: Option<NativeMetalView>,
 }
@@ -507,7 +528,7 @@ pub(super) fn prewarm() {
 
 impl NativeGpuPresenter {
     #[cfg(not(target_os = "macos"))]
-    pub(super) fn new(window: &Window) -> Result<Self, String> {
+    pub(crate) fn new(window: &Window) -> Result<Self, String> {
         let started_at = Instant::now();
         let (instance, surface) = create_surface_on_main_thread(window)?;
         let surface_ready_at = Instant::now();
@@ -519,7 +540,7 @@ impl NativeGpuPresenter {
     }
 
     #[cfg(target_os = "macos")]
-    pub(super) fn new_with_metal_view_on_current_thread(window: &Window) -> Result<Self, String> {
+    pub(crate) fn new_with_metal_view_on_current_thread(window: &Window) -> Result<Self, String> {
         let started_at = Instant::now();
         let metal_view = NativeMetalView::install(window)?;
         let instance = gpu_instance();
@@ -551,7 +572,6 @@ impl NativeGpuPresenter {
         let shared = shared_gpu(Some(&surface))?;
         let adapter = &shared.adapter;
         let device = shared.device.clone();
-        let queue = shared.queue.clone();
         let mut config = surface
             .get_default_config(&adapter, width, height)
             .ok_or_else(|| "native GPU surface is not supported by adapter".to_string())?;
@@ -562,6 +582,23 @@ impl NativeGpuPresenter {
         config.desired_maximum_frame_latency = 1;
         configure_surface_checked(&surface, &device, &config)?;
 
+        Self::with_target(shared, Some(surface), config)
+    }
+
+    pub(crate) fn offscreen(width: u32, height: u32) -> Result<Self, String> {
+        crate::video_io::frame::frame_len(width, height)?;
+        Self::with_target(shared_gpu(None)?, None, wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: wgpu::TextureFormat::Rgba8Unorm, width, height,
+            present_mode: wgpu::PresentMode::AutoNoVsync,
+            desired_maximum_frame_latency: 1, alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+        })
+    }
+
+    fn with_target(shared: Arc<SharedGpu>, surface: Option<wgpu::Surface<'static>>, config: wgpu::SurfaceConfiguration) -> Result<Self, String> {
+        let device = shared.device.clone();
+        let queue = shared.queue.clone();
         let compute_pipeline = shared.compute_pipeline.clone();
         let render_pipeline = shared.render_pipeline(config.format)?;
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -629,6 +666,7 @@ impl NativeGpuPresenter {
             next_history_texture: None,
             next_history_view: None,
             next_compute_bind_group: None,
+            coverage_texture: None, coverage_view: None, next_coverage_texture: None, next_coverage_view: None,
             history_texture: None,
             history_view: None,
             params_buffer,
@@ -654,7 +692,9 @@ impl NativeGpuPresenter {
             loaded_glyph_pages: [false; NATIVE_GLYPH_ATLAS_PAGE_COUNT as usize],
             compute_bind_group: None,
             render_bind_group: None,
+            next_render_bind_group: None,
             rgba_frame: Vec::new(),
+            transition_targets: None,
             #[cfg(target_os = "macos")]
             metal_view: None,
         })
@@ -780,6 +820,47 @@ impl NativeGpuPresenter {
         })
     }
 
+    pub(crate) fn reset_history(&mut self) { self.spatial_history = spatial::History::default(); }
+
+    /// Reuses the native cell/glyph pipelines without a drawable or a window.
+    /// The source may be an imported Syphon Metal texture on this same device.
+    pub(crate) fn render_texture(&mut self, source: &wgpu::Texture, output: &wgpu::Texture,
+        payload: &super::NativeOutputPayload, frame_index: usize) -> Result<(), String> {
+        self.config.width = output.width(); self.config.height = output.height();
+        self.source_size = (source.width(), source.height());
+        if self.source_texture.as_ref() != Some(source) {
+            self.source_texture = Some(source.clone());
+            self.source_view = Some(source.create_view(&Default::default()));
+            self.compute_bind_group = None; self.next_compute_bind_group = None;
+        }
+        let frame = DecodedRgbFrame { alpha: None, index: frame_index, width: source.width(), height: source.height(), data: vec![] };
+        let view = output.create_view(&Default::default());
+        let params = NativeRenderParams::from_payload(payload);
+        // The frontend supplies its canonical effective params, including audio
+        // modulation and tweens. Crossfades interpolate premultiplied RGBA so
+        // a half-transparent source stays half-transparent through the fade.
+        if let Some(transition) = &payload.transition {
+            let now = palette::now_ms();
+            let mix = ((now - transition.start_at_unix_ms.unwrap_or(now)) / transition.duration_ms.unwrap_or(1.0).max(1.0)).clamp(0.0, 1.0);
+            if mix < 1.0 && transition.kind.as_deref() == Some("crossfade") {
+                let mut from_payload = payload.clone(); from_payload.params = transition.from_params.clone();
+                let from = NativeRenderParams::from_payload(&from_payload);
+                let targets = self.transition_targets.take().filter(|(a, _, _)| (a.width(), a.height()) == (output.width(), output.height()));
+                let (a, b, mixer) = targets.unwrap_or_else(|| (
+                    crate::video_io::gpu::texture(&self.device, output.width(), output.height()),
+                    crate::video_io::gpu::texture(&self.device, output.width(), output.height()),
+                    crate::video_io::gpu::Blitter::new(&self.device, self.config.format)));
+                self.submit_render_pass(&a.create_view(&Default::default()), &frame, &from, frame_index, true, 1.0)?;
+                self.submit_render_pass(&b.create_view(&Default::default()), &frame, &params, frame_index, true, 1.0)?;
+                mixer.mix(&self.device, &self.queue, &a, &b, &view, (1.0-(1.0-mix).powf(1.45)) as f32);
+                self.transition_targets = Some((a, b, mixer));
+                return Ok(());
+            }
+        }
+        self.submit_render_pass(&view, &frame, &params, frame_index, true, 1.0)?;
+        Ok(())
+    }
+
     fn submit_render_pass(
         &mut self,
         output_view: &wgpu::TextureView,
@@ -804,7 +885,7 @@ impl NativeGpuPresenter {
             .as_ref()
             .ok_or_else(|| "native GPU cell texture is unavailable".to_string())?;
         if self.compute_bind_group.is_none() {
-            let bind = |read: &wgpu::TextureView, write: &wgpu::TextureView| self.device.create_bind_group(
+            let bind = |read: &wgpu::TextureView, write: &wgpu::TextureView, read_coverage: &wgpu::TextureView, write_coverage: &wgpu::TextureView| self.device.create_bind_group(
                 &wgpu::BindGroupDescriptor {
                     label: Some("ASCILINE native GPU compute bind group"),
                     layout: &self.compute_pipeline.get_bind_group_layout(0),
@@ -832,14 +913,16 @@ impl NativeGpuPresenter {
                         wgpu::BindGroupEntry { binding: 5, resource: self.spatial_buffer.as_entire_binding() },
                         wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(read) },
                         wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::TextureView(write) },
+                        wgpu::BindGroupEntry { binding: 8, resource: wgpu::BindingResource::TextureView(read_coverage) },
+                        wgpu::BindGroupEntry { binding: 9, resource: wgpu::BindingResource::TextureView(write_coverage) },
                     ],
                 },
             );
-            self.compute_bind_group = Some(bind(self.history_view.as_ref().unwrap(), self.next_history_view.as_ref().unwrap()));
-            self.next_compute_bind_group = Some(bind(self.next_history_view.as_ref().unwrap(), self.history_view.as_ref().unwrap()));
+            self.compute_bind_group = Some(bind(self.history_view.as_ref().unwrap(), self.next_history_view.as_ref().unwrap(), self.coverage_view.as_ref().unwrap(), self.next_coverage_view.as_ref().unwrap()));
+            self.next_compute_bind_group = Some(bind(self.next_history_view.as_ref().unwrap(), self.history_view.as_ref().unwrap(), self.next_coverage_view.as_ref().unwrap(), self.coverage_view.as_ref().unwrap()));
         }
         if self.render_bind_group.is_none() {
-            self.render_bind_group = Some(self.device.create_bind_group(
+            let bind = |coverage: &wgpu::TextureView| self.device.create_bind_group(
                 &wgpu::BindGroupDescriptor {
                     label: Some("ASCILINE native GPU render bind group"),
                     layout: &self.render_pipeline.get_bind_group_layout(0),
@@ -860,9 +943,12 @@ impl NativeGpuPresenter {
                             binding: 3,
                             resource: self.glyph_ramp_buffer.as_entire_binding(),
                         },
+                        wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(coverage) },
                     ],
                 },
-            ));
+            );
+            self.render_bind_group = Some(bind(self.next_coverage_view.as_ref().unwrap()));
+            self.next_render_bind_group = Some(bind(self.coverage_view.as_ref().unwrap()));
         }
         self.queue.write_buffer(
             &self.params_buffer,
@@ -884,7 +970,7 @@ impl NativeGpuPresenter {
         );
         if !clear { self.spatial_history = spatial::History::default(); }
         let effects = params.spatial.uniforms(cols, rows, params.cell_width, params.cell_height, self.glyph_ramp_len, &mut self.spatial_history, self.glyph_key ^ self.feature_key ^ u64::from(params.bright_output), palette::now_ms());
-        let mut effects_bytes = [0_u8; 160];
+        let mut effects_bytes = [0_u8; 208];
         for (bytes, value) in effects_bytes.chunks_exact_mut(4).zip(effects) {
             bytes.copy_from_slice(&value.to_le_bytes());
         }
@@ -908,12 +994,7 @@ impl NativeGpuPresenter {
         }
         {
             let load = if clear {
-                wgpu::LoadOp::Clear(wgpu::Color {
-                    r: 3.0 / 255.0,
-                    g: 4.0 / 255.0,
-                    b: 5.0 / 255.0,
-                    a: 1.0,
-                })
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT)
             } else {
                 wgpu::LoadOp::Load
             };
@@ -940,6 +1021,9 @@ impl NativeGpuPresenter {
         let encode_ns = duration_ns_u64(encode_started_at.elapsed());
         let submit_started_at = Instant::now();
         self.queue.submit(Some(encoder.finish()));
+        std::mem::swap(&mut self.coverage_texture, &mut self.next_coverage_texture);
+        std::mem::swap(&mut self.coverage_view, &mut self.next_coverage_view);
+        std::mem::swap(&mut self.render_bind_group, &mut self.next_render_bind_group);
         std::mem::swap(&mut self.history_texture, &mut self.next_history_texture);
         std::mem::swap(&mut self.history_view, &mut self.next_history_view);
         std::mem::swap(&mut self.compute_bind_group, &mut self.next_compute_bind_group);
@@ -947,17 +1031,32 @@ impl NativeGpuPresenter {
         Ok((prep_ns, encode_ns, submit_ns))
     }
 
+    pub(crate) fn surface_format(&self) -> wgpu::TextureFormat { self.config.format }
+    pub(crate) fn present_texture(&mut self, window: &Window, blitter: &crate::video_io::gpu::Blitter, texture: &wgpu::Texture) -> Result<(), String> {
+        let size = window.inner_size().map_err(|_| "Output window is unavailable")?;
+        #[cfg(target_os="macos")]
+        if let Some(view) = &self.metal_view { if self.config.width != size.width || self.config.height != size.height { view.resize(); } }
+        self.configure_surface(size.width.max(1), size.height.max(1))?;
+        if let (Some(output), _) = self.current_surface_texture()? {
+            blitter.draw(&self.device, &self.queue, texture, &output.texture.create_view(&Default::default()), false, true);
+            output.present();
+        }
+        Ok(())
+    }
+
     fn current_surface_texture(
         &mut self,
     ) -> Result<(Option<wgpu::SurfaceTexture>, &'static str), String> {
-        match self.surface.get_current_texture() {
+        let surface = self.surface.as_ref().ok_or("No presentation surface")?;
+        match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(texture) => Ok((Some(texture), "success")),
             wgpu::CurrentSurfaceTexture::Suboptimal(texture) => Ok((Some(texture), "suboptimal")),
             wgpu::CurrentSurfaceTexture::Timeout => Ok((None, "timeout")),
             wgpu::CurrentSurfaceTexture::Occluded => Ok((None, "occluded")),
             wgpu::CurrentSurfaceTexture::Outdated => {
-                configure_surface_checked(&self.surface, &self.device, &self.config)?;
-                match self.surface.get_current_texture() {
+                configure_surface_checked(surface, &self.device, &self.config)?;
+                let surface = self.surface.as_ref().ok_or("No presentation surface")?;
+        match surface.get_current_texture() {
                     wgpu::CurrentSurfaceTexture::Success(texture) => {
                         Ok((Some(texture), "outdated-success"))
                     }
@@ -979,7 +1078,8 @@ impl NativeGpuPresenter {
         }
         self.config.width = width;
         self.config.height = height;
-        configure_surface_checked(&self.surface, &self.device, &self.config)
+        if let Some(surface) = &self.surface { configure_surface_checked(surface, &self.device, &self.config)?; }
+        Ok(())
     }
 
     fn ensure_source_texture(
@@ -1030,6 +1130,10 @@ impl NativeGpuPresenter {
             rgba[3] = 255;
         }
 
+        if let Some(alpha) = &frame.alpha {
+            if alpha.len() != frame.width as usize * frame.height as usize { return Err("Invalid source coverage length".into()); }
+            for (rgba, a) in self.rgba_frame.chunks_exact_mut(4).zip(alpha) { rgba[3] = *a; }
+        }
         let texture = self
             .source_texture
             .as_ref()
@@ -1180,6 +1284,10 @@ impl NativeGpuPresenter {
             dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba16Float,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING, view_formats: &[],
         });
+        let coverage = create_history(); let next_coverage = create_history();
+        self.coverage_view = Some(coverage.create_view(&Default::default()));
+        self.next_coverage_view = Some(next_coverage.create_view(&Default::default()));
+        self.coverage_texture = Some(coverage); self.next_coverage_texture = Some(next_coverage);
         let history = create_history();
         let next = create_history();
         self.next_history_view = Some(next.create_view(&wgpu::TextureViewDescriptor::default()));
@@ -1189,7 +1297,7 @@ impl NativeGpuPresenter {
         self.spatial_history = spatial::History::default();
         self.cell_size = (cols, rows);
         self.compute_bind_group = None;
-        self.render_bind_group = None;
+        self.render_bind_group = None; self.next_render_bind_group = None;
     }
 }
 
@@ -1556,7 +1664,7 @@ mod tests {
             audio_reactive_noise_floor: 0.005,
         };
         let frame = DecodedRgbFrame {
-            index: 0,
+            alpha: None,            index: 0,
             width: 640,
             height: 360,
             data: vec![0; 640 * 360 * 3],

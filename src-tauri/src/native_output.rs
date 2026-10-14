@@ -28,7 +28,7 @@ use tauri::{
     WindowBuilder, WindowEvent,
 };
 
-mod gpu;
+pub(crate) mod gpu;
 mod native_camera;
 mod palette;
 mod spatial;
@@ -1859,7 +1859,7 @@ async fn start_or_update_native_mirror_output(
 }
 
 impl NativeOutputState {
-    fn stop_and_destroy(&self) {
+    pub(crate) fn stop_and_destroy(&self) {
         let handle = self
             .inner
             .lock()
@@ -3143,7 +3143,7 @@ fn install_close_watcher(
     });
 }
 
-fn ensure_native_window(
+pub(crate) fn ensure_native_window(
     app: &AppHandle,
     request: &NativeOutputWindowRequest,
 ) -> Result<Window, String> {
@@ -3983,7 +3983,7 @@ fn decode_static_image_frame(path: &Path) -> Result<DecodedRgbFrame, String> {
 
     let mut rgb = image::open(path)
         .map_err(|error| format!("native output image decode failed: {error}"))?
-        .to_rgb8();
+        .to_rgba8();
     let (mut width, mut height) = rgb.dimensions();
     if width == 0 || height == 0 {
         return Err("native output image has empty dimensions".to_string());
@@ -4001,12 +4001,7 @@ fn decode_static_image_frame(path: &Path) -> Result<DecodedRgbFrame, String> {
         height = target_height;
     }
 
-    Ok(DecodedRgbFrame {
-        index: 0,
-        width,
-        height,
-        data: rgb.into_raw(),
-    })
+    Ok(DecodedRgbFrame::from_rgba(0, width, height, &rgb.into_raw()))
 }
 
 fn decode_svg_frame(path: &Path) -> Result<DecodedRgbFrame, String> {
@@ -4039,12 +4034,9 @@ fn decode_svg_frame(path: &Path) -> Result<DecodedRgbFrame, String> {
     );
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
-    Ok(DecodedRgbFrame {
-        index: 0,
-        width,
-        height,
-        data: premultiplied_rgba_to_rgb(pixmap.data()),
-    })
+    let mut rgba = pixmap.data().to_vec();
+    crate::video_io::frame::unpremultiply(&mut rgba);
+    Ok(DecodedRgbFrame::from_rgba(0, width, height, &rgba))
 }
 
 fn static_image_output_dimensions(width: u32, height: u32) -> (u32, u32) {
@@ -4057,18 +4049,6 @@ fn static_image_output_dimensions(width: u32, height: u32) -> (u32, u32) {
         ((width as f64 * scale).round() as u32).max(1),
         ((height as f64 * scale).round() as u32).max(1),
     )
-}
-
-fn premultiplied_rgba_to_rgb(rgba: &[u8]) -> Vec<u8> {
-    let mut rgb = Vec::with_capacity(rgba.len() / 4 * 3);
-    for pixel in rgba.chunks_exact(4) {
-        let alpha = u32::from(pixel[3]);
-        let inv_alpha = 255 - alpha;
-        rgb.push((u32::from(pixel[0]) + (3 * inv_alpha / 255)).min(255) as u8);
-        rgb.push((u32::from(pixel[1]) + (4 * inv_alpha / 255)).min(255) as u8);
-        rgb.push((u32::from(pixel[2]) + (5 * inv_alpha / 255)).min(255) as u8);
-    }
-    rgb
 }
 
 #[cfg(target_os = "macos")]
@@ -5647,7 +5627,7 @@ mod tests {
         params.cell_width = 2;
         params.cell_height = 2;
         let frame = DecodedRgbFrame {
-            index: 0,
+            alpha: None,            index: 0,
             width: 2,
             height: 1,
             data: vec![255, 0, 0, 0, 0, 255],
@@ -5672,7 +5652,7 @@ mod tests {
         params.cell_width = NATIVE_GLYPH_TILE_WIDTH;
         params.cell_height = NATIVE_GLYPH_TILE_HEIGHT;
         let frame = DecodedRgbFrame {
-            index: 0,
+            alpha: None,            index: 0,
             width: 1,
             height: 1,
             data: vec![255, 255, 255],
@@ -5743,7 +5723,7 @@ mod tests {
     #[test]
     fn native_camera_preview_packet_is_bounded_and_decodable() {
         let frame = DecodedRgbFrame {
-            index: 7,
+            alpha: None,            index: 7,
             width: 1280,
             height: 720,
             data: vec![96; 1280 * 720 * 3],

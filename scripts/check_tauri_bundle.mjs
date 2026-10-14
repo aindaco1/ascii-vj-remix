@@ -91,7 +91,7 @@ async function checkMacosBundle() {
   const looseInspection = await inspectMacosAppBundle(appDir, {
     expectedBundleId,
     expectedMinimumSystemVersion: macosDeploymentTarget,
-    requiredFfmpegPlatforms
+    requiredFfmpegPlatforms, requireVideoIo: true
   });
   issues.push(...looseInspection.issues);
 
@@ -103,7 +103,7 @@ async function checkMacosBundle() {
           await inspectMacosAppBundle(appPath, {
             expectedBundleId,
             expectedMinimumSystemVersion: macosDeploymentTarget,
-            requiredFfmpegPlatforms
+            requiredFfmpegPlatforms, requireVideoIo: true
           }),
           'mounted macOS app bundle'
         );

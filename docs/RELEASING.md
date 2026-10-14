@@ -55,6 +55,24 @@ that the app versions match with `npm run release:version:check`, creates
 release workflow with that tag. If the tag already exists, it skips release
 dispatch so repeated pushes do not overwrite a published version accidentally.
 
+## Preparing a Candidate Without Publishing
+
+Synchronize the version in `package.json`, both root entries of
+`package-lock.json`, `src-tauri/Cargo.toml`, the app entry of `Cargo.lock`, and
+`src-tauri/tauri.conf.json`. Add an unreleased version section to the Changelog
+and a release record with the tested matrix and open gates. Run
+`npm run release:version:check`, `npm run release:secrets:check:public`, stage the
+native runtimes, then run `npm run check:release` and the change-specific checks.
+
+Push a feature/release branch and open a draft pull request to run Desktop CI
+and generate the Windows/Linux development installers. Keep the PR in draft
+until release-blocking checks pass or the owner records a specific deferral.
+Merging a version change to `main` is the production trigger: after exact-main
+Desktop CI passes, automation creates the tag and publishes the release. A
+preparation request alone does not call for merging, tagging or dispatching the
+publishing workflow. Record public signing, installer and updater evidence only
+after those stages actually run.
+
 ## Updater Signing
 
 The GitHub Releases updater reads:
@@ -188,6 +206,30 @@ Azure IDs as GitHub repository variables. The Azure client secret is the only
 required Windows signing secret; keep it out of shell history and chat logs.
 Provider selection and Windows signing rollout remain roadmap decisions; the
 inactive tooling does not describe the current distribution posture.
+
+## Native Video Runtime Packaging
+
+Run `npm run video-io:stage` before desktop checks/builds; CI does this for each
+binary and packaging job. `check:video-io-resources` verifies the staged NDI
+version/hash and notices, including the complete SDK third-party license file. macOS includes NDI and Syphon under Contents/Frameworks
+so Tauri signs nested code before signing the app. Windows/Linux package NDI
+under resources/video-io for the current architecture. Linux deb/rpm metadata
+requires Avahi libraries/service; AppImage users follow the
+[host setup](USER_GUIDE.md#linux-ndi-sources-do-not-appear). Bundle notices and pinned
+provenance with installers and updater archives. Do not distribute SDK headers,
+NDI Tools or SDK example programs as application dependencies.
+
+The pinned NDI 6.3.2 agreement and required end-user notices were reviewed during
+implementation; retain its separate component terms and NDI attribution/link.
+The Tauri bundle copyright metadata supplies the required trademark statement to the default
+native About dialog; the Video I/O link carries the same attribution.
+The [vendor licensing page](https://docs.ndi.video/all/developing-with-ndi/sdk/licensing)
+still identifies SDK 6.3.2 on 2026-10-13. Recheck the full agreement and archive
+hashes before public redistribution; stop on an upstream checksum change. Preserve
+Syphon's BSD license. Verify signed dynamic library loading, installer contents,
+clean network-permission/firewall behavior and real input/output after updates.
+Current candidate evidence and unverified platform/device claims are recorded
+in the [1.3.0 release record](releases/RELEASE_1.3.0.md).
 
 ## Build and Package
 

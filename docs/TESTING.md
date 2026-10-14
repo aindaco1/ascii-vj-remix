@@ -489,8 +489,9 @@ npm run smoke:release-install
 npm run test:macos-dmg-layout
 ```
 
-Run `npm run ffmpeg:build-sidecar` before `npm run check:release` on a clean
-clone. `npm run bundle:release` runs the sidecar build step automatically.
+Run `npm run video-io:stage` and `npm run ffmpeg:build-sidecar` before
+`npm run check:release` on a clean clone. `npm run bundle:release` runs both
+staging/build steps automatically.
 
 The release smoke downloads artifacts from GitHub Releases and checks installer
 layout, bundled assets, signed updater packages, `latest.json` behavior, the
@@ -733,3 +734,44 @@ uses moving-source history. Add `--accent-combinations` to review fixed-color
 glyphs, monochrome and optional scene combinations. Use the normal static matrix, installed primary
 preset sweep and optimized native/UI performance gates for these changes.
 Physical Windows/Linux and reference-floor hardware remain separate acceptance.
+
+## Native Video I/O
+
+Stage SDKs with `npm run video-io:stage`. The deterministic Rust frame/ABI/config
+checks run in `npm run test:rust`; run `npm run test:video-io-alpha` for the actual
+WebGPU/WebGL2/Canvas transparent, half-transparent and opaque pixel fixtures.
+`npm run test:video-io-runtime` uses the staged SDK for a synthetic 60-frame
+1080p send/receive round trip with transparent/partial/opaque alpha and black
+checks. The compressed SDK round trip permits two 8-bit code values of rounding;
+renderer/transport-buffer unit fixtures retain their stricter bounds. The
+30-second deadline allows connection startup and debug-build copies on hosted
+VMs; it does not measure the 1080p60 target. Desktop CI
+runs this on each platform after compilation; it does not establish LAN/device
+or installed-app acceptance.
+On a native GPU, run:
+
+```bash
+node scripts/cargo_env.mjs test --release --manifest-path src-tauri/Cargo.toml native_gpu_coverage_and_bounded_readback -- --ignored --nocapture
+```
+
+`src-tauri/examples/video_io_probe.rs` is a separate NDI SDK peer. Its first
+argument is the staged runtime path; no mode performs a loopback/alpha check,
+`send` publishes the synthetic source, and `receive NAME` verifies 120 incoming
+frames. The optional fifth argument sets send duration in seconds.
+`src-tauri/examples/syphon_probe.m` is a public-SDK Metal peer on Mac; its source
+header contains the build command. Use `send 'ASCII VJ Remix SDK proof' SECONDS`
+or `receive NAME SECONDS`. These fixtures contain synthetic media only.
+
+For installed-app acceptance, start a peer named `ASCII VJ Remix SDK proof` and
+launch the signed Dev executable with `ASCILINE_VIDEO_IO_SMOKE=ndi` or `syphon`,
+`ASCILINE_VIDEO_IO_SMOKE_BACKEND=webgl2` or `canvas2d`, and `ASCILINE_SMOKE_REPORT`
+pointing to a local result file. The fixture exercises the real WebView controller,
+checks input alpha/dimensions, starts both supported outputs plus Pop Out, then
+verifies closing Pop Out leaves sharing active. `ASCILINE_VIDEO_IO_SMOKE_DURATION_MS`
+extends the default 8-second measurement. A second peer independently receives
+the `ASCII VJ Remix Video Smoke` output. This mode exits the app and changes its
+Dev profile; use the isolated Dev identity and do not run it against production.
+
+Build/CI, installed local peers, physical LAN/device compatibility, 1080p60 soak,
+clean installs and updater hops are separate gates. See the exact current
+[release matrix and open gates](releases/RELEASE_1.3.0.md).

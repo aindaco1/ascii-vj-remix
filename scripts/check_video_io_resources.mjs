@@ -1,0 +1,16 @@
+import {readFile,stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import path from 'node:path';
+const target=process.platform==='darwin'?'macos-aarch64':process.platform==='win32'?'windows-x86_64':'linux-x86_64';
+const root=path.resolve('src-tauri'),resources=path.join(root,'resources/video-io');
+const pins=JSON.parse(await readFile(path.join(resources,'provenance.json'),'utf8'));
+const manifest=JSON.parse(await readFile(path.join(resources,target,'manifest.json'),'utf8'));
+if(manifest.target!==target||manifest.version!==pins.ndi.version)throw Error('Stale video runtime manifest; run npm run video-io:stage');
+const runtime=path.join(process.platform==='darwin'?path.join(root,'frameworks'):path.join(resources,target),manifest.library);
+const hash=createHash('sha256').update(await readFile(runtime)).digest('hex');
+if(hash!==pins.ndi[target].runtimeSha256||hash!==manifest.sha256)throw Error('NDI runtime checksum mismatch');
+const notices=await readFile(path.join(resources,target,'NDI-THIRD-PARTY-LICENSES.txt'));
+if(!notices.length||createHash('sha256').update(notices).digest('hex')!==manifest.noticesSha256)throw Error('Missing or modified NDI third-party notices; run npm run video-io:stage');
+for(const name of ['NOTICE.md','SYPHON-LICENSE.txt'])if(!(await stat(path.join(resources,name))).isFile())throw Error(`Missing ${name}`);
+if(process.platform==='darwin'&&!(await stat(path.join(root,'frameworks/Syphon.framework/Syphon'))).isFile())throw Error('Missing Syphon runtime');
+console.log(`Pinned video runtime and notices verified: ${target}`);

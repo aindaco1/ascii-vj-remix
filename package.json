@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -20,7 +20,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 8010",
     "check": "npm run check:offline",
     "check:offline": "npm run build && node scripts/check_offline_bundle.mjs",
-    "check:desktop": "npm run check:offline && npm run test:smoke-diagnostics && npm run check:tauri-policy && npm run check:icons && npm run check:glyph-atlas && npm run test:release-build-reuse && npm run test:spatial && npm run test:render-math && npm run test:palette-cycling && npm run test:preset-backend-contract && npm run test:preset-playlists && npm run test:canvas-readback && npm run test:renderer-fallback && npm run test:renderer-resources && npm run test:media-source-policy && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
+    "check:desktop": "npm run check:offline && npm run test:smoke-diagnostics && npm run check:tauri-policy && npm run check:icons && npm run check:glyph-atlas && npm run test:release-build-reuse && npm run test:spatial && npm run test:render-math && npm run test:palette-cycling && npm run test:preset-backend-contract && npm run test:preset-playlists && npm run test:canvas-readback && npm run test:renderer-fallback && npm run test:renderer-resources && npm run test:media-source-policy && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:ffmpeg-resources && npm run check:video-io-resources && npm run test:rust && npm run tauri:build:dev -- --debug --no-bundle",
     "check:release": "npm run check:offline && npm run check:tauri-policy && npm run check:icons && npm run check:glyph-atlas && npm run test:release-build-reuse && npm run test:spatial && npm run test:render-math && npm run test:palette-cycling && npm run test:preset-backend-contract && npm run test:preset-playlists && npm run test:canvas-readback && npm run test:renderer-fallback && npm run test:renderer-resources && npm run test:media-source-policy && npm run test:audio-reactive && npm run test:midi && npm run test:crash-report-ui && npm run test:crash-relay && npm run test:output-display && npm run test:desktop-updater && npm run test:updater-manifest && npm run test:macos-artifacts && npm run test:macos-secret-args && npm run test:windows-secret-args && npm run test:ffmpeg-policy && npm run check:release-runtime && npm run test:rust",
     "check:bundle": "node scripts/check_tauri_bundle.mjs",
     "check:bundle:debug": "node scripts/check_tauri_bundle.mjs --profile debug --expected-bundle-id com.asciline.remix.dev",
@@ -29,7 +29,7 @@
     "check:icons": "node scripts/check_app_icons.mjs",
     "check:glyph-atlas": "node scripts/check_glyph_atlas.mjs",
     "check:ffmpeg-release": "node scripts/check_ffmpeg_resources.mjs --require-current-platform",
-    "check:release-runtime": "npm run test:ffmpeg-source-build && npm run check:ffmpeg-release",
+    "check:release-runtime": "npm run test:ffmpeg-source-build && npm run check:ffmpeg-release && npm run check:video-io-resources",
     "check:macos-notarization": "node scripts/check_macos_notarization.mjs --profile release",
     "check:windows-authenticode": "node scripts/check_windows_authenticode.mjs --profile release",
     "check:windows-gui": "node scripts/check_windows_gui_subsystem.mjs --profile release",
@@ -38,7 +38,7 @@
     "bundle:debug": "npm run tauri:build:dev -- --debug && npm run check:bundle:debug",
     "bundle:test": "npm run check:ffmpeg-release && npm run tauri:build:dev -- --bundles nsis,msi && node scripts/check_tauri_bundle.mjs --profile release --expected-bundle-id com.asciline.remix.dev && npm run check:windows-gui",
     "bundle:test:linux": "npm run check:ffmpeg-release && npm run tauri:build:dev -- --bundles appimage,deb,rpm && node scripts/check_tauri_bundle.mjs --profile release --expected-bundle-id com.asciline.remix.dev",
-    "bundle:release": "npm run ffmpeg:build-sidecar && npm run check:release && npm run tauri:build && npm run check:bundle:release",
+    "bundle:release": "npm run video-io:stage && npm run ffmpeg:build-sidecar && npm run check:release && npm run tauri:build && npm run check:bundle:release",
     "desktop:run-local": "bash scripts/run_local_desktop_app.sh",
     "desktop:run-local:foreground": "ASCILINE_FOREGROUND=1 bash scripts/run_local_desktop_app.sh",
     "desktop:run-local:reset": "ASCILINE_RESET_TCC=1 bash scripts/run_local_desktop_app.sh",
@@ -102,7 +102,11 @@
     "test:renderer-resources": "node scripts/test_renderer_resources.mjs && node scripts/test_webgpu_video_lifecycle.mjs",
     "test:spatial": "node scripts/test_spatial.mjs && node scripts/test_fractal_accents.mjs && node scripts/test_wtf_visibility.mjs",
     "smoke:spatial": "node scripts/smoke_spatial.mjs",
-    "smoke:wtf": "node scripts/smoke_wtf_visibility.mjs"
+    "smoke:wtf": "node scripts/smoke_wtf_visibility.mjs",
+    "video-io:stage": "node scripts/stage_video_io.mjs",
+    "test:video-io-alpha": "node scripts/test_video_io_alpha.mjs",
+    "check:video-io-resources": "node scripts/check_video_io_resources.mjs",
+    "test:video-io-runtime": "node scripts/test_video_io_runtime.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

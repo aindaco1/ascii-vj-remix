@@ -16,5 +16,22 @@
         "center": true
       }
     ]
+  },
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": [
+          "avahi-daemon",
+          "libavahi-client3",
+          "libavahi-common3"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "avahi",
+          "avahi-libs"
+        ]
+      }
+    }
   }
 }

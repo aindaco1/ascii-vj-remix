@@ -8,6 +8,7 @@ pub mod midi;
 pub mod native_output;
 pub mod screenshot;
 pub mod system_audio;
+pub mod video_io;
 
 use tauri::Manager;
 
@@ -21,6 +22,7 @@ pub fn run() {
         .manage(system_audio::SystemAudioCaptureState::default())
         .manage(system_audio::InputAudioCaptureState::default())
         .manage(midi::MidiState::default())
+        .manage(video_io::VideoIoState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -68,6 +70,13 @@ pub fn run() {
             system_audio::start_input_audio_capture,
             system_audio::read_input_audio_features,
             system_audio::stop_input_audio_capture,
+            video_io::get_video_io_status,
+            video_io::discover_video_sources,
+            video_io::configure_video_io,
+            video_io::update_video_io_params,
+            video_io::write_video_io_frame,
+            video_io::read_video_io_frame,
+            video_io::open_video_io_popout,
             midi::list_midi_ports,
             midi::connect_midi,
             midi::disconnect_midi,

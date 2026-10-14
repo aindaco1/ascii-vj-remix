@@ -1,0 +1,27 @@
+{
+  "ndi": {
+    "version": "6.3.2",
+    "macos-aarch64": {
+      "url": "https://downloads.ndi.tv/SDK/NDI_SDK_Mac/Install_NDI_SDK_v6_Apple.pkg",
+      "archiveSha256": "5aa101a01b00494724c60b7e1e15b5d1743bf9c68b61739c22ac54932dde95fb",
+      "runtimeSha256": "af53789fcb8fc1737e6827a54d7ccea09736dc759e00ef02d53f4ed64d9abbd5"
+    },
+    "windows-x86_64": {
+      "url": "https://downloads.ndi.tv/SDK/NDI_SDK/NDI%206%20SDK.exe",
+      "archiveSha256": "4d5dd36a1c7c7634f408bf459b068787cce6f5310a3efe832d76b1ddeb54e499",
+      "runtimeSha256": "2b6602075868ba4401f82f417d72424805d69b11ca86078023d0d489ff45dd84"
+    },
+    "linux-x86_64": {
+      "url": "https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz",
+      "archiveSha256": "f0314f245446defc488b63ceb4689acf1a965aeefdadacb70571bb216a8cc183",
+      "runtimeSha256": "1c70a0068bb8ad1c894e556bc7c0e790dbd2c8229167d808d137a4b944355ae3"
+    }
+  },
+  "syphon": {
+    "revision": "f4761677a45b8034a3c2069ec0f3d2553da81fba",
+    "url": "https://github.com/Syphon/Syphon-Framework/archive/f4761677a45b8034a3c2069ec0f3d2553da81fba.tar.gz",
+    "archiveSha256": "a3766088c46588c42b087f4e5ff7ae7bb0f83292af59a0aeb8bba69eba5311c5",
+    "minimumMacos": "13.0",
+    "architecture": "arm64"
+  }
+}

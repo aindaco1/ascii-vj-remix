@@ -10,5 +10,9 @@
   <string>ASCII VJ Remix can capture display or window audio/video when you explicitly select display capture for local audio-reactive testing.</string>
   <key>NSAudioCaptureUsageDescription</key>
   <string>ASCII VJ Remix uses system audio you select to drive local audio-reactive visuals.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>ASCII VJ Remix discovers, receives, and sends video on your local network only when you select NDI input or enable NDI output.</string>
+  <key>NSBonjourServices</key>
+  <array><string>_ndi._tcp</string></array>
 </dict>
 </plist>

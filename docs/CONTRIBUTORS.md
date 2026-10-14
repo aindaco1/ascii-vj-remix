@@ -39,11 +39,12 @@ Minimum development tools:
 
 Platform-specific desktop prerequisites:
 
-- macOS: Xcode command line tools.
+- macOS: full Xcode and its Metal toolchain for Syphon.
 - Windows: Visual Studio Build Tools with the C++ workload and WebView2
   runtime.
 - Linux: WebKitGTK 4.1 development packages, appindicator, ALSA development
-  headers, librsvg, OpenSSL, patchelf, and build tools.
+  headers, librsvg, OpenSSL, patchelf, and build tools. Native NDI discovery also
+  requires the Avahi client/common libraries and a running `avahi-daemon` service.
 
 Optional but useful:
 
@@ -59,7 +60,13 @@ Install JavaScript dependencies:
 ```bash
 git submodule update --init shared/dust-wave-platform
 npm ci
+npm run video-io:stage
 ```
+
+SDK staging downloads pinned build inputs from official sources. It supports
+macOS arm64 and Windows/Linux x64, and must run before desktop builds/checks.
+The browser-only development path does not use native transports. See
+[native runtime packaging](RELEASING.md#native-video-runtime-packaging).
 
 Run the browser dev server:
 
@@ -124,6 +131,7 @@ archiving.
 | `npm run dev` | Browser dev server on `127.0.0.1:8010`. |
 | `npm run build` | Vite production build plus runtime asset copy. |
 | `npm run preview` | Preview the production build. |
+| `npm run video-io:stage` | Stage pinned NDI/Syphon runtime libraries and notices. |
 | `npm run tauri:dev` | Tauri desktop dev mode. |
 | `npm run tauri:build:dev -- --bundles app` | Optimized macOS development app. |
 | `npm run bundle:debug` | Build and validate a local debug desktop bundle. |
@@ -289,13 +297,12 @@ ASCII VJ Remix Dev  com.asciline.remix.dev
 Do not use a production-named bundle for local Camera, Microphone, or System
 Audio testing.
 
-Create the stable local code-signing identity once:
+Install an Apple Development signing identity through Xcode, or select another
+Apple team identity with `ASCILINE_CODESIGN_IDENTITY`. Bundled video libraries
+require a Team ID for hardened-runtime library validation; the older self-signed
+`desktop:codesign:local` identity cannot load them.
 
-```bash
-npm run desktop:codesign:local
-```
-
-Then build, install, and launch the development app:
+Build, install, and launch the development app:
 
 ```bash
 npm run desktop:run-local -- --build
@@ -419,3 +426,25 @@ assets and sidecars retain their own notices (including
 
 Contributions must be compatible with that license and with the project's
 local-first runtime policy.
+
+## Native Video Runtime Setup
+
+After `npm ci`, run `npm run video-io:stage`, then
+`npm run check:video-io-resources`. The staging script downloads official SDK
+archives, checks pinned hashes and copies runtime libraries and required notices. macOS
+also builds the pinned Syphon framework. It uses `ASCII_VIDEO_SDK_CACHE` or a
+system temporary cache. Read the bundled NDI and Syphon notices before building
+or redistributing these separately licensed components. Supported build hosts
+match current release architectures: Mac arm64 and Windows/Linux x64.
+
+Build with `npm run tauri:build:dev -- --bundles app` on Mac, then
+`npm run desktop:run-local`. With bundled libraries, the local installer prefers
+an installed Apple Development signing identity; set `ASCILINE_CODESIGN_IDENTITY`
+for another Apple team identity. A self-signed certificate has no Team ID and
+cannot load these libraries under hardened runtime. The script fails with a
+clear instruction if no suitable default identity is available. Production
+signing and the `com.asciline.remix.dev` identity remain separate.
+
+The desktop and release workflows stage the same pinned inputs on each platform.
+Browser-only development still works without native SDKs; transport controls
+appear only in Tauri.

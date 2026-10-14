@@ -33,6 +33,14 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 - Decide whether Windows releases need a fixed WebView2 runtime for offline
   installation.
 
+## Native Video Release Acceptance
+
+The implemented Dev candidate and accepted scope are recorded in
+[1.3.0 release record](releases/RELEASE_1.3.0.md).
+Before public release, complete the Windows/Linux installed matrix, physical
+LAN and HX2/HX3/device interoperability, sustained performance, network-permission
+recovery, sleep/wake, clean installation and updater-hop gates in that record.
+
 ## MIDI Controllers and Profiles
 
 - Validate the existing UC-33e/mioXC DIN profile on Windows and Linux hardware.

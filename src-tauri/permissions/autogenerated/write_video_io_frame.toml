@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-write-video-io-frame"
+description = "Enables the write_video_io_frame command without any pre-configured scope."
+commands.allow = ["write_video_io_frame"]
+
+[[permission]]
+identifier = "deny-write-video-io-frame"
+description = "Denies the write_video_io_frame command without any pre-configured scope."
+commands.deny = ["write_video_io_frame"]

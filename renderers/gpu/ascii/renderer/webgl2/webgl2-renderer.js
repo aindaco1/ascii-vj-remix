@@ -67,10 +67,17 @@ uniform int u_ditherInvert;
 in vec2 v_texCoord;
 layout(location=0) out vec4 fragColor;
 layout(location=1) out vec4 historyColor;
+layout(location=2) out vec4 coverageColor;
 
 
 uniform vec4 u_spatial[13];
 uniform sampler2D u_history;
+uniform sampler2D u_coverageHistory;
+vec4 effect(int index);
+float sceneHistoryCoverage(vec2 uv) {
+    if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return 0.0;
+    return texture(u_coverageHistory, vec2(uv.x, 1.0 - uv.y)).r;
+}
 vec4 effect(int index) { return u_spatial[index]; }
 float choose(float a, float b, bool condition) { return condition ? b : a; }
 float sceneSourceAspect() { ivec2 size = textureSize(u_source, 0); return float(size.x) / float(size.y); }
@@ -79,6 +86,12 @@ vec3 sceneMedia(vec2 uv) {
     ivec2 size = textureSize(u_source, 0);
     ivec2 at = clamp(ivec2(clamp(uv, vec2(0.0), vec2(0.999999)) * vec2(size)), ivec2(0), size - 1);
     return texelFetch(u_source, ivec2(at.x, size.y - 1 - at.y), 0).rgb;
+}
+float sceneCoverage(vec2 uv) {
+    if (u_mirrorX == 1) uv.x = 1.0 - uv.x;
+    ivec2 size = textureSize(u_source, 0);
+    ivec2 at = clamp(ivec2(clamp(uv, vec2(0.0), vec2(0.999999)) * vec2(size)), ivec2(0), size - 1);
+    return texelFetch(u_source, ivec2(at.x, size.y - 1 - at.y), 0).a;
 }
 vec4 sceneHistory(vec2 uv) {
     if (effect(5).y < 0.5 || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return vec4(0.0);
@@ -178,6 +191,7 @@ void main() {
 
     fragColor = sceneFinish(processColor(c.rgb, cellCoord), sceneUV, scene.glyph);
     historyColor = fragColor;
+    coverageColor = vec4(sceneCoverageFinish(c.a, sceneUV), 0., 0., 0.);
 }`;
 
 const RENDER_PASS_VERT = `#version 300 es
@@ -193,6 +207,7 @@ precision highp float;
 precision highp sampler2DArray;
 precision highp usampler2D;
 uniform sampler2D u_cellColors;
+uniform sampler2D u_coverage;
 uniform sampler2DArray u_glyphAtlas;
 uniform usampler2D u_glyphRamp;
 uniform vec2 u_gridSize;
@@ -211,8 +226,9 @@ void main() {
     vec2 cellCoord = floor(pixel / u_cellSize);
     cellCoord = clamp(cellCoord, vec2(0.0), u_gridSize - 1.0);
     vec4 cell = texelFetch(u_cellColors, ivec2(cellCoord), 0);
+    float coverage = texelFetch(u_coverage, ivec2(cellCoord), 0).r;
     if (u_glyphMode == 0 || u_glyphCount <= 0) {
-        fragColor = vec4(cell.rgb, 1.0);
+        fragColor = vec4(cell.rgb * coverage, coverage);
         return;
     }
     vec2 local = pixel - cellCoord * u_cellSize;
@@ -234,11 +250,11 @@ void main() {
     );
     float alpha = texelFetch(u_glyphAtlas, ivec3(atlasPixel, page), glyphMip).r;
     if (alpha <= 0.5) {
-        fragColor = vec4(u_backgroundColor, 1.0);
+        fragColor = vec4(u_backgroundColor * coverage, coverage);
         return;
     }
     vec3 foreground = u_glyphColorMode == 1 ? u_glyphColor : cell.rgb;
-    fragColor = vec4(foreground, 1.0);
+    fragColor = vec4(foreground * coverage, coverage);
 }`;
 
 function colorFloats(value, fallback = '#030405') {
@@ -391,7 +407,7 @@ export class WebGL2Renderer {
         this.cellProgram = this._createProgram(CELL_PASS_VERT, CELL_PASS_FRAG);
         this.renderProgram = this._createProgram(RENDER_PASS_VERT, RENDER_PASS_FRAG);
         this.cellUniforms = this._uniformLocations(this.cellProgram, [
-            'u_spatial[0]', 'u_history', 'u_source',
+            'u_spatial[0]', 'u_history', 'u_source', 'u_coverageHistory',
             'u_gridSize',
             'u_saturationBoost',
             'u_contrastBoost',
@@ -416,7 +432,7 @@ export class WebGL2Renderer {
             'u_ditherInvert'
         ]);
         this.renderUniforms = this._uniformLocations(this.renderProgram, [
-            'u_cellColors',
+            'u_cellColors', 'u_coverage',
             'u_glyphAtlas',
             'u_glyphRamp',
             'u_gridSize',
@@ -570,6 +586,9 @@ export class WebGL2Renderer {
             return texture;
         };
         this.historyTexture = history(); this.nextHistoryTexture = history();
+        if (this.coverageTexture) gl.deleteTexture(this.coverageTexture);
+        if (this.nextCoverageTexture) gl.deleteTexture(this.nextCoverageTexture);
+        this.coverageTexture = history(); this.nextCoverageTexture = history();
         this.spatialState = {};
         this.cellColorTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.cellColorTexture);
@@ -691,7 +710,7 @@ export class WebGL2Renderer {
 
     _renderFrame() {
         if (!this.initialized) return;
-        if (this.source.isNativeOutputPreview) this.syncNativePreviewGeometry();
+        if ((this.source.isNativeOutputPreview || this.source.isDynamicDimensions)) this.syncNativePreviewGeometry();
 
         this.syncPaletteDisplay();
         this.frameCount++;
@@ -710,7 +729,8 @@ export class WebGL2Renderer {
         // Pass 1: cell colors
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.cellFramebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.nextHistoryTexture, 0);
-        gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, this.nextCoverageTexture, 0);
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]);
         gl.viewport(0, 0, this.cols, this.rows);
         gl.useProgram(this.cellProgram);
         const cellUniforms = this.cellUniforms;
@@ -720,6 +740,8 @@ export class WebGL2Renderer {
         gl.activeTexture(gl.TEXTURE5);
         gl.bindTexture(gl.TEXTURE_2D, this.historyTexture);
         gl.uniform1i(cellUniforms.u_history, 5);
+        gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, this.coverageTexture);
+        gl.uniform1i(cellUniforms.u_coverageHistory, 6);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
@@ -757,6 +779,9 @@ export class WebGL2Renderer {
         gl.viewport(0, 0, this.canvasWidth, this.canvasHeight);
         gl.useProgram(this.renderProgram);
         const renderUniforms = this.renderUniforms;
+        gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, this.nextCoverageTexture);
+        gl.uniform1i(renderUniforms.u_coverage, 6);
+        [this.coverageTexture, this.nextCoverageTexture] = [this.nextCoverageTexture, this.coverageTexture];
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.cellColorTexture);
@@ -851,6 +876,8 @@ export class WebGL2Renderer {
         if (gl) {
             if (this.quadBuffer) gl.deleteBuffer(this.quadBuffer);
             if (this.quadVAO) gl.deleteVertexArray(this.quadVAO);
+            if (this.coverageTexture) gl.deleteTexture(this.coverageTexture);
+            if (this.nextCoverageTexture) gl.deleteTexture(this.nextCoverageTexture);
             if (this.historyTexture) gl.deleteTexture(this.historyTexture);
             if (this.nextHistoryTexture) gl.deleteTexture(this.nextHistoryTexture);
             if (this.cellColorTexture) gl.deleteTexture(this.cellColorTexture);

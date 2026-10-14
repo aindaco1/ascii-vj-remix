@@ -1,0 +1,92 @@
+{
+  "ndiRestart": {
+    "backend": "webgl2",
+    "closePreservesSharing": true,
+    "disconnects": 1,
+    "dropped": 0,
+    "finalInputSize": [
+      1280,
+      720
+    ],
+    "frames": 3164,
+    "inputAlpha": [
+      0,
+      255
+    ],
+    "inputSize": [
+      1920,
+      1080
+    ],
+    "ok": true,
+    "popout": true,
+    "protocol": "ndi",
+    "reconnections": 1,
+    "resolvedBackend": "webgl2"
+  },
+  "syphonRestart": {
+    "backend": "webgl2",
+    "closePreservesSharing": true,
+    "disconnects": 1,
+    "dropped": 0,
+    "finalInputSize": [
+      640,
+      360
+    ],
+    "frames": 3035,
+    "inputAlpha": [
+      0,
+      255
+    ],
+    "inputSize": [
+      640,
+      360
+    ],
+    "ok": true,
+    "popout": true,
+    "protocol": "syphon",
+    "reconnections": 1,
+    "resolvedBackend": "webgl2"
+  },
+  "ndiCanvas": {
+    "backend": "canvas2d",
+    "closePreservesSharing": true,
+    "dropped": 0,
+    "frames": 429,
+    "inputAlpha": [
+      0,
+      255
+    ],
+    "inputSize": [
+      1920,
+      1080
+    ],
+    "ok": true,
+    "popout": true,
+    "protocol": "ndi",
+    "resolvedBackend": "canvas2d"
+  },
+  "environment": {
+    "dateUTC": "2026-10-10",
+    "os": "27.0.1",
+    "cpu": "Apple M1 Max",
+    "architecture": "arm64",
+    "ndiSDK": "6.3.2",
+    "syphonRevision": "f4761677a45b8034a3c2069ec0f3d2553da81fba"
+  },
+  "independentPeers": {
+    "ndiOutput": "runtime=NDI SDK APPLE 12:49:17 Apr 13 2026 6.3.2.0\nPASS: NDI received 120 frames 1920x1080 alpha=0..255",
+    "syphonOutput": "PASS: Syphon received 120 frames 1920x1080 alpha=0..255"
+  },
+  "automated": {
+    "rustLibrary": {
+      "passed": 93,
+      "failed": 0,
+      "ignoredGPUFixture": 1
+    },
+    "explicitNativeGPUFixture": "passed: bounded readback, alpha 0/128/255 and crossfade",
+    "browserAlpha": "passed: WebGPU, WebGL2 and Canvas alpha 0/128/255",
+    "localFfmpegDecodeResize": "passed",
+    "offlineAndTauriPolicy": "passed"
+  },
+  "acceptanceBoundary": "Local Mac development evidence. Windows/Linux installations, physical LAN/HX/hardware, sustained 1080p60, clean installs and updater acceptance remain open."
+}

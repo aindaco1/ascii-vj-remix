@@ -224,12 +224,14 @@ export function createSpatialSampler(p, sample, aspect, time) {
 export function renderSpatialCells(p, pixels, sw, sh, cols, rows, process, state, now, sampleTime = 0) {
     const length=cols*rows*4;
     if(state.cells?.length!==length){state.cells=new Uint8ClampedArray(length);state.history=new Float32Array(length);state.nextHistory=new Float32Array(length);state.clock={};}
+    if(state.coverage?.length!==cols*rows){state.coverage=new Float32Array(cols*rows);state.coverageHistory=new Float32Array(cols*rows);}
     const uniforms=state.uniforms ||= new Float32Array(SPATIAL_UNIFORM_FLOATS);
     fillSpatialUniforms(uniforms,p,cols,rows,[...activeGlyphRamp(p)].length,state.clock,now);
     const sample=(u,v)=>{
         const x=Math.min(sw-1,Math.floor(clamp(u)*sw)),y=Math.min(sh-1,Math.floor(clamp(v)*sh)),i=(y*sw+x)*4;
         return [pixels[i]/255,pixels[i+1]/255,pixels[i+2]/255];
     };sample.aspect=sw/sh;
+    const sampleCoverage=(u,v)=>pixels[(Math.min(sh-1,Math.floor(clamp(v)*sh))*sw+Math.min(sw-1,Math.floor(clamp(u)*sw)))*4+3]/255;
     const scene=createSpatialSampler(p,sample,uniforms[17],uniforms[2]),base=uniforms[22],total=uniforms[23];
     const accent = accentsEnabled(p) ? createAccentSampler(p, sample, process, cols, rows, uniforms[17], uniforms[2], state, uniforms[34]) : null;
     const old=(u,v)=>{if(!uniforms[21]||u<0||v<0||u>=1||v>=1)return [0,0,0,0];const i=(Math.floor(v*rows)*cols+Math.floor(u*cols))*4;return Array.from(state.history.subarray(i,i+4));};
@@ -243,6 +245,8 @@ export function renderSpatialCells(p, pixels, sw, sh, cols, rows, process, state
             sampleV=(y+(p.sampleY??.5)+(shaderHash(sx+37,sy+91)-.5)*(p.jitterAmount||0))/rows;
         }
         const result=spatial?scene(...(accent ? accent.warp(u,v,x,y) : [u,v])):{color:sample(sampleU,sampleV),glyph:0};
+        let coverage=spatial?1:sampleCoverage(sampleU,sampleV);
+        if(accent && !spatial) coverage=accent.coverage(coverage,sampleCoverage,u,v,x,y);
         const processed=process(result.color.map(n=>clamp(n)*255),x,y);
         let color=processed.slice(0,3).map(n=>n/255),alpha=(processed[3]??dot(processed.slice(0,3),LUMA))/255;
         if (accent && p.accentPlacement !== 'trails') { const c = accent([...color, alpha], u, v, x, y); color = c.slice(0, 3); alpha = c[3]; }
@@ -255,7 +259,9 @@ export function renderSpatialCells(p, pixels, sw, sh, cols, rows, process, state
         }
         if(uniforms[18]>0){
             const angle=uniforms[20],px=(u-.5)*Math.exp(-uniforms[19]),py=(v-.5)*Math.exp(-uniforms[19]);
-            const previous=old(px*Math.cos(angle)-py*Math.sin(angle)+.5,px*Math.sin(angle)+py*Math.cos(angle)+.5);
+            const oldU=px*Math.cos(angle)-py*Math.sin(angle)+.5,oldV=px*Math.sin(angle)+py*Math.cos(angle)+.5;
+            const previous=old(oldU,oldV);
+            if(uniforms[21] && oldU>=0 && oldV>=0 && oldU<1 && oldV<1) coverage=Math.max(coverage,state.coverageHistory[Math.floor(oldV*rows)*cols+Math.floor(oldU*cols)]*uniforms[18]);
             let oldColor=mul(previous.slice(0,3),uniforms[18]);
             let oldAlpha=previous[3];
             if (accent && p.accentPlacement === 'trails') {
@@ -264,8 +270,10 @@ export function renderSpatialCells(p, pixels, sw, sh, cols, rows, process, state
             }
             if(dot(oldColor,LUMA)>dot(color,LUMA))alpha=oldAlpha;color=color.map((n,i)=>Math.max(n,oldColor[i]));
         }
+        state.coverage[y*cols+x]=coverage;
         state.cells.set([...color.map(n=>Math.round(clamp(n)*255)),Math.round(clamp(alpha)*255)],(y*cols+x)*4);
         state.nextHistory.set([...color.map(n=>clamp(n)),clamp(alpha)],(y*cols+x)*4);
     }
+    state.coverageHistory.set(state.coverage);
     [state.history,state.nextHistory]=[state.nextHistory,state.history];return state.cells;
 }

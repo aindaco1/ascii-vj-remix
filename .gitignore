@@ -42,6 +42,11 @@ src-tauri/*private*
 src-tauri/resources/ffmpeg/*/bin/
 src-tauri/resources/ffmpeg/*/manifest.json
 src-tauri/resources/ffmpeg/*/NOTICE.md
+src-tauri/resources/video-io/*/libndi*
+src-tauri/resources/video-io/*/*.dll
+src-tauri/resources/video-io/*/*.framework/
+src-tauri/resources/video-io/*/manifest.json
+src-tauri/resources/video-io/*/NDI-THIRD-PARTY-LICENSES.txt
 
 # Experiment artifacts (scripts are tracked; generated outputs are not)
 experiments/vectors/
@@ -58,3 +63,5 @@ experiments/autobahn/reports/
 
 # stray temp dirs
 tmp*/
+src-tauri/frameworks/*.framework/
+src-tauri/frameworks/*.dylib

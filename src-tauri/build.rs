@@ -4,11 +4,14 @@ fn main() {
         cc::Build::new()
             .file("native/native_camera.m")
             .file("native/native_output_view.m")
+            .file("native/video_syphon.m")
             .flag("-fobjc-arc")
             .flag("-Wno-deprecated-declarations")
             .compile("asciline_native_camera");
         println!("cargo:rerun-if-changed=native/native_camera.m");
         println!("cargo:rerun-if-changed=native/native_output_view.m");
+        println!("cargo:rerun-if-changed=native/video_syphon.m");
+        println!("cargo:rustc-link-lib=framework=Metal");
         println!("cargo:rustc-link-lib=framework=AppKit");
         println!("cargo:rustc-link-lib=framework=AVFoundation");
         println!("cargo:rustc-link-lib=framework=CoreMedia");
@@ -20,6 +23,13 @@ fn main() {
 
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "get_video_io_status",
+            "discover_video_sources",
+            "configure_video_io",
+            "update_video_io_params",
+            "write_video_io_frame",
+            "read_video_io_frame",
+            "open_video_io_popout",
             "select_media_file",
             "list_media_files",
             "forget_media_file",

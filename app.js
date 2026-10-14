@@ -1,3 +1,5 @@
+import { applyCanvasCoverage } from './renderers/shared/coverage.js';
+import { VideoIoController, LiveVideoSource, isTransportSource } from './renderers/desktop/video-io.js';
 import { protectWtfVisibility } from './renderers/shared/wtf-visual-safety.js';
 import { inspectWtfTarget, sampleWtfSource } from './renderers/shared/wtf-visual-probe.js';
 import { renderSpatialCells } from './renderers/shared/spatial-canvas.js';
@@ -2092,7 +2094,7 @@ function normalizeParams(params, options = {}) {
         out.mediaType = 'video';
         out.sourceName = 'Demo Video';
     }
-    if (!['auto', 'image', 'video', 'camera'].includes(out.mediaType)) out.mediaType = mediaTypeFromName(out.mediaUrl);
+    if (!['auto', 'image', 'video', 'camera', 'ndi', 'syphon'].includes(out.mediaType)) out.mediaType = mediaTypeFromName(out.mediaUrl);
     const matchedSource = hasRuntimeCustomMedia ? null : findSourcePreset(out.mediaUrl, out.mediaType);
     if (matchedSource && out.mediaType === 'auto') out.mediaType = matchedSource.mediaType;
     out.sourceName = isCameraUrl(out.mediaUrl) ? 'Camera' : matchedSource?.name || out.sourceName || sourceNameFromUrl(out.mediaUrl);
@@ -2664,7 +2666,7 @@ function forcedMediaType(params) {
 
 function isLikelyVideo(params) {
     if (params.sourceMode !== 'static') return false;
-    if (params.mediaType === 'camera') return false;
+    if (params.mediaType === 'camera' || isTransportSource(params)) return false;
     if (params.mediaType === 'video') return true;
     if (params.mediaType === 'image') return false;
     return detectMediaType(params.mediaUrl) === 'video';
@@ -2880,10 +2882,11 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     const sampleYOffset = params.sampleY ?? 0.5;
 
     if (effectsEnabled(params)) {
+        const coverageState = {};
         const cells = renderSpatialCells(params, sourcePixels, sampleWidth, sampleHeight, cols, rows,
-            (rgb, x, y) => processGpuCellColor(...rgb, params, x, y, paletteLut, paletteDisplay), {}, undefined, time);
+            (rgb, x, y) => processGpuCellColor(...rgb, params, x, y, paletteLut, paletteDisplay), coverageState, undefined, time);
         gridPixels.set(cells);
-        for (let i = 3; i < gridPixels.length; i += 4) gridPixels[i] = 255;
+        for (let i = 3; i < gridPixels.length; i += 4) gridPixels[i] = Math.round(coverageState.coverage[(i - 3) / 4] * 255);
     } else for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             const seedX = col + time * jitterSpeed * 7.13;
@@ -2901,7 +2904,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
             gridPixels[dstIndex] = r;
             gridPixels[dstIndex + 1] = g;
             gridPixels[dstIndex + 2] = b;
-            gridPixels[dstIndex + 3] = 255;
+            gridPixels[dstIndex + 3] = sourcePixels[srcIndex + 3];
         }
     }
     gridCtx.putImageData(gridImage, 0, 0);
@@ -2911,9 +2914,7 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     const renderCanvas = document.createElement('canvas');
     renderCanvas.width = renderWidth;
     renderCanvas.height = renderHeight;
-    const renderCtx = renderCanvas.getContext('2d', { alpha: false });
-    renderCtx.fillStyle = '#030405';
-    renderCtx.fillRect(0, 0, renderWidth, renderHeight);
+    const renderCtx = renderCanvas.getContext('2d', { alpha: true });
     renderCtx.imageSmoothingEnabled = false;
     renderCtx.drawImage(gridCanvas, 0, 0, renderWidth, renderHeight);
 
@@ -2926,8 +2927,6 @@ function renderSoftwareCellSnapshot(source, params, targetWidth, targetHeight, f
     const drawHeight = Math.max(1, Math.floor(renderHeight * scale));
     const dx = Math.floor((targetWidth - drawWidth) / 2);
     const dy = Math.floor((targetHeight - drawHeight) / 2);
-    snapshotCtx.fillStyle = '#030405';
-    snapshotCtx.fillRect(0, 0, targetWidth, targetHeight);
     snapshotCtx.imageSmoothingEnabled = Boolean(params.smoothing);
     snapshotCtx.drawImage(renderCanvas, dx, dy, drawWidth, drawHeight);
     return snapshot;
@@ -3838,7 +3837,7 @@ class TauriRawVideoSource {
         this.type = 'video';
         this.element = null;
         this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        this.ctx = this.canvas.getContext('2d', { alpha: true });
         this.width = 640;
         this.height = 360;
         this.ready = false;
@@ -3981,6 +3980,7 @@ class TauriRawVideoSource {
 
     _drawFrame(frame) {
         const rgb = decodeBase64Bytes(frame.rgbBase64);
+        const alpha = frame.alphaBase64 ? decodeBase64Bytes(frame.alphaBase64) : null;
         const pixelCount = this.width * this.height;
         if (!this.imageData || this.imageData.width !== this.width || this.imageData.height !== this.height) {
             this.imageData = this.ctx.createImageData(this.width, this.height);
@@ -3990,7 +3990,7 @@ class TauriRawVideoSource {
             this.rgba[dst] = rgb[src] || 0;
             this.rgba[dst + 1] = rgb[src + 1] || 0;
             this.rgba[dst + 2] = rgb[src + 2] || 0;
-            this.rgba[dst + 3] = 255;
+            this.rgba[dst + 3] = alpha?.[dst / 4] ?? 255;
         }
         this.ctx.putImageData(this.imageData, 0, 0);
     }
@@ -4242,7 +4242,7 @@ class CanvasStaticRenderer {
         this.glyphRamp = spatialGlyphRamp(activeGlyphRamp(this.params), this.params);
         this.canvas = this.document.createElement('canvas');
         this.canvas.className = 'ascii-canvas';
-        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        this.ctx = this.canvas.getContext('2d', { alpha: true });
         this.targetElement.innerHTML = '';
         this.targetElement.appendChild(this.canvas);
         this._configureCanvas();
@@ -4352,10 +4352,12 @@ class CanvasStaticRenderer {
         if (this.readbackBlocked) return;
         const sourceEl = this.source.canvas || this.source.element;
         if (!sourceEl) return;
+        if (this.source.isDynamicDimensions && (this.lastSourceWidth !== this.source.width || this.lastSourceHeight !== this.source.height)) { this.lastSourceWidth = this.source.width; this.lastSourceHeight = this.source.height; this._configureCanvas(); }
         const cols = this.params.cols;
         const sampleWidth = Math.max(cols, this.sampleWidth || cols);
         const sampleHeight = Math.max(this.rows, this.sampleHeight || this.rows);
         try {
+            this.offctx.clearRect(0, 0, sampleWidth, sampleHeight);
             this.offctx.imageSmoothingEnabled = Boolean(this.params.smoothing);
             if (shouldRendererMirrorCamera(this.params)) {
                 this.offctx.save();
@@ -4391,6 +4393,7 @@ class CanvasStaticRenderer {
         const sourceCellHeight = sampleHeight / this.rows;
         const sampleXOffset = clamp(Number(this.params.sampleX ?? 0.5), 0, 1);
         const sampleYOffset = clamp(Number(this.params.sampleY ?? 0.5), 0, 1);
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.fillStyle = this.params.backgroundColor || '#030405';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.textBaseline = 'top';
@@ -4410,10 +4413,12 @@ class CanvasStaticRenderer {
                     ctx.fillText(ramp[Math.min(ramp.length - 1, Math.floor(cells[i + 3] / 255 * ramp.length))], x * this.params.cellWidth, y * this.params.cellHeight);
                 }
             }
+            applyCanvasCoverage(ctx, this.spatialState.coverage, cols, this.rows, this.coverageState ||= {});
             this.frameCount++;
             return;
         }
         this.spatialState = null;
+        if (this.coverage?.length !== cols * this.rows) this.coverage = new Float32Array(cols * this.rows);
         for (let y = 0; y < this.rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const seedX = x + time * jitterSpeed * 7.13;
@@ -4423,6 +4428,7 @@ class CanvasStaticRenderer {
                 const sampleX = clamp(Math.trunc((x + sampleXOffset) * sourceCellWidth + jitterX), 0, sampleWidth - 1);
                 const sampleY = clamp(Math.trunc((y + sampleYOffset) * sourceCellHeight + jitterY), 0, sampleHeight - 1);
                 const i = (sampleY * sampleWidth + sampleX) * 4;
+                this.coverage[y * cols + x] = data[i + 3] / 255;
                 const [r, g, b, baseLuma] = processColor(
                     data[i], data[i + 1], data[i + 2], this.params, x, y, this.paletteLut, this.paletteDisplay
                 );
@@ -4437,6 +4443,7 @@ class CanvasStaticRenderer {
                 }
             }
         }
+        applyCanvasCoverage(ctx, this.coverage, cols, this.rows, this.coverageState ||= {});
         this.frameCount++;
     }
 
@@ -5998,6 +6005,7 @@ class RendererLabApp {
         this.rendererDiagnostics = new RendererDiagnosticLog();
         this.reportedRendererFailureKeys = new Set();
         this.warmMediaElements = [];
+        this.videoIo = new VideoIoController(this);
     }
 
     async init() {
@@ -6021,6 +6029,8 @@ class RendererLabApp {
                 };
             }
         }
+        if (isTransportSource(this.params)) this.params = normalizeParams({ ...this.params, ...defaultStaticSourceParams() });
+        await this.videoIo.init();
         await this._restoreCustomSource();
         if (els.takeScreenshot) els.takeScreenshot.hidden = !isTauriRuntime();
         this._buildControls();
@@ -6864,6 +6874,7 @@ class RendererLabApp {
     }
 
     async loadStaticSource(params, options = {}) {
+        if (isTransportSource(params)) { this._stopCameraStream(); return new LiveVideoSource(this.videoIo); }
         if (isCameraParams(params)) {
             if (this._shouldUseNativeOutputCameraPreview(params)) {
                 return this._loadNativeOutputCameraPreview(params);
@@ -6942,6 +6953,7 @@ class RendererLabApp {
             statusType: 'ready'
         }));
         const cameraEntry = this._cameraSourceEntry();
+        builtIns.push(...this.videoIo.entries());
 
         if (!this.customSourceMeta && !this.customFile && !this.customTauriFile) return [...builtIns, cameraEntry];
 
@@ -6965,6 +6977,7 @@ class RendererLabApp {
     }
 
     _activeSourceId() {
+        if (isTransportSource(this.params)) return `video-io:${this.params.mediaType}`;
         if (isCameraParams(this.params)) return CAMERA_SOURCE_ID;
         const matched = findSourcePreset(this.params.mediaUrl, this.params.mediaType);
         if (matched) return matched.id;
@@ -8288,6 +8301,7 @@ class RendererLabApp {
     }
 
     async _selectSource(id) {
+        if (id.startsWith("video-io:")) return this.videoIo.discover(id.split(":")[1]);
         const preset = SOURCE_PRESETS.find((item) => item.id === id);
         if (preset) {
             this._clearLocalObjectUrl();
@@ -8379,6 +8393,7 @@ class RendererLabApp {
     }
 
     async _switchStaticSourceNow(sourceParams, options = {}) {
+        if (!isTransportSource(sourceParams)) await this.videoIo.releaseInput();
         clearTimeout(this.rebuildTimer);
         if (this.nativeOutputCapabilities?.nativeCameraPreviewBridge) await this.nativeOutputOpenPromise;
         const resumeWtf = options.interruptTransition !== false
@@ -8774,6 +8789,7 @@ class RendererLabApp {
     }
 
     async openPopout() {
+        if (this.videoIo.active) { await this._refreshOutputDisplays(); return this.videoIo.openPopout(); }
         await this._refreshOutputDisplays();
 
         if (this.popout && !this.popout.closed) {
@@ -9267,6 +9283,11 @@ button:hover{background:#202a35}
             setCycleTransportRate(this.sceneTransport, this.running ? (to.sceneFreeze ? 0 : to.sceneSpeed) : 0, cycleNowMs(), durationMs);
             return { armed: false, startAtUnixMs };
         };
+        if (this.videoIo.active) {
+            const result = localStart();
+            this.videoIo.transition = this._nativeOutputPayload(to, { kind, startAtUnixMs: result.startAtUnixMs, durationMs, fromParams: from }).transition;
+            return result;
+        }
         if (this.nativeOutputSourceSwitching) return localStart();
         if (!this.nativeOutputActive || !this._canUseNativeOutputWindow()) {
             return localStart();

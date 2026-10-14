@@ -207,6 +207,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Stage pinned NDI and Syphon runtimes
+        run: npm run video-io:stage
+
       - name: Compile release app without bundling
         run: npm run tauri:build -- --no-bundle --ci
 
@@ -287,6 +290,9 @@ jobs:
 
       - name: Install npm dependencies
         run: npm ci
+
+      - name: Stage pinned NDI and Syphon runtimes
+        run: npm run video-io:stage
 
       - name: Download verified FFmpeg runtime
         uses: actions/download-artifact@v8
@@ -606,10 +612,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            avahi-daemon \
+            libavahi-client3 \
+            libavahi-common3 \
             ca-certificates \
             dbus-x11 \
             libfuse2 \
             xvfb
+          sudo systemctl start avahi-daemon
 
       - name: Download published release assets
         env:
