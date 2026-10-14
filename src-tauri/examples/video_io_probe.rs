@@ -63,6 +63,9 @@ fn main() -> Result<(), String> {
     for pixel in frame.rgba[..1920 * 4].chunks_exact_mut(4) {
         pixel.copy_from_slice(&[0, 0, 0, 255]);
     }
+    for pixel in frame.rgba[(1080 - 64) * 1920 * 4..].chunks_exact_mut(4) {
+        pixel[3] = 0;
+    }
     if mode == "send" {
         let width = std::env::args()
             .nth(5)
@@ -115,9 +118,16 @@ fn main() -> Result<(), String> {
                 if f.width != 1920 || f.height != 1080 {
                     return Err("Incorrect received dimensions".into());
                 }
-                if f.rgba[3] != 255 || f.rgba[1920 * 4 + 3].abs_diff(128) > 2 {
+                // NDI is compressed: the Windows SDK rounds the opaque sample
+                // to 254. Apply the same two-code tolerance to every alpha band.
+                let transparent = f.rgba[(1040 * 1920 + 960) * 4 + 3];
+                if f.rgba[3].abs_diff(255) > 2
+                    || f.rgba[1920 * 4 + 3].abs_diff(128) > 2
+                    || transparent > 2
+                    || f.rgba[..3].iter().any(|c| *c > 2)
+                {
                     return Err(format!(
-                        "Alpha did not survive the NDI connection: top={:?}, next_row={:?}, center={:?}, alpha_range={:?}",
+                        "Alpha did not survive the NDI connection: top={:?}, next_row={:?}, center={:?}, transparent={transparent}, alpha_range={:?}",
                         &f.rgba[..4],
                         &f.rgba[1920 * 4..1920 * 4 + 4],
                         &f.rgba[(540 * 1920 + 960) * 4..(540 * 1920 + 960) * 4 + 4],
@@ -126,7 +136,7 @@ fn main() -> Result<(), String> {
                 }
                 received += 1;
                 if received == 60 {
-                    println!("PASS: 60 video frames, 1920x1080, partial alpha and opaque black retained; no audio requested or sent");
+                    println!("PASS: 60 video frames, 1920x1080, transparent/partial/opaque alpha and black retained within two-code codec tolerance; no audio requested or sent");
                     return Ok(());
                 }
             }

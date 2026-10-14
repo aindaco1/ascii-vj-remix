@@ -73,6 +73,12 @@ the Linux packages, CI and AppImage setup instructions. The
 passed the SDK round trip and proceeded to package building. Final PR checks
 remain authoritative for the current candidate.
 
+The Windows SDK round trip exposed an over-strict test assertion: the received
+opaque black pixel was `[0, 0, 0, 254]`, while half-transparent samples remained
+128. The SDK fixture now uses the same two-code compression tolerance for all
+alpha bands and also checks a fully transparent band. Renderer alpha checks
+remain unchanged; this correction does not clamp or alter application pixels.
+
 ## Acceptance Before Production
 
 Complete these checks or record an explicit owner-approved deferral with its
