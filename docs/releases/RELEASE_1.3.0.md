@@ -68,8 +68,10 @@ full SDK agreement and the exact packaged libraries, not the web summary alone.
 The first Linux SDK round trip received no frames despite successful compilation.
 NDI requires Avahi libraries and an active daemon on Linux; those prerequisites
 were missing from the CI setup and package metadata. They are now declared in
-the Linux packages, CI and AppImage setup instructions. The next exact-candidate
-CI run must verify the correction.
+the Linux packages, CI and AppImage setup instructions. The
+[corrected Linux lane](https://github.com/aindaco1/ascii-vj-remix/actions/runs/38498395941)
+passed the SDK round trip and proceeded to package building. Final PR checks
+remain authoritative for the current candidate.
 
 ## Acceptance Before Production
 

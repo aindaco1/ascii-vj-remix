@@ -78,7 +78,8 @@
       "resources/ffmpeg/**/*",
       "../media/**/*",
       "resources/video-io/**/*"
-    ]
+    ],
+    "copyright": "NDI® is a registered trademark of Vizrt NDI AB."
   },
   "plugins": {
     "updater": {

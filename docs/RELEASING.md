@@ -221,6 +221,8 @@ NDI Tools or SDK example programs as application dependencies.
 
 The pinned NDI 6.3.2 agreement and required end-user notices were reviewed during
 implementation; retain its separate component terms and NDI attribution/link.
+The Tauri bundle copyright metadata supplies the required trademark statement to the default
+native About dialog; the Video I/O link carries the same attribution.
 The [vendor licensing page](https://docs.ndi.video/all/developing-with-ndi/sdk/licensing)
 still identifies SDK 6.3.2 on 2026-10-13. Recheck the full agreement and archive
 hashes before public redistribution; stop on an upstream checksum change. Preserve
