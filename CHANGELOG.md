@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-10-21
+
+- Reject compromised eMudhra TLS chains with rustls-webpki 0.103.16 and webpki root bundles 1.0.10.
+- Add opt-in live TLS acceptance against all 12 disclosed test chains and a valid HTTPS control (`npm run test:tls`).
+
 ## [1.3.0] - 2026-10-13
 
 Publication and acceptance evidence are tracked in the
