@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -94,6 +94,7 @@
     "test:crash-relay": "npm --prefix crash-relay test",
     "test:vectors": "node scripts/test_vectors.mjs",
     "test:rust": "node scripts/cargo_env.mjs test --manifest-path src-tauri/Cargo.toml",
+    "test:tls": "node scripts/cargo_env.mjs test --locked --manifest-path src-tauri/Cargo.toml --test tls_trust -- --ignored --nocapture",
     "tauri": "node scripts/tauri_env.mjs",
     "tauri:dev": "node scripts/tauri_env.mjs dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "node scripts/tauri_env.mjs build",
