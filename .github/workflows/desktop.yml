@@ -83,6 +83,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Verify FFmpeg source download policy
+        run: npm run test:ffmpeg-source-build
+
       - name: Stage pinned NDI and Syphon runtimes
         run: npm run video-io:stage
 
