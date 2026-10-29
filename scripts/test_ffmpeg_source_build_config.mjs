@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { macosDeploymentTarget } from './lib/macos_deployment_target.mjs';
 
 const result = spawnSync('bash', ['scripts/build_ffmpeg_sidecar.sh', '--print-config'], {
@@ -50,9 +50,9 @@ const fixture = 'verified FFmpeg download fixture\n';
 const fixtureHash = createHash('sha256').update(fixture).digest('hex');
 const temp = mkdtempSync(join(tmpdir(), 'asciline-ffmpeg-download-test-'));
 try {
-  const bin = join(temp, 'bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'curl'), `#!/usr/bin/env node
+  const mockCurl = join(temp, 'curl.cjs');
+  const bashEnv = join(temp, 'mocks.sh');
+  writeFileSync(mockCurl, `
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const url = args.find(arg => arg.startsWith('https://'));
@@ -62,8 +62,9 @@ const mode = process.env.DOWNLOAD_TEST_MODE;
 const fails = mode === 'both-fail' || (mode !== 'primary-success' && !mirror);
 fs.writeFileSync(args[args.indexOf('-o') + 1], fails || mode === 'bad-hash' ? 'partial or corrupt' : ${JSON.stringify(fixture)});
 process.exit(fails ? 28 : 0);
-`, { mode: 0o755 });
-  writeFileSync(join(bin, 'tar'), '#!/bin/sh\nprintf extracted > "$EXTRACT_MARKER"\nexit 77\n', { mode: 0o755 });
+`);
+  // Shell functions avoid Windows executable lookup and PATH conversion differences.
+  writeFileSync(bashEnv, 'curl() { "$DOWNLOAD_TEST_NODE" "$DOWNLOAD_TEST_CURL" "$@"; }\ntar() { printf extracted > "$EXTRACT_MARKER"; exit 77; }\n');
   for (const mode of ['primary-success', 'fallback-success', 'bad-hash', 'both-fail', 'custom-fail']) {
     const work = join(temp, mode);
     mkdirSync(work);
@@ -71,9 +72,12 @@ process.exit(fails ? 28 : 0);
     const marker = join(work, 'extracted');
     const run = spawnSync('bash', ['scripts/build_ffmpeg_sidecar.sh'], {
       encoding: 'utf8',
+      timeout: 30000,
       env: {
         ...process.env,
-        PATH: `${bin}${delimiter}${process.env.PATH}`,
+        BASH_ENV: bashEnv.replaceAll('\\', '/'),
+        DOWNLOAD_TEST_NODE: process.execPath.replaceAll('\\', '/'),
+        DOWNLOAD_TEST_CURL: mockCurl.replaceAll('\\', '/'),
         ASCILINE_FFMPEG_BUILD_DIR: work.replaceAll('\\', '/'),
         ASCILINE_FFMPEG_SHA256: fixtureHash,
         ASCILINE_FFMPEG_URL: mode === 'custom-fail' ? 'https://example.invalid/custom.tar.xz' : '',
@@ -82,6 +86,8 @@ process.exit(fails ? 28 : 0);
         DOWNLOAD_TEST_MODE: mode
       }
     });
+    assert.ifError(run.error);
+    assert.ok(existsSync(log), `${mode}: mock downloader was not invoked: ${run.stderr}`);
     const urls = readFileSync(log, 'utf8').trim().split('\n');
     const succeeded = mode === 'primary-success' || mode === 'fallback-success';
     assert.equal(run.status, succeeded ? 77 : 1, `${mode}: ${run.stderr}`);
