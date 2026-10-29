@@ -1,0 +1,542 @@
+{
+  "schema_version": 1,
+  "release": {
+    "version": "1.3.2",
+    "tag": "v1.3.2",
+    "source_commit": "63d8a7421b220cb94261aa62559e3a8db6debe5c",
+    "pull_request": "https://github.com/aindaco1/ascii-vj-remix/pull/51",
+    "published_at": "2026-10-29T08:11:31Z",
+    "url": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.3.2"
+  },
+  "pull_request_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40832180256",
+    "workflow_commit": "c8bcda2c29a3b3691bc5b321f69335868e885426",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40832180256/job/123308667979"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40832180256/job/123308668286"
+      },
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40832180256/job/123308668341"
+      },
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40832180256/job/123308668359"
+      }
+    ]
+  },
+  "local_playback": {
+    "macOS": {
+      "unattended": {
+        "from": 0,
+        "to": 206.583,
+        "duration": 206.583,
+        "ended": true,
+        "muted": false,
+        "volume": 0.63,
+        "signal": {
+          "readings": 635,
+          "nonSilent": 633,
+          "maxSilentSeconds": 0
+        }
+      },
+      "failures": [],
+      "failureCount": 0
+    },
+    "Windows": {
+      "unattended": {
+        "from": 2.3553,
+        "to": 2.3553,
+        "duration": 2.5,
+        "ended": false,
+        "muted": false,
+        "volume": 0.63
+      },
+      "failures": [],
+      "failureCount": 0
+    },
+    "Linux": {
+      "unattended": {
+        "from": 2.3637,
+        "to": 2.3637,
+        "duration": 2.5,
+        "ended": false,
+        "muted": false,
+        "volume": 0.63
+      },
+      "failures": [],
+      "failureCount": 0
+    }
+  },
+  "native_output_ci": {
+    "ascii-vj-remix-native-smoke-windows-latest-40832180256-1": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 19071,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 0,
+          "firstPresentMs": 8626,
+          "pass": 0
+        },
+        {
+          "commandMs": 0,
+          "firstPresentMs": 2646,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.3.2"
+    },
+    "ascii-vj-remix-native-smoke-ubuntu-24.04-40832180256-1": {
+      "backend": "native-softbuffer",
+      "elapsed_ms": 11124,
+      "error": null,
+      "kind": "native-output",
+      "media_url": "media/point-click-test-30s.mp4",
+      "mode": "perf",
+      "ok": true,
+      "opens": [
+        {
+          "commandMs": 0,
+          "firstPresentMs": 3130,
+          "pass": 0
+        },
+        {
+          "commandMs": 6,
+          "firstPresentMs": 217,
+          "pass": 1
+        }
+      ],
+      "package_version": "1.3.2"
+    }
+  },
+  "installed_previous_mac": {
+    "version": "1.3.1",
+    "signature": "valid; designated requirement satisfied",
+    "gatekeeper": "accepted; Notarized Developer ID"
+  },
+  "acceptance_boundaries": [
+    "Owner confirmed audible playback in the fixed Mac Dev app.",
+    "Browser platform identities do not establish Windows/Linux audio hardware acceptance.",
+    "Native CI output reports use softbuffer; physical GPU, transport, and older-macOS checks remain documented separately."
+  ],
+  "recorded_at": "2026-10-29T08:21:51.311929+00:00",
+  "source_ci": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40836788796",
+    "workflow_commit": "63d8a7421b220cb94261aa62559e3a8db6debe5c",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "windows-latest",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40836788796/job/123323323235"
+      },
+      {
+        "name": "xcode-27",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40836788796/job/123323323477"
+      },
+      {
+        "name": "macos-26",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40836788796/job/123323323504"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40836788796/job/123323323556"
+      }
+    ]
+  },
+  "release_and_published_acceptance": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145",
+    "workflow_commit": "63d8a7421b220cb94261aa62559e3a8db6debe5c",
+    "conclusion": "success",
+    "attempt": 1,
+    "jobs": [
+      {
+        "name": "Resolve immutable release context",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326899308"
+      },
+      {
+        "name": "Build macos-aarch64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970247"
+      },
+      {
+        "name": "Build linux-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970324"
+      },
+      {
+        "name": "Build macos-aarch64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970326"
+      },
+      {
+        "name": "Require exact Desktop CI success",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970334"
+      },
+      {
+        "name": "Build windows-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970354"
+      },
+      {
+        "name": "Build linux-x86_64 FFmpeg runtime",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970371"
+      },
+      {
+        "name": "Build windows-x86_64 app binary",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123326970495"
+      },
+      {
+        "name": "Bundle macos-aarch64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123332958469"
+      },
+      {
+        "name": "Bundle linux-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123332958566"
+      },
+      {
+        "name": "Bundle windows-x86_64",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123332958584"
+      },
+      {
+        "name": "Publish GitHub Release",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123334883719"
+      },
+      {
+        "name": "macos-26 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123335084826"
+      },
+      {
+        "name": "ubuntu-24.04 install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123335084971"
+      },
+      {
+        "name": "windows-latest install and updater smoke",
+        "conclusion": "success",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/40837889145/job/123335085073"
+      }
+    ]
+  },
+  "public_download_verification": {
+    "assets": [
+      {
+        "name": "ASCII.VJ.Remix-1.3.2-1.x86_64.rpm",
+        "bytes": 61671116,
+        "sha256": "990384b37401f2131cac6744bec7a9f2869f89a1ee05b8accd81c993e20069b1"
+      },
+      {
+        "name": "ASCII.VJ.Remix-1.3.2-1.x86_64.rpm.sig",
+        "bytes": 424,
+        "sha256": "d1bf9f171d9411998585cfabfacb458e2d2a2a857479b25edc1348eed88cf9e8"
+      },
+      {
+        "name": "ASCII.VJ.Remix.app.tar.gz",
+        "bytes": 58758973,
+        "sha256": "a3d0cdc4d483b63d4b7c5dcd43ca9d043d9499bf343f966059f2829ddfbe8e52"
+      },
+      {
+        "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+        "bytes": 416,
+        "sha256": "12e1828a89c306e3f64661a1d7c8b96eaee6b01edabfcab78e46d75ed007cc81"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_aarch64.dmg",
+        "bytes": 58380735,
+        "sha256": "a6314925a1a419a4ace0ab7666c2fbe3f02df5a229d1c4a63002e35ba665883b"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_amd64.AppImage",
+        "bytes": 133261816,
+        "sha256": "10bef83fad7341975ef8d31712f20789e1e848b7759eae6f459b7d8c432c505b"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_amd64.AppImage.sig",
+        "bytes": 428,
+        "sha256": "6f045118707e4b28ea5c762a2696f6d62cf6f2e7283460d17763091e609cbd2b"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_amd64.deb",
+        "bytes": 61677734,
+        "sha256": "697f6eda55945a959a76679df889631294a52dfd9ef2443185eaf18d3c77e032"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_amd64.deb.sig",
+        "bytes": 420,
+        "sha256": "0c6c0c3fbb138b440f0008a091a02d2581372ee3b0f61b66a0b2c60040864f69"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_x64-setup.exe",
+        "bytes": 46411057,
+        "sha256": "212b5d07e9f581517dce31cb894e859273dacd5b4d28d177d80a65876eaaf8db"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_x64-setup.exe.sig",
+        "bytes": 428,
+        "sha256": "72a8d1cff61ccd31d8af07c149831184c8486943de7ea637e5436f575baaf3d9"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_x64_en-US.msi",
+        "bytes": 60510208,
+        "sha256": "c2b3bbf8bf4440e3c7768a43ab2fd4cb67a5cefa7db9285785a41608d328ae8c"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.2_x64_en-US.msi.sig",
+        "bytes": 428,
+        "sha256": "ecf2b0cdaab07729b652943f9541727538718a7e38942d5ba970663e82770586"
+      },
+      {
+        "name": "latest.json",
+        "bytes": 5488,
+        "sha256": "1844592fb671eea9082ce788d7f3b7874c3b237896adbb7fa1f7a093ad43063b"
+      }
+    ],
+    "updater_platforms": [
+      "linux-x86_64-appimage",
+      "linux-x86_64-deb",
+      "linux-x86_64-rpm",
+      "linux-x86_64",
+      "darwin-aarch64-app",
+      "darwin-aarch64",
+      "windows-x86_64-msi",
+      "windows-x86_64-nsis",
+      "windows-x86_64"
+    ]
+  },
+  "local_public_mac": {
+    "artifact_and_previous_version_smoke": "passed",
+    "verified_gates": [
+      "DMG signature, notarization staple and Gatekeeper",
+      "Production bundle identity and version",
+      "DMG and updater-archive designated-requirement match",
+      "Previous 1.3.1 archive updated to 1.3.2 and retained production identity",
+      "Top-bar updater/reports UI"
+    ],
+    "production_update": {
+      "ok": true,
+      "kind": "updater",
+      "mode": "install",
+      "package_version": "1.3.1",
+      "expected_version": "1.3.2",
+      "found_update": true,
+      "update_version": "1.3.2",
+      "current_version": "1.3.1",
+      "target": "darwin",
+      "download_url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.2/ASCII.VJ.Remix.app.tar.gz",
+      "downloaded_bytes": 58758973,
+      "install_started": true,
+      "install_finished": true,
+      "forced_update": false,
+      "forced_from_version": null,
+      "backend": null,
+      "media_url": null,
+      "elapsed_ms": 3758,
+      "error": null
+    },
+    "production_relaunch": {
+      "ok": true,
+      "kind": "launch",
+      "mode": "launch",
+      "package_version": "1.3.2",
+      "expected_version": null,
+      "found_update": false,
+      "update_version": null,
+      "current_version": null,
+      "target": null,
+      "download_url": null,
+      "downloaded_bytes": null,
+      "install_started": false,
+      "install_finished": false,
+      "forced_update": false,
+      "forced_from_version": null,
+      "backend": null,
+      "media_url": null,
+      "elapsed_ms": 1201,
+      "error": null
+    },
+    "installed_version": "1.3.2",
+    "installed_signature": "valid; Gatekeeper accepted Notarized Developer ID"
+  },
+  "cleanup": {
+    "local_reproducible_bytes_removed": 4676653056,
+    "local_outputs_removed": [
+      "Cargo debug and temporary build trees",
+      "Static smoke output",
+      "Mirror verification archive",
+      "Redundant previous-release download set"
+    ],
+    "remote_artifacts_removed": [
+      {
+        "id": 12390256460,
+        "name": "ascii-vj-remix-Linux-X64",
+        "bytes": 255082105
+      },
+      {
+        "id": 12389333044,
+        "name": "ascii-vj-remix-Windows-X64",
+        "bytes": 106035534
+      },
+      {
+        "id": 12389303108,
+        "name": "ascii-vj-remix-macOS-ARM64",
+        "bytes": 116410348
+      },
+      {
+        "id": 12382618333,
+        "name": "ascii-vj-remix-windows-test-ceff71c25895fa90808a738e7908eac2553ebdba",
+        "bytes": 106022673
+      },
+      {
+        "id": 12380559612,
+        "name": "ascii-vj-remix-linux-test-ceff71c25895fa90808a738e7908eac2553ebdba",
+        "bytes": 255025056
+      },
+      {
+        "id": 12882570906,
+        "name": "release-runtime-windows-x86_64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 59313432
+      },
+      {
+        "id": 12882125506,
+        "name": "release-binary-macos-aarch64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 37443180
+      },
+      {
+        "id": 12882071582,
+        "name": "release-binary-windows-x86_64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 36415529
+      },
+      {
+        "id": 12882030786,
+        "name": "release-runtime-macos-aarch64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 42346150
+      },
+      {
+        "id": 12881711338,
+        "name": "release-runtime-linux-x86_64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 57703728
+      },
+      {
+        "id": 12881367676,
+        "name": "release-binary-linux-x86_64-63d8a7421b220cb94261aa62559e3a8db6debe5c",
+        "bytes": 42778883
+      }
+    ],
+    "remote_caches_removed": [
+      {
+        "id": 9686941419,
+        "key": "node-cache-Windows-x64-npm-ceb4c8e277797eae58429d99a93ac04bd188678cce3dc9f69dff476bf279f926",
+        "ref": "refs/pull/51/merge",
+        "bytes": 85416237
+      },
+      {
+        "id": 9686179039,
+        "key": "node-cache-Linux-x64-npm-ebf45db3e9e69eac5ccbc2c95a1594e30d9b020c1b5fe7129b381d44df1bdd7f",
+        "ref": "refs/pull/51/merge",
+        "bytes": 91584448
+      },
+      {
+        "id": 9686083443,
+        "key": "msys2-pkgs-upd:true-conf:d1e95228-files:97682b4ab7e1e7500bd644f243d6c5fc929b26eb4697b4b8f2ccd599b759bed3",
+        "ref": "refs/pull/51/merge",
+        "bytes": 100499894
+      },
+      {
+        "id": 9684966244,
+        "key": "node-cache-macOS-arm64-npm-ebf45db3e9e69eac5ccbc2c95a1594e30d9b020c1b5fe7129b381d44df1bdd7f",
+        "ref": "refs/pull/51/merge",
+        "bytes": 85976448
+      },
+      {
+        "id": 9308873079,
+        "key": "node-cache-Windows-x64-npm-a5b56c1b58c6098abba095d046d4bc951509d12938363ba8420f2700f349f847",
+        "ref": "refs/heads/main",
+        "bytes": 85463230
+      },
+      {
+        "id": 9308465080,
+        "key": "node-cache-Linux-x64-npm-496a3b9dfe4355874787e4322bee53923864ac039be2ddfa97c03975309a8479",
+        "ref": "refs/heads/main",
+        "bytes": 91629732
+      },
+      {
+        "id": 9308490249,
+        "key": "node-cache-macOS-arm64-npm-496a3b9dfe4355874787e4322bee53923864ac039be2ddfa97c03975309a8479",
+        "ref": "refs/heads/main",
+        "bytes": 85928311
+      },
+      {
+        "id": 9302463290,
+        "key": "node-cache-macOS-arm64-npm-496a3b9dfe4355874787e4322bee53923864ac039be2ddfa97c03975309a8479",
+        "ref": "refs/pull/50/merge",
+        "bytes": 85928665
+      },
+      {
+        "id": 9304127647,
+        "key": "node-cache-Windows-x64-npm-a5b56c1b58c6098abba095d046d4bc951509d12938363ba8420f2700f349f847",
+        "ref": "refs/pull/50/merge",
+        "bytes": 85463684
+      },
+      {
+        "id": 9303139771,
+        "key": "node-cache-Linux-x64-npm-496a3b9dfe4355874787e4322bee53923864ac039be2ddfa97c03975309a8479",
+        "ref": "refs/pull/50/merge",
+        "bytes": 91627826
+      },
+      {
+        "id": 9303093822,
+        "key": "msys2-pkgs-upd:true-conf:d1e95228-files:9c74c1133a84d39e4ca6557532e3ec82ce88f3b95eb44dbc0e0f805fe11d97de",
+        "ref": "refs/pull/50/merge",
+        "bytes": 94316586
+      },
+      {
+        "id": 9308940426,
+        "key": "msys2-pkgs-upd:true-conf:d1e95228-files:9c74c1133a84d39e4ca6557532e3ec82ce88f3b95eb44dbc0e0f805fe11d97de",
+        "ref": "refs/heads/main",
+        "bytes": 94316576
+      }
+    ],
+    "remote_bytes_removed": 2192728255,
+    "branches_removed": [
+      "local release/1.3.2-audio-playback",
+      "origin/release/1.3.2-audio-playback"
+    ],
+    "retained": [
+      "Production Mac app 1.3.2",
+      "Dev app and optimized release cache 1.3.2",
+      "node_modules, dist, staged runtimes and pinned SDK cache",
+      "Current public/test packages and current CI dependency caches",
+      "One signed 1.3.1 Mac rollback archive with signature and manifest",
+      "Published release history and other chats worktrees"
+    ]
+  }
+}
