@@ -1,6 +1,6 @@
 {
   "name": "ascii-vj-remix",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "private": true,
   "workspaces": [
     "crash-relay"
@@ -61,7 +61,8 @@
     "media:native-session-preview": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example native_session_preview --",
     "media:pipeline-preview": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example pipeline_preview --",
     "midi:probe": "node scripts/cargo_env.mjs run --manifest-path src-tauri/Cargo.toml --example midi_probe --",
-    "smoke:static": "npm run build && node scripts/smoke_static_pages.mjs",
+    "smoke:static": "npm run build && node scripts/smoke_static_pages.mjs && node scripts/smoke_video_playback.mjs",
+    "smoke:video-playback": "node scripts/smoke_video_playback.mjs",
     "smoke:native-output": "node scripts/smoke_native_output_perf.mjs",
     "smoke:ui-perf": "node scripts/smoke_ui_perf.mjs",
     "smoke:primary-presets": "node scripts/smoke_primary_presets.mjs",

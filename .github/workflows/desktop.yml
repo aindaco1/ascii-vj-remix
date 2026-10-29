@@ -96,12 +96,14 @@ jobs:
       - name: Verify Jev harness offline
         run: npm run test:jev-harness
 
-      - name: Verify Windows preset renderer matrix
+      - name: Verify Windows renderer and playback regressions
         id: static-smoke
         if: runner.os == 'Windows'
         env:
           SMOKE_DIAGNOSTICS_DIR: tmp-smoke-static
-        run: node scripts/smoke_static_pages.mjs
+        run: |
+          node scripts/smoke_static_pages.mjs
+          node scripts/smoke_video_playback.mjs
 
       - name: Upload Windows smoke failure diagnostics
         if: failure() && steps.static-smoke.outcome == 'failure'

@@ -157,6 +157,10 @@ NDI® is a registered trademark of Vizrt NDI AB. [About NDI](https://ndi.video/)
   candidate or fallback is safe, it holds the current look and retries. Naturally
   black source frames remain valid. Bright Output stays under your control.
 
+Visual presets, playlists, and WTF preserve your playback volume, mute, and loop
+settings. Use the Playback controls to change them, including when loading older
+saved presets.
+
 ### Pixel Art and Color Cycling
 
 Eight original presets pair solid pixels and glyphs in four palettes: Tidal

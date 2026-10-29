@@ -239,6 +239,18 @@ plus Custom labeling and reselection through the actual audio controls.
 `npm run test:renderer-resources` checks decoded-frame lifetime through GPU
 submission, failure cleanup and animation-loop recovery.
 
+`npm run smoke:video-playback` checks volume/mute/loop preservation across all
+built-in preset bases, both renderer families, older saved presets, WTF, and
+manual edits during transitions. It also runs within `smoke:static`. The three
+platform identities exercise shared source/preset behavior in Chromium; they do
+not certify Windows/Linux native decoders or audio devices.
+
+For a local file soak, set `ASCILINE_PLAYBACK_MEDIA` to its absolute path and
+`ASCILINE_PLAYBACK_SOAK_MS` to the desired duration in milliseconds. The Mac
+identity case reads that file locally and reports playback progress plus bounded
+Web Audio signal summaries. It does not capture raw audio, upload media, or
+measure physical speaker output. Other cases use the bundled fixtures.
+
 After building the optimized Dev app, a local native-input timing probe runs
 alongside the existing video, Pop Out and transition performance gates:
 
