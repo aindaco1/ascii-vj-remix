@@ -116,6 +116,11 @@ preview artifacts and does not require Windows signing secrets.
 
 ## Local Packaging and App Identity
 
+The FFmpeg source builder retries the official release URL, then falls back to
+the MacPorts distfile mirror if the transfer fails. Both paths require the same
+pinned SHA-256 before extraction. Setting `ASCILINE_FFMPEG_URL` uses only that
+explicit source and disables the fallback.
+
 For updater-disabled local bundles, use the
 [contributor commands](CONTRIBUTORS.md#common-commands). On macOS, follow
 [Permissions During Development](CONTRIBUTORS.md#macos-permissions-during-development)

@@ -1738,7 +1738,9 @@ const STATIC_REBUILD_KEYS = new Set([
 const STATIC_SOURCE_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const CAMERA_SOURCE_PARAM_KEYS = new Set(['cameraDeviceId', 'cameraSelectedDeviceIds', 'cameraFacingMode', 'cameraResolution', 'cameraFps', 'cameraMirror', 'cameraLayout', 'cameraFit']);
 const SOURCE_PARAM_KEYS = new Set(['sourceMode', 'mediaUrl', 'mediaType', 'sourceName', ...CAMERA_SOURCE_PARAM_KEYS]);
-const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, ...SPATIAL_GLOBAL_KEYS, 'statsOverlay', 'advancedDensity', 'brightOutput', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
+// Playback is user-owned; visual presets and WTF must leave it alone.
+const PLAYBACK_PARAM_KEYS = ['volume', 'muted', 'loop'];
+const PRESET_EXCLUDED_PARAM_KEYS = new Set([...SOURCE_PARAM_KEYS, ...PLAYBACK_PARAM_KEYS, ...SPATIAL_GLOBAL_KEYS, 'statsOverlay', 'advancedDensity', 'brightOutput', 'paletteCycleTransport', 'paletteCycleClockMs', 'sceneTransport', 'sceneClockMs', 'sceneResetId']);
 const MAX_USER_PRESETS = 128;
 const MAX_PRESET_NAME_LENGTH = 80;
 const MAX_PRESET_ID_LENGTH = 96;
@@ -10652,7 +10654,7 @@ button:hover{background:#202a35}
             ...this._currentSourceParams(),
             statsOverlay: this.params.statsOverlay,
             brightOutput: this.params.brightOutput,
-            ...Object.fromEntries(SPATIAL_GLOBAL_KEYS.map(key => [key, this.params[key]]))
+            ...Object.fromEntries([...SPATIAL_GLOBAL_KEYS, ...PLAYBACK_PARAM_KEYS].map(key => [key, this.params[key]]))
         };
     }
 
@@ -10772,10 +10774,6 @@ button:hover{background:#202a35}
         if (staticMode) {
             target.backend = 'auto';
         }
-
-        target.volume = snapToStep(randomBetween(0, 1), 0.01);
-        target.loop = true;
-        target.muted = randomBool(0.72);
 
         const lowColumnBias = asciiAnchor || Boolean(anchorParams) || randomBool(0.38);
         target.cols = lowColumnBias ? randomInt(80, 280) : randomInt(280, 780);

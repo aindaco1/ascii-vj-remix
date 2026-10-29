@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.2] - 2026-10-29
+
+- Preserve media volume, mute, and looping across visual presets, playlists, and WTF. Older saved presets no longer override these playback settings.
+- Keep release builds working through FFmpeg source-host outages with a checksum-pinned mirror fallback.
+
 ## [1.3.1] - 2026-10-21
 
 - Reject compromised eMudhra TLS chains with rustls-webpki 0.103.16 and webpki root bundles 1.0.10.

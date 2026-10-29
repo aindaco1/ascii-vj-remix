@@ -83,6 +83,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Verify FFmpeg source download policy
+        run: npm run test:ffmpeg-source-build
+
       - name: Stage pinned NDI and Syphon runtimes
         run: npm run video-io:stage
 
@@ -96,12 +99,14 @@ jobs:
       - name: Verify Jev harness offline
         run: npm run test:jev-harness
 
-      - name: Verify Windows preset renderer matrix
+      - name: Verify Windows renderer and playback regressions
         id: static-smoke
         if: runner.os == 'Windows'
         env:
           SMOKE_DIAGNOSTICS_DIR: tmp-smoke-static
-        run: node scripts/smoke_static_pages.mjs
+        run: |
+          node scripts/smoke_static_pages.mjs
+          node scripts/smoke_video_playback.mjs
 
       - name: Upload Windows smoke failure diagnostics
         if: failure() && steps.static-smoke.outcome == 'failure'

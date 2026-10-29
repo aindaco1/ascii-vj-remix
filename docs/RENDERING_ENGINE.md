@@ -141,6 +141,11 @@ Tauri desktop audio sources:
 The audio layer outputs bounded feature vectors, not raw audio buffers or raw
 visual frames.
 
+Video soundtrack playback belongs to the selected media element. Volume, mute,
+and looping are global playback settings excluded from visual presets (including
+older imports) and WTF randomization. Renderer changes reuse the playing source;
+explicit playback edits during a transition still take effect immediately.
+
 ### Stream Sessions
 
 Stream sessions are development and advanced infrastructure. They are not a
