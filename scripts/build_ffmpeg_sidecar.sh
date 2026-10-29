@@ -5,6 +5,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="${ASCILINE_FFMPEG_VERSION:-8.1.2}"
 SHA256="${ASCILINE_FFMPEG_SHA256:-464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c}"
 SOURCE_URL="${ASCILINE_FFMPEG_URL:-https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz}"
+FALLBACK_SOURCE_URL=""
+if [ -z "${ASCILINE_FFMPEG_URL:-}" ]; then
+  FALLBACK_SOURCE_URL="https://distfiles.macports.org/ffmpeg/ffmpeg-${VERSION}.tar.xz"
+fi
 LICENSE="${ASCILINE_FFMPEG_LICENSE:-LGPL-2.1-or-later}"
 VARIANT="${ASCILINE_FFMPEG_VARIANT:-source-lgpl-static-libs}"
 WORK_DIR="${ASCILINE_FFMPEG_BUILD_DIR:-${RUNNER_TEMP:-/tmp}/asciline-ffmpeg-${VERSION}}"
@@ -79,6 +83,7 @@ if [ "$PRINT_CONFIG" -eq 1 ]; then
   printf "version=%s\n" "$VERSION"
   printf "sha256=%s\n" "$SHA256"
   printf "url=%s\n" "$SOURCE_URL"
+  printf "fallback_url=%s\n" "$FALLBACK_SOURCE_URL"
   printf "license=%s\n" "$LICENSE"
   printf "variant=%s\n" "$VARIANT"
   printf "source=%s\n" "$SOURCE_NOTE"
@@ -113,7 +118,15 @@ if [ ! -f "$TARBALL" ]; then
   rm -f "$PARTIAL_TARBALL"
   if ! curl "${DOWNLOAD_FLAGS[@]}" "$SOURCE_URL" -o "$PARTIAL_TARBALL"; then
     rm -f "$PARTIAL_TARBALL"
-    exit 1
+    if [ -z "$FALLBACK_SOURCE_URL" ]; then
+      exit 1
+    fi
+    printf "Primary FFmpeg source download failed; trying checksum-pinned mirror %s\n" "$FALLBACK_SOURCE_URL" >&2
+    if ! curl "${DOWNLOAD_FLAGS[@]}" "$FALLBACK_SOURCE_URL" -o "$PARTIAL_TARBALL"; then
+      rm -f "$PARTIAL_TARBALL"
+      exit 1
+    fi
+    SOURCE_NOTE="$SOURCE_NOTE Downloaded from checksum-verified mirror ${FALLBACK_SOURCE_URL}."
   fi
   mv "$PARTIAL_TARBALL" "$TARBALL"
 fi
