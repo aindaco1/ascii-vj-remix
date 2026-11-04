@@ -128,3 +128,14 @@ test('operator failure logging retains only an allowlisted provider status', () 
     providerOperation: null, providerReason: null
   });
 });
+
+test('Gemma reports retain the bounded metadata-only contract', () => {
+  const value = report();
+  value.state.formatter = 'gemma';
+  value.state.appleFormatterReady = null;
+  value.state.progressStage = 'model_verification';
+  value.state.failureCode = 'gemma_formatting_failed';
+  assert.equal(validateCutNotesReport(value).state.formatter, 'gemma');
+  value.state.transcript = 'private';
+  assert.throws(() => validateCutNotesReport(value), /Invalid CutNotes/);
+});
