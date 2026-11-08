@@ -105,8 +105,11 @@ try {
         execFileSync(sevenzip, ["x", "-y", `-o${dest}`, archive], {
           stdio: "pipe",
         });
-      // RPM/DEB/DMG containers can expose a nested filesystem archive.
-      for (let pass = 0; pass < 3; pass++) {
+      // AppImage and updater tar extraction already yield the complete payload.
+      // Do not unpack bundled corresponding-source archives into that inventory.
+      // Other installer containers can expose nested filesystem archives.
+      const nestedPasses = archive.endsWith(".AppImage") || archive.endsWith(".app.tar.gz") ? 0 : 3;
+      for (let pass = 0; pass < nestedPasses; pass++) {
         const nested = (await regularFiles(dest)).filter((p) =>
           /\.(cpio|tar|tar\.xz|tar\.gz|tar\.zst|cab|hfs)$/.test(p),
         );
