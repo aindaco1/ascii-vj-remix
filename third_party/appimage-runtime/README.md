@@ -32,6 +32,9 @@ the 16-byte `.digest_md5` format checksum written by
 [the pinned appimagetool](https://github.com/AppImage/appimagetool/blob/8c8c91f/src/appimagetool.c#L1011).
 Its location comes from the hashed source-built ELF; all code and other metadata
 remain byte-identical. The complete installer is hashed and updater-signed.
+After verification, the runtime extracts its own squashfs payload for inspection;
+Ubuntu's p7zip-compatible command lacks that decoder. Other installer formats
+use the existing configured 7-Zip command.
 The native source archive
 also covers ELF helpers without `.so` names, distro sources and launcher scripts.
 The final payload is verified again after notices are bundled.

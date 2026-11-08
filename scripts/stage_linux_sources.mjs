@@ -19,7 +19,7 @@ import {
   filesBelow,
 } from "./lib/distribution_licenses.mjs";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
-import { inspectAppImageRuntime, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
+import { extractVerifiedAppImage, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 if (process.platform !== "linux")
   throw new Error("Native Linux source capture requires the packaging host");
 const root = fileURLToPath(new URL("..", import.meta.url)),
@@ -40,12 +40,6 @@ const run = (command, args, options = {}) =>
 const packages = new Map(),
   files = [];
 try {
-  run(process.env.ASCII_SEVENZIP || "7zz", [
-    "x",
-    "-y",
-    `-o${temp}`,
-    path.join(bundle, images[0]),
-  ]);
   // The AppImage ELF runtime sits OUTSIDE its squashfs library inventory. Its
   // statically linked libraries need a separate, reviewed source/build bundle.
   const runtimeEvidence = path.join(
@@ -53,9 +47,7 @@ try {
     ".compliance/appimage-runtime/evidence.json",
   );
   const image = path.join(bundle, images[0]);
-  const offset = Number(run(image, ["--appimage-offset"]).trim());
-  const bytes = await readFile(image);
-  await inspectAppImageRuntime(root, bytes, offset);
+  await extractVerifiedAppImage(root, image, temp);
   const runtimeSources = path.join(root, ".compliance/runtime-sources.tar.gz");
   await cp(
     runtimeSources,

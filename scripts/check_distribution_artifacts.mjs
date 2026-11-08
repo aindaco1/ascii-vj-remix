@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
-import { inspectAppImageRuntime, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
+import { extractVerifiedAppImage, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 import {
   verifyManifest,
   verifySourceBundle,
@@ -99,6 +99,8 @@ try {
       await mkdir(dest);
       if (archive.endsWith(".app.tar.gz"))
         execFileSync("tar", ["-xzf", archive, "-C", dest]);
+      else if (archive.endsWith(".AppImage"))
+        await extractVerifiedAppImage(root, archive, dest);
       else
         execFileSync(sevenzip, ["x", "-y", `-o${dest}`, archive], {
           stdio: "pipe",
@@ -130,9 +132,6 @@ try {
             `${path.basename(archive)} missing/changed legal resource: ${f.path}`,
           );
       if (archive.endsWith(".AppImage")) {
-        const offset = Number(execFileSync(archive, ["--appimage-offset"], { encoding: "utf8" }).trim());
-        const bytes = await readFile(archive);
-        await inspectAppImageRuntime(root, bytes, offset);
         const native = JSON.parse(
           await readFile(path.join(licenses, "native-system-catalog.json")),
         );

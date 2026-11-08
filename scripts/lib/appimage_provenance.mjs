@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { sha256 } from "./distribution_licenses.mjs";
 
@@ -57,15 +58,22 @@ export function verifyAppImageRuntime({ image, offset, runtime, evidence, source
   }
 }
 
-export async function inspectAppImageRuntime(root, image, offset) {
+export async function inspectAppImageRuntime(root, image) {
   const directory = path.join(root, ".compliance/appimage-runtime");
   const evidence = JSON.parse(await readFile(path.join(directory, "evidence.json")));
-  verifyAppImageRuntime({ image, offset, evidence,
-    runtime: await readFile(path.join(directory, "runtime-x86_64")),
+  const runtime = await readFile(path.join(directory, "runtime-x86_64"));
+  verifyAppImageRuntime({ image, offset: runtime.length, runtime, evidence,
     sources: await readFile(path.join(root, ".compliance/runtime-sources.tar.gz")),
     inputs: await readFile(path.join(root, "third_party/appimage-runtime/inputs.json")),
   });
   return evidence;
+}
+
+export async function extractVerifiedAppImage(root, archive, directory) {
+  await inspectAppImageRuntime(root, await readFile(archive));
+  // The verified source-built runtime already owns its squashfs/Zstandard
+  // decoder. Ubuntu's p7zip-compatible 7z cannot read this AppImage format.
+  execFileSync(archive, ["--appimage-extract"], { cwd: directory, stdio: "ignore" });
 }
 
 export function isElf(bytes) {
