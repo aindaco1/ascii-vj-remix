@@ -482,7 +482,7 @@ jobs:
           if [ "${{ runner.os }}" = "Linux" ]; then
             sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
             sudo apt-get update
-            sudo apt-get install -y 7zip
+            sudo apt-get install -y 7zip ubuntu-dev-tools
             sevenzip=$(command -v 7zz || command -v 7z)
             echo "ASCII_SEVENZIP=$sevenzip" >> "$GITHUB_ENV"
           fi

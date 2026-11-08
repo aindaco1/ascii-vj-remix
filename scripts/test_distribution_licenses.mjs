@@ -8,9 +8,18 @@ import {
   verifyManifest,
   verifySourceBundle,
   safeRelative,
+  verifyDebianSourceIdentity,
 } from "./lib/distribution_licenses.mjs";
 import { sha256 } from "./lib/distribution_licenses.mjs";
 import { verifyAppImageRuntime, extractVerifiedAppImage, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
+
+test("historical distro source must match the installed package and exact version", () => {
+  const descriptor = "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\nSource: pcre2\nVersion: 10.42-4ubuntu2.1\n";
+  verifyDebianSourceIdentity(descriptor, "pcre2", "10.42-4ubuntu2.1");
+  assert.throws(() => verifyDebianSourceIdentity(descriptor, "pcre2", "10.42-4ubuntu2.2"), /identity/);
+  assert.throws(() => verifyDebianSourceIdentity(descriptor, "other", "10.42-4ubuntu2.1"), /identity/);
+  assert.throws(() => verifyDebianSourceIdentity(descriptor + "Version: 10.42-4ubuntu2.1\n", "pcre2", "10.42-4ubuntu2.1"), /identity/);
+});
 
 function runtimeFixture() {
   const runtime = Buffer.alloc(320), sources = Buffer.from("complete preferred source"), inputs = Buffer.from("reviewed inputs");

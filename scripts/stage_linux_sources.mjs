@@ -17,6 +17,7 @@ import {
   sha256,
   createManifest,
   filesBelow,
+  verifyDebianSourceIdentity,
 } from "./lib/distribution_licenses.mjs";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
 import { extractVerifiedAppImage, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
@@ -107,7 +108,19 @@ try {
   for (const [id, p] of packages) {
     const dir = path.join(source, p.pkg);
     await mkdir(dir, { recursive: true });
-    run("apt-get", ["source", "--download-only", id], { cwd: dir });
+    try {
+      run("apt-get", ["source", "--download-only", id], { cwd: dir, env: { ...process.env, LC_ALL: "C" } });
+    } catch (error) {
+      // Runner images can retain binaries superseded in the current apt index.
+      // Ubuntu's standard tool retrieves that exact version from Launchpad and
+      // verifies the archive checksums against its HTTPS-fetched descriptor.
+      if (!/Can not find version|Unable to find a source package/.test(String(error.stderr))) throw error;
+      console.log(`Retrieving historical Ubuntu source: ${id}`);
+      run("pull-lp-source", ["--no-conf", "--download-only", p.pkg, p.version], { cwd: dir, stdio: "inherit" });
+    }
+    const descriptors = (await readdir(dir)).filter(name => name.endsWith(".dsc"));
+    if (descriptors.length !== 1) throw new Error(`Expected one source descriptor for ${id}`);
+    verifyDebianSourceIdentity(await readFile(path.join(dir, descriptors[0]), "utf8"), p.pkg, p.version);
     const copyright = path.join(
       "/usr/share/doc",
       p.binary.split(":")[0],
