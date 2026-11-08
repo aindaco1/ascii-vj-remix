@@ -55,6 +55,9 @@ for component, library in packages:
     dist.mkdir()
     env = {**os.environ, 'SRCDEST': str(dist)}
     subprocess.run(['abuild', '-F', 'fetch', 'verify'], cwd=folder, env=env, check=True)
+    # abuild creates disposable links in src/ to these already-retained inputs.
+    # Ship the recipes, patches and distfiles without container-absolute links.
+    shutil.rmtree(folder / 'src')
     records.append({'component': component, 'binary': binary, 'version': fields['V'], 'origin': origin,
                     'aportsCommit': commit, 'license': fields['L'], 'recipeUrl': url})
 
