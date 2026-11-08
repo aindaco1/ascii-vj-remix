@@ -13,11 +13,26 @@ import { sha256 } from "./lib/distribution_licenses.mjs";
 import { verifyAppImageRuntime, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 
 test("AppImage publication rejects changed runtime, source, inputs or missing static sources", () => {
-  const runtime = Buffer.from("runtime"), sources = Buffer.from("complete preferred source"), inputs = Buffer.from("reviewed inputs");
-  const fixture = { image: Buffer.concat([runtime, Buffer.from("payload")]), offset: runtime.length, sources, inputs,
+  const runtime = Buffer.alloc(320), sources = Buffer.from("complete preferred source"), inputs = Buffer.from("reviewed inputs");
+  Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1]).copy(runtime);
+  runtime.writeUInt16LE(62, 18); runtime.writeBigUInt64LE(64n, 40);
+  runtime.writeUInt16LE(64, 58); runtime.writeUInt16LE(3, 60); runtime.writeUInt16LE(1, 62);
+  runtime.writeBigUInt64LE(256n, 128 + 24); runtime.writeBigUInt64LE(13n, 128 + 32);
+  runtime.writeUInt32LE(1, 192); runtime.writeBigUInt64LE(288n, 192 + 24); runtime.writeBigUInt64LE(16n, 192 + 32);
+  Buffer.from("\0.digest_md5\0").copy(runtime, 256);
+  const fixture = { runtime, image: Buffer.concat([runtime, Buffer.from("payload")]), offset: runtime.length, sources, inputs,
     evidence: { schema: 1, runtimeSha256: sha256(runtime), sourceSha256: sha256(sources), inputsSha256: sha256(inputs),
       staticPackages: ["musl", "zstd", "zlib", "mimalloc", "gcc"].map(component => ({ component })) } };
   verifyAppImageRuntime(fixture);
+  const packed = Buffer.from(fixture.image); packed.fill(0xaa, 288, 304);
+  verifyAppImageRuntime({ ...fixture, image: packed });
+  for (const position of [287, 304, 16, 192]) {
+    const changed = Buffer.from(packed); changed[position] ^= 1;
+    assert.throws(() => verifyAppImageRuntime({ ...fixture, image: changed }), /runtime/);
+  }
+  assert.throws(() => verifyAppImageRuntime({ ...fixture, runtime: Buffer.from("substituted runtime") }), /runtime/);
+  const malformed = Buffer.from(runtime); malformed.writeBigUInt64LE(1000000n, 40);
+  assert.throws(() => verifyAppImageRuntime({ ...fixture, runtime: malformed, evidence: { ...fixture.evidence, runtimeSha256: sha256(malformed) } }), /ELF sections/);
   for (const offset of [0, -1, NaN, 1.2, fixture.image.length]) assert.throws(() => verifyAppImageRuntime({ ...fixture, offset }));
   assert.throws(() => verifyAppImageRuntime({ ...fixture, image: Buffer.from("corrupted image") }), /runtime/);
   assert.throws(() => verifyAppImageRuntime({ ...fixture, sources: Buffer.from("incomplete") }), /source archive/);

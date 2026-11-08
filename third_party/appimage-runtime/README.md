@@ -27,7 +27,12 @@ packaging remains available; it does not replace the distribution gate.
 Generated evidence, notices, runtime and source archives stay in `.compliance/`.
 Linux source staging and the final artifact check share a verifier that rejects
 changed inputs, missing static sources, altered source archives and a runtime
-prefix differing from the source-built executable. The native source archive
+prefix differing from the source-built executable. The sole permitted change is
+the 16-byte `.digest_md5` format checksum written by
+[the pinned appimagetool](https://github.com/AppImage/appimagetool/blob/8c8c91f/src/appimagetool.c#L1011).
+Its location comes from the hashed source-built ELF; all code and other metadata
+remain byte-identical. The complete installer is hashed and updater-signed.
+The native source archive
 also covers ELF helpers without `.so` names, distro sources and launcher scripts.
 The final payload is verified again after notices are bundled.
 
