@@ -211,10 +211,11 @@ await writeFile(
   `# Component sources\n\nRelease ${version}, ${platform}.\n\nCorresponding dependency source archive: ${sourceUrl}\n\n${platform === "linux-x86_64" ? `Native library sources: https://github.com/aindaco1/ascii-vj-remix/releases/download/v${version}/ascii-vj-remix-${version}-linux-x86_64-native-sources.tar.gz\n\n` : ""}FFmpeg complete source and build inputs also accompany its sidecars in resources/ffmpeg/${platform}/source/.\n\nSources and component rights do not expire with update/support coverage. This notice is not a three-year written offer. The release must supply the stated files before publication.\n`,
 );
 const textNames = (await filesBelow(out)).filter(
-  (n) => n !== "manifest.json" && n !== "index.html",
+  (n) => !["manifest.json", "index.html", "style.css"].includes(n),
 );
+await copy(path.join(root, "renderers/desktop/distribution-licenses.css"), path.join(out, "style.css"));
 let html =
-  '<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;"><title>Software licenses — ASCII VJ Remix</title><style>body{background:#111;color:#eee;font:14px monospace;padding:1rem}a{color:#7ad}pre{white-space:pre-wrap;overflow-wrap:anywhere}summary{cursor:pointer;padding:.5rem}</style><h1>Software licenses</h1><p>Original component terms apply. Update/support expiry does not remove component rights.</p>';
+  '<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;self&#39;"><title>Software licenses — ASCII VJ Remix</title><link rel="stylesheet" href="/licenses/style.css"><h1>Software licenses</h1><p>Original component terms apply. Update/support expiry does not remove component rights.</p>';
 for (const n of textNames)
   html += `<details><summary>${htmlEscape(n)}</summary><pre>${htmlEscape(
     await readFile(path.join(out, n), "utf8"),

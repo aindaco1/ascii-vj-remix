@@ -37,6 +37,11 @@ Ubuntu's p7zip-compatible command lacks that decoder. Other installer formats
 use the existing configured 7-Zip command.
 The native source archive
 also covers ELF helpers without `.so` names, distro sources and launcher scripts.
+Install `ubuntu-dev-tools` alongside the inspection tools. If an installed
+binary's exact source version has left the current apt index, source capture uses
+Ubuntu's `pull-lp-source` to retrieve that version from Launchpad, with archive
+checksum verification and an explicit descriptor identity check. It never
+substitutes a newer source version.
 The final payload is verified again after notices are bundled.
 
 Release records identify actual package acceptance. Source capture does not

@@ -1,0 +1,4 @@
+body { background: #111; color: #eee; font: 14px monospace; padding: 1rem; }
+a { color: #7ad; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+summary { cursor: pointer; padding: .5rem; overflow-wrap: anywhere; }

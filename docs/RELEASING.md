@@ -17,6 +17,8 @@ bundled and exposed by the offline **Software licenses** panel. The desktop
 reader opens only that fixed document, including notices added during Linux
 packaging; it is not a general filesystem reader. The iframe has no script or
 IPC permissions. Component terms are independent of paid update/support status.
+Its bundled stylesheet works under the production CSP; do not replace it with
+inline styles or relax the app's security policy for this document.
 
 `npm run licenses:stage` collects original app, font, native, Platform and locked
 dependency notices before compilation. It takes a conservative resolved-source
