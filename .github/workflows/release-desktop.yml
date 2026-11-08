@@ -466,6 +466,12 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run check:ffmpeg-release
 
+      - name: Build reviewed Linux AppImage runtime
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/stage_appimage_runtime.mjs
+          echo "LDAI_RUNTIME_FILE=$GITHUB_WORKSPACE/.compliance/appimage-runtime/runtime-x86_64" >> "$GITHUB_ENV"
+
       - name: Create corresponding source archive and notices
         run: npm run licenses:sources
 

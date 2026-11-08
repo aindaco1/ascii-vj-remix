@@ -162,9 +162,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Prepare Linux runtime and corresponding sources
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: |
+          sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+          sudo apt-get install -y 7zip
+          node scripts/stage_appimage_runtime.mjs
+          echo "LDAI_RUNTIME_FILE=$GITHUB_WORKSPACE/.compliance/appimage-runtime/runtime-x86_64" >> "$GITHUB_ENV"
+          npm run licenses:sources
+
       - name: Build unsigned Linux test packages
         if: runner.os == 'Linux' && github.event_name == 'pull_request'
         run: npm run bundle:test:linux
+
+      - name: Verify Linux distribution source and notice payload
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: |
+          node scripts/stage_linux_sources.mjs
+          node scripts/stage_distribution_licenses.mjs
+          npm run tauri -- bundle --config src-tauri/tauri.dev.conf.json --ci
+          npm run check:distribution
 
       - name: Upload unsigned Linux test packages
         if: runner.os == 'Linux' && github.event_name == 'pull_request'

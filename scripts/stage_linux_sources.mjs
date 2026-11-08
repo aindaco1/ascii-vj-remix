@@ -19,6 +19,7 @@ import {
   filesBelow,
 } from "./lib/distribution_licenses.mjs";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
+import { inspectAppImageRuntime, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 if (process.platform !== "linux")
   throw new Error("Native Linux source capture requires the packaging host");
 const root = fileURLToPath(new URL("..", import.meta.url)),
@@ -49,36 +50,13 @@ try {
   // statically linked libraries need a separate, reviewed source/build bundle.
   const runtimeEvidence = path.join(
     root,
-    "third_party/appimage-runtime/evidence.json",
+    ".compliance/appimage-runtime/evidence.json",
   );
-  let evidence;
-  try {
-    evidence = JSON.parse(await readFile(runtimeEvidence));
-  } catch {
-    throw new Error(
-      "AppImage runtime source provenance missing; see third_party/appimage-runtime/README.md",
-    );
-  }
   const image = path.join(bundle, images[0]);
   const offset = Number(run(image, ["--appimage-offset"]).trim());
   const bytes = await readFile(image);
-  if (
-    !Number.isSafeInteger(offset) ||
-    offset <= 0 ||
-    offset >= bytes.length ||
-    sha256(bytes.subarray(0, offset)) !== evidence.runtimeSha256
-  )
-    throw new Error(
-      "AppImage runtime does not match reviewed source provenance",
-    );
+  await inspectAppImageRuntime(root, bytes, offset);
   const runtimeSources = path.join(root, ".compliance/runtime-sources.tar.gz");
-  if (
-    !evidence.sourceSha256 ||
-    sha256(await readFile(runtimeSources)) !== evidence.sourceSha256
-  )
-    throw new Error(
-      "Reviewed AppImage runtime source archive missing or changed",
-    );
   await cp(
     runtimeSources,
     path.join(source, "appimage-runtime-sources.tar.gz"),
@@ -88,7 +66,7 @@ try {
     path.join(source, "appimage-runtime-evidence.json"),
   );
   await cp(
-    path.join(root, "third_party/appimage-runtime/notices"),
+    path.join(root, ".compliance/appimage-runtime/notices"),
     path.join(out, "native/appimage-runtime"),
     { recursive: true },
   );
@@ -101,11 +79,12 @@ try {
     }
     return r;
   }
-  for (const file of (await scan(temp)).filter((p) =>
-    /\.so(?:\.|$)/.test(path.basename(p)),
-  )) {
+  for (const file of await scan(temp)) {
+    const data = await readFile(file);
+    if (!isElf(data)) continue;
+    const relative = path.relative(temp, file);
+    if (separatelyCoveredElf(relative)) continue;
     const name = path.basename(file);
-    if (name.startsWith("libndi")) continue;
     const matches = run("dpkg-query", ["-S", `*/${name}`])
       .trim()
       .split("\n");
@@ -127,8 +106,8 @@ try {
     const [pkg, version, binary] = origins[0];
     packages.set(`${pkg}=${version}`, { pkg, version, binary });
     files.push({
-      file: path.relative(temp, file),
-      sha256: sha256(await readFile(file)),
+      file: relative,
+      sha256: sha256(data),
       sourcePackage: pkg,
       sourceVersion: version,
     });
@@ -155,15 +134,13 @@ try {
   // the packaging recipe alongside source packages (no binary-only offer).
   const scripts = path.join(source, "packaging");
   await mkdir(scripts, { recursive: true });
-  for (const file of (await scan(temp)).filter(
-    (p) => path.basename(p) === "AppRun" || p.endsWith(".sh"),
-  )) {
+  for (const file of await scan(temp)) {
     const data = await readFile(file);
-    if (data.subarray(0, 2).toString() !== "#!")
-      throw new Error(`Unreviewed launcher binary: ${file}`);
+    if (data.subarray(0, 2).toString() !== "#!") continue;
     const dest = path.join(scripts, path.relative(temp, file));
     await mkdir(path.dirname(dest), { recursive: true });
     await cp(file, dest);
+    files.push({ file: path.relative(temp, file), sha256: sha256(data), sourceScript: path.relative(source, dest) });
   }
   await cp(
     path.join(root, ".github/workflows/release-desktop.yml"),

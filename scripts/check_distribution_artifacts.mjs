@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
+import { inspectAppImageRuntime, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 import {
   verifyManifest,
   verifySourceBundle,
@@ -129,20 +130,17 @@ try {
             `${path.basename(archive)} missing/changed legal resource: ${f.path}`,
           );
       if (archive.endsWith(".AppImage")) {
-        const evidence = JSON.parse(await readFile(path.join(root, "third_party/appimage-runtime/evidence.json")));
         const offset = Number(execFileSync(archive, ["--appimage-offset"], { encoding: "utf8" }).trim());
         const bytes = await readFile(archive);
-        if (!Number.isSafeInteger(offset) || offset <= 0 || offset >= bytes.length || sha256(bytes.subarray(0, offset)) !== evidence.runtimeSha256) {
-          throw new Error("Final AppImage runtime differs from reviewed source provenance");
-        }
+        await inspectAppImageRuntime(root, bytes, offset);
         const native = JSON.parse(
           await readFile(path.join(licenses, "native-system-catalog.json")),
         );
-        for (const p of files.filter((p) =>
-          /\.so(?:\.|$)/.test(path.basename(p)),
-        )) {
-          if (path.basename(p).startsWith("libndi")) continue;
-          const hash = sha256(await readFile(p));
+        for (const p of files) {
+          const data = await readFile(p);
+          if (!isElf(data) && data.subarray(0, 2).toString() !== "#!") continue;
+          if (isElf(data) && separatelyCoveredElf(path.relative(dest, p))) continue;
+          const hash = sha256(data);
           if (!native.files.some((f) => f.sha256 === hash))
             throw new Error(`Unrecorded AppImage library: ${path.basename(p)}`);
         }
