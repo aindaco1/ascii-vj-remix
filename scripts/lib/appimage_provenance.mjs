@@ -13,7 +13,7 @@ export function verifyAppImageRuntime({ image, offset, evidence, sources, inputs
   if (sha256(sources) !== evidence.sourceSha256) {
     throw new Error("AppImage runtime source archive missing or changed");
   }
-  const packages = new Set(evidence.staticPackages?.map(p => p.origin));
+  const packages = new Set(evidence.staticPackages?.map(p => p.component));
   for (const name of ["musl", "zstd", "zlib", "mimalloc", "gcc"]) {
     if (!packages.has(name)) throw new Error(`Missing static runtime source: ${name}`);
   }

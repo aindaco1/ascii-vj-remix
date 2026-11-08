@@ -205,6 +205,9 @@ jobs:
           ASCILINE_NATIVE_OUTPUT_REPORT_PATH: tmp-smoke-native/report.json
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
+            images=(src-tauri/target/release/bundle/appimage/*.AppImage)
+            test "${#images[@]}" -eq 1
+            export ASCILINE_SOURCE_APP="$GITHUB_WORKSPACE/${images[0]}"
             xvfb-run -a npm run smoke:native-output
           else
             npm run smoke:native-output

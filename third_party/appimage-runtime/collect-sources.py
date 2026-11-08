@@ -13,7 +13,7 @@ out = Path('/output')
 source = out / 'sources'
 notices = out / 'notices'
 archives = sorted(set(re.findall(r'([^\s()]+\.a)(?:\(|\s)', (out / 'runtime.map').read_text())))
-allowed = {'libc.a', 'libm.a', 'libpthread.a', 'libgcc.a', 'libgcc_eh.a',
+allowed = {'libc.a', 'libm.a', 'libpthread.a', 'libssp_nonshared.a', 'libgcc.a', 'libgcc_eh.a',
            'libsquashfuse.a', 'libsquashfuse_ll.a', 'libfuse3.a', 'libzstd.a', 'libz.a', 'libmimalloc.a'}
 assert archives, 'Empty static linker inventory'
 assert all(Path(p).name in allowed for p in archives), f'Unrecorded static library: {archives}'
@@ -25,10 +25,14 @@ for record in Path('/lib/apk/db/installed').read_text().split('\n\n'):
 
 # These static archives are selected by the pinned runtime Makefile and clang.
 # gcc includes the libgcc runtime exception as well as its complete sources.
-packages = ['musl-dev', 'zstd-static', 'zlib-static', 'mimalloc-dev', 'libgcc']
+packages = [('musl', '/usr/lib/libc.a'), ('zstd', '/usr/lib/libzstd.a'),
+            ('zlib', '/usr/lib/libz.a'), ('mimalloc', '/usr/lib/libmimalloc.a'),
+            ('gcc', next(p for p in archives if Path(p).name == 'libgcc.a'))]
 records = []
-for binary in packages:
-    fields = installed[binary]
+for component, library in packages:
+    owner = subprocess.check_output(['apk', 'info', '-W', library], text=True).split(' is owned by ', 1)[1].strip()
+    fields = next(p for p in installed.values() if p['P'] + '-' + p['V'] == owner)
+    binary = fields['P']
     origin, commit = fields['o'], fields['c']
     folder = source / 'alpine' / origin
     folder.mkdir(parents=True)
@@ -51,7 +55,7 @@ for binary in packages:
     dist.mkdir()
     env = {**os.environ, 'SRCDEST': str(dist)}
     subprocess.run(['abuild', '-F', 'fetch', 'verify'], cwd=folder, env=env, check=True)
-    records.append({'binary': binary, 'version': fields['V'], 'origin': origin,
+    records.append({'component': component, 'binary': binary, 'version': fields['V'], 'origin': origin,
                     'aportsCommit': commit, 'license': fields['L'], 'recipeUrl': url})
 
 # The complete downloaded archives are retained above; copy their original

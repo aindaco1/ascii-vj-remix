@@ -16,7 +16,7 @@ test("AppImage publication rejects changed runtime, source, inputs or missing st
   const runtime = Buffer.from("runtime"), sources = Buffer.from("complete preferred source"), inputs = Buffer.from("reviewed inputs");
   const fixture = { image: Buffer.concat([runtime, Buffer.from("payload")]), offset: runtime.length, sources, inputs,
     evidence: { schema: 1, runtimeSha256: sha256(runtime), sourceSha256: sha256(sources), inputsSha256: sha256(inputs),
-      staticPackages: ["musl", "zstd", "zlib", "mimalloc", "gcc"].map(origin => ({ origin })) } };
+      staticPackages: ["musl", "zstd", "zlib", "mimalloc", "gcc"].map(component => ({ component })) } };
   verifyAppImageRuntime(fixture);
   for (const offset of [0, -1, NaN, 1.2, fixture.image.length]) assert.throws(() => verifyAppImageRuntime({ ...fixture, offset }));
   assert.throws(() => verifyAppImageRuntime({ ...fixture, image: Buffer.from("corrupted image") }), /runtime/);
