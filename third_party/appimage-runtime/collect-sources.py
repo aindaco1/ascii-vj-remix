@@ -29,6 +29,7 @@ packages = [('musl', '/usr/lib/libc.a'), ('zstd', '/usr/lib/libzstd.a'),
             ('zlib', '/usr/lib/libz.a'), ('mimalloc', '/usr/lib/libmimalloc.a'),
             ('gcc', next(p for p in archives if Path(p).name == 'libgcc.a'))]
 records = []
+alpine_series = '.'.join(Path('/etc/alpine-release').read_text().strip().split('.')[:2])
 for component, library in packages:
     owner = subprocess.check_output(['apk', 'info', '-W', library], text=True).split(' is owned by ', 1)[1].strip()
     fields = next(p for p in installed.values() if p['P'] + '-' + p['V'] == owner)
@@ -53,7 +54,10 @@ for component, library in packages:
     archive.unlink()
     dist = folder / 'distfiles'
     dist.mkdir()
-    env = {**os.environ, 'SRCDEST': str(dist)}
+    # Prefer Alpine's preserved distfiles over transient upstream responses.
+    # abuild still verifies the exact APKBUILD checksums and falls back upstream.
+    env = {**os.environ, 'SRCDEST': str(dist),
+           'DISTFILES_MIRROR': f'https://distfiles.alpinelinux.org/distfiles/v{alpine_series}'}
     subprocess.run(['abuild', '-F', 'fetch', 'verify'], cwd=folder, env=env, check=True)
     # abuild creates disposable links in src/ to these already-retained inputs.
     # Ship the recipes, patches and distfiles without container-absolute links.

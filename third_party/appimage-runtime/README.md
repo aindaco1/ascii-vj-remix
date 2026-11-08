@@ -13,6 +13,8 @@ recipe with checked libfuse/squashfuse archives. It records the linker map and
 collects the actual Alpine source recipes, patches, checksum-verified archives
 and notices for static musl, zstd, zlib, mimalloc and libgcc. The source bundle
 contains the complete pinned upstream sources and the local build recipe.
+Source downloads prefer Alpine's versioned distfiles mirror using `abuild`'s
+standard mirror support; the original recipe checksums remain mandatory.
 
 The launcher is AppImageKit's original shell AppRun, staged in Tauri's cache.
 It replaces the opaque old prebuilt AppRun. Generated GTK wrappers are captured
