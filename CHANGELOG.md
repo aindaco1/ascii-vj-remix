@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added an opt-in macOS complimentary-license pilot with Keychain-backed Rust activation and authenticated signed updates; default release feeds and installed offline use remain unchanged.
+
+- Bundle the original app and component notices in an offline Software licenses
+  panel, record public-domain demo-footage provenance, and retain the VCR font
+  pending explicit redistribution evidence.
+- Generate locked dependency/FFmpeg source archives and verify legal resources,
+  source hashes and release identity before publication. Linux additionally
+  requires reviewed AppImage runtime and bundled distro-library sources.
+
 ## [1.3.2] - 2026-10-29
 
 - Preserve media volume, mute, and looping across visual presets, playlists, and WTF. Older saved presets no longer override these playback settings.

@@ -7,6 +7,11 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
 
 ## Distribution and Platform Validation
 
+- Prepare paid future builds, updates, and support using the
+  [draft customer language, Entitle eligibility memo, and distribution review](proposals/paid-distribution-review.md).
+  Resolve the documented notice/source-delivery findings before paid release;
+  preserve existing license restrictions and offline use after coverage expiry.
+
 - Complete the remaining physical checks for the owner-approved
   [1.1.0 Spatial ASCII release](releases/RELEASE_1.1.0.md#release-decision--2026-09-29):
   reference-floor performance, camera/audio/GPU behavior on Windows/Linux,

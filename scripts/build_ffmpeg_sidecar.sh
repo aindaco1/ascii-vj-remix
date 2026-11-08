@@ -156,3 +156,5 @@ node "$ROOT/scripts/stage_ffmpeg_sidecars.mjs" \
   --license "$LICENSE" \
   --source "$SOURCE_NOTE" \
   --variant "$VARIANT"
+
+node "$ROOT/scripts/stage_ffmpeg_sources.mjs" --archive "$TARBALL"

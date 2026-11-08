@@ -50,6 +50,9 @@ function checkNoOnlineUrls(label, value, allowedPrefixes = allowedRemoteDevPrefi
 }
 
 const config = JSON.parse(await readFile(configPath, 'utf8'));
+if (!config?.bundle?.resources?.includes('resources/licenses/**/*')) {
+  issues.push('desktop packages must retain the generated license resource collection');
+}
 const devConfig = JSON.parse(await readFile(devConfigPath, 'utf8'));
 const linuxConfig = JSON.parse(await readFile(linuxConfigPath, 'utf8'));
 const notarizedConfig = JSON.parse(await readFile(notarizedConfigPath, 'utf8'));
@@ -344,7 +347,7 @@ if (!mainCapability) {
       issues.push(`main capability must include ${permission}`);
     }
   }
-  const tauriAdapter = await readFile(tauriAdapterPath, 'utf8') + await readFile(path.join(root, 'renderers/desktop/video-io.js'), 'utf8');
+  const tauriAdapter = await readFile(tauriAdapterPath, 'utf8') + await readFile(path.join(root, 'renderers/desktop/video-io.js'), 'utf8') + await readFile(path.join(root, 'renderers/desktop/distribution-licenses.js'), 'utf8') + await readFile(path.join(root, 'renderers/desktop/software-licensing.js'), 'utf8');
   const invokedCommands = new Set(
     [...tauriAdapter.matchAll(/\binvoke(?:Tauri)?\(\s*['"]([a-z][a-z0-9_]*)['"]/g)]
       .map((match) => match[1])

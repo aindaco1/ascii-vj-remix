@@ -439,8 +439,22 @@ async fn run_updater_smoke(
         builder = builder.installer_args(["/qn", "/norestart"]);
     }
 
-    let updater = builder.build().map_err(|error| error.to_string())?;
-    let update = updater.check().await.map_err(|error| error.to_string())?;
+    let update = if crate::software_licensing::software_license_status(handle.clone()).await?.enabled {
+        #[cfg(debug_assertions)]
+        if let Ok(path) = env::var("ASCII_LICENSING_SMOKE_KEY_FILE") {
+            let key=std::fs::read_to_string(path).map_err(|_|"Synthetic license fixture unavailable")?;
+            crate::software_licensing::activate_software_license(handle.clone(),key).await?;
+        }
+        #[cfg(debug_assertions)]
+        if env::var_os("ASCII_LICENSING_SMOKE_EXPECT_ACTIVATED").is_some()
+            && !crate::software_licensing::software_license_status(handle.clone()).await?.activated
+        {
+            return Err("expected a persisted activated license".into());
+        }
+        crate::software_licensing::private_update(&handle).await?
+    } else {
+        builder.build().map_err(|error| error.to_string())?.check().await.map_err(|error| error.to_string())?
+    };
     let Some(update) = update else {
         if expected_version.is_some() {
             return Err("expected an update, but updater reported no update".to_string());

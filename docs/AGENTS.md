@@ -66,7 +66,10 @@ ASCII/cell visuals.
 - Intentional online runtime paths are limited to the production app's bounded
   release-metadata check for signed updater artifacts at launch, explicit
   updater download/install actions, and production-only reviewed/sanitized
-  crash report submission. User-enabled NDI® discovery/input/output is an
+  crash report submission. Explicitly configured macOS licensing pilot builds
+  also allow Rust-only activation and authenticated signed private updates;
+  installed rendering/use must remain independent of entitlement and networking.
+  See [pilot boundaries](proposals/software-licensing-pilot.md). User-enabled NDI® discovery/input/output is an
   explicit LAN video-sharing path; Syphon is local to the Mac. See
   [native transport security](SECURITY.md#native-video-transport-boundary).
 - Preserve the app name: ASCII VJ Remix.

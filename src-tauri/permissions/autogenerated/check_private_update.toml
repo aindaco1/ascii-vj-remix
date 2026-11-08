@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-private-update"
+description = "Enables the check_private_update command without any pre-configured scope."
+commands.allow = ["check_private_update"]
+
+[[permission]]
+identifier = "deny-check-private-update"
+description = "Denies the check_private_update command without any pre-configured scope."
+commands.deny = ["check_private_update"]

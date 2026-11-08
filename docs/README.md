@@ -13,6 +13,7 @@ release records and benchmark evidence.
 | [ascii.today Character Presets](ASCII_TODAY_PRESETS.md) | Included ramps, source credits, and the preset-pack contract. |
 | [Changelog](../CHANGELOG.md) | Released and unreleased changes. |
 | [Roadmap](ROADMAP.md) | Prospective work and deferred validation. |
+| [Paid distribution review](proposals/paid-distribution-review.md) | Draft use restrictions, publisher eligibility, and source/artifact findings; not published customer terms. |
 
 ## Development and Architecture
 
@@ -70,3 +71,6 @@ references together. Validate local links and run `git diff --check`.
 The [1.3.0 Native Video I/O release record](releases/RELEASE_1.3.0.md) owns the
 published installer/updater evidence, cleanup and remaining manual acceptance.
 The [1.2.0 record](releases/RELEASE_1.2.0.md) retains the previous release's evidence.
+
+- [Complimentary private-update pilot](proposals/software-licensing-pilot.md):
+  Rust/Keychain activation, existing updater integration and test-only acceptance.

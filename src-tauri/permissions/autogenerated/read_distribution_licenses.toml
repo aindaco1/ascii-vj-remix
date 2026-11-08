@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-distribution-licenses"
+description = "Enables the read_distribution_licenses command without any pre-configured scope."
+commands.allow = ["read_distribution_licenses"]
+
+[[permission]]
+identifier = "deny-read-distribution-licenses"
+description = "Denies the read_distribution_licenses command without any pre-configured scope."
+commands.deny = ["read_distribution_licenses"]

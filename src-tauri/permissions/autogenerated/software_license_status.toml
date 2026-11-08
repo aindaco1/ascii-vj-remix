@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-software-license-status"
+description = "Enables the software_license_status command without any pre-configured scope."
+commands.allow = ["software_license_status"]
+
+[[permission]]
+identifier = "deny-software-license-status"
+description = "Denies the software_license_status command without any pre-configured scope."
+commands.deny = ["software_license_status"]

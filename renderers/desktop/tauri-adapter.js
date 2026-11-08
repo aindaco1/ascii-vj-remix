@@ -44,7 +44,8 @@ function isTauriRuntime() {
 async function isTauriUpdaterAvailable() {
     if (!isTauriRuntime()) return false;
     try {
-        return await getName() === PRODUCTION_APP_NAME;
+        const license = await invokeTauri('software_license_status');
+        return license.enabled || await getName() === PRODUCTION_APP_NAME;
     } catch (error) {
         console.warn('[Updater] Could not verify the production app identity:', error);
         return false;
@@ -415,7 +416,21 @@ async function saveTauriScreenshot(pngBytes) {
 
 async function checkTauriUpdate(options = {}) {
     if (!isTauriRuntime()) return null;
-    return checkForTauriUpdate(options);
+    const license = await invokeTauri('software_license_status');
+    if (!license.enabled) return checkForTauriUpdate(options);
+    const update = await invokeTauri('check_private_update');
+    if (!update) return null;
+    return {
+        ...update,
+        async downloadAndInstall(onEvent) {
+            const unlisten = await listen('software-license-update-progress', event => onEvent?.(event.payload));
+            try {
+                onEvent?.({ event: 'Started', data: {} });
+                await invokeTauri('install_private_update', { version: update.version });
+                onEvent?.({ event: 'Finished', data: {} });
+            } finally { unlisten(); }
+        }
+    };
 }
 
 async function installTauriUpdate(update, onEvent, options = {}) {

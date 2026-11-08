@@ -2,6 +2,8 @@ pub mod bundled_media;
 pub mod ci_smoke;
 pub mod crash_reporter;
 pub mod desktop_bridge;
+pub mod distribution_licenses;
+pub mod software_licensing;
 pub mod media_engine;
 pub mod media_permissions;
 pub mod midi;
@@ -15,6 +17,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(software_licensing::LicensingState::default())
         .manage(desktop_bridge::MediaRegistry::default())
         .manage(desktop_bridge::MediaSessions::default())
         .manage(desktop_bridge::RawVideoSessions::default())
@@ -37,6 +40,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            distribution_licenses::read_distribution_licenses,
+            software_licensing::software_license_status,
+            software_licensing::activate_software_license,
+            software_licensing::check_private_update,
+            software_licensing::install_private_update,
             crash_reporter::get_crash_report_state,
             crash_reporter::set_crash_report_preference,
             crash_reporter::capture_crash_report,
