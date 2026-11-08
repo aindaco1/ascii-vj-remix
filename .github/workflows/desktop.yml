@@ -168,11 +168,14 @@ jobs:
           sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
           sudo apt-get install -y 7zip
+          sevenzip=$(command -v 7zz || command -v 7z)
+          echo "ASCII_SEVENZIP=$sevenzip" >> "$GITHUB_ENV"
           node scripts/stage_appimage_runtime.mjs
           echo "LDAI_RUNTIME_FILE=$GITHUB_WORKSPACE/.compliance/appimage-runtime/runtime-x86_64" >> "$GITHUB_ENV"
           npm run licenses:sources
 
       - name: Build unsigned Linux test packages
+        id: linux-bundle
         if: runner.os == 'Linux' && github.event_name == 'pull_request'
         run: npm run bundle:test:linux
 
@@ -185,7 +188,9 @@ jobs:
           npm run check:distribution
 
       - name: Upload unsigned Linux test packages
-        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        # Retain inspection inputs after a later source/notice check fails.
+        # These test artifacts do not authorize publication; the job must pass.
+        if: always() && runner.os == 'Linux' && github.event_name == 'pull_request' && steps.linux-bundle.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: ascii-vj-remix-linux-test-${{ github.sha }}

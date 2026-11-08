@@ -483,6 +483,8 @@ jobs:
             sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
             sudo apt-get update
             sudo apt-get install -y 7zip
+            sevenzip=$(command -v 7zz || command -v 7z)
+            echo "ASCII_SEVENZIP=$sevenzip" >> "$GITHUB_ENV"
           fi
 
       - name: Bundle notarized macOS app
