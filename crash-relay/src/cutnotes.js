@@ -3,9 +3,11 @@ const workflows = ['record', 'import', 'format'];
 const languages = ['bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hr', 'hu',
   'it', 'lt', 'lv', 'mt', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'uk'];
 const transcribers = ['parakeet', 'macwhisper'];
-const formatters = ['apple', 'codex'];
-const stages = ['recording', 'recording-paused', 'validating', 'transcribing', 'formatting', 'model-download'];
+const formatters = ['apple', 'gemma', 'codex'];
+const stages = ['model_download', 'model_verification', 'recording', 'recording-paused', 'validating', 'transcribing', 'formatting', 'model-download'];
 const failures = [
+  'gemma_formatting_failed', 'gemma_model_invalid', 'gemma_model_missing', 'gemma_runtime_unavailable',
+  'gemma_model_busy', 'gemma_model_unavailable', 'model_license_required', 'output_exists', 'formatter_incomplete',
   'apple_context_window', 'apple_formatting_failed', 'apple_formatting_invalid_result', 'apple_guardrail',
   'apple_model_unavailable', 'audio_not_captured', 'audio_preparation_failed', 'audio_track_missing',
   'cancelled', 'codex_formatting_failed', 'codex_formatting_invalid_result', 'cutnotes_failed',
