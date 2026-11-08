@@ -6,6 +6,11 @@
     "main"
   ],
   "permissions": [
+    "allow-software-license-status",
+    "allow-activate-software-license",
+    "allow-check-private-update",
+    "allow-install-private-update",
+    "allow-read-distribution-licenses",
     "core:app:allow-name",
     "core:event:allow-emit-to",
     "core:event:allow-listen",

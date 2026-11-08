@@ -23,6 +23,11 @@ fn main() {
 
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "read_distribution_licenses",
+            "software_license_status",
+            "activate_software_license",
+            "check_private_update",
+            "install_private_update",
             "get_video_io_status",
             "discover_video_sources",
             "configure_video_io",

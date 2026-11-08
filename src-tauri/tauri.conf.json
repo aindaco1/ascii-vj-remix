@@ -77,7 +77,8 @@
       "../shared/dust-wave-platform/packages/desktop-core/NOTICE",
       "resources/ffmpeg/**/*",
       "../media/**/*",
-      "resources/video-io/**/*"
+      "resources/video-io/**/*",
+      "resources/licenses/**/*"
     ],
     "copyright": "NDI\u00ae is a registered trademark of Vizrt NDI AB."
   },

@@ -231,6 +231,21 @@
                 </section>
 
                 <form id="controls" class="controls"></form>
+                <details class="panel software-license-activation" hidden>
+                    <summary>Software license</summary>
+                    <p>Licensing covers updates and support. Your installed app keeps working offline.</p>
+                    <form>
+                        <label for="software-license-key">License key</label>
+                        <input id="software-license-key" type="password" autocomplete="off" spellcheck="false" minlength="32" maxlength="256" required>
+                        <button type="submit">Activate license</button>
+                    </form>
+                    <p role="status" aria-live="polite"></p>
+                </details>
+                <details class="panel software-licenses">
+                    <summary>Software licenses</summary>
+                    <p role="status"></p>
+                    <iframe src="licenses/index.html" title="Software licenses" sandbox loading="lazy"></iframe>
+                </details>
             </aside>
         </main>
     </div>
@@ -317,6 +332,8 @@
 
     <script type="module" src="codec.js?v=20260617-live-renderer-crossfade"></script>
     <script type="module" src="app.js?v=20260826-launch-update"></script>
+    <script type="module" src="renderers/desktop/distribution-licenses.js"></script>
+    <script type="module" src="renderers/desktop/software-licensing.js"></script>
 </body>
 
 </html>

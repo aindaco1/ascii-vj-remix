@@ -7,6 +7,7 @@ const dist = path.join(root, 'dist');
 
 const runtimeAssets = [
   ['codec.js', 'codec.js'],
+  ['src-tauri/resources/licenses', 'licenses'],
   ['media', 'media'],
   ['assets/fonts', 'assets/fonts'],
   ['renderers/gpu/assets', 'renderers/gpu/assets']

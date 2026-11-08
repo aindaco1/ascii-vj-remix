@@ -65,3 +65,10 @@ experiments/autobahn/reports/
 tmp*/
 src-tauri/frameworks/*.framework/
 src-tauri/frameworks/*.dylib
+
+# Generated compliance resources and complete corresponding source bundles
+.compliance/
+src-tauri/resources/licenses/
+src-tauri/resources/ffmpeg/*/source/
+src-tauri/resources/ffmpeg/*/COPYING.LGPLv2.1
+src-tauri/resources/ffmpeg/*/LICENSE.md

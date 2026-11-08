@@ -474,3 +474,17 @@ Runtime provenance and bundled notices are in `src-tauri/resources/video-io/`.
 Mac nested code is signed with the application's team; library validation is
 not disabled. Release acceptance includes the actual NDI 6.3.2 agreement,
 network permissions/firewall behavior and installed runtime loading.
+
+### Opt-in private licensing pilot
+
+An explicitly configured macOS pilot adds Rust-only key activation and
+bearer-authenticated signed updates. Its endpoint is pinned at build time;
+release builds require HTTPS. Only debug builds accept loopback HTTP. Keychain
+holds the service-scoped installation token, never JavaScript or URLs. Status
+and update checks suppress Keychain prompts; activation is an explicit action.
+Both activation and updater clients reject redirects, and update URLs must stay
+on the pinned service origin. The existing Tauri signature verifier remains
+mandatory. Rendering and installed use do not depend on coverage or connectivity.
+The default shipping configuration remains on the public feed. See the
+[private-update pilot](proposals/software-licensing-pilot.md) for boundaries and
+acceptance gaps.

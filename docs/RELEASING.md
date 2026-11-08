@@ -9,6 +9,57 @@ Version-specific decisions and evidence are kept in
 [release records](releases/README.md). They are historical snapshots, not the
 current release procedure.
 
+## Distribution notices and corresponding source
+
+The consumer owns distribution obligations. `scripts/stage_distribution_licenses.mjs`
+is the single staging owner; its generated `resources/licenses` collection is
+bundled and exposed by the offline **Software licenses** panel. The desktop
+reader opens only that fixed document, including notices added during Linux
+packaging; it is not a general filesystem reader. The iframe has no script or
+IPC permissions. Component terms are independent of paid update/support status.
+
+`npm run licenses:stage` collects original app, font, native, Platform and locked
+dependency notices before compilation. It takes a conservative resolved-source
+superset, including build dependencies, rather than claiming a minimized SBOM.
+`npm run licenses:sources` also creates a per-version/per-platform source tarball
+and SHA-256 record in `.compliance/artifacts`. Complete registry sources include
+MPL files and original notices; FFmpeg's exact pinned source archive, configure
+record and rebuild inputs accompany its sidecars and the source tarball. Sources
+are generated from actual installed locks, not guessed upstream `main` archives.
+
+Release sequence:
+
+1. Stage NDI/Syphon, build FFmpeg from its pinned source and install locked npm/
+   Cargo dependencies. Stage dependency notices before compiling the app.
+2. In the packaging job, create the corresponding source archive, then bundle.
+3. On Linux, capture exact installed distro source packages and full notices
+   for bundled libraries, reviewed AppImage runtime source/build inputs, and
+   launcher scripts; refresh notices and rebundle. The runtime provenance gate
+   intentionally fails until [its inputs](../third_party/appimage-runtime/README.md)
+   are complete. It has not been accepted on this macOS host.
+4. `npm run check:distribution` extracts every expected installer/updater format,
+   checks notice bytes against the staging manifest, detects lock drift and
+   unknown AppImage libraries, and verifies source archive digests, release
+   identity and extracted manifests. Only verified source archives are copied
+   into release assets. `--sources-only` validates source archives locally.
+5. Publish sources beside the corresponding release, verify their actual URLs
+   and hashes, and retain accessible sources independently of subscription
+   status. Existing publication/signature/install gates still apply. A local
+   path or generated `SOURCES.md` URL is not proof of public availability.
+
+Do not commit generated source archives or license collections. Preserve the
+original root anti-advertisement license. Demo/test footage is public domain by
+the publisher's [recorded attestation](../media/PUBLIC-DOMAIN.md). The user chose
+to retain VCR OSD Mono pending redistribution evidence; its author statement is
+preserved, but paid-release clearance remains pending. NDI's component-specific
+terms must not restrict FFmpeg/MPL/other component rights.
+
+November 4 local evidence: offline build and legal-panel browser smoke; 732
+notice files and FFmpeg source manifest verified inside an ad-hoc signed macOS
+development app; Rust tests passed. This is not notarized release, installation,
+Windows/Linux or paid-update acceptance. The initial release audit and remaining
+rights review are in [paid distribution review](proposals/paid-distribution-review.md).
+
 ## Evidence and Release Records
 
 Record the exact version, commit or tag, artifact filename/hash, and tested
@@ -137,6 +188,14 @@ production updates. Public macOS release builds use
 notarization credentials are missing.
 
 ## macOS Release Signing
+
+The established public signing identity is **Developer ID Application: Volver
+Health LLC (PWT3Q52LZ2)**. On November 4, 2026, the installed public 1.3.2 app's
+signature and Gatekeeper assessment confirmed this identity and notarized trust.
+The owner confirmed retaining it for the licensing work. The development app's
+Apple Development certificate also belongs to team `PWT3Q52LZ2`. Keep the release
+identity separate from the legal publisher wording, Fumblers LLC dba Dust Wave;
+this signing continuity does not change that publisher decision.
 
 The supported OS floor is `bundle.macOS.minimumSystemVersion` in
 `src-tauri/tauri.conf.json` (13.0). Tauri/Cargo wrappers and the FFmpeg source

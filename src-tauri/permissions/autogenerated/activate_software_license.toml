@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-activate-software-license"
+description = "Enables the activate_software_license command without any pre-configured scope."
+commands.allow = ["activate_software_license"]
+
+[[permission]]
+identifier = "deny-activate-software-license"
+description = "Denies the activate_software_license command without any pre-configured scope."
+commands.deny = ["activate_software_license"]

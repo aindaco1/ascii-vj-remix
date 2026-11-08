@@ -213,6 +213,9 @@ jobs:
       - name: Stage pinned NDI and Syphon runtimes
         run: npm run video-io:stage
 
+      - name: Stage complete dependency notices
+        run: npm run licenses:stage
+
       - name: Compile release app without bundling
         run: npm run tauri:build -- --no-bundle --ci
 
@@ -463,6 +466,19 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run check:ffmpeg-release
 
+      - name: Create corresponding source archive and notices
+        run: npm run licenses:sources
+
+      - name: Install artifact inspection tool
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then brew install sevenzip; fi
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
+            sudo apt-get update
+            sudo apt-get install -y 7zip
+          fi
+
       - name: Bundle notarized macOS app
         if: runner.os == 'macOS'
         env:
@@ -481,6 +497,19 @@ jobs:
           node "$tooling_script" --profile release
 
       - name: Bundle Linux desktop app
+        if: runner.os == 'Linux'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri -- bundle --ci
+
+      - name: Capture bundled Linux library sources and notices
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/stage_linux_sources.mjs
+          node scripts/stage_distribution_licenses.mjs
+
+      - name: Rebundle Linux with native notices
         if: runner.os == 'Linux'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -513,6 +542,9 @@ jobs:
 
       - name: Collect release assets
         run: node scripts/collect_tauri_release_assets.mjs --profile release
+
+      - name: Verify packaged notices and publishable source archives
+        run: node scripts/check_distribution_artifacts.mjs
 
       - name: Create updater fragment
         run: node scripts/create_tauri_update_fragment.mjs --profile release --repo "${{ github.repository }}" --tag "${{ env.RELEASE_TAG }}" --out "src-tauri/target/release/release-assets/updater-fragment-${{ runner.os }}-${{ runner.arch }}.json"
