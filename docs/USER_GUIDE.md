@@ -560,6 +560,15 @@ FFmpeg decoder when the platform webview rejects them. If a file still does not
 play, verify it with a common MP4/H.264 or VP8/WebM encoding; corrupt or unusual
 container/codec combinations can remain unsupported.
 
+### Update download fails
+
+If Update reports **Install failed** during a download, the current installation
+remains usable. Downloads have a five-minute limit, so a slow connection can
+exceed it. Retry on a stable connection, or download the installer from
+[GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases/latest)
+and follow the [install guide](../README.md#install-guide). Do not disable
+signature checks or macOS security protections.
+
 ### Upgrading from 0.9.6 or 0.9.7
 
 These versions shipped without the main-window capability used by the updater

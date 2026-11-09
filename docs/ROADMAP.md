@@ -35,6 +35,10 @@ work and release history belong in the [Changelog](../CHANGELOG.md).
   using the maintained [hardware checks](TESTING.md#hardware-and-platform-checks).
 - Confirm macOS privacy grants survive an identity-stable public updater hop on
   a clean machine.
+- Improve slow-download updater recovery: reproduce the public 1.3.2 download
+  failure recorded in [1.3.3 acceptance](releases/RELEASE_1.3.3.md), expose a
+  bounded actionable error, and validate retry/timeout behavior without weakening
+  signature or production-identity checks.
 - Decide whether Windows releases need a fixed WebView2 runtime for offline
   installation.
 

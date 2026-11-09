@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.3] - Unreleased
+## [1.3.3] - 2026-11-09
 
 - Added an opt-in macOS complimentary-license pilot with Keychain-backed Rust activation and authenticated signed updates; default release feeds and installed offline use remain unchanged.
 

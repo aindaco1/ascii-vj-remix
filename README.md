@@ -8,10 +8,11 @@ The app is built for VJ-style experimentation: pick a source, choose a preset,
 push the renderer hard, pop the output onto another display, and keep tuning
 the look live while the media keeps running.
 
-The current published version is **1.3.2 — Video Soundtrack Playback**.
-It preserves volume, mute, and looping when changing visual presets,
-running playlists, or using WTF. See the [release record](docs/releases/RELEASE_1.3.2.md) for
-published installer/updater evidence and remaining manual acceptance checks.
+The current published version is **1.3.3 — Distribution Notices**.
+It adds an offline Software licenses panel and publishes corresponding component
+sources alongside the installers. This remains a free release with its public
+updater and offline rendering. See the [release record](docs/releases/RELEASE_1.3.3.md)
+for publication evidence and remaining manual acceptance checks.
 Published artifacts are listed in
 [GitHub Releases](https://github.com/aindaco1/ascii-vj-remix/releases); version-specific
 acceptance evidence lives in the [release records](docs/releases/README.md).

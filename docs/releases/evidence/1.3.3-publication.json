@@ -1,0 +1,608 @@
+{
+  "version": "1.3.3",
+  "recordedAt": "2026-11-09T01:48:32.605921+00:00",
+  "publication": {
+    "url": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.3.3",
+    "publishedAt": "2026-11-09T01:22:31Z",
+    "commit": "45f8f1a8e7b8cbec9e21bbf3a8d2ba2bf8c713c3",
+    "tag": "v1.3.3",
+    "assetCount": 22,
+    "freeRelease": true
+  },
+  "ci": {
+    "commit": "45f8f1a8e7b8cbec9e21bbf3a8d2ba2bf8c713c3",
+    "tag": "v1.3.3",
+    "pr": 54,
+    "prHead": "a550cd9da0db44a0dfb34ad7e7a8aa910da795a4",
+    "prCi": 42538569719,
+    "mainCi": 42542018346,
+    "autoVersion": 42542018350,
+    "releaseRun": 42543256824,
+    "jobs": [
+      {
+        "id": 128922660489,
+        "name": "Resolve immutable release context",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728233,
+        "name": "Require exact Desktop CI success",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728240,
+        "name": "Build linux-x86_64 FFmpeg runtime",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728252,
+        "name": "Build macos-aarch64 FFmpeg runtime",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728313,
+        "name": "Build linux-x86_64 app binary",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728316,
+        "name": "Build windows-x86_64 FFmpeg runtime",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728336,
+        "name": "Build windows-x86_64 app binary",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128922728340,
+        "name": "Build macos-aarch64 app binary",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128925198327,
+        "name": "Bundle macos-aarch64",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128925198362,
+        "name": "Bundle windows-x86_64",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128925198375,
+        "name": "Bundle linux-x86_64",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128928539469,
+        "name": "Publish GitHub Release",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128928813117,
+        "name": "macos-26 install and updater smoke",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128928813162,
+        "name": "windows-latest install and updater smoke",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128928813174,
+        "name": "ubuntu-24.04 install and updater smoke",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "publicDownloads": {
+    "checkedAt": "2026-11-09T01:43:19.508508+00:00",
+    "release": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.3.3",
+    "publishedAt": "2026-11-09T01:22:31Z",
+    "authenticatedDownloads": false,
+    "assets": [
+      {
+        "name": "ASCII.VJ.Remix.app.tar.gz",
+        "bytes": 71616085,
+        "sha256": "818f31385ecdcc6d7e23fc54c92051f6b8124cbc8c91629d64ccb02c04054114",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix.app.tar.gz"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_aarch64.dmg",
+        "bytes": 71349314,
+        "sha256": "56bb51b93c58a8799b7036859e06aaac5fe10879ff4d5278b8516f56b321b941",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_aarch64.dmg"
+      },
+      {
+        "name": "latest.json",
+        "bytes": 5488,
+        "sha256": "1a5a65d696135e3a653216feefc2bf232726af10cef81605a0688fc7a6c564a4",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/latest.json"
+      },
+      {
+        "name": "ASCII.VJ.Remix-1.3.3-1.x86_64.rpm",
+        "bytes": 75692685,
+        "sha256": "e7796faae693872cdf95fc395c10cbe0534814cb5d654925758870a49796d602",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix-1.3.3-1.x86_64.rpm"
+      },
+      {
+        "name": "ASCII.VJ.Remix-1.3.3-1.x86_64.rpm.sig",
+        "bytes": 424,
+        "sha256": "92d801db945d753cdbe94d2000a929537aae0cb3ea69d21a88efac20deadfb2a",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix-1.3.3-1.x86_64.rpm.sig"
+      },
+      {
+        "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+        "bytes": 416,
+        "sha256": "6aa9f60a06e54eeab9327052f50d16e258f06f3f07f31cc5c4219e02b27d8bd2",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix.app.tar.gz.sig"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_amd64.AppImage",
+        "bytes": 146909688,
+        "sha256": "09785ba831038db2c8d0d873d7181fa8bf571518f829eb804d2b2614416efe6d",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_amd64.AppImage"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_amd64.AppImage.sig",
+        "bytes": 428,
+        "sha256": "123018e7a944b26cf787b04305c9d4e023e5b55e0728088304acd7457251c97e",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_amd64.AppImage.sig"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_amd64.deb",
+        "bytes": 75645492,
+        "sha256": "243978b78fd72fc1e238d409dce119d7a652462a9787748178db50b3ca63133b",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_amd64.deb"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_amd64.deb.sig",
+        "bytes": 420,
+        "sha256": "79004818485d836ff67cb828c8f798480ef3272c6cf4c71e937882a081a67b13",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_amd64.deb.sig"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_x64-setup.exe",
+        "bytes": 58988252,
+        "sha256": "391ea1014e3be45d44e78b6f338088517f38b341636bc5b8347639e8c97ddb09",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_x64-setup.exe"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_x64-setup.exe.sig",
+        "bytes": 428,
+        "sha256": "9b1f4e328c18915eb570dab15911273913cabc6bc160c2969df3f6d8f4e7e2b5",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_x64-setup.exe.sig"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_x64_en-US.msi",
+        "bytes": 73628892,
+        "sha256": "51742f9da3e949998465be69d53c4110444cd824a82a31319836889c1fa692a5",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_x64_en-US.msi"
+      },
+      {
+        "name": "ASCII.VJ.Remix_1.3.3_x64_en-US.msi.sig",
+        "bytes": 428,
+        "sha256": "81bc106b10ab386acbc61232d5b4c84a78042dcbabc80197a3a8fc364d337d64",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ASCII.VJ.Remix_1.3.3_x64_en-US.msi.sig"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-linux-x86_64-native-sources.tar.gz",
+        "bytes": 564344840,
+        "sha256": "052cf2156a59035e7ea09f82339c89ea9ef21833ee384372147eed1ac4963a57",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-linux-x86_64-native-sources.tar.gz"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-linux-x86_64-native-sources.tar.gz.json",
+        "bytes": 204,
+        "sha256": "d4122361fb0027b78fdd155fc2811e1228d695e2d3941a1ec2cb19ff20f695a1",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-linux-x86_64-native-sources.tar.gz.json"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-linux-x86_64-sources.tar.gz",
+        "bytes": 57743941,
+        "sha256": "61291b93f7d2352905ccc6668cbe345f2ddb1324bf26060134ff15dfc1fd268e",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-linux-x86_64-sources.tar.gz"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-linux-x86_64-sources.tar.gz.json",
+        "bytes": 218,
+        "sha256": "db45e30fefb17b5eb02ede3e85ac698a03dd794ce1fc610b2c602bb6763d340b",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-linux-x86_64-sources.tar.gz.json"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-macos-aarch64-sources.tar.gz",
+        "bytes": 48548995,
+        "sha256": "9e0268c6438678d1dc66dea5bafba6daab19297ed59afdfe97cd849ea3c26036",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-macos-aarch64-sources.tar.gz"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-macos-aarch64-sources.tar.gz.json",
+        "bytes": 220,
+        "sha256": "396c623262ebdce9c0b3a5b1a140417b4b4c5ca5fdd33797f1c197eb8b369bd4",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-macos-aarch64-sources.tar.gz.json"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-windows-x86_64-sources.tar.gz",
+        "bytes": 79636977,
+        "sha256": "f5b15183f470fe40e8ab03c5e325ecdbbdabb3cc83adbb54c398c7c2eca0e115",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-windows-x86_64-sources.tar.gz"
+      },
+      {
+        "name": "ascii-vj-remix-1.3.3-windows-x86_64-sources.tar.gz.json",
+        "bytes": 222,
+        "sha256": "d4749de9ef8e0da787b64a626ec1f2dc113461a43f6855dae5f207acbdc7d223",
+        "url": "https://github.com/aindaco1/ascii-vj-remix/releases/download/v1.3.3/ascii-vj-remix-1.3.3-windows-x86_64-sources.tar.gz.json"
+      }
+    ],
+    "sourceDigestRecords": "passed",
+    "updaterVersion": "1.3.3"
+  },
+  "publicSourceVerification": {
+    "checkedAt": "2026-11-09T01:44:58.521Z",
+    "results": [
+      {
+        "file": "ascii-vj-remix-1.3.3-macos-aarch64-sources.tar.gz",
+        "manifestFiles": 18187,
+        "result": "passed"
+      },
+      {
+        "file": "ascii-vj-remix-1.3.3-windows-x86_64-sources.tar.gz",
+        "manifestFiles": 18508,
+        "result": "passed"
+      },
+      {
+        "file": "ascii-vj-remix-1.3.3-linux-x86_64-sources.tar.gz",
+        "manifestFiles": 21527,
+        "result": "passed"
+      },
+      {
+        "file": "ascii-vj-remix-1.3.3-linux-x86_64-native-sources.tar.gz",
+        "manifestFiles": 434,
+        "result": "passed"
+      }
+    ]
+  },
+  "localPublicMac": {
+    "trust": {
+      "checkedAt": "2026-11-09T01:31:48.964Z",
+      "dmgTrust": {
+        "schemaVersion": "ascii-vj-remix-macos-dmg-trust-v1",
+        "dmgPath": "ASCII.VJ.Remix_1.3.3_aarch64.dmg"
+      },
+      "mounted": {
+        "schemaVersion": "ascii-vj-remix-macos-dmg-verification-v1",
+        "bytes": 71349314,
+        "layout": {
+          "schemaVersion": "ascii-vj-remix-macos-dmg-layout-v1",
+          "appName": "ASCII VJ Remix.app",
+          "applicationsLink": "/Applications",
+          "entries": [
+            ".VolumeIcon.icns",
+            "ASCII VJ Remix.app",
+            "Applications"
+          ]
+        },
+        "callbackResult": {
+          "version": "1.3.3",
+          "bundleIdentifier": "com.asciline.remix",
+          "team": "PWT3Q52LZ2",
+          "authorities": [
+            "Developer ID Application: Volver Health LLC (PWT3Q52LZ2)",
+            "Developer ID Certification Authority",
+            "Apple Root CA"
+          ],
+          "designatedRequirement": "identifier \"com.asciline.remix\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = PWT3Q52LZ2",
+          "noticeFiles": 733
+        }
+      },
+      "updaterArchiveIdentity": "passed",
+      "previousDesignatedRequirement": "unchanged"
+    },
+    "installedVersion": "1.3.3",
+    "bundleIdentifier": "com.asciline.remix",
+    "team": "PWT3Q52LZ2",
+    "authorities": [
+      "Developer ID Application: Volver Health LLC (PWT3Q52LZ2)",
+      "Developer ID Certification Authority",
+      "Apple Root CA"
+    ],
+    "designatedRequirement": "identifier \"com.asciline.remix\" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = PWT3Q52LZ2",
+    "installationMethod": "Verified official public DMG; in-app download failed before installation",
+    "ui": {
+      "launch": "passed",
+      "existingSettings": "retained",
+      "builtInDemoRendering": "visible",
+      "softwareLicenses": "dark styled, wrapped text and original component notice list visible",
+      "localInAppUpdate": {
+        "result": "download failed before installation",
+        "lastObservedPercentage": 14,
+        "displayedError": "Install failed",
+        "rootCause": "not confirmed; slow download and five-minute timeout are consistent with the observation",
+        "fallback": "Installed the independently verified official public DMG",
+        "hostedThreePlatformUpdaterAcceptance": "passed"
+      }
+    }
+  },
+  "disabledGuards": {
+    "checkedAt": "2026-11-09T01:46:52.387Z",
+    "productionStoreWorker": "store-worker",
+    "softwareLicensingEntitleBindings": [],
+    "repositoryLicensingVariables": [],
+    "productionBackupEnvironmentLicensingVariables": [],
+    "scheduledSoftwareCaptureDefault": false,
+    "paidSalesEnabled": false,
+    "productionLicensingEnabled": false,
+    "scheduledLicensingCaptureEnabled": false,
+    "mutations": []
+  },
+  "cleanup": {
+    "localAllocatedBytesRemoved": 13499006976,
+    "localPathCount": 34,
+    "spaceCaveat": "APFS clones and snapshots can change physical free-space recovery.",
+    "remoteArtifacts": [
+      {
+        "run": 42536192341,
+        "id": 13640675474,
+        "name": "ascii-vj-remix-native-smoke-windows-latest-42536192341-1",
+        "bytes": 356,
+        "status": "removed"
+      },
+      {
+        "run": 42536192341,
+        "id": 13640041948,
+        "name": "ascii-vj-remix-linux-test-23ad5f3349887d9c5ec9cb317ca51a6a7755b4d1",
+        "bytes": 296478366,
+        "status": "removed"
+      },
+      {
+        "run": 42536192341,
+        "id": 13639812917,
+        "name": "ascii-vj-remix-windows-test-23ad5f3349887d9c5ec9cb317ca51a6a7755b4d1",
+        "bytes": 129982500,
+        "status": "removed"
+      },
+      {
+        "run": 42533833480,
+        "id": 13639387293,
+        "name": "ascii-vj-remix-linux-test-66149b769ccc9cb7e75d54bf9194a9c26bf9a9f9",
+        "bytes": 296427490,
+        "status": "removed"
+      },
+      {
+        "run": 42531484417,
+        "id": 13639245535,
+        "name": "ascii-vj-remix-windows-test-33b0f26852338411b01786a4abc640921aa81931",
+        "bytes": 130436755,
+        "status": "removed"
+      },
+      {
+        "run": 42531484417,
+        "id": 13638961798,
+        "name": "ascii-vj-remix-native-smoke-windows-latest-42531484417-1",
+        "bytes": 352,
+        "status": "removed"
+      },
+      {
+        "run": 42531484417,
+        "id": 13638516422,
+        "name": "ascii-vj-remix-linux-test-33b0f26852338411b01786a4abc640921aa81931",
+        "bytes": 293553215,
+        "status": "removed"
+      },
+      {
+        "run": 42529458712,
+        "id": 13637408383,
+        "name": "ascii-vj-remix-native-smoke-windows-latest-42529458712-1",
+        "bytes": 350,
+        "status": "removed"
+      },
+      {
+        "run": 42529458712,
+        "id": 13637054416,
+        "name": "ascii-vj-remix-windows-test-93d4d633401bf7732f1346bcd925e1363a8b3daa",
+        "bytes": 130457600,
+        "status": "removed"
+      }
+    ],
+    "remoteArtifactBytesRemoved": 1277336984,
+    "taskContainersRemoved": 3,
+    "taskImagesRemoved": 7,
+    "remoteBranchesRemoved": 13,
+    "localBranchesRemoved": 12,
+    "branches": [
+      {
+        "repository": "dust-wave-platform",
+        "branch": "codex/licensing-planning-record",
+        "head": "77d0a94d0455c4c13e40255816da257cb584f339",
+        "merge": "eeee313b85340481913772ccc0ced1bfdbe5808a",
+        "removed": [
+          "local"
+        ],
+        "recovery": "platform-planning-branch.bundle"
+      },
+      {
+        "repository": "ascii-vj-remix",
+        "branch": "codex/licensing-distribution-groundwork",
+        "head": "3d2b0c07bfbdfda3ade948eca9a824bf1ec3e529",
+        "merge": "df6000435a8001140d5db25bed64b9fe76d45e51",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "ascii-groundwork-branch.bundle"
+      },
+      {
+        "repository": "ascii-vj-remix",
+        "branch": "codex/release-1.3.3",
+        "head": "a550cd9da0db44a0dfb34ad7e7a8aa910da795a4",
+        "merge": "45f8f1a8e7b8cbec9e21bbf3a8d2ba2bf8c713c3",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "ascii-release-branch.bundle"
+      },
+      {
+        "repository": "dust-wave-licensing",
+        "branch": "codex/deployed-source-recovery",
+        "head": "6776d36718f26aee3b03a725986fd9b3bd20cd38",
+        "merge": "8c9b1b41ee10cbbdc2ed895279ba292d8cfa6677",
+        "removed": [
+          "remote"
+        ],
+        "recovery": "main ancestry"
+      },
+      {
+        "repository": "dust-wave-licensing",
+        "branch": "codex/license-administration",
+        "head": "a7af5349458bd533ddb97213cc4e1f7a6444f8f3",
+        "merge": "d224d6475144b80439b3f44f9bf93eb28aada324",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "licensing-merged-branches.bundle"
+      },
+      {
+        "repository": "dust-wave-licensing",
+        "branch": "codex/server-secret-rotation",
+        "head": "e84e61090de73c921096c0a86449e9265229d98b",
+        "merge": "5b5f398a95a7b03ba14a8a51981064ea973432b3",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "licensing-merged-branches.bundle"
+      },
+      {
+        "repository": "dust-wave-licensing",
+        "branch": "codex/native-rotation-acceptance",
+        "head": "274be923d2cb75446a09dba6c445977fcce8d56e",
+        "merge": "ed90bcf86beaccab54c5755b5afc5c01132e278b",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "licensing-merged-branches.bundle"
+      },
+      {
+        "repository": "dust-wave-licensing",
+        "branch": "codex/provider-acceptance",
+        "head": "8c9b1b41ee10cbbdc2ed895279ba292d8cfa6677",
+        "merge": "8c9b1b41ee10cbbdc2ed895279ba292d8cfa6677",
+        "removed": [
+          "local"
+        ],
+        "recovery": "main ancestry"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-secret-activation",
+        "head": "641cd36853fcb93d216c4dba39e4e2ac566eca8a",
+        "merge": "7bb1f44a6e5a8ed99840043607c3c01a09a355d1",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "store-merged-branches.bundle"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-secret-recovery",
+        "head": "9779d6ebbbd2ae528fd5e8718105aec6415d8a36",
+        "merge": "de0f0ea9295267a604c0f31d8b325f23fd1baa7f",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "store-merged-branches.bundle"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-administration",
+        "head": "609cf0e3142b57c231159d2db88953c10a756d96",
+        "merge": "53f2bd03b56dacc3cb57c704502cbe0812160f4e",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "store-merged-branches.bundle"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-provider-acceptance",
+        "head": "4bd84683519443411f55693ca8a68d7872fd7b95",
+        "merge": "982e165a9f04fea868d35a5697a60426af592d29",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "main ancestry"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-deployed-source",
+        "head": "292b46bea4d736507941507c4e773f7610c90329",
+        "merge": "eb9ed3e60d2feb840536b2e873490dd9e14f4bab",
+        "removed": [
+          "remote",
+          "local"
+        ],
+        "recovery": "main ancestry"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-recovery-runner",
+        "head": "e676b8b89435c63b668ee0d0e04928ca83190722",
+        "merge": "3f605e2dcb4b3d7959e2afcce599395ff0e1a4e9",
+        "removed": [
+          "remote"
+        ],
+        "recovery": "main ancestry"
+      },
+      {
+        "repository": "store",
+        "branch": "codex/licensing-recovery-review",
+        "head": "bcfd956f1c7f7e4d136397263243a463d89d12d3",
+        "merge": "ffdc2a6dff34374a06808e3bdfb75e8de74a2db1",
+        "removed": [
+          "remote"
+        ],
+        "recovery": "main ancestry"
+      }
+    ],
+    "retained": [
+      "Production 1.3.3 and Dev apps",
+      "Source, dependencies, dist, staged runtimes and pinned SDK/source inputs",
+      "Optimized Rust release cache",
+      "All current public release assets and current successful CI artifacts",
+      "Verified 1.3.2 Mac rollback archives and original installed app",
+      "Small acceptance logs, receipts and Git recovery bundles",
+      "User media, preferences, signing material, recovery stash and other active worktrees",
+      "Public releases, tags and historical source offers",
+      "Unrelated Store edits and the separate Platform planning draft"
+    ]
+  },
+  "limitations": [
+    "The local 1.3.2 GUI updater download failed before installation; official DMG fallback passed. The root cause was not confirmed.",
+    "Windows installers remain an unsigned preview.",
+    "Physical camera/audio/MIDI/display, older macOS and performance acceptance remain separate follow-ups.",
+    "VCR font paid-distribution clearance remains pending; no paid release authorized."
+  ]
+}
