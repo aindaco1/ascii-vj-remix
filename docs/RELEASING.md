@@ -17,6 +17,8 @@ bundled and exposed by the offline **Software licenses** panel. The desktop
 reader opens only that fixed document, including notices added during Linux
 packaging; it is not a general filesystem reader. The iframe has no script or
 IPC permissions. Component terms are independent of paid update/support status.
+Its bundled stylesheet works under the production CSP; do not replace it with
+inline styles or relax the app's security policy for this document.
 
 `npm run licenses:stage` collects original app, font, native, Platform and locked
 dependency notices before compilation. It takes a conservative resolved-source
@@ -34,9 +36,11 @@ Release sequence:
 2. In the packaging job, create the corresponding source archive, then bundle.
 3. On Linux, capture exact installed distro source packages and full notices
    for bundled libraries, reviewed AppImage runtime source/build inputs, and
-   launcher scripts; refresh notices and rebundle. The runtime provenance gate
-   intentionally fails until [its inputs](../third_party/appimage-runtime/README.md)
-   are complete. It has not been accepted on this macOS host.
+   launcher scripts; refresh notices and rebundle. Build the runtime and stage
+   pinned tools with `node scripts/stage_appimage_runtime.mjs`, then set
+   `LDAI_RUNTIME_FILE` to its absolute output path for both bundles. See the
+   [source/build contract](../third_party/appimage-runtime/README.md). The shared
+   verifier fails if the packaged runtime or corresponding sources change.
 4. `npm run check:distribution` extracts every expected installer/updater format,
    checks notice bytes against the staging manifest, detects lock drift and
    unknown AppImage libraries, and verifies source archive digests, release

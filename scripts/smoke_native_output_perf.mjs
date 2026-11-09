@@ -53,12 +53,17 @@ const launchEnv = {
 
 // The unbundled Windows/Linux executable has no installer resource directory.
 // Use the same verified sidecars that bundle:test just packaged, never PATH.
-if (process.platform !== 'darwin') {
+if (process.platform !== 'darwin' && !sourceApp.endsWith('.AppImage')) {
   run(process.execPath, ['scripts/check_ffmpeg_resources.mjs', '--require-current-platform']);
   const sidecars = path.join(root, 'src-tauri', 'resources', 'ffmpeg', hostPlatformId(), 'bin');
   const suffix = process.platform === 'win32' ? '.exe' : '';
   launchEnv.ASCILINE_FFMPEG = path.join(sidecars, `ffmpeg${suffix}`);
   launchEnv.ASCILINE_FFPROBE = path.join(sidecars, `ffprobe${suffix}`);
+} else if (sourceApp.endsWith('.AppImage')) {
+  // Exercise the actual packaged launcher, libraries and bundled sidecars.
+  delete launchEnv.ASCILINE_FFMPEG;
+  delete launchEnv.ASCILINE_FFPROBE;
+  launchEnv.APPIMAGE_EXTRACT_AND_RUN = '1';
 }
 
 const launch = spawnSync(process.platform === 'darwin' ? 'bash' : sourceApp,

@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { tauriTargetDir } from "./lib/tauri_target_dir.mjs";
+import { extractVerifiedAppImage, isElf, separatelyCoveredElf } from "./lib/appimage_provenance.mjs";
 import {
   verifyManifest,
   verifySourceBundle,
@@ -98,12 +99,17 @@ try {
       await mkdir(dest);
       if (archive.endsWith(".app.tar.gz"))
         execFileSync("tar", ["-xzf", archive, "-C", dest]);
+      else if (archive.endsWith(".AppImage"))
+        await extractVerifiedAppImage(root, archive, dest);
       else
         execFileSync(sevenzip, ["x", "-y", `-o${dest}`, archive], {
           stdio: "pipe",
         });
-      // RPM/DEB/DMG containers can expose a nested filesystem archive.
-      for (let pass = 0; pass < 3; pass++) {
+      // AppImage and updater tar extraction already yield the complete payload.
+      // Do not unpack bundled corresponding-source archives into that inventory.
+      // Other installer containers can expose nested filesystem archives.
+      const nestedPasses = archive.endsWith(".AppImage") || archive.endsWith(".app.tar.gz") ? 0 : 3;
+      for (let pass = 0; pass < nestedPasses; pass++) {
         const nested = (await regularFiles(dest)).filter((p) =>
           /\.(cpio|tar|tar\.xz|tar\.gz|tar\.zst|cab|hfs)$/.test(p),
         );
@@ -129,20 +135,14 @@ try {
             `${path.basename(archive)} missing/changed legal resource: ${f.path}`,
           );
       if (archive.endsWith(".AppImage")) {
-        const evidence = JSON.parse(await readFile(path.join(root, "third_party/appimage-runtime/evidence.json")));
-        const offset = Number(execFileSync(archive, ["--appimage-offset"], { encoding: "utf8" }).trim());
-        const bytes = await readFile(archive);
-        if (!Number.isSafeInteger(offset) || offset <= 0 || offset >= bytes.length || sha256(bytes.subarray(0, offset)) !== evidence.runtimeSha256) {
-          throw new Error("Final AppImage runtime differs from reviewed source provenance");
-        }
         const native = JSON.parse(
           await readFile(path.join(licenses, "native-system-catalog.json")),
         );
-        for (const p of files.filter((p) =>
-          /\.so(?:\.|$)/.test(path.basename(p)),
-        )) {
-          if (path.basename(p).startsWith("libndi")) continue;
-          const hash = sha256(await readFile(p));
+        for (const p of files) {
+          const data = await readFile(p);
+          if (!isElf(data) && data.subarray(0, 2).toString() !== "#!") continue;
+          if (isElf(data) && separatelyCoveredElf(path.relative(dest, p))) continue;
+          const hash = sha256(data);
           if (!native.files.some((f) => f.sha256 === hash))
             throw new Error(`Unrecorded AppImage library: ${path.basename(p)}`);
         }

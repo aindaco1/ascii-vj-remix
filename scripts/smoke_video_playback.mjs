@@ -10,7 +10,12 @@ const platforms = {
     Windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     Linux: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15'
 };
-const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
+const server = await createServer({
+    // These browser dependencies are ESM. Avoid a cold-start optimization reload
+    // racing app initialization in this HMR-disabled acceptance server.
+    optimizeDeps: { noDiscovery: true },
+    server: { host: '127.0.0.1', port: 0, hmr: false, watch: null }
+});
 let browser;
 try {
     await server.listen();

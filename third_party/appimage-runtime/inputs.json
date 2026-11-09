@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "image": "docker.io/library/alpine@sha256:2d8a11041a92082ba21e364dec73559ce44f1de69b60fa68315f6d3774e59117",
+  "runtimeCommit": "fedfad51acc2860b2916a1eef32ba4a500ff31ef",
+  "appRunCommit": "2b8f5b39c41d3895e6b6b88a45b1905f4ffce4ef",
+  "sources": [
+    {
+      "file": "type2-runtime.tar.gz",
+      "url": "https://codeload.github.com/AppImage/type2-runtime/tar.gz/fedfad51acc2860b2916a1eef32ba4a500ff31ef",
+      "sha256": "e27ea3c837e9c660e1a9a2993b673ae93bbb53077330efba8654031e302d4e8e"
+    },
+    {
+      "file": "AppImageKit.tar.gz",
+      "url": "https://codeload.github.com/AppImage/AppImageKit/tar.gz/2b8f5b39c41d3895e6b6b88a45b1905f4ffce4ef",
+      "sha256": "deaee0c6db0ef958d02fdde11b46bc611129b4cd7b50dd4079e7a595af2dd460"
+    },
+    {
+      "file": "fuse-3.15.0.tar.xz",
+      "url": "https://github.com/libfuse/libfuse/releases/download/fuse-3.15.0/fuse-3.15.0.tar.xz",
+      "sha256": "70589cfd5e1cff7ccd6ac91c86c01be340b227285c5e200baa284e401eea2ca0"
+    },
+    {
+      "file": "0.5.2.tar.gz",
+      "url": "https://github.com/vasi/squashfuse/archive/0.5.2.tar.gz",
+      "sha256": "db0238c5981dabbd80ee09ae15387f390091668ca060a7bc38047912491443d3"
+    },
+    {
+      "file": "linuxdeploy-gtk-LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gtk/dda522bce37387f1b853d9095713bfaa924c8423/LICENSE.txt",
+      "sha256": "0718f6cadf38d2662f397591b777884c5389e65b9919aae6aca2bea87a52eac4"
+    }
+  ],
+  "tools": [
+    {
+      "file": "linuxdeploy-x86_64.AppImage",
+      "url": "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage",
+      "sha256": "e762bea85c8eb0d4b3508d46e5c1f037f717d0f9303ae3b4aafc8b04991fa1ef"
+    },
+    {
+      "file": "linuxdeploy-plugin-appimage.AppImage",
+      "url": "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage",
+      "sha256": "49d6a17160675a6bd1781699aae6bdf7692d98552e02a3671d2183d10547842e"
+    },
+    {
+      "file": "linuxdeploy-plugin-gtk.sh",
+      "url": "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gtk/dda522bce37387f1b853d9095713bfaa924c8423/linuxdeploy-plugin-gtk.sh",
+      "sha256": "7804c9eef13e59bf2783aad9882ef9db8f3f3f9e8d631874b1d348d550a3693f"
+    },
+    {
+      "file": "linuxdeploy-plugin-gstreamer.sh",
+      "url": "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gstreamer/2a2e67491c32995a3f279ad0ecbe77abd512b42a/linuxdeploy-plugin-gstreamer.sh",
+      "sha256": "c107b49d84edbffc6ab226ed1007e0626a4f7aa2c3a36b7782bef62351d49e94"
+    }
+  ]
+}

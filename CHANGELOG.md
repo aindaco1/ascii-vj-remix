@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
+## [1.3.3] - Unreleased
 
 - Added an opt-in macOS complimentary-license pilot with Keychain-backed Rust activation and authenticated signed updates; default release feeds and installed offline use remain unchanged.
 
 - Bundle the original app and component notices in an offline Software licenses
   panel, record public-domain demo-footage provenance, and retain the VCR font
   pending explicit redistribution evidence.
+- Build the Linux AppImage launcher from pinned source and include the complete
+  static-runtime and bundled-library source records.
 - Generate locked dependency/FFmpeg source archives and verify legal resources,
   source hashes and release identity before publication. Linux additionally
   requires reviewed AppImage runtime and bundled distro-library sources.

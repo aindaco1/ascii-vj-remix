@@ -162,12 +162,35 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Prepare Linux runtime and corresponding sources
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: |
+          sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+          sudo apt-get install -y 7zip ubuntu-dev-tools
+          sevenzip=$(command -v 7zz || command -v 7z)
+          echo "ASCII_SEVENZIP=$sevenzip" >> "$GITHUB_ENV"
+          node scripts/stage_appimage_runtime.mjs
+          echo "LDAI_RUNTIME_FILE=$GITHUB_WORKSPACE/.compliance/appimage-runtime/runtime-x86_64" >> "$GITHUB_ENV"
+          npm run licenses:sources
+
       - name: Build unsigned Linux test packages
+        id: linux-bundle
         if: runner.os == 'Linux' && github.event_name == 'pull_request'
         run: npm run bundle:test:linux
 
-      - name: Upload unsigned Linux test packages
+      - name: Verify Linux distribution source and notice payload
         if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: |
+          node scripts/stage_linux_sources.mjs
+          node scripts/stage_distribution_licenses.mjs
+          npm run tauri -- bundle --config src-tauri/tauri.dev.conf.json --ci
+          npm run check:distribution
+
+      - name: Upload unsigned Linux test packages
+        # Retain inspection inputs after a later source/notice check fails.
+        # These test artifacts do not authorize publication; the job must pass.
+        if: always() && runner.os == 'Linux' && github.event_name == 'pull_request' && steps.linux-bundle.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: ascii-vj-remix-linux-test-${{ github.sha }}
@@ -187,6 +210,9 @@ jobs:
           ASCILINE_NATIVE_OUTPUT_REPORT_PATH: tmp-smoke-native/report.json
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
+            images=(src-tauri/target/release/bundle/appimage/*.AppImage)
+            test "${#images[@]}" -eq 1
+            export ASCILINE_SOURCE_APP="$GITHUB_WORKSPACE/${images[0]}"
             xvfb-run -a npm run smoke:native-output
           else
             npm run smoke:native-output

@@ -1,24 +1,53 @@
-# AppImage runtime provenance — pending
+# AppImage runtime and packaging provenance
 
-The ELF launcher before the squashfs filesystem is not covered by collecting
-`.so` files. The current AppImage type-2 runtime statically links musl, libfuse,
-squashfuse, zstd and zlib; its MIT notice does not replace those licenses.
-See [upstream license](https://github.com/AppImage/type2-runtime/blob/main/LICENSE)
-and [build instructions](https://github.com/AppImage/type2-runtime/blob/main/BUILD.md).
-These moving links explain the requirement; they are not a source pin.
+`inputs.json` pins runtime/AppImageKit commits and source hashes, the amd64
+Alpine build image, and the packaging tools used by the locked Tauri CLI.
+Moving tool downloads must match the recorded digest; changes fail for review.
+No tool binary is committed or included in the source offer.
 
-Before the next Linux release, pin the **actual** runtime and packaging tools
-selected by the locked Tauri CLI. Collect the exact runtime source, all linked
-dependency sources, patches, configuration, build/link scripts and notices.
-Verify rebuilding/modifying that runtime is possible. Do not substitute an
-arbitrary current upstream archive or omit static libfuse's LGPL obligations.
+Run `node scripts/stage_appimage_runtime.mjs` on Ubuntu with Docker. Local
+verification can select an existing Podman connection with
+`--podman-connection NAME`; it never changes or restarts the shared VM.
+The builder reuses the pinned upstream Makefile, libfuse patch and dependency
+recipe with checked libfuse/squashfuse archives. It records the linker map and
+collects the actual Alpine source recipes, patches, checksum-verified archives
+and notices for static musl, zstd, zlib, mimalloc and libgcc. The source bundle
+contains the complete pinned upstream sources and the local build recipe.
+Source downloads prefer Alpine's versioned distfiles mirror using `abuild`'s
+standard mirror support; the original recipe checksums remain mandatory.
 
-Record the reviewed result in `evidence.json` with `runtimeSha256` (the exact
-bytes before `--appimage-offset`), `sourceSha256`, upstream commits, dependency
-versions, build commands and reviewer/date. Put original notices in `notices/`
-and the complete reviewed source/build archive at
-`.compliance/runtime-sources.tar.gz`. Generated archives stay out of Git.
+The launcher adapts AppImageKit's shell AppRun, staged in Tauri's cache, with the
+same `usr` working directory as its native `src/AppRun.c`. Tauri's GTK plugin
+relocates WebKit helper paths relative to that directory. The source recipe
+records the modification; a build-time regression checks helper lookup and
+argument forwarding when started elsewhere. Generated GTK wrappers are captured
+as source alongside the packaged executables and libraries.
 
-`stage_linux_sources.mjs` fails closed until these inputs exist and match the
-packaged runtime. It then includes them in the versioned Linux native source
-archive. Linux packaging has not been accepted on this macOS development host.
+Set `LDAI_RUNTIME_FILE` to the absolute path of
+`.compliance/appimage-runtime/runtime-x86_64` for both bundling passes. The
+existing linuxdeploy output plugin passes it to appimagetool's `--runtime-file`.
+Desktop PR CI and release CI perform this setup. Default local development
+packaging remains available; it does not replace the distribution gate.
+
+Generated evidence, notices, runtime and source archives stay in `.compliance/`.
+Linux source staging and the final artifact check share a verifier that rejects
+changed inputs, missing static sources, altered source archives and a runtime
+prefix differing from the source-built executable. The sole permitted change is
+the 16-byte `.digest_md5` format checksum written by
+[the pinned appimagetool](https://github.com/AppImage/appimagetool/blob/8c8c91f/src/appimagetool.c#L1011).
+Its location comes from the hashed source-built ELF; all code and other metadata
+remain byte-identical. The complete installer is hashed and updater-signed.
+After verification, the runtime extracts its own squashfs payload for inspection;
+Ubuntu's p7zip-compatible command lacks that decoder. Other installer formats
+use the existing configured 7-Zip command.
+The native source archive
+also covers ELF helpers without `.so` names, distro sources and launcher scripts.
+Install `ubuntu-dev-tools` alongside the inspection tools. If an installed
+binary's exact source version has left the current apt index, source capture uses
+Ubuntu's `pull-lp-source` to retrieve that version from Launchpad, with archive
+checksum verification and an explicit descriptor identity check. It never
+substitutes a newer source version.
+The final payload is verified again after notices are bundled.
+
+Release records identify actual package acceptance. Source capture does not
+claim byte-for-byte reproducible binaries or physical Linux acceptance.

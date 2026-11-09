@@ -68,6 +68,15 @@ export async function verifySourceBundle(root, manifest, identity) {
     throw new Error("Source bundle release identity mismatch");
   return verifyManifest(root, manifest);
 }
+// Both apt-get and pull-lp-source verify source-file checksums. Also require
+// the downloaded descriptor to identify the exact installed source package.
+export function verifyDebianSourceIdentity(descriptor, pkg, version) {
+  for (const [field, expected] of [["Source", pkg], ["Version", version]]) {
+    const values = [...descriptor.matchAll(new RegExp(`^${field}: (.+)\\r?$`, "gm"))];
+    if (values.length !== 1 || values[0][1].trim() !== expected)
+      throw new Error(`Debian source identity mismatch: ${field}`);
+  }
+}
 export const htmlEscape = (value) =>
   String(value).replace(
     /[&<>\"]/g,
