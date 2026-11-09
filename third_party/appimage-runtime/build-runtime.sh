@@ -45,5 +45,6 @@ cp /recipe/* /output/sources/
 cp /inputs/Dockerfile /output/sources/Dockerfile
 cp LICENSE /output/notices/type2-runtime-LICENSE
 python3 /recipe/collect-sources.py
+bash /recipe/test-apprun.sh /output/AppRun-x86_64
 /output/runtime-x86_64 --appimage-version
 printf 'Runtime and corresponding sources built successfully.\n'

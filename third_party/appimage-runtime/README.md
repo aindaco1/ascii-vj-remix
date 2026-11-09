@@ -16,8 +16,11 @@ contains the complete pinned upstream sources and the local build recipe.
 Source downloads prefer Alpine's versioned distfiles mirror using `abuild`'s
 standard mirror support; the original recipe checksums remain mandatory.
 
-The launcher is AppImageKit's original shell AppRun, staged in Tauri's cache.
-It replaces the opaque old prebuilt AppRun. Generated GTK wrappers are captured
+The launcher adapts AppImageKit's shell AppRun, staged in Tauri's cache, with the
+same `usr` working directory as its native `src/AppRun.c`. Tauri's GTK plugin
+relocates WebKit helper paths relative to that directory. The source recipe
+records the modification; a build-time regression checks helper lookup and
+argument forwarding when started elsewhere. Generated GTK wrappers are captured
 as source alongside the packaged executables and libraries.
 
 Set `LDAI_RUNTIME_FILE` to the absolute path of

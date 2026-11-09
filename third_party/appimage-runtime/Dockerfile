@@ -8,5 +8,5 @@ RUN apk add --no-cache \
     zstd-dev zstd-static zlib-dev zlib-static clang musl-dev mimalloc-dev \
     python3 curl ca-certificates
 
-COPY build-runtime.sh collect-sources.py /recipe/
+COPY build-runtime.sh collect-sources.py test-apprun.sh /recipe/
 ENTRYPOINT ["bash", "/recipe/build-runtime.sh"]

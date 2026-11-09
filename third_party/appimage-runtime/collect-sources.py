@@ -87,7 +87,13 @@ for archive in [*(source / 'inputs').glob('*.tar.*'), *(source / 'alpine').glob(
 kit = source / 'inputs' / 'AppImageKit.tar.gz'
 with tarfile.open(kit) as tar:
     script = next(m for m in tar.getmembers() if m.name.endswith('/resources/AppRun'))
-    (out / 'AppRun-x86_64').write_bytes(tar.extractfile(script).read())
+    launcher = tar.extractfile(script).read().decode()
+    command = 'exec "${EXEC}" "$@"'
+    assert launcher.count(command) == 1, 'Pinned AppRun launch command changed'
+    # Match AppImageKit src/AppRun.c: the GTK plugin relocates WebKit's /usr
+    # helper paths to ././, so its child processes require this working directory.
+    launcher = launcher.replace(command, 'cd "${HERE}/usr" || exit 1\n' + command)
+    (out / 'AppRun-x86_64').write_text(launcher)
     (out / 'AppRun-x86_64').chmod(0o755)
 
 subprocess.run(['apk', 'info', '-vv'], stdout=(source / 'installed-packages.txt').open('w'), check=True)
@@ -101,10 +107,12 @@ Original complete source archives, Alpine APKBUILD recipes/patches and checksum-
 distfiles are included. The runtime is built from the pinned type2-runtime commit;
 libfuse and squashfuse use its exact upstream recipe and patch. Alpine source records
 identify the actual installed static musl, zstd, zlib, mimalloc and libgcc packages.
-The AppRun launcher is the original shell script from the pinned AppImageKit source.
+The AppRun launcher adapts the pinned AppImageKit shell script to use the same
+usr working directory as its native launcher. collect-sources.py records the change;
+test-apprun.sh checks helper lookup and argument forwarding from an unrelated directory.
 
 To rebuild or modify: install Docker, put inputs/* and Dockerfile in an input directory,
-build this Dockerfile with build-runtime.sh and collect-sources.py in its context
+build this Dockerfile with build-runtime.sh, collect-sources.py and test-apprun.sh in its context
 and --build-arg RUNTIME_BASE set to the image in inputs/inputs.json,
 then run the resulting amd64 container with that input directory mounted read-only at
 /inputs and an empty writable directory at /output. Original source archives can be
