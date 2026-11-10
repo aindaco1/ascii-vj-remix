@@ -5,6 +5,26 @@ current product and it does not promise a release date or version. Current
 behavior belongs in the [User Guide](USER_GUIDE.md) and practice guides; completed
 work and release history belong in the [Changelog](../CHANGELOG.md).
 
+## Next Maintenance Release
+
+- Address [WebGPU runtime recovery (#55)](https://github.com/aindaco1/ascii-vj-remix/issues/55)
+  as a medium-priority reliability fix. Recover the active preview after device
+  loss or repeated frame-submission failures: stop the failed renderer, attempt
+  bounded resource reconstruction, and fall back to WebGL2/Canvas when needed.
+  Preserve source identity/playback, visual controls, preset state, and the
+  user's backend preference. Coordinate shared-device crossfades and ignore
+  stale recovery work after source/backend changes or teardown.
+- Add bounded, deduplicated renderer diagnostics for #55 with the failing
+  operation, device-loss reason when available, actual backend, and recovery
+  outcome, using the existing sanitization and report-consent boundaries.
+- Cover transient/persistent encoder failure, device loss, recovery/fallback
+  success and failure, source changes, teardown, and playback continuity with
+  regression tests. Validate image/video rendering, minimize/restore,
+  sleep/wake, and preset/crossfade stress in packaged macOS WKWebView before
+  closing #55. The original incident trigger remains unconfirmed; isolated
+  fault injection established the application recovery gap, not a native
+  process crash or a confirmed 1.3.3 regression.
+
 ## Distribution and Platform Validation
 
 - Prepare paid future builds, updates, and support using the
