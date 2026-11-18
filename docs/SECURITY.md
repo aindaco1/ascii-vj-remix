@@ -472,7 +472,7 @@ texture sharing. Both transports omit audio.
 
 Runtime provenance and bundled notices are in `src-tauri/resources/video-io/`.
 Mac nested code is signed with the application's team; library validation is
-not disabled. Release acceptance includes the actual NDI 6.3.2 agreement,
+not disabled. Release acceptance includes the actual NDI 6.4.0 agreement,
 network permissions/firewall behavior and installed runtime loading.
 
 ### Opt-in private licensing pilot

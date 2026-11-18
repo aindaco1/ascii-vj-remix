@@ -9,7 +9,8 @@ if (!['darwin', 'win32', 'linux'].includes(process.platform) || process.arch !==
 const target = process.platform === 'darwin' ? 'macos-aarch64' : process.platform === 'win32' ? 'windows-x86_64' : 'linux-x86_64';
 const resources = path.join(root, 'src-tauri/resources/video-io');
 const pins = JSON.parse(await readFile(path.join(resources, 'provenance.json'), 'utf8'));
-const cache = process.env.ASCII_VIDEO_SDK_CACHE || path.join(os.tmpdir(), 'ascii-video-io-sdk-pinned');
+const cacheRoot = process.env.ASCII_VIDEO_SDK_CACHE || path.join(os.tmpdir(), 'ascii-video-io-sdk-pinned');
+const cache = path.join(cacheRoot, pins.ndi.version);
 await mkdir(cache, { recursive: true });
 const exists = async file => { try { await access(file); return true; } catch { return false; } };
 const hash = async file => createHash('sha256').update(await readFile(file)).digest('hex');
@@ -42,9 +43,10 @@ if (process.platform === 'darwin') {
         run('tar', ['-xzf', tar, '-C', cache]);
         run('sh', [path.join(cache, 'Install_NDI_SDK_v6_Linux.sh')], { cwd: cache, input: 'y\n', env: { ...process.env, PAGER: 'cat' }, stdio: ['pipe', 'inherit', 'inherit'] });
     }
-    runtime = path.join(expanded, 'lib/x86_64-linux-gnu/libndi.so.6.3.2');
+    runtime = path.join(expanded, `lib/x86_64-linux-gnu/libndi.so.${pins.ndi.version}`);
     thirdPartyNotices = path.join(expanded, 'licenses/libndi_licenses.txt');
 }
+if (await hash(thirdPartyNotices) !== pin.noticesSha256) throw new Error('NDI notices checksum mismatch');
 if (await hash(runtime) !== pin.runtimeSha256) throw new Error('NDI runtime checksum mismatch');
 const destination = path.join(resources, target);
 await mkdir(destination, { recursive: true });
