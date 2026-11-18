@@ -13,6 +13,7 @@
     "check": "npm test && wrangler deploy --dry-run"
   },
   "dependencies": {
+    "@dustwave/worker-core": "file:../shared/dust-wave-platform/packages/worker-core",
     "@octokit/auth-app": "^8.1.4",
     "@dustwave/desktop-core": "file:../shared/dust-wave-platform/packages/desktop-core"
   },

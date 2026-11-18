@@ -45,7 +45,8 @@
     "GITHUB_REPO": "ascii-vj-remix",
     "FINE_ME_NOT_REPORTS_ENABLED": "true",
     "PAPER_REPORTS_ENABLED": "true",
-    "RECORD_REPORTS_ENABLED": "true"
+    "RECORD_REPORTS_ENABLED": "true",
+    "ISSUE_ARTIFACTS_ENABLED": "true"
   },
   "durable_objects": {
     "bindings": [
@@ -80,6 +81,10 @@
       {
         "name": "RECORD_REPORT_GROUPS",
         "class_name": "RecordReportGroup"
+      },
+      {
+        "name": "ASCII_ARTIFACTS",
+        "class_name": "AsciiArtifactMirror"
       }
     ]
   },
@@ -125,6 +130,12 @@
       "tag": "record-reports-v1",
       "new_sqlite_classes": [
         "RecordReportGroup"
+      ]
+    },
+    {
+      "tag": "ascii-artifacts-v1",
+      "new_sqlite_classes": [
+        "AsciiArtifactMirror"
       ]
     }
   ],
