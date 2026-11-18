@@ -11,6 +11,7 @@ shipped changes. The [documentation index](../README.md) covers current guides.
 
 | Version | Record | Evidence boundary |
 | --- | --- | --- |
+| 1.3.4 | [Preview recovery](RELEASE_1.3.4.md) | Maintenance candidate. |
 | 1.3.3 | [Distribution notices and licensing groundwork](RELEASE_1.3.3.md) | Published 2026-11-09 UTC; exact-main CI, source/notice gates and three-platform installer/updater checks passed. Public hashes/source manifests and local Mac DMG/notice checks passed; local updater download failure and verified-installer fallback are recorded. |
 | 1.3.2 | [Video Soundtrack Playback](RELEASE_1.3.2.md) | Published 2026-10-29 UTC; exact-main CI, three-platform installer/updater checks, local Mac updater/launch and Dev listening checks passed. Windows/Linux audio hardware remains untested. |
 | 1.3.0 | [Native Video I/O](RELEASE_1.3.0.md) | Published 2026-10-14 UTC; exact-main CI, three-platform installer/updater checks and independent local Mac acceptance passed. Physical transport/performance follow-ups remain explicit. |

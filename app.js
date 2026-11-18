@@ -4248,7 +4248,7 @@ class CanvasStaticRenderer {
         this.targetElement.innerHTML = '';
         this.targetElement.appendChild(this.canvas);
         this._configureCanvas();
-        if (this.source.isVideo) {
+        if (this.source.isVideo && !options.preservePlayback) {
             const playback = await restoreVideoPlaybackState(this.source, params, options.mediaState);
             if (playback?.mutedFallback) this.params.muted = true;
         }
@@ -4477,11 +4477,62 @@ class CanvasStaticRenderer {
 class StaticRuntime {
     constructor(app) {
         this.app = app;
+        this.generation = 0;
         this.renderer = null;
         this.source = null;
         this.usingCanvasFallback = false;
         this.mediaUrl = null;
         this.mediaType = null;
+    }
+
+    _activateRenderer(next) {
+        this.renderer = next.renderer;
+        this.usingCanvasFallback = next.usingCanvasFallback;
+        this._recoverPreview(this.renderer);
+    }
+
+    async _recoverPreview(failed) {
+        const failure = failed?.runtimeFailure;
+        if (!failure || failed !== this.renderer || this.crossfading || this.recovering === failed) return;
+        this.recovering = failed;
+        const generation = this.generation;
+        const params = this.app.renderParams();
+        const oldLayer = failed.canvas.parentElement;
+        const layer = this._makeRendererLayer();
+        layer.style.visibility = 'hidden';
+        const current = () => generation === this.generation && failed === this.renderer;
+        let next;
+        const context = { phase: 'preview-recovery', requestedBackend: params.backend };
+        this.app._recordRendererDiagnostic({ ...context, event: failure.operation, reason: failure.reason,
+            actualBackend: 'webgpu', errorName: failure.error.name });
+        try {
+            next = await this._createRendererForParams(params, layer, {
+                rendererContext: context, preservePlayback: true, current,
+                skipWebGPU: Boolean(failed.rebuiltAfterFailure)
+            });
+            if (!current()) return;
+            next.renderer.rebuiltAfterFailure = true;
+            this._applyRendererParams(next.renderer, this.app.renderParams());
+            failed.destroy();
+            oldLayer.remove();
+            layer.style.visibility = '';
+            this._activateRenderer(next);
+            const backend = next.stats?.backend;
+            if (!next.renderer.runtimeFailure) this.app._queueRendererFailureReport(failure.error, {
+                ...context, actualBackend: backend, fallbackBackend: backend === 'webgpu' ? '' : backend,
+                recovered: true
+            });
+        } catch (error) {
+            if (current()) this.app._queueRendererFailureReport(error, {
+                ...context, actualBackend: 'webgpu', recovered: false
+            });
+        } finally {
+            if (this.renderer !== next?.renderer) {
+                next?.renderer.destroy();
+                layer.remove();
+            }
+            if (this.recovering === failed) this.recovering = null;
+        }
     }
 
     _makeRendererLayer(className = 'renderer-buffer-current') {
@@ -4626,6 +4677,7 @@ class StaticRuntime {
         await renderer.start(params, {
             source: this.source,
             ownsSource: false,
+            preservePlayback: options.preservePlayback,
             mediaState: options.mediaState || null
         });
         return { renderer, stats: renderer.getStats(), usingCanvasFallback: true };
@@ -4656,7 +4708,12 @@ class StaticRuntime {
         let preferredRenderer = null;
         const created = await createRendererWithFallback(
             async () => {
-                preferredRenderer = await createRenderer(this._rendererOptions(params, layer));
+                preferredRenderer = await createRenderer({
+                    ...this._rendererOptions(params, layer),
+                    skipWebGPU: options.skipWebGPU,
+                    onRuntimeFailure: renderer => this._recoverPreview(renderer)
+                });
+                if (options.current && !options.current()) throw new Error('Preview recovery superseded');
                 if (this.source?.isVideo && options.mediaState) {
                     await restoreVideoPlaybackState(this.source, params, options.mediaState);
                 }
@@ -4669,9 +4726,10 @@ class StaticRuntime {
                 };
             },
             async (error) => {
-                console.warn('[StaticRuntime] GPU renderer failed, falling back to canvas:', error);
                 preferredRenderer?.stop?.();
                 preferredRenderer?.destroy?.();
+                if (options.current && !options.current()) throw error;
+                console.warn('[StaticRuntime] GPU renderer failed, falling back to canvas:', error);
                 this.app._recordRendererDiagnostic({
                     event: 'create-failed',
                     requestedBackend: params.backend,
@@ -4728,8 +4786,7 @@ class StaticRuntime {
                 presetId: this.app.activePresetId
             }
         });
-        this.renderer = next.renderer;
-        this.usingCanvasFallback = next.usingCanvasFallback;
+        this._activateRenderer(next);
         this.updateParams(params);
         return next.stats;
     }
@@ -4744,6 +4801,8 @@ class StaticRuntime {
     }
 
     async rebuildRenderer(params, rendererContext = {}) {
+        this.generation++;
+        this.crossfading = false;
         if (!this.canReuseSource(params)) {
             return this.start(params);
         }
@@ -4755,8 +4814,7 @@ class StaticRuntime {
 
         const layer = this._makeRendererLayer('renderer-buffer-current');
         const next = await this._createRendererForParams(params, layer, { rendererContext });
-        this.renderer = next.renderer;
-        this.usingCanvasFallback = next.usingCanvasFallback;
+        this._activateRenderer(next);
         this.updateParams(params);
         return next.stats;
     }
@@ -4764,6 +4822,9 @@ class StaticRuntime {
     async prepareCrossfadeRenderer(params, rendererContext = {}) {
         if (!this.canReuseSource(params)) return null;
 
+        const generation = ++this.generation;
+        this.recovering = null;
+        this.crossfading = true;
         const oldRenderer = this.renderer;
         const oldLayer = this._ensureCurrentRendererLayer();
         oldLayer.classList.remove('renderer-buffer-current');
@@ -4776,7 +4837,19 @@ class StaticRuntime {
         nextLayer.style.opacity = '1';
         els.gpuStage.insertBefore(nextLayer, oldLayer);
 
-        const next = await this._createRendererForParams(params, nextLayer, { rendererContext });
+        let next;
+        try {
+            next = await this._createRendererForParams(params, nextLayer, { rendererContext });
+        } catch (error) {
+            if (this.generation === generation) this.cancelCrossfadeRenderer({ oldRenderer, oldLayer, nextLayer, generation });
+            else nextLayer.remove();
+            throw error;
+        }
+        if (this.generation !== generation) {
+            next.renderer.destroy();
+            nextLayer.remove();
+            return null;
+        }
         const nextRenderer = next.renderer;
         this.renderer = nextRenderer;
         this.mediaUrl = params.mediaUrl;
@@ -4784,6 +4857,7 @@ class StaticRuntime {
         this.usingCanvasFallback = next.usingCanvasFallback;
 
         return {
+            generation,
             oldRenderer,
             oldLayer,
             nextRenderer,
@@ -4797,12 +4871,15 @@ class StaticRuntime {
         prepared.oldRenderer?.stop?.();
         prepared.oldRenderer?.destroy?.();
         prepared.oldLayer?.remove?.();
+        if (prepared.generation !== this.generation) return;
         prepared.nextLayer?.classList.remove('renderer-buffer-incoming');
         prepared.nextLayer?.classList.add('renderer-buffer-current');
         if (prepared.nextLayer) {
             prepared.nextLayer.style.zIndex = '';
             prepared.nextLayer.style.opacity = '';
         }
+        this.crossfading = false;
+        this._recoverPreview(this.renderer);
     }
 
     cancelCrossfadeRenderer(prepared) {
@@ -4810,6 +4887,11 @@ class StaticRuntime {
         prepared.nextRenderer?.stop?.();
         prepared.nextRenderer?.destroy?.();
         prepared.nextLayer?.remove?.();
+        if (prepared.generation !== this.generation) {
+            prepared.oldRenderer?.destroy?.();
+            prepared.oldLayer?.remove?.();
+            return;
+        }
         this.renderer = prepared.oldRenderer;
         prepared.oldLayer?.classList.remove('renderer-buffer-outgoing');
         prepared.oldLayer?.classList.add('renderer-buffer-current');
@@ -4817,6 +4899,8 @@ class StaticRuntime {
             prepared.oldLayer.style.zIndex = '';
             prepared.oldLayer.style.opacity = '';
         }
+        this.crossfading = false;
+        this._recoverPreview(this.renderer);
     }
 
     updateParams(params) {
@@ -4829,6 +4913,8 @@ class StaticRuntime {
     }
 
     destroy(options = {}) {
+        this.generation++;
+        this.crossfading = false;
         const { clearStage = true } = options;
         const layer = this.renderer?.canvas?.parentElement;
         this.renderer?.stop?.();

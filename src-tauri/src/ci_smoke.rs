@@ -99,6 +99,44 @@ impl SmokeReport {
 }
 
 pub fn maybe_spawn(app: &App) {
+    #[cfg(debug_assertions)]
+    if env::var_os("ASCILINE_PREVIEW_RECOVERY_SMOKE").is_some() {
+        let handle = app.handle().clone();
+        let (tx, rx) = mpsc::channel();
+        let listener = handle.listen("asciline-preview-recovery-result", move |event| {
+            let _ = tx.send(event.payload().to_owned());
+        });
+        let window_handle = handle.clone();
+        handle.once("asciline-preview-minimize", move |_| {
+            thread::spawn(move || {
+                if let Some(main) = window_handle.get_webview_window("main") {
+                    if main.minimize().is_err() { return; }
+                    thread::sleep(Duration::from_secs(2));
+                    if matches!(main.is_minimized(), Ok(true)) && main.unminimize().is_ok() {
+                        let _ = main.eval("window.previewWindowRestored = true");
+                    }
+                }
+            });
+        });
+        handle.once("asciline-preview-await-sleep", |_| println!("PREVIEW READY FOR SLEEP"));
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(2));
+            let check_sleep = env::var_os("ASCILINE_PREVIEW_SLEEP_SMOKE").is_some();
+            if let Some(main) = handle.get_webview_window("main") {
+                let _ = main.show();
+                let script = include_str!("../../scripts/smoke_preview_recovery.js")
+                    .replace("CHECK_SUSPEND", if check_sleep { "true" } else { "false" });
+                let _ = main.eval(script);
+            }
+            let report = rx.recv_timeout(Duration::from_secs(if check_sleep { 720 } else { 120 })).ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .unwrap_or_else(|| json!({"ok":false, "error":"Preview recovery smoke timed out"}));
+            handle.unlisten(listener);
+            let ok = report["ok"] == true;
+            finish(report, if ok { 0 } else { 1 });
+        });
+        return;
+    }
     if env::var_os("ASCILINE_VIDEO_IO_SMOKE").is_some() {
         spawn_video_io_smoke(app);
     } else if env::var_os("ASCILINE_CRASH_REPORT_SMOKE").is_some() {

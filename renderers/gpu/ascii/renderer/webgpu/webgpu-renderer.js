@@ -366,6 +366,13 @@ function packedColor(value, fallback = '#030405') {
 export class WebGPURenderer {
     constructor(options = {}) {
         this.device = options.device;
+        this.onRuntimeFailure = options.onRuntimeFailure;
+        this.failedFrames = 0;
+        this.deviceLoss = options.deviceLoss;
+        this.onDeviceLost = () => {
+            const reason = this.deviceLoss.reason === 'destroyed' ? 'destroyed' : 'unknown';
+            this._failRuntime(new Error('WebGPU device lost'), 'device-lost', reason);
+        };
         this.source = options.source; // MediaSource object
         this.targetElement = options.targetElement;
 
@@ -850,7 +857,9 @@ export class WebGPURenderer {
         const renderBG = this.renderBindGroup;
         if (!computeBG || !renderBG) return;
 
+        this.frameOperation = 'create-command-encoder';
         const encoder = this.device.createCommandEncoder();
+        this.frameOperation = 'encode-frame';
 
         const computePass = encoder.beginComputePass();
         computePass.setPipeline(computePipeline);
@@ -872,6 +881,7 @@ export class WebGPURenderer {
         renderPass.end();
 
 
+        this.frameOperation = 'queue-submit';
         this.device.queue.submit([encoder.finish()]);
         this.frameCount++;
         [this.coverageTexture, this.nextCoverageTexture] = [this.nextCoverageTexture, this.coverageTexture];
@@ -882,17 +892,26 @@ export class WebGPURenderer {
         [this.imageComputeBindGroup, this.nextImageComputeBindGroup] = [this.nextImageComputeBindGroup, this.imageComputeBindGroup];
     }
 
+    _failRuntime(error, operation, reason = '') {
+        if (this.runtimeFailure || !this.onRuntimeFailure) return;
+        this.runtimeFailure = { error, operation, reason };
+        this.stop();
+        this.onRuntimeFailure(this);
+    }
+
     start() {
-        if (this.running) return;
+        if (this.running || this.runtimeFailure) return;
+        if (this.onRuntimeFailure && this.deviceLoss) {
+            if (this.deviceLoss.aborted) { this.onDeviceLost(); return; }
+            this.deviceLoss.addEventListener('abort', this.onDeviceLost, { once: true });
+        }
         this.running = true;
         this.lastRafAt = this.window.performance?.now?.() ?? performance.now();
 
         const tick = (ts) => {
             if (!this.running) return;
             if (ts - this.lastFrameTime >= this.frameInterval) {
-                const beforeFrame = this.frameCount;
-                this._renderFrame();
-                if (this.frameCount !== beforeFrame) this._recordFrame(ts);
+                this.renderFrame(ts);
                 this.lastFrameTime = ts;
             }
         };
@@ -914,6 +933,7 @@ export class WebGPURenderer {
     }
 
     stop() {
+        this.deviceLoss?.removeEventListener('abort', this.onDeviceLost);
         this.running = false;
         if (this.animationId) {
             this.window.cancelAnimationFrame(this.animationId);
@@ -925,12 +945,20 @@ export class WebGPURenderer {
         }
     }
 
-    renderFrame() {
+    renderFrame(ts) {
+        if (this.runtimeFailure) return;
         const beforeFrame = this.frameCount;
-        this._renderFrame();
+        this.frameOperation = 'render-frame';
+        try {
+            this._renderFrame();
+        } catch (error) {
+            if (!this.onRuntimeFailure) throw error;
+            if (++this.failedFrames >= 2) this._failRuntime(error, this.frameOperation);
+            return;
+        }
         if (this.frameCount !== beforeFrame) {
-            const now = this.window.performance?.now?.() ?? performance.now();
-            this._recordFrame(now);
+            this.failedFrames = 0;
+            this._recordFrame(ts ?? this.window.performance?.now?.() ?? performance.now());
         }
     }
 

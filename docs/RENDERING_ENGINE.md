@@ -325,6 +325,8 @@ packaged macOS, Windows, and Linux views all attempt the same WebGPU, WebGL2,
 then Canvas fallback order. Native Pop Out backend selection is separate and
 unchanged.
 
+The main preview reuses the current media source after device loss or two consecutive frame submission failures. It tries one WebGPU rebuild, then WebGL2 or Canvas. During a live crossfade the surviving layer handles recovery. Backend preferences remain user-owned.
+
 ## WebGPU Renderer
 
 The WebGPU renderer is the primary quality target.

@@ -46,3 +46,41 @@ assert.equal(callbacks.length, 1); failBind = false; callbacks.shift()(150);
 assert.equal(renderer.frameCount, 2); assert.equal(submitted, 2); assert.equal(renderer.historyView.id, 1);
 renderer.stop(); assert.ok(frames.every(frame => frame.closed));
 console.log('WebGPU decoded-frame lifetime, failed-frame accounting and render-loop recovery passed.');
+
+// Mirrored by the preview's failure callback. Other renderer clients retain
+// their ordinary exception behavior above.
+const failures = [];
+const preview = new WebGPURenderer({ device, source,
+  onRuntimeFailure: renderer => failures.push(renderer.runtimeFailure)
+});
+let throwFrame = true;
+preview._renderFrame = () => {
+  preview.frameOperation = 'create-command-encoder';
+  if (throwFrame) throw invalid();
+  preview.frameCount++;
+};
+preview.renderFrame();
+throwFrame = false;
+preview.renderFrame();
+assert.equal(failures.length, 0, 'one missed frame must recover in place');
+throwFrame = true;
+preview.renderFrame();
+preview.renderFrame();
+preview.renderFrame();
+assert.equal(failures.length, 1, 'repeated frame failure signals once');
+assert.equal(failures[0].operation, 'create-command-encoder');
+assert.equal(preview.running, false);
+const loss = new AbortController();
+const sharedFailures = [];
+const fromDevice = () => new WebGPURenderer({ device, source, deviceLoss: loss.signal,
+  onRuntimeFailure: value => sharedFailures.push(value.runtimeFailure)
+});
+const outgoing = fromDevice(), incoming = fromDevice(), discarded = fromDevice();
+for (const view of [outgoing, incoming, discarded]) view.start();
+discarded.destroy();
+loss.abort('destroyed');
+assert.equal(sharedFailures.length, 2);
+assert.ok(sharedFailures.every(event => event.operation === 'device-lost' && event.reason === 'destroyed'));
+assert.equal(incoming.running, false);
+assert.equal(discarded.runtimeFailure, undefined);
+console.log('Preview submission and shared-device failure handling passed.');
