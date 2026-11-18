@@ -27,7 +27,7 @@ export async function githubRequest(env, path, options = {}) {
   const token = await installationToken(env);
   if (options.method === 'GET' && /\/artifacts\/\d+$/.test(path)) path += '?per_page=1';
   const response = await fetch(`https://api.github.com${path}`, {
-    redirect: 'error',
+    redirect: 'manual',
     ...options,
     ...(!options.signal && env.REPORT_ISSUE_BODY ? { signal: AbortSignal.timeout(15000) } : {}),
     headers: {
