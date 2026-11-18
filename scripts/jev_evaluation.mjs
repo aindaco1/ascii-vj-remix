@@ -9,7 +9,9 @@ import { prepareCases } from './jev_cases.mjs';
 import { evaluateJevCases, callCloudflareJev } from '../shared/dust-wave-platform/packages/test-core/src/jev.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-export const PLATFORM_PIN = JSON.parse(readFileSync(path.join(ROOT, 'platform-desktop.json'), 'utf8')).commit;
+const platformContract = JSON.parse(readFileSync(path.join(ROOT, 'platform-desktop.json'), 'utf8'));
+export const PLATFORM_PIN = platformContract.commit;
+const testCoreVersion = platformContract.packages['test-core'];
 export const POLICY = { minimumMargin: 0.10, models: ['jev-1.13.0'] }; // Provisional for this corpus; never auto-tuned.
 export const LIMITS = { requests: 20, questions: 20, totalBytes: 64000 };
 const SOURCES = ['scripts/jev_cases.mjs', 'scripts/jev_evaluation.mjs',
@@ -25,7 +27,7 @@ export function verifyPlatform() {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
   const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { cwd, encoding: 'utf8' }).trim();
   const version = JSON.parse(readFileSync(path.join(cwd, 'packages/test-core/package.json'))).version;
-  if (commit !== PLATFORM_PIN || dirty || version !== '0.3.1') throw new Error('Unexpected Platform pin, version or local changes');
+  if (commit !== PLATFORM_PIN || dirty || version !== testCoreVersion) throw new Error('Unexpected Platform pin, version or local changes');
   return commit;
 }
 
@@ -88,7 +90,7 @@ export async function runEvaluation({ dryRun = false, wranglerAuth = false, outp
   const output = path.resolve(outputDir || path.join(ROOT, 'jev-results', new Date().toISOString().replace(/[:.]/g, '-')));
   mkdirSync(path.dirname(output), { recursive: true });
   mkdirSync(output); // Evidence is immutable: refuse an existing directory.
-  const metadata = { createdAt: new Date().toISOString(), platformCommit, testCoreVersion: '0.3.0',
+  const metadata = { createdAt: new Date().toISOString(), platformCommit, testCoreVersion,
     dryRun, limits: LIMITS, sourceHashes: Object.fromEntries(SOURCES.map(file => [file, hash(readFileSync(path.join(ROOT, file)))])),
     requestSha256: hash(JSON.stringify(preview.cases.map(row => row.request))), deterministicFixturesPassed: true };
   save(output, 'requests.json', preview.cases);

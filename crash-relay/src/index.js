@@ -5,6 +5,8 @@ export { PaperReportGroup } from './paper-aggregation.js';
 import { validateFineMeNotReport, fineMeNotFingerprint } from './fine-me-not.js';
 import { checkFineMeNotRateLimit } from './rate-limit.js';
 export { FineMeNotReportGroup, FineMeNotInbox } from './fine-me-not-aggregation.js';
+import { mirrorAsciiIssue } from './issue-artifacts.js';
+export { AsciiArtifactMirror } from './issue-artifacts.js';
 import { crashFingerprint } from './fingerprint.js';
 import { submitCrashReport } from './github.js';
 import { checkIpRateLimit } from './rate-limit.js';
@@ -120,7 +122,7 @@ async function readBoundedJson(request, env) {
   return JSON.parse(text);
 }
 
-async function handleReport(request, env) {
+async function handleReport(request, env, ctx) {
   if (String(env.CRASH_REPORTS_ENABLED || 'false') !== 'true') {
     return json({ error: 'Crash reporting disabled' }, 503);
   }
@@ -158,6 +160,9 @@ async function handleReport(request, env) {
   const fingerprint = await crashFingerprint(sanitized);
   try {
     const result = await submitCrashReport(env, sanitized, fingerprint);
+    if (env.ISSUE_ARTIFACTS_ENABLED === 'true' && ['created', 'updated'].includes(result.action)) {
+      ctx.waitUntil(mirrorAsciiIssue(env, result, fingerprint));
+    }
     return json({
       ok: true,
       reportId: sanitized.report.id,
@@ -202,7 +207,7 @@ async function handleReviewedReport(request, env, adapter) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
       return json({ ok: true, service: 'ascii-vj-crash-relay' });
@@ -216,7 +221,7 @@ export default {
         validate: validateMkvReport, fingerprint: mkvFingerprint });
     }
     if (request.method === 'POST' && url.pathname === '/v1/reports') {
-      return handleReport(request, env);
+      return handleReport(request, env, ctx);
     }
     if (request.method === 'POST' && url.pathname === '/v1/podcast-visualizer/reports') {
       return handleReviewedReport(request, env, { name: 'Podcast Visualizer', enabled: 'PODCAST_REPORTS_ENABLED',

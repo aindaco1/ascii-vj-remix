@@ -1,3 +1,4 @@
+import { readBoundedText } from '@dustwave/worker-core/response-body';
 import { createGitHubIssueReporter } from '@dustwave/desktop-core/github-issues';
 import { createAppAuth } from '@octokit/auth-app';
 import { crashGroupingSummary } from './fingerprint.js';
@@ -22,11 +23,13 @@ async function installationToken(env) {
   return result.token;
 }
 
-async function githubRequest(env, path, options = {}) {
+export async function githubRequest(env, path, options = {}) {
   const token = await installationToken(env);
+  if (options.method === 'GET' && /\/artifacts\/\d+$/.test(path)) path += '?per_page=1';
   const response = await fetch(`https://api.github.com${path}`, {
+    redirect: 'manual',
     ...options,
-    ...(env.REPORT_ISSUE_BODY ? { signal: AbortSignal.timeout(15000) } : {}),
+    ...(!options.signal && env.REPORT_ISSUE_BODY ? { signal: AbortSignal.timeout(15000) } : {}),
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
@@ -36,7 +39,7 @@ async function githubRequest(env, path, options = {}) {
       ...(options.headers || {})
     }
   });
-  const text = await response.text();
+  const text = options.signal ? await readBoundedText(response, 2 * 1024 * 1024) : await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
     const message = data?.message || `GitHub API error ${response.status}`;
