@@ -113,6 +113,8 @@ pub fn maybe_spawn(app: &App) {
                     if main.minimize().is_err() { return; }
                     thread::sleep(Duration::from_secs(2));
                     if matches!(main.is_minimized(), Ok(true)) && main.unminimize().is_ok() {
+                        let _ = main.show();
+                        let _ = main.set_focus();
                         let _ = main.eval("window.previewWindowRestored = true");
                     }
                 }
@@ -124,6 +126,7 @@ pub fn maybe_spawn(app: &App) {
             let check_sleep = env::var_os("ASCILINE_PREVIEW_SLEEP_SMOKE").is_some();
             if let Some(main) = handle.get_webview_window("main") {
                 let _ = main.show();
+                let _ = main.set_focus();
                 let script = include_str!("../../scripts/smoke_preview_recovery.js")
                     .replace("CHECK_SUSPEND", if check_sleep { "true" } else { "false" });
                 let _ = main.eval(script);

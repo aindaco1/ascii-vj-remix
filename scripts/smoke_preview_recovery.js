@@ -17,7 +17,7 @@
         const renderer = () => runtime().renderer;
         const backend = () => renderer()?.getStats().backend;
         const restart = async (mediaType, mediaUrl) => {
-            app.params = { ...app.params, sourceMode: 'static', backend: 'webgpu', mediaType, mediaUrl };
+            app.params = { ...app.params, sourceMode: 'static', backend: 'webgpu', mediaType, mediaUrl, loop: true, muted: true };
             await app.restart();
             await until(mediaType + ' WebGPU frames', () => backend() === 'webgpu' && renderer().frameCount > 1);
         };
@@ -54,8 +54,23 @@
         await window.__TAURI_INTERNALS__.invoke('plugin:event|emit_to', {
             target: {kind:'App'}, event:'asciline-preview-minimize', payload:null
         });
-        await until('native window restored and video paints', () => window.previewWindowRestored && renderer().frameCount > presented);
+        report.windowBeforeWait = { visibility: document.visibilityState, paused: video.element.paused };
+        try {
+            await until('native window restored and video plays', () => window.previewWindowRestored
+                && document.visibilityState === 'visible' && !video.element.paused && renderer().frameCount > presented);
+        } finally {
+            report.windowAfterWait = { visibility: document.visibilityState, paused: video.element.paused,
+                time: video.element.currentTime, frames: renderer().frameCount };
+        }
         if (CHECK_SUSPEND) {
+            const sample = () => ({
+                frames: renderer()?.frameCount, backend: backend(), sameSource: runtime().source === video,
+                paused: video.element.paused, ended: video.element.ended, time: video.element.currentTime,
+                readyState: video.element.readyState, loop: video.element.loop, visibility: document.visibilityState,
+                requested: app.params.backend, running: renderer()?.running,
+                failure: renderer()?.runtimeFailure?.operation || null
+            });
+            report.beforeSleep = sample();
             await window.__TAURI_INTERNALS__.invoke('plugin:event|emit_to', {
                 target: {kind:'App'}, event:'asciline-preview-await-sleep', payload:null
             });
@@ -69,10 +84,53 @@
             }
             if (gap < 4000) throw new Error('No suspend interval observed');
             report.suspendGapMs = gap;
-            const first = renderer().frameCount;
-            await until('post-wake video advances', () => runtime().source === video && !video.element.paused
-                && renderer().frameCount > first + 2 && app.params.backend === 'webgpu');
+            report.afterWake = sample();
+            // A rebuilt renderer starts its own frame counter at zero.
+            let lastRenderer = renderer();
+            let first = sample();
+            try {
+                await until('post-wake video advances', () => {
+                    if (renderer() !== lastRenderer) { lastRenderer = renderer(); first = sample(); }
+                    const now = sample();
+                    return now.sameSource && !now.paused && now.time !== first.time
+                        && now.frames > first.frames + 2 && now.requested === 'webgpu';
+                });
+            } finally { report.final = sample(); }
         }
+        await restart('image', 'media/demo.svg');
+        const owner = runtime();
+        const create = owner._createRendererForParams.bind(owner);
+        let unblock;
+        owner._createRendererForParams = async (params, layer, options) => {
+            if (options.preservePlayback) await new Promise(resolve => { unblock = resolve; });
+            return create(params, layer, options);
+        };
+        renderer().device.destroy();
+        await until('recovery in flight', () => Boolean(unblock));
+        app.params.backend = 'canvas2d';
+        await app.restart({ reuseStaticMedia: true });
+        const chosen = renderer();
+        unblock();
+        try {
+            await until('stale recovery discarded after backend switch', () =>
+                !owner.recovering && renderer() === chosen && runtime().usingCanvasFallback && chosen.frameCount > 1);
+        } finally {
+            report.backendSwitch = { sameRenderer: renderer() === chosen, recovering: Boolean(owner.recovering),
+                backend: backend(), frames: chosen.frameCount, preference: app.params.backend };
+        }
+        delete owner._createRendererForParams;
+        await restart('image', 'media/demo.svg');
+        failed = renderer();
+        failed.rebuiltAfterFailure = true;
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        try {
+            HTMLCanvasElement.prototype.getContext = function(kind, ...args) {
+                return kind === 'webgl2' ? null : getContext.call(this, kind, ...args);
+            };
+            failed._renderSourceFrame = () => { throw observed; };
+            await until('Canvas paints when both GPU paths fail', () =>
+                runtime().usingCanvasFallback && renderer().frameCount > 1);
+        } finally { HTMLCanvasElement.prototype.getContext = getContext; }
         report.ok = true;
     } catch (error) {
         report.error = String(error);

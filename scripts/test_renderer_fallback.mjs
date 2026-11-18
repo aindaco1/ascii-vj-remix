@@ -65,3 +65,9 @@ assert.doesNotMatch(JSON.stringify(report), /alice|private\.mov/i);
 assert.equal(rendererFailureKey(failure, report.context), rendererFailureKey(failure, report.context));
 
 console.log('Renderer fallback and diagnostics tests passed.');
+
+const unavailable = new Error('No preview backend available');
+await assert.rejects(createRendererWithFallback(
+  async () => { throw failure; },
+  async () => { throw unavailable; }
+), error => error === unavailable);

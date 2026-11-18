@@ -4497,7 +4497,7 @@ class StaticRuntime {
         this.recovering = failed;
         const generation = this.generation;
         const params = this.app.renderParams();
-        const oldLayer = failed.canvas.parentElement;
+        const oldLayer = failed.canvas?.parentElement;
         const layer = this._makeRendererLayer();
         layer.style.visibility = 'hidden';
         const current = () => generation === this.generation && failed === this.renderer;
@@ -4514,7 +4514,7 @@ class StaticRuntime {
             next.renderer.rebuiltAfterFailure = true;
             this._applyRendererParams(next.renderer, this.app.renderParams());
             failed.destroy();
-            oldLayer.remove();
+            oldLayer?.remove();
             layer.style.visibility = '';
             this._activateRenderer(next);
             const backend = next.stats?.backend;
@@ -4527,7 +4527,7 @@ class StaticRuntime {
                 ...context, actualBackend: 'webgpu', recovered: false
             });
         } finally {
-            if (this.renderer !== next?.renderer) {
+            if (!next || this.renderer !== next.renderer) {
                 next?.renderer.destroy();
                 layer.remove();
             }
@@ -4754,7 +4754,7 @@ class StaticRuntime {
             fallbackBackend: created.fallbackError ? actualBackend : '',
             ...rendererContext
         });
-        if (created.fallbackError) {
+        if (created.fallbackError && !options.preservePlayback) {
             this.app._queueRendererFailureReport(created.fallbackError, {
                 phase: rendererContext.phase || 'renderer-create',
                 presetId: rendererContext.presetId,
