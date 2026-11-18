@@ -122,7 +122,7 @@ async function readBoundedJson(request, env) {
   return JSON.parse(text);
 }
 
-async function handleReport(request, env, ctx) {
+async function handleReport(request, env) {
   if (String(env.CRASH_REPORTS_ENABLED || 'false') !== 'true') {
     return json({ error: 'Crash reporting disabled' }, 503);
   }
@@ -161,7 +161,7 @@ async function handleReport(request, env, ctx) {
   try {
     const result = await submitCrashReport(env, sanitized, fingerprint);
     if (env.ISSUE_ARTIFACTS_ENABLED === 'true' && ['created', 'updated'].includes(result.action)) {
-      ctx.waitUntil(mirrorAsciiIssue(env, result, fingerprint));
+      await mirrorAsciiIssue(env, result, fingerprint);
     }
     return json({
       ok: true,
@@ -207,7 +207,7 @@ async function handleReviewedReport(request, env, adapter) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
       return json({ ok: true, service: 'ascii-vj-crash-relay' });
@@ -221,7 +221,7 @@ export default {
         validate: validateMkvReport, fingerprint: mkvFingerprint });
     }
     if (request.method === 'POST' && url.pathname === '/v1/reports') {
-      return handleReport(request, env, ctx);
+      return handleReport(request, env);
     }
     if (request.method === 'POST' && url.pathname === '/v1/podcast-visualizer/reports') {
       return handleReviewedReport(request, env, { name: 'Podcast Visualizer', enabled: 'PODCAST_REPORTS_ENABLED',

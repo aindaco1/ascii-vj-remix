@@ -307,8 +307,13 @@ retain the namespace, migration history, existing routes and selected repositori
 With `ISSUE_ARTIFACTS_ENABLED=true`, the relay maintains one versioned Markdown
 artifact with the confirmed count, first and last seen times, and app version
 counts. The seven reviewed adapters mirror from their serialized groups. On
-the native ASCII endpoint, a separate Durable Object reads the confirmed issue
-inside its queue after creation or a permitted update. Cooldown-only responses
-skip publication. The native receipt can arrive before its artifact appears.
+the native ASCII endpoint, the Worker schedules a Durable Object alarm after
+issue creation or a permitted update. The alarm reads the latest confirmed issue
+and publishes its aggregate. Failed alarms retry up to six times with backoff,
+including after a Worker restart. A later confirmed update schedules another
+attempt. After an uncertain create, retries look for the original artifact
+before writing. Cooldown-only receipts skip publication. The native receipt
+can arrive before its artifact appears. If scheduling itself fails, the relay
+logs the issue number and returns the existing issue receipt.
 Set the flag to false and redeploy to disable publication. Retain the additive
 `ascii-artifacts-v1` namespace and existing artifact records across rollbacks.
