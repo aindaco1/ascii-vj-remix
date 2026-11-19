@@ -1,20 +1,23 @@
 {
   "ndi": {
-    "version": "6.3.2",
+    "version": "6.4.0",
     "macos-aarch64": {
       "url": "https://downloads.ndi.tv/SDK/NDI_SDK_Mac/Install_NDI_SDK_v6_Apple.pkg",
-      "archiveSha256": "5aa101a01b00494724c60b7e1e15b5d1743bf9c68b61739c22ac54932dde95fb",
-      "runtimeSha256": "af53789fcb8fc1737e6827a54d7ccea09736dc759e00ef02d53f4ed64d9abbd5"
+      "archiveSha256": "4e0781be36a46d50224e2af6c483db8e26c1606870d18e80b906ab3b0f6fbb30",
+      "runtimeSha256": "b10315f9435c59a5db76dd44d27ea809432468151aea458359129f279ca6f09c",
+      "noticesSha256": "9f18e17e95324b1907c4de45f676ce2fedbc0a5c4ff6ed451b31c3fcb1229b8d"
     },
     "windows-x86_64": {
       "url": "https://downloads.ndi.tv/SDK/NDI_SDK/NDI%206%20SDK.exe",
-      "archiveSha256": "4d5dd36a1c7c7634f408bf459b068787cce6f5310a3efe832d76b1ddeb54e499",
-      "runtimeSha256": "2b6602075868ba4401f82f417d72424805d69b11ca86078023d0d489ff45dd84"
+      "archiveSha256": "f37604ee01cb788ccb954b5b4e5888328ea391d9610e9a8eab65ac68191784ba",
+      "runtimeSha256": "adca7e9c98ddddb01a1b684f90c97d0bd764990ee2839524fde51ab37f21028a",
+      "noticesSha256": "9f18e17e95324b1907c4de45f676ce2fedbc0a5c4ff6ed451b31c3fcb1229b8d"
     },
     "linux-x86_64": {
       "url": "https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz",
-      "archiveSha256": "f0314f245446defc488b63ceb4689acf1a965aeefdadacb70571bb216a8cc183",
-      "runtimeSha256": "1c70a0068bb8ad1c894e556bc7c0e790dbd2c8229167d808d137a4b944355ae3"
+      "archiveSha256": "1b066cca076d3e8b49a5f1dc7fbf77065967256807e3cb5ea387c574176eace6",
+      "runtimeSha256": "802ed10b68ef73068e197009c31f9a5bfc5f54d8f9046fbc1c3d101a68e405e4",
+      "noticesSha256": "bbec10a5f5caf19b134dd6e617f898357a26c1df20a14de636b8ea29f82888d6"
     }
   },
   "syphon": {

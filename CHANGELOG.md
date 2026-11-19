@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.4] - Release candidate
+
+- Recover a stalled WebGPU preview while preserving the current image or playing video, preset and backend preference. Repeated failures use an available fallback renderer.
+- Update the bundled NDI runtime to 6.4.0 and verify its third-party notices during staging.
+
 ## [1.3.3] - 2026-11-09
 
 - Added an opt-in macOS complimentary-license pilot with Keychain-backed Rust activation and authenticated signed updates; default release feeds and installed offline use remain unchanged.

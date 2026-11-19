@@ -1,6 +1,6 @@
 # Native video components
 
-ASCII VJ Remix includes the NDI runtime from the standard NDI SDK 6.3.2.
+ASCII VJ Remix includes the NDI runtime from the standard NDI SDK 6.4.0.
 NDI software is proprietary, copyright NDI, Inc. and its licensors, and is
 licensed separately from this application's source. NDI® is a registered
 trademark of Vizrt NDI AB. Learn about NDI at <https://ndi.video/>.

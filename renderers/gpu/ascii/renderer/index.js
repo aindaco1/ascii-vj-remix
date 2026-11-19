@@ -56,8 +56,11 @@ async function probeCapabilities() {
     }
 
     capabilities = result;
-    result.webgpuDevice?.lost.then(() => {
+    const loss = new AbortController();
+    result.deviceLoss = loss.signal;
+    result.webgpuDevice?.lost.then(info => {
         if (capabilities === result) { capabilities = null; detection = null; }
+        loss.abort(info?.reason);
     });
     return result;
 }
@@ -82,7 +85,7 @@ async function initializeRenderer(renderer) {
 
 async function createRenderer(options = {}) {
     const caps = await detectCapabilities();
-    const backend = selectRendererBackend(caps, options);
+    const backend = selectRendererBackend(options.skipWebGPU ? { ...caps, webgpu: false } : caps, options);
 
     console.log(`[Renderer] Using ${backend} backend for ${options.source?.type || 'unknown'} source`);
 
@@ -92,6 +95,7 @@ async function createRenderer(options = {}) {
                 const renderer = new WebGPURenderer({
                     ...options,
                     device: caps.webgpuDevice,
+                    deviceLoss: caps.deviceLoss,
                     adapter: caps.webgpuAdapter
                 });
                 return await initializeRenderer(renderer);
