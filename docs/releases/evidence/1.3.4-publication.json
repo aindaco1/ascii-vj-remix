@@ -1,0 +1,314 @@
+{
+  "version": "1.3.4",
+  "publishedAt": "2026-11-19T05:03:58Z",
+  "tagCommit": "4bd9e2060606c679198413e70560042dad3ae449",
+  "releaseUrl": "https://github.com/aindaco1/ascii-vj-remix/releases/tag/v1.3.4",
+  "releaseWorkflow": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398",
+  "releaseJobs": [
+    {
+      "name": "Resolve immutable release context",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320782833"
+    },
+    {
+      "name": "Require exact Desktop CI success",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320852891"
+    },
+    {
+      "name": "Build linux-x86_64 app binary",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320852898"
+    },
+    {
+      "name": "Build windows-x86_64 app binary",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320852907"
+    },
+    {
+      "name": "Build windows-x86_64 FFmpeg runtime",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320852916"
+    },
+    {
+      "name": "Build macos-aarch64 FFmpeg runtime",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320852934"
+    },
+    {
+      "name": "Build linux-x86_64 FFmpeg runtime",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320853029"
+    },
+    {
+      "name": "Build macos-aarch64 app binary",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135320853052"
+    },
+    {
+      "name": "Bundle windows-x86_64",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135325959206"
+    },
+    {
+      "name": "Bundle macos-aarch64",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135325959312"
+    },
+    {
+      "name": "Bundle linux-x86_64",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135325959356"
+    },
+    {
+      "name": "Publish GitHub Release",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135352230867"
+    },
+    {
+      "name": "macos-26 install and updater smoke",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135352713505"
+    },
+    {
+      "name": "ubuntu-24.04 install and updater smoke",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135352713516"
+    },
+    {
+      "name": "windows-latest install and updater smoke",
+      "conclusion": "success",
+      "url": "https://github.com/aindaco1/ascii-vj-remix/actions/runs/44452865398/job/135352713551"
+    }
+  ],
+  "publicInstallerChecks": {
+    "macos-26 install and updater smoke": "macOS updater identity hop passed: 1.3.3 -> 1.3.4",
+    "ubuntu-24.04 install and updater smoke": "Linux updater hop smoke passed: 1.3.3 -> 1.3.4",
+    "windows-latest install and updater smoke": "Windows updater hop smoke passed: 1.3.3 -> 1.3.4"
+  },
+  "publicAssets": [
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-native-sources.tar.gz",
+      "bytes": 564376600,
+      "sha256": "7c3c3a69dd26e33832355d65a06cac09bdc03c9e622e7ddca19ab678d167d975"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-native-sources.tar.gz.json",
+      "bytes": 204,
+      "sha256": "bf7a7aacc5e2cf39a4f8dda9ca78ad4d1ab7d3abdaea07bd18b00e7cbb4d7d3c"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-sources.tar.gz",
+      "bytes": 57809753,
+      "sha256": "f8bc1fb0f4d297c49d8aec9b71b0d69e37114ebafe1608b6f2fba5f299c81e8d"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-sources.tar.gz.json",
+      "bytes": 218,
+      "sha256": "c54f2024ef4587adefaf1ac142d031abec17ca39d6d08eca64f89cc9db77eef5"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-macos-aarch64-sources.tar.gz",
+      "bytes": 48549121,
+      "sha256": "b99cdddad396c0323e9819ef2d4ec4a0250d22e2533b1e924f1133c67fbb056a"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-macos-aarch64-sources.tar.gz.json",
+      "bytes": 220,
+      "sha256": "3d0770af71f0af912f023a7e792bc4e6721431d3a593f6c31918c9e927e10a6f"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-windows-x86_64-sources.tar.gz",
+      "bytes": 79637260,
+      "sha256": "e05a3b79b2b5b0fa83dd2241bad2a4e5178ebf79934e00cd47533dd2356eb58f"
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-windows-x86_64-sources.tar.gz.json",
+      "bytes": 222,
+      "sha256": "45c0874922cb12d14d59879b405250b16d60979e9715d3c96c1b3261a1f207ce"
+    },
+    {
+      "name": "ASCII.VJ.Remix-1.3.4-1.x86_64.rpm",
+      "bytes": 75768155,
+      "sha256": "c4591f3cb5794675668516093d5ddc7c53a14c0e828f4ae8a8c00d150b280697"
+    },
+    {
+      "name": "ASCII.VJ.Remix-1.3.4-1.x86_64.rpm.sig",
+      "bytes": 424,
+      "sha256": "a2fa589cc6b47b7acfb44fde9fd1ca5baeb4238dc5022cdad35b068c4458bc62"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz",
+      "bytes": 71771623,
+      "sha256": "336cbf11ec7bb1f38f6d1f1138068a45749e964b82d7a91120712bbd194c0e9b"
+    },
+    {
+      "name": "ASCII.VJ.Remix.app.tar.gz.sig",
+      "bytes": 416,
+      "sha256": "0eb97abe36211581643f351c35deb503d51e435b4c5aa911162405c521d92e55"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_aarch64.dmg",
+      "bytes": 71508756,
+      "sha256": "cdd118c3a967a426d4ce0e43bc684188d2b486c3080ad852ce002ebc45d089b9"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_amd64.AppImage",
+      "bytes": 146946552,
+      "sha256": "9b2ad23abbe69739d1dcbcb659185a2ae1e3bc729d3c69f3717a852a688e6ce9"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_amd64.AppImage.sig",
+      "bytes": 428,
+      "sha256": "7c697d757d184c22344e23931d7af0b6f3f44841f5427da6a9fd23e5eb7598e6"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_amd64.deb",
+      "bytes": 75729046,
+      "sha256": "efd8737a4dd56656508b4f9d695373e6948b5c51562d121893ddb9451a210e20"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_amd64.deb.sig",
+      "bytes": 420,
+      "sha256": "67716c9eaaac61c84bbc0f5cc2acfffa54399a891f13257c64e15cd901ab79d5"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_x64-setup.exe",
+      "bytes": 59048018,
+      "sha256": "bbbec0b23f50e728bbc6556911f8732d04501a6627c0ee78b4fdbf0728ef8f9c"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_x64-setup.exe.sig",
+      "bytes": 428,
+      "sha256": "3c6f1a2859d5f4ecf51e9e626f2fb9ce97bbb16c974f4d1f3d940d0dcea759e1"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_x64_en-US.msi",
+      "bytes": 73743580,
+      "sha256": "0289b895e84c98ab5d3d9044f579d7901f0a79c1f245df32327924f963093d58"
+    },
+    {
+      "name": "ASCII.VJ.Remix_1.3.4_x64_en-US.msi.sig",
+      "bytes": 428,
+      "sha256": "841fb14cac4770d9fa0980ec9bd9f4e34462b1eda78f776f495291835ca00976"
+    },
+    {
+      "name": "latest.json",
+      "bytes": 5488,
+      "sha256": "af0469f05e3eb907155a45d7baabc3ad00bd9ded1a42295c708bf747fefcf499"
+    }
+  ],
+  "publicSourceVerification": [
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-native-sources.tar.gz",
+      "files": 433
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-linux-x86_64-sources.tar.gz",
+      "files": 21527
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-macos-aarch64-sources.tar.gz",
+      "files": 18187
+    },
+    {
+      "name": "ascii-vj-remix-1.3.4-windows-x86_64-sources.tar.gz",
+      "files": 18508
+    }
+  ],
+  "publicFeed": {
+    "platforms": [
+      "darwin-aarch64",
+      "darwin-aarch64-app",
+      "linux-x86_64",
+      "linux-x86_64-appimage",
+      "linux-x86_64-deb",
+      "linux-x86_64-rpm",
+      "windows-x86_64",
+      "windows-x86_64-msi",
+      "windows-x86_64-nsis"
+    ],
+    "signedPackages": 6
+  },
+  "localMac": {
+    "from": "1.3.3",
+    "to": "1.3.4",
+    "limitBytesPerSecond": 1638400,
+    "interruption": {
+      "elapsedSeconds": 5.9,
+      "tlsBytes": 5246822,
+      "status": 1,
+      "installed": false
+    },
+    "retry": {
+      "elapsedSeconds": 97.8,
+      "downloadedBytes": 71771623,
+      "status": 0,
+      "installed": true
+    },
+    "launch": {
+      "ok": true,
+      "version": "1.3.4"
+    },
+    "dmg": {
+      "name": "ASCII.VJ.Remix_1.3.4_aarch64.dmg",
+      "bytes": 71508756,
+      "digest": "sha256:cdd118c3a967a426d4ce0e43bc684188d2b486c3080ad852ce002ebc45d089b9",
+      "signature": "Developer ID",
+      "notarizationTicket": "stapled",
+      "gatekeeper": "accepted",
+      "version": "1.3.4",
+      "bundleId": "com.asciline.remix",
+      "sameDesignatedRequirement": true
+    }
+  },
+  "packagedMacDebug": {
+    "rendererChecks": [
+      "app ready",
+      "image WebGPU frames",
+      "transient failure resumes on same renderer",
+      "persistent failure rebuilds WebGPU",
+      "second failure falls back and paints",
+      "video WebGPU frames",
+      "incoming WebGPU ready",
+      "shared-device loss recovers video after crossfade",
+      "native window restored and video plays",
+      "image WebGPU frames",
+      "recovery in flight",
+      "stale recovery discarded after backend switch",
+      "image WebGPU frames",
+      "Canvas paints when both GPU paths fail"
+    ],
+    "physicalSleep": {
+      "gapMilliseconds": 33640,
+      "before": {
+        "backend": "webgpu",
+        "ended": false,
+        "failure": null,
+        "frames": 34,
+        "loop": true,
+        "paused": false,
+        "readyState": 4,
+        "requested": "webgpu",
+        "running": true,
+        "sameSource": true,
+        "time": 0.685619083,
+        "visibility": "visible"
+      },
+      "afterForeground": {
+        "backend": "webgpu",
+        "ended": false,
+        "failure": null,
+        "frames": 446,
+        "loop": true,
+        "paused": false,
+        "readyState": 4,
+        "requested": "webgpu",
+        "running": true,
+        "sameSource": true,
+        "time": 9.65366295831449,
+        "visibility": "visible"
+      }
+    }
+  }
+}
